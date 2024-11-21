@@ -1,60 +1,64 @@
-{% extends "webadmin/base.html" %}
-{% load i18n %}
-{% load static %}
+{% extends "webadmin/base.html" %} {% load i18n %} {% load static %} {% block
+title %}Workflows Database{% endblock %} {% block link %} {{ block.super }}
+<link
+  rel="stylesheet"
+  type="text/css"
+  href="{% static 'omero-boost/css/database_pages.css' %}"
+/>
+{% endblock %} {% block script %} {{ block.super }}
+<script
+  src="{% static 'webclient/javascript/jquery.infieldlabel-0.1.js' %}"
+  type="text/javascript"
+></script>
+<script>
+  $(document).ready(function () {
+    var METABASE_SITE_URL = "{{ metabase_site_url }}";
+    var token = "{{ metabase_token }}";
+    var refreshInterval = 20; // Set the refresh interval to 20 seconds
+    var iframeUrl =
+      METABASE_SITE_URL +
+      "/embed/dashboard/" +
+      token +
+      "#bordered=true&titled=true&refresh=" +
+      refreshInterval;
 
-{% block title %}Workflows Database{% endblock %}
+    var iframe = $("<iframe>", {
+      src: iframeUrl,
+      frameborder: 0,
+    });
 
-{% block link %}
-    {{ block.super }}
-    <link rel="stylesheet" type="text/css" href="{% static 'databasepages/css/database_pages.css' %}">
-{% endblock %}
+    $("#metabase-dashboard").append(iframe);
 
-{% block script %}
-    {{ block.super }}
-    <script src="{% static 'webclient/javascript/jquery.infieldlabel-0.1.js' %}" type="text/javascript"></script>
-    <script>
-        $(document).ready(function(){
-            var METABASE_SITE_URL = "{{ metabase_site_url }}";
-            var token = "{{ metabase_token }}";
-            var refreshInterval = 20; // Set the refresh interval to 20 seconds
-            var iframeUrl = METABASE_SITE_URL + "/embed/dashboard/" + token + "#bordered=true&titled=true&refresh=" + refreshInterval;
+    var loadTimeout = setTimeout(function () {
+      $("#metabase-dashboard").html(
+        '<div class="error">Error loading Metabase dashboard. Please try refreshing the page.</div>'
+      );
+    }, 30000); // 30 seconds timeout
 
-            var iframe = $('<iframe>', {
-                src: iframeUrl,
-                frameborder: 0
-            });
+    iframe.on("load", function () {
+      clearTimeout(loadTimeout);
+    });
 
-            $('#metabase-dashboard').append(iframe);
+    // Log admin status to console
+    console.log(
+      "User is " + "{% if is_admin %}an admin{% else %}not an admin{% endif %}"
+    );
+    console.log("Username: {{ user_name }}");
+    console.log("User ID: {{ user_id }}");
+  });
+</script>
 
-            var loadTimeout = setTimeout(function() {
-                $('#metabase-dashboard').html('<div class="error">Error loading Metabase dashboard. Please try refreshing the page.</div>');
-            }, 30000); // 30 seconds timeout
+<!-- keep-alive ping so that OMERO session doesn't die -->
+{% include "webclient/base/includes/ping.html" %} {% endblock %} {% block
+content %} {{ block.super }}
 
-            iframe.on('load', function() {
-                clearTimeout(loadTimeout);
-            });
-
-            // Log admin status to console
-            console.log("User is " + "{% if is_admin %}an admin{% else %}not an admin{% endif %}");
-            console.log("Username: {{ user_name }}");
-            console.log("User ID: {{ user_id }}");
-        });
-    </script>
-
-    <!-- keep-alive ping so that OMERO session doesn't die -->
-    {% include "webclient/base/includes/ping.html" %}
-{% endblock %}
-
-{% block content %}
-    {{ block.super }}
-
-    <div class="bottom-message">
-        {% if is_admin %}
-            <a href="{{ metabase_site_url|add:'/' }}" target="_blank">Click here to access the Metabase interface</a>
-        {% endif %}
-    </div>
-{% endblock %}
-
-{% block center_details %}
-    <div id="metabase-dashboard"></div>
+<div class="bottom-message">
+  {% if is_admin %}
+  <a href="{{ metabase_site_url|add:'/' }}" target="_blank"
+    >Click here to access the Metabase interface</a
+  >
+  {% endif %}
+</div>
+{% endblock %} {% block center_details %}
+<div id="metabase-dashboard"></div>
 {% endblock %}
