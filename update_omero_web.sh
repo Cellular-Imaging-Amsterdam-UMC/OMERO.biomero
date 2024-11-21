@@ -16,9 +16,9 @@ COMMAND2="/opt/omero/web/venv3/bin/omero-boost-setup"
 COMMAND3="/opt/omero/web/venv3/bin/omero web stop"
 COMMAND4="/opt/omero/web/omero-boost/startup.sh"
 
-# docker exec --user root "$CONTAINER_NAME" sh -c "$COMMAND0"
-# docker exec --user root "$CONTAINER_NAME" sh -c "$COMMAND1"
-# docker exec --user root "$CONTAINER_NAME" sh -c "$COMMAND2"
+docker exec --user root "$CONTAINER_NAME" sh -c "$COMMAND0"
+docker exec --user root "$CONTAINER_NAME" sh -c "$COMMAND1"
+docker exec --user root "$CONTAINER_NAME" sh -c "$COMMAND2"
 # docker exec --user omero-web "$CONTAINER_NAME" sh -c "$COMMAND3"
 # docker exec --user omero-web "$CONTAINER_NAME" sh -c "$COMMAND4"
 

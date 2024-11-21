@@ -2,62 +2,35 @@
 <!-- Bootstrap Icons CSS -->
 <link
   rel="stylesheet"
-  href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css"
-/>
-<!-- Custom CSS -->
-<link
-  rel="stylesheet"
-  type="text/css"
-  href="{% static 'omero-boost/css/server_side_browser.css' %}"
+  href="{% static 'omero_boost/assets/static/css/main.f855e6bc.css' %}"
 />
 {% endblock %} {% block script %} {{ block.super }}
 
-<!-- Bootstrap JS -->
-<script
-  src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"
-  integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV"
-  crossorigin="anonymous"
-></script>
-
-<!-- Custom JS -->
-<script src="{% static 'omero-boost/js/server_side_browser.js' %}"></script>
-
 <!-- keep-alive ping so that OMERO session doesn't die -->
 {% include "webclient/base/includes/ping.html" %} {% endblock %} {% block content %} {{ block.super }} {% csrf_token %}
-<div class="database-pages-browser">Hello there!
-  <div class="container-fluid d-flex flex-column" id="main-container">
-    <!-- File Browser Section -->
-    <div id="file-browser-section" class="flex-grow-1">
-      <div id="columns"></div>
-    </div>
-
-    <!-- Movable Separator -->
-    <div id="separator" class="position-relative">
-      <!-- Separator Line -->
-      <div id="separator-line"></div>
-
-      <!-- Import Selected Button -->
-      <button id="import-button" class="btn btn-primary">
-        <i class="bi bi-cloud-upload"></i>
-        Import Selected
-      </button>
-
-      <!-- Separator Handle -->
-      <div id="separator-handle">
-        <button id="separator-button" class="btn btn-light border border-dark">
-          <i class="bi bi-arrow-up"></i>
-          <i class="bi bi-arrow-down"></i>
-        </button>
-      </div>
-
-      <!-- Clear Selection Button -->
-      <button id="clear-button" class="btn btn-danger">Clear Selection</button>
-    </div>
-
-    <!-- Selected Items List -->
-    <div id="selected-items-section">
-      <!-- This will be populated dynamically -->
-    </div>
-  </div>
-</div>
+<noscript>You need to enable JavaScript to run this app.</noscript>
+<div id="root"></div>
+<!-- React's JavaScript -->
+<script src="{% static 'omero_boost/assets/static/js/main.d07e1296.js' %}"></script>
 {% endblock %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>React in Django</title>
+    {% load static %}
+    <!-- React's CSS -->
+    <link
+      rel="stylesheet"
+      href="{% static 'omero_boost/assets/static/css/main.f855e6bc.css' %}"
+    />
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <!-- React's JavaScript -->
+    <script src="{% static 'omero_boost/assets/static/js/main.d07e1296.js' %}"></script>
+  </body>
+</html>
