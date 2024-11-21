@@ -1,5 +1,4 @@
-{% extends "webadmin/base.html" %} {% load i18n %} {% load static %} {% block
-title %}Server Side Browser{% endblock %} {% block link %} {{ block.super }}
+{% extends "webadmin/base.html" %} {% load i18n %} {% load static %} {% block title %}Server Side Browser{% endblock %} {% block link %} {{ block.super }}
 <!-- Bootstrap Icons CSS -->
 <link
   rel="stylesheet"
@@ -24,9 +23,8 @@ title %}Server Side Browser{% endblock %} {% block link %} {{ block.super }}
 <script src="{% static 'omero-boost/js/server_side_browser.js' %}"></script>
 
 <!-- keep-alive ping so that OMERO session doesn't die -->
-{% include "webclient/base/includes/ping.html" %} {% endblock %} {% block
-content %} {{ block.super }} {% csrf_token %}
-<div class="database-pages-browser">
+{% include "webclient/base/includes/ping.html" %} {% endblock %} {% block content %} {{ block.super }} {% csrf_token %}
+<div class="database-pages-browser">Hello there!
   <div class="container-fluid d-flex flex-column" id="main-container">
     <!-- File Browser Section -->
     <div id="file-browser-section" class="flex-grow-1">

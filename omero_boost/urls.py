@@ -4,22 +4,24 @@ from django.urls import path, re_path
 from . import views
 
 urlpatterns = [
-    # Import page URLs
-    path("server_side_browser/", views.omero_boost_upload, name="omero_boost_upload"),
+    # API URLs
     path("api/list_dir/", views.list_directory, name="list_directory"),
     path("api/file_info/", views.file_info, name="file_info"),
     path("api/import_selected/", views.import_selected, name="import_selected"),
-    # Database page URLs
+
+    # Webclient URLs
+    path("upload/", views.omero_boost_upload, name="omero_boost_upload"),
     path(
-        "imports/",
+        "monitor_uploads/",
         views.omero_boost_monitor_uploads,
         name="omero_boost_monitor_uploads",
     ),
     path(
-        "workflows/",
+        "monitor_workflows/",
         views.omero_boost_monitor_workflows,
         name="omero_boost_monitor_workflows",
     ),
+    
     # Webclient templates and script menu
     re_path(
         r"^webclient_templates/(?P<base_template>[a-z0-9_]+)/",

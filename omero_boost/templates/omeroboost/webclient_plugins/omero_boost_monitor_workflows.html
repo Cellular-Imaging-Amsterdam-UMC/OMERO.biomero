@@ -1,5 +1,4 @@
-{% extends "webadmin/base.html" %} {% load i18n %} {% load static %} {% block
-title %}Workflows Database{% endblock %} {% block link %} {{ block.super }}
+{% extends "webadmin/base.html" %} {% load i18n %} {% load static %} {% block title %}Workflows Database{% endblock %} {% block link %} {{ block.super }}
 <link
   rel="stylesheet"
   type="text/css"
@@ -49,8 +48,7 @@ title %}Workflows Database{% endblock %} {% block link %} {{ block.super }}
 </script>
 
 <!-- keep-alive ping so that OMERO session doesn't die -->
-{% include "webclient/base/includes/ping.html" %} {% endblock %} {% block
-content %} {{ block.super }}
+{% include "webclient/base/includes/ping.html" %} {% endblock %} {% block content %} {{ block.super }}
 
 <div class="bottom-message">
   {% if is_admin %}

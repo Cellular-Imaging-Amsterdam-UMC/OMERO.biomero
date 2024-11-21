@@ -2,6 +2,6 @@
 
 # Left Header Links
 config append -- omero.web.apps '"omero_boost"'
-config append -- omero.web.ui.top_links '["New Import", "omero_boost_upload", {"title": "Upload files to Omero"}]'
-config append -- omero.web.ui.top_links '["Import History", "omero_boost_monitor_uploads", {"title": "Monitor your upload status and history"}]'
+config append -- omero.web.ui.top_links '["Upload", "omero_boost_upload", {"title": "Upload files to Omero"}]'
+config append -- omero.web.ui.top_links '["aaa", "omero_boost_monitor_uploads", {"title": "Monitor your upload status and history"}]'
 config append -- omero.web.ui.top_links '["Workflows", "omero_boost_monitor_workflows", {"title": "Monitor your workflows status and history"}]'
