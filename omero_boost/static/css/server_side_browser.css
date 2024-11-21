@@ -1,0 +1,213 @@
+.database-pages-browser #columns {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    height: 70vh;
+}
+
+.database-pages-browser .column {
+    min-width: 300px;
+    max-width: 500px;
+    border-right: 1px solid #000;
+    overflow-y: auto;
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
+.database-pages-browser .column:last-child {
+    border-right: none;
+}
+
+.database-pages-browser .column ul {
+    list-style-type: none;
+    padding: 0 5px;
+    margin: 0;
+    width:100%;
+    box-sizing: border-box;
+}
+
+.database-pages-browser .column li {
+    padding: 8px 12px !important;
+    margin: 4px 0 !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    width: calc(100% - 8px) !important;  /* Adjust width accounting for margins */
+    box-sizing: border-box !important;
+    white-space: nowrap !important;       /* Prevent text wrapping */
+    overflow: hidden !important;          /* Hide overflow */
+    text-overflow: ellipsis !important;   /* Add ellipsis for overflow */
+}
+
+.database-pages-browser .column li:hover {
+    background-color: #f0f0f0;
+}
+
+.database-pages-browser .directory-name {
+    font-weight: bold !important;
+    color: #2c2c2c !important;
+    /* font-size: 1.1rem !important; */
+    }
+
+.database-pages-browser .column li.selected {
+    background-color: #d0e0ff !important;
+    border-radius: 5px !important;
+}
+
+/* .database-pages-browser .bi { */
+    /* font-size: 1.2rem !important; */
+    /* margin-right: 8px !important;
+} */
+
+/* Main container styles */
+.database-pages-browser #main-container {
+    height: 100%;  /* Changed from 100vh */
+    position: relative;
+}
+
+/* Add these styles at the top */
+.database-pages-browser {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.database-pages-browser #file-browser-section {
+    overflow: hidden;
+    height: 70%;
+}
+
+.database-pages-browser #selected-items-section {
+    overflow-y: auto;
+    height: 30%;
+    padding-top: 15px;
+    background-color: transparent;
+}
+
+/* Separator styles */
+.database-pages-browser #separator {
+    height: 20px;
+    position: relative;
+    background-color: transparent;
+    z-index: 100;
+}
+
+.database-pages-browser #separator-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 2px;
+    background-color: #000;
+    transform: translateY(-50%);
+}
+
+.database-pages-browser #separator-handle {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 101;
+}
+
+.database-pages-browser #separator-button {
+    padding: 2px 8px;
+    height: 20px;
+    font-size: 0.8rem;
+    line-height: 1;
+    border: 1px solid #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #ffffff;
+}
+
+.database-pages-browser #import-button,
+.database-pages-browser #clear-button {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 101;
+    padding: 8px 16px;
+    background-color: #ffffff;
+}
+
+.database-pages-browser #import-button {
+    left: 10px;
+}
+
+.database-pages-browser #import-button .bi-cloud-upload {
+    color: #28a745;
+    margin-right: 5px;
+}
+
+.database-pages-browser #clear-button {
+    right: 10px;
+}
+
+/* Selected items list styles */
+.database-pages-browser #selected-items-section ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.database-pages-browser #selected-items-section li {
+    padding: 8px 12px !important;
+    border-bottom: 2px solid #ccc !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background-color: #ffffff !important;
+    width: calc(100% - 6px) !important; /* Adjusted width to account for margins */
+    box-sizing: border-box !important;
+    margin: 0 3px !important;
+    overflow: hidden !important;
+    position: relative !important;
+    cursor: pointer !important;
+    transition: background-color 0.3s, border-width 0.3s, font-weight 0.3s, color 0.3s, height 0.3s, padding 0.3s, max-height 0.3s !important;
+    font-weight: bold !important;
+    border-radius: 5px;
+}
+
+.database-pages-browser #selected-items-section li .file-info {
+    display: flex !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    flex-grow: 1 !important;
+    padding-right: 16px !important;
+    width: 100% !important;
+    overflow: hidden !important;
+}
+
+.database-pages-browser #selected-items-section li .file-path {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    margin-right: 16px !important;
+    flex: 1 !important;
+}
+
+.database-pages-browser #selected-items-section li .file-details {
+    white-space: nowrap !important;
+    color: #666 !important;
+    flex-shrink: 0 !important;
+    margin-right: 16px !important;
+}
+
+.database-pages-browser #selected-items-section li .remove-item {
+    cursor: pointer;
+    color: #dc3545;
+}
+
+.database-pages-browser #selected-items-section li:hover {
+    background-color: #f0f0f0;
+}
+
+.database-pages-browser .column li.active-directory {
+    border: 2px solid #000000 !important;
+    border-radius: 5px !important;
+    background-color: #ffffff !important;
+}
+
