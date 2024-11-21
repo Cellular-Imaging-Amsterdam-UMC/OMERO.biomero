@@ -2,9 +2,6 @@
 
 # Left Header Links
 config append -- omero.web.apps '"omero_boost"'
-config append -- omero.web.ui.top_links '["New Import", "server_side_browser_page", {"title": "Choose data to import"}]'
-config append -- omero.web.ui.top_links '["Import History", "imports_database_page", {"title": "Browse your imports status and history"}]'
-config append -- omero.web.ui.top_links '["Workflows", "workflows_database_page", {"title": "Browse your workflows status and history"}]'
-
-# Script Menu Widget
-config append -- omero.web.ui.right_plugins '["", "omeroboost/webclient_plugins/script_menu_widget.html", "scripts menu"]'
+config append -- omero.web.ui.top_links '["New Import", "omero_boost_upload", {"title": "Upload files to Omero"}]'
+config append -- omero.web.ui.top_links '["Import History", "omero_boost_monitor_uploads", {"title": "Monitor your upload status and history"}]'
+config append -- omero.web.ui.top_links '["Workflows", "omero_boost_monitor_workflows", {"title": "Monitor your workflows status and history"}]'
