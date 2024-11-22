@@ -1,36 +1,27 @@
-{% extends "webadmin/base.html" %} {% load i18n %} {% load static %} {% block title %}Server Side Browser{% endblock %} {% block link %} {{ block.super }}
-<!-- Bootstrap Icons CSS -->
-<link
-  rel="stylesheet"
-  href="{% static 'omero_boost/assets/static/css/main.f855e6bc.css' %}"
-/>
-{% endblock %} {% block script %} {{ block.super }}
+{% extends "webadmin/base.html" %} {% load i18n %} {% load static %} 
 
-<!-- keep-alive ping so that OMERO session doesn't die -->
-{% include "webclient/base/includes/ping.html" %} {% endblock %} {% block content %} {{ block.super }} {% csrf_token %}
-<noscript>You need to enable JavaScript to run this app.</noscript>
-<div id="root"></div>
-<!-- React's JavaScript -->
-<script src="{% static 'omero_boost/assets/static/js/main.d07e1296.js' %}"></script>
+{% block title %}
+  Server Side Browser
+{% endblock %} 
+
+{% block link %}
+  {{ block.super }}
+  <link
+    rel="stylesheet"
+    href="{% static main_css %}"
+  />
+{% endblock %} 
+
+{% block script %} 
+  {{ block.super }}
+  <!-- keep-alive ping so that OMERO session doesn't die -->
+  {% include "webclient/base/includes/ping.html" %} 
+  <script src="{% static main_js %}"></script>
 {% endblock %}
-
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>React in Django</title>
-    {% load static %}
-    <!-- React's CSS -->
-    <link
-      rel="stylesheet"
-      href="{% static 'omero_boost/assets/static/css/main.f855e6bc.css' %}"
-    />
-  </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-    <!-- React's JavaScript -->
-    <script src="{% static 'omero_boost/assets/static/js/main.d07e1296.js' %}"></script>
-  </body>
-</html>
+{% block center_details %} {% endblock %}
+{% block content %} 
+  {{ block.super }} 
+  {% csrf_token %}
+  <noscript>You need to enable JavaScript to run this app.</noscript>
+  <div id="root"></div>
+{% endblock %}

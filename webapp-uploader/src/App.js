@@ -1,25 +1,20 @@
-import logo from './logo.svg';
-import './App.css';
+import FileTree from "./FileTree";
+import { useAppContext } from "./AppContext";
 
-function App() {
+const App = () => {
+  const { state, updateState } = useAppContext();
+  console.log(state);
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="bg-[#d5d9dd] w-full h-full absolute top-0">
+      <div className="flex space-x-4">
+        <div className="w-1/4 bg-red-300">
+          <FileTree />
+        </div>
+        <div className="w-1/2 bg-green-300">50% Width</div>
+        <div className="w-1/4 bg-blue-300">25% Width</div>
+      </div>
     </div>
   );
-}
+};
 
 export default App;

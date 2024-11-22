@@ -12,7 +12,7 @@ from django.conf import settings
 from omeroweb.webclient.decorators import login_required, render_response
 from omero.gateway import BlitzGateway
 from omero.rtypes import unwrap
-
+from .utils import get_react_build_file
 logger = logging.getLogger(__name__)
 
 
@@ -130,6 +130,8 @@ def omero_boost_upload(request, conn=None, **kwargs):
         "user_id": user_id,
         "is_admin": is_admin,
         "base_dir": os.path.basename(BASE_DIR),
+        'main_js': get_react_build_file('main.js'),
+        'main_css': get_react_build_file('main.css'),
     }
     return context
 
