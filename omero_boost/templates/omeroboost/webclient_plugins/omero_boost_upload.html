@@ -7,10 +7,10 @@
 
 {% block link %}
   {{ block.super }}
-  <link
+  <!-- <link
     rel="stylesheet"
     href="{% static main_css %}"
-  />
+  /> -->
 {% endblock %} 
 
 {% block script %} 
@@ -19,7 +19,6 @@
   {% include "webclient/base/includes/ping.html" %} 
   <script src="{% static main_js %}"></script>
   <script>
-    console.log("Hellowwwww");
     // OMERO constants
     if (OMERO === undefined) {var OMERO = {};}
     OMERO['constants'] = {

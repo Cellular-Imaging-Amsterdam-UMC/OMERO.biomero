@@ -18,15 +18,16 @@ module.exports = {
       publicPath: "/omero_boost/assets/",
     }),
     new WebpackShellPluginNext({
-      onBuildEnd: {
-        scripts: ["bash ../omero-update.sh"], // Replace with your Bash command
-        blocking: false,
-        parallel: false,
-      },
       onAfterDone: {
         scripts: ["bash ../omero-update.sh"], // Run on every rebuild during watch
         blocking: false,
         parallel: false,
+      },
+      onBuildStart: {
+        scripts: [
+          "rm -rf ../omero_boost/static/omero_boost/assets/*",
+          "echo 'Cleaning up'",
+        ],
       },
     }),
   ],

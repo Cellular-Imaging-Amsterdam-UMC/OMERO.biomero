@@ -3,14 +3,11 @@ import FileTree from "./FileTree";
 import { useAppContext } from "./AppContext";
 
 const App = () => {
-  const { loadTreeData, loading, error } = useAppContext();
+  const { loadomeroTreeData } = useAppContext();
 
   useEffect(() => {
-    loadTreeData(); // Load tree data on component mount
+    loadomeroTreeData(); // Load tree data on component mount
   }, []);
-
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p>Error: {error}</p>;
 
   return (
     <div className="bg-[#d5d9dd] w-full h-full absolute top-0">

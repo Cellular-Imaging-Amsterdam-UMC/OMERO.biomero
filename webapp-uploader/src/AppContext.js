@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState } from "react";
-import { fetchTreeData } from "./apiService";
+import { fetchomeroTreeData } from "./apiService";
 import { getDjangoConstants } from "./constants";
+import {transformStructure} from "./utils";
+
 // Create the context
 const AppContext = createContext();
 
@@ -10,20 +12,19 @@ export const AppProvider = ({ children }) => {
   const [state, setState] = useState({
     user,
     urls,
-    treeData: null,
+    omeroTreeData: null,
   });
 
   const [apiLoading, setLoading] = useState(false);
   const [apiError, setError] = useState(null);
 
   // Fetch tree data and update context state
-  const loadTreeData = async () => {
+  const loadomeroTreeData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const treeData = await fetchTreeData();
-      updateState({ treeData: treeData });
-      console.log("Tree data loaded:", treeData);
+      const omeroTreeData = await fetchomeroTreeData();
+      updateState({ omeroTreeData: transformStructure(omeroTreeData) });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -37,7 +38,7 @@ export const AppProvider = ({ children }) => {
 
   return (
     <AppContext.Provider
-      value={{ state, updateState, loadTreeData, apiLoading, apiError }}
+      value={{ state, updateState, loadomeroTreeData, apiLoading, apiError }}
     >
       {children}
     </AppContext.Provider>
