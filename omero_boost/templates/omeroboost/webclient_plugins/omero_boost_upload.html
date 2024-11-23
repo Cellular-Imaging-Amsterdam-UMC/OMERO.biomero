@@ -1,4 +1,5 @@
 {% extends "webadmin/base.html" %} {% load i18n %} {% load static %} 
+{% load common_filters %}
 
 {% block title %}
   Server Side Browser
@@ -17,8 +18,80 @@
   <!-- keep-alive ping so that OMERO session doesn't die -->
   {% include "webclient/base/includes/ping.html" %} 
   <script src="{% static main_js %}"></script>
+  <script>
+    console.log("Hellowwwww");
+    // OMERO constants
+    if (OMERO === undefined) {var OMERO = {};}
+    OMERO['constants'] = {
+        'namespaces': {
+            'NSCOMPANIONFILE': "{{ omero.constants.NSCOMPANIONFILE }}"
+        },
+        'annotation': {
+            'file': {'ORIGINALMETADATA': "{{ omero.constants.ORIGINALMETADATA }}"}
+        },
+        'metadata': {
+            'NSCLIENTMAPANNOTATION': "{{ omero.constants.NSCLIENTMAPANNOTATION }}"
+        }
+    };
+
+    // Variables used by static files, particularly ome.tree.js for jstree setup
+    // Also used by right panel annotation tabs
+    var WEBCLIENT = {};
+
+    WEBCLIENT.USER = {'id': {{ ome.user.id }}, 'fullName': "{{ ome.user.getFullName }}"};
+    WEBCLIENT.active_user = {'id': {{ ome.active_user }}, 'fullName': "{{ active_user.getFullName }}"};
+    WEBCLIENT.member_of_groups = {{ member_of_groups|json_dumps|safe }};
+    WEBCLIENT.isAdmin = {% if ome.user.isAdmin %}true{% else %}false{% endif %};
+    WEBCLIENT.CAN_CREATE = {{ ome.can_create|json_dumps|safe }};
+    WEBCLIENT.current_admin_privileges = {{ current_admin_privileges|json_dumps|safe }};
+    WEBCLIENT.leader_of_groups = {{ leader_of_groups|json_dumps|safe }};
+
+    WEBCLIENT.URLS = {};
+    WEBCLIENT.URLS.webindex = "{% url 'webindex' %}";
+    WEBCLIENT.URLS.api_paths_to_object = "{% url 'api_paths_to_object' %}";
+    WEBCLIENT.URLS.api_containers = "{% url 'api_containers' %}";
+    WEBCLIENT.URLS.api_datasets = "{% url 'api_datasets' %}";
+    WEBCLIENT.URLS.api_images = "{% url 'api_images' %}";
+    WEBCLIENT.URLS.api_plates = "{% url 'api_plates' %}";
+    WEBCLIENT.URLS.api_plate_acquisitions = "{% url 'api_plate_acquisitions' %}";
+    WEBCLIENT.URLS.api_base = "{% url 'api_base' 0 %}";
+    WEBCLIENT.URLS.static_webclient = "{% static 'webclient' %}/";
+    WEBCLIENT.URLS.static_webgateway = "{% static 'webgateway' %}/";
+    WEBCLIENT.URLS.api_tags_and_tagged = "{% url 'api_tags_and_tagged' %}";
+    WEBCLIENT.URLS.fileset_check = "{% url 'fileset_check' 'delete' %}";
+    WEBCLIENT.URLS.api_parent_links = "{% url 'api_parent_links' %}";
+    WEBCLIENT.URLS.deletemany = "{% url 'manage_action_containers' 'deletemany' %}";
+    WEBCLIENT.URLS.copy_image_rdef_json = "{% url 'copy_image_rdef_json' %}";
+    WEBCLIENT.URLS.reset_owners_rdef_json = "{% url 'reset_owners_rdef_json' %}";
+    WEBCLIENT.URLS.reset_rdef_json = "{% url 'reset_rdef_json' %}";
+    WEBCLIENT.URLS.script_upload = "{% url 'script_upload' %}";
+    // jsTree code in ome.tree.js and center panel code in center_plugin.thumbs.js.html uses initially_select
+    // instead of browser URL since URL may be /webclient/?path=plate.name-barcode|well.name-A1
+
+    WEBCLIENT.initially_select = {{ initially_select|json_dumps|safe }};
+    WEBCLIENT.initially_open = {{ initially_open|json_dumps|safe }};
+
+    {% if menu == 'usertags' %}
+        WEBCLIENT.TAG_TREE = true;
+        WEBCLIENT.URLS.tree_top_level = WEBCLIENT.URLS.api_tags_and_tagged;
+    {% else %}
+        WEBCLIENT.URLS.tree_top_level = WEBCLIENT.URLS.api_containers;
+    {% endif %}
+
+    WEBCLIENT.URLS.api_experimenter = "{% url 'api_experimenter' ome.active_user %}";
+
+    WEBCLIENT.UI = {};
+    WEBCLIENT.UI.TREE = {};
+    WEBCLIENT.UI.TREE.pagination_nodes = ["experimenter", "screen", "plate", "acquisition", "project", "tagset", "image"];
+    WEBCLIENT.UI.TREE.type_order = "{{ui.tree.type_order}}".toLowerCase().split(",").filter(function(e){return e});
+
+    {% if page_size %}
+        var PAGE_SIZE = {{ page_size }};
+    {% endif %}
+    window.WEBCLIENT = WEBCLIENT;
+    </script>
+
 {% endblock %}
-{% block center_details %} {% endblock %}
 {% block content %} 
   {{ block.super }} 
   {% csrf_token %}

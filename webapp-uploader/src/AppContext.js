@@ -1,21 +1,44 @@
 import React, { createContext, useContext, useState } from "react";
-
+import { fetchTreeData } from "./apiService";
+import { getDjangoConstants } from "./constants";
 // Create the context
 const AppContext = createContext();
 
 // Create a provider component
 export const AppProvider = ({ children }) => {
+  const { user, urls } = getDjangoConstants();
   const [state, setState] = useState({
-    user: null, // Example: User data
-    theme: "light", // Example: Theme setting
+    user,
+    urls,
+    treeData: null,
   });
+
+  const [apiLoading, setLoading] = useState(false);
+  const [apiError, setError] = useState(null);
+
+  // Fetch tree data and update context state
+  const loadTreeData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const treeData = await fetchTreeData();
+      updateState({ treeData: treeData });
+      console.log("Tree data loaded:", treeData);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Function to update the state (optional)
   const updateState = (newState) =>
     setState((prevState) => ({ ...prevState, ...newState }));
 
   return (
-    <AppContext.Provider value={{ state, updateState }}>
+    <AppContext.Provider
+      value={{ state, updateState, loadTreeData, apiLoading, apiError }}
+    >
       {children}
     </AppContext.Provider>
   );
