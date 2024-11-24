@@ -13,9 +13,9 @@ COMMAND2="/opt/omero/web/venv3/bin/omero-boost-setup"
 COMMAND3="/opt/omero/web/venv3/bin/omero web stop"
 COMMAND4="/opt/omero/web/omero-boost/startup.sh"
 
-# Monitor the directory for changes
+# Monitor for changes
 inotifywait -m -r -e close_write --format '%w%f' \
-  --exclude 'assets|webapp-uploader' "$WATCHED_DIR" |
+  --exclude './webapp-uploader(/.*)?' "$WATCHED_DIR" |
 while read FILE; do
   echo "File changed: $FILE"
 
