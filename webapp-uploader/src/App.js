@@ -12,11 +12,12 @@ const App = () => {
   return (
     <div className="bg-[#d5d9dd] w-full h-full absolute top-0">
       <div className="flex space-x-4">
-        <div className="w-1/4 bg-red-300">
+        <div className="w-1/4">
+          <h1 className="text-lg font-bold p-4 pb-0">OMERO Data</h1>
           <FileTree />
         </div>
-        <div className="w-1/2 bg-green-300">50% Width</div>
-        <div className="w-1/4 bg-blue-300">25% Width</div>
+        <div className="w-1/2"></div>
+        <div className="w-1/4"></div>
       </div>
     </div>
   );

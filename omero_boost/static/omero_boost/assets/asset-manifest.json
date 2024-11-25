@@ -1,3 +1,8 @@
 {
-  "main.js": "/omero_boost/assets/main.cbadb30dcabf9953eee0.js"
+  "main.js": "/omero_boost/assets/main.91f65b25bf981a2a81a8.js",
+  "blueprint-icons-all-paths-loader.js": "/omero_boost/assets/main.99b88f47c3dc9eb75048.js",
+  "blueprint-icons-split-paths-by-size-loader.js": "/omero_boost/assets/main.3995d9bd756d9763d978.js",
+  "blueprint-icons-all-paths.js": "/omero_boost/assets/main.e39238ecc515690d04d9.js",
+  "blueprint-icons-16px-paths.js": "/omero_boost/assets/main.5cf7b2ec8a125d43f592.js",
+  "blueprint-icons-20px-paths.js": "/omero_boost/assets/main.53ddefa33501c0727b4d.js"
 }
