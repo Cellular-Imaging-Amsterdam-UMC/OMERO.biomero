@@ -3,6 +3,7 @@ const { WebpackManifestPlugin } = require("webpack-manifest-plugin");
 const WebpackShellPluginNext = require("webpack-shell-plugin-next");
 
 module.exports = {
+  devtool: "source-map",
   entry: "./src/index.js",
   output: {
     path: path.resolve(__dirname, "../omero_boost/static/omero_boost/assets/"),
@@ -23,7 +24,7 @@ module.exports = {
         blocking: false,
         parallel: false,
       },
-      onBuildStart: {
+      onBeforeBuild: {
         scripts: [
           "rm -rf ../omero_boost/static/omero_boost/assets/*",
           "echo 'Cleaning up'",

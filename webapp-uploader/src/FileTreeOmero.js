@@ -70,9 +70,12 @@ const FileTree = () => {
     const hasCaret = item.isFolder;
     const isExpanded = expandedItems.includes(item.index);
     const isSelected = selectedItems.includes(item.index);
-    const iconName = isRoot ? "user" : isExpanded ? "folder-open" : "folder-close";
-    const icon = <Icon icon={iconName} size={18} />
-
+    const iconName = isRoot
+      ? "user"
+      : isExpanded
+      ? "folder-open"
+      : "folder-close";
+    const icon = <Icon icon={iconName} size={18} />;
 
     const childNodes = item.children
       ? item.children
@@ -125,9 +128,7 @@ const FileTree = () => {
     }
     setFocusedItem(item.index);
   };
-
   return (
-    // <div className="p-4 border rounded-md bg-gray-50">
     <div className="p-4">
       {treeNodes.length > 0 ? (
         <Tree

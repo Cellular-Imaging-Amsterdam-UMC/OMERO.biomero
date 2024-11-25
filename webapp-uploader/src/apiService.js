@@ -46,3 +46,14 @@ export const fetchProjectData = async (item) => {
   };
   return apiRequest(urls.api_datasets, "GET", null, { params });
 };
+
+export const fetchFolderData = async (folderId = null) => {
+  const { urls } = getDjangoConstants();
+  const params = {
+    folder_id: folderId,
+    page: 0,
+    group: 0,
+    _: new Date().getTime(),
+  };
+  return apiRequest(urls.api_local_file_browser, "GET", null, { params });
+};

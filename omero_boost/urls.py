@@ -11,6 +11,7 @@ urlpatterns = [
 
     # Webclient URLs
     path("upload/", views.omero_boost_upload, name="omero_boost_upload"),
+    path("local_file_browser/", views.LocalFileBrowserView.as_view(), name="local_file_browser"),
     path(
         "monitor_uploads/",
         views.omero_boost_monitor_uploads,
