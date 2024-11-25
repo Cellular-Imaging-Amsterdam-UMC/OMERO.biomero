@@ -10,7 +10,7 @@ const App = () => {
   }, []);
 
   return (
-    <div className="bg-[#d5d9dd] w-full h-full absolute top-0">
+    <div className="bg-[#f0f1f5] w-full h-full absolute top-0">
       <div className="flex space-x-4">
         <div className="w-1/4">
           <h1 className="text-lg font-bold p-4 pb-0">OMERO Data</h1>

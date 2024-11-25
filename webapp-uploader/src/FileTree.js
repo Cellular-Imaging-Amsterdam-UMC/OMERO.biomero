@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Tree, Icon, IconSize } from "@blueprintjs/core";
+import { Tree, Icon } from "@blueprintjs/core";
 import { useAppContext } from "./AppContext";
 import { fetchProjectData } from "./apiService";
 import "@blueprintjs/core/lib/css/blueprint.css";
@@ -65,11 +65,12 @@ const FileTree = () => {
     if (!state.omeroTreeData || !state.omeroTreeData[itemIndex]) return null;
 
     const item = state.omeroTreeData[itemIndex];
+    const isRoot = itemIndex === "root";
 
     const hasCaret = item.isFolder;
     const isExpanded = expandedItems.includes(item.index);
     const isSelected = selectedItems.includes(item.index);
-    const iconName = isExpanded ? "folder-open" : "folder-close";
+    const iconName = isRoot ? "user" : isExpanded ? "folder-open" : "folder-close";
     const icon = <Icon icon={iconName} size={18} />
 
 

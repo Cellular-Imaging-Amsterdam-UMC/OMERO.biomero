@@ -1,3 +1,4 @@
+// Description: Utility functions for the webapp-uploader
 export const transformStructure = (data) => {
   if (!data || Object.keys(data).length === 0) {
     return {
