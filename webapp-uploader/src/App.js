@@ -2,8 +2,6 @@ import React, { useEffect } from "react";
 import { useAppContext } from "./AppContext";
 import FileBrowser from "./FileBrowser";
 import OmeroDataBrowser from "./OmeroDataBrowser";
-import { Button, MenuItem } from "@blueprintjs/core";
-import { ItemPredicate, ItemRenderer, Select } from "@blueprintjs/select";
 import GroupSelect from "./GroupSelect";
 
 const App = () => {
