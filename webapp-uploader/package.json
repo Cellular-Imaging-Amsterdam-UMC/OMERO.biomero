@@ -5,6 +5,7 @@
   "private": true,
   "dependencies": {
     "@blueprintjs/core": "^5.15.0",
+    "@blueprintjs/select": "^5.3.4",
     "@mdi/js": "^7.4.47",
     "@mdi/react": "^1.6.1",
     "@testing-library/jest-dom": "^5.14.1",

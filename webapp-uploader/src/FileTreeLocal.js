@@ -10,7 +10,6 @@ const FileTree = () => {
   const [expandedItems, setExpandedItems] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
 
-  // Fetch folder contents dynamically and update the context state
   const fetchAndUpdateFolderData = async (folderId = null) => {
     try {
       const response = await fetchFolderData(folderId);
@@ -22,9 +21,9 @@ const FileTree = () => {
         acc[nodeId] = {
           index: nodeId,
           isFolder: item.is_folder,
-          children: [], // Initially empty; dynamically populated
-          data: item.name, // Node name or label
-          childCount: 0, // Default; updated dynamically
+          children: [],
+          data: item.name,
+          childCount: 0,
         };
         return acc;
       }, {});
@@ -84,8 +83,6 @@ const FileTree = () => {
 
     if (!expandedItems.includes(nodeId)) {
       setExpandedItems([...expandedItems, nodeId]);
-
-      // Check if the node is a folder and fetch children if not already fetched
       const node = state.folderData[nodeId];
       if (node?.isFolder && (!node.children || node.children.length === 0)) {
         await fetchAndUpdateFolderData(nodeId);

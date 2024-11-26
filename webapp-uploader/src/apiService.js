@@ -26,10 +26,10 @@ export const apiRequest = async (
 export const fetchomeroTreeData = async () => {
   const { user, urls } = getDjangoConstants();
   const params = {
-    id: 0,
+    id: user.active_user.id,
     experimenter_id: user.active_user.id,
     page: 0,
-    group: 0,
+    group: user.active_group_id,
     _: new Date().getTime(),
   };
   return apiRequest(urls.tree_top_level, "GET", null, { params });
@@ -37,22 +37,22 @@ export const fetchomeroTreeData = async () => {
 
 export const fetchProjectData = async (item) => {
   const projectId = item.id;
-  const { urls } = getDjangoConstants();
+  const { urls, user } = getDjangoConstants();
   const params = {
     id: projectId,
     page: 0,
-    group: 0,
+    group: user.active_group_id,
     _: new Date().getTime(),
   };
   return apiRequest(urls.api_datasets, "GET", null, { params });
 };
 
 export const fetchFolderData = async (folderId = null) => {
-  const { urls } = getDjangoConstants();
+  const { urls, user } = getDjangoConstants();
   const params = {
     folder_id: folderId,
     page: 0,
-    group: 0,
+    group: user.active_group_id,
     _: new Date().getTime(),
   };
   return apiRequest(urls.api_local_file_browser, "GET", null, { params });

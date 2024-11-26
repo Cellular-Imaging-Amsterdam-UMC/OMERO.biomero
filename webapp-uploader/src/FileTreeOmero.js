@@ -1,13 +1,12 @@
 import React, { useState, useMemo } from "react";
-import { Tree, Icon } from "@blueprintjs/core";
 import { useAppContext } from "./AppContext";
+import { Tree, Icon } from "@blueprintjs/core";
 import { fetchProjectData } from "./apiService";
 import "@blueprintjs/core/lib/css/blueprint.css";
 
 const FileTree = () => {
   const { state, updateState } = useAppContext();
 
-  const [focusedItem, setFocusedItem] = useState();
   const [expandedItems, setExpandedItems] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
 
@@ -104,10 +103,10 @@ const FileTree = () => {
   const handleNodeExpand = (nodeData) => {
     const item = nodeData.nodeData;
     if (!item) return;
-    if (!expandedItems.includes(item.index)) {
-      setExpandedItems([...expandedItems, item.index]);
-    }
     if (item.category === "projects" && item.childCount) {
+      if (!expandedItems.includes(item.index)) {
+        setExpandedItems([...expandedItems, item.index]);
+      }
       handleExpandItem(item);
     }
   };
@@ -126,8 +125,8 @@ const FileTree = () => {
     } else {
       setSelectedItems([...selectedItems, item.index]);
     }
-    setFocusedItem(item.index);
   };
+
   return (
     <div className="p-4">
       {treeNodes.length > 0 ? (

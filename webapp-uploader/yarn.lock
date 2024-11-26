@@ -1136,6 +1136,16 @@
     classnames "^2.3.1"
     tslib "~2.6.2"
 
+"@blueprintjs/select@^5.3.4":
+  version "5.3.4"
+  resolved "https://registry.yarnpkg.com/@blueprintjs/select/-/select-5.3.4.tgz#26a1743d09fab5423d1566b3e88a97c6218d0ae8"
+  integrity sha512-4vmG+Qe8nCGGeV10Rk8VtptcIUhfobpbJK05TcRns7Ehpze029eWhWsX3U97WxQGKZg2aKGLInNn8GeBjgi9vw==
+  dependencies:
+    "@blueprintjs/core" "^5.15.0"
+    "@blueprintjs/icons" "^5.14.0"
+    classnames "^2.3.1"
+    tslib "~2.6.2"
+
 "@csstools/normalize.css@*":
   version "12.1.1"
   resolved "https://registry.yarnpkg.com/@csstools/normalize.css/-/normalize.css-12.1.1.tgz#f0ad221b7280f3fc814689786fd9ee092776ef8f"

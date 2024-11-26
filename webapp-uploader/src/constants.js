@@ -8,6 +8,7 @@ export const getDjangoConstants = () => {
     CAN_CREATE: WEBCLIENT.CAN_CREATE,
     current_admin_privileges: WEBCLIENT.current_admin_privileges,
     leader_of_groups: WEBCLIENT.leader_of_groups,
+    active_group_id: WEBCLIENT.active_group_id,
   };
 
   const urls = {
@@ -33,7 +34,7 @@ export const getDjangoConstants = () => {
     initially_open: WEBCLIENT.initially_open,
     tree_top_level: WEBCLIENT.URLS.tree_top_level,
     api_experimenter: WEBCLIENT.URLS.api_experimenter,
-    api_local_file_browser: '/omero_boost/local_file_browser/',
+    api_local_file_browser: "/omero_boost/local_file_browser/",
   };
 
   return { user, urls };
