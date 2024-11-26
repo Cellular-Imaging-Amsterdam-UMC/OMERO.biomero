@@ -104,3 +104,16 @@ export const transformStructure = (data) => {
 
   return items;
 };
+
+export const extractGroups = (htmlContent) => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlContent, "text/html");
+
+  const groupElements = doc.querySelectorAll("ul#groupList li a[data-gid]");
+  const groups = Array.from(groupElements).map((el) => ({
+    id: parseInt(el.getAttribute("data-gid"), 10),
+    name: el.textContent.trim(),
+  }));
+
+  return Array.from(new Map(groups.map((group) => [group.id, group])).values());
+};

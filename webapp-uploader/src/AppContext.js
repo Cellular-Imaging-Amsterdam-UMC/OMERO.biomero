@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState } from "react";
-import { fetchomeroTreeData, fetchFolderData } from "./apiService";
+import { fetchomeroTreeData, fetchFolderData, fetchGroups } from "./apiService";
 import { getDjangoConstants } from "./constants";
-import { transformStructure } from "./utils";
+import { transformStructure, extractGroups } from "./utils";
 
 // Create the context
 const AppContext = createContext();
@@ -14,6 +14,8 @@ export const AppProvider = ({ children }) => {
     omeroTreeData: null,
     folderData: null,
   });
+
+  console.log("state", state);
 
   const [apiLoading, setLoading] = useState(false);
   const [apiError, setError] = useState(null);
@@ -78,6 +80,28 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const loadGroups = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const groupsHtml = await fetchGroups();
+      const groups = extractGroups(groupsHtml);
+      console.log("groups", groups);
+      // Add groups to user obj in state
+      setState((prevState) => ({
+        ...prevState,
+        user: {
+          ...prevState.user,
+          groups,
+        },
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Function to update the state (optional)
   const updateState = (newState) => {
     console.log("newState", newState);
@@ -91,6 +115,7 @@ export const AppProvider = ({ children }) => {
         updateState,
         loadomeroTreeData,
         loadFolderData,
+        loadGroups,
         apiLoading,
         apiError,
       }}

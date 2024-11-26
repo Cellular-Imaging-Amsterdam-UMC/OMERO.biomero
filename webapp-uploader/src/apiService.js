@@ -57,3 +57,8 @@ export const fetchFolderData = async (folderId = null) => {
   };
   return apiRequest(urls.api_local_file_browser, "GET", null, { params });
 };
+
+export const fetchGroups = async () => {
+  const { urls } = getDjangoConstants();
+  return apiRequest(urls.api_get_groups, "GET");
+};
