@@ -24,7 +24,7 @@ module.exports = {
         blocking: false,
         parallel: false,
       },
-      onBeforeBuild: {
+      onBeforeCompile: {
         scripts: [
           "rm -rf ../omero_boost/static/omero_boost/assets/*",
           "echo 'Cleaning up'",
