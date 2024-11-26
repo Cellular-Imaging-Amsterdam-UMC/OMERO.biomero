@@ -347,87 +347,40 @@ def workflows_webclient_templates(request, base_template, **kwargs):
 
 
 import os
-from django.conf import settings
 from django.http import JsonResponse, HttpResponseBadRequest
-from django.views import View
 from uuid import uuid4
 
 
-class LocalFileBrowserView(View):
+@login_required()
+@render_response()
+@require_http_methods(["GET"])
+def get_folder_contents(request, conn=None, **kwargs):
+    """
+    Handles the GET request to retrieve folder contents.
+    """
+    base_dir = "/tmp"  # Path to root folder from settings
 
-    # @login_required()
-    @render_response()
-    def get(self, request):
-        """
-        Handles the GET request to retrieve folder contents.
-        """
-        base_dir = "/tmp"  # Path to root folder from settings
+    # Extract the folder ID from the request
+    folder_id = request.GET.get("folder_id", None)
+    logger.info(f"Connection: {conn.getUser().getName()}")
 
-        # Extract the folder ID from the request
-        folder_id = request.GET.get("folder_id", None)
+    # Determine the target directory based on folder_id or default to the root folder
+    target_dir = base_dir if folder_id is None else os.path.join(base_dir, folder_id)
 
-        # Determine the target directory based on folder_id or default to the root folder
-        target_dir = (
-            base_dir if folder_id is None else os.path.join(base_dir, folder_id)
-        )
+    # Validate if the directory exists
+    if not os.path.exists(target_dir) or not os.path.isdir(target_dir):
+        return HttpResponseBadRequest("Invalid folder ID or path does not exist.")
 
-        # Validate if the directory exists
-        if not os.path.exists(target_dir) or not os.path.isdir(target_dir):
-            return HttpResponseBadRequest("Invalid folder ID or path does not exist.")
-
-        # Get the contents of the folder
-        contents = []
-        for item in os.listdir(target_dir):
-            item_path = os.path.join(target_dir, item)
-            contents.append(
-                {
-                    "name": item,
-                    "is_folder": os.path.isdir(item_path),
-                    "id": os.path.relpath(
-                        item_path, base_dir
-                    ),  # Use relative path as ID
-                }
-            )
-
-        return {"contents": contents, "folder_id": folder_id}
-
-    @login_required()
-    @render_response()
-    def post(self, request):
-        """
-        Handles the POST request to create a new folder.
-        """
-        base_dir = settings.ROOT_FOLDER  # Path to root folder from settings
-
-        # Extract the target folder ID and new folder name from the request
-        target_folder_id = request.POST.get("folder_id", "")
-        new_folder_name = request.POST.get("folder_name", "")
-
-        if not new_folder_name:
-            return HttpResponseBadRequest("Folder name is required.")
-
-        target_dir = (
-            base_dir
-            if not target_folder_id
-            else os.path.join(base_dir, target_folder_id)
-        )
-
-        # Validate target directory
-        if not os.path.exists(target_dir) or not os.path.isdir(target_dir):
-            return HttpResponseBadRequest(
-                "Invalid target folder ID or path does not exist."
-            )
-
-        # Create the new folder
-        new_folder_path = os.path.join(target_dir, new_folder_name)
-        try:
-            os.makedirs(new_folder_path, exist_ok=True)
-        except Exception as e:
-            return HttpResponseBadRequest(f"Failed to create folder: {str(e)}")
-
-        return JsonResponse(
+    # Get the contents of the folder
+    contents = []
+    for item in os.listdir(target_dir):
+        item_path = os.path.join(target_dir, item)
+        contents.append(
             {
-                "message": "Folder created successfully.",
-                "id": os.path.relpath(new_folder_path, base_dir),
+                "name": item,
+                "is_folder": os.path.isdir(item_path),
+                "id": os.path.relpath(item_path, base_dir),  # Use relative path as ID
             }
         )
+
+    return {"contents": contents, "folder_id": folder_id}

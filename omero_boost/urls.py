@@ -8,10 +8,13 @@ urlpatterns = [
     path("api/list_dir/", views.list_directory, name="list_directory"),
     path("api/file_info/", views.file_info, name="file_info"),
     path("api/import_selected/", views.import_selected, name="import_selected"),
-
     # Webclient URLs
     path("upload/", views.omero_boost_upload, name="omero_boost_upload"),
-    path("local_file_browser/", views.LocalFileBrowserView.as_view(), name="local_file_browser"),
+    path(
+        "local_file_browser/",
+        views.get_folder_contents,
+        name="local_file_browser",
+    ),
     path(
         "monitor_uploads/",
         views.omero_boost_monitor_uploads,
@@ -22,7 +25,6 @@ urlpatterns = [
         views.omero_boost_monitor_workflows,
         name="omero_boost_monitor_workflows",
     ),
-    
     # Webclient templates and script menu
     re_path(
         r"^webclient_templates/(?P<base_template>[a-z0-9_]+)/",
