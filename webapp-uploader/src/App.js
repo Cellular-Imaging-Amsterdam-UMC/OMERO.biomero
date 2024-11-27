@@ -5,13 +5,14 @@ import OmeroDataBrowser from "./OmeroDataBrowser";
 import GroupSelect from "./GroupSelect";
 
 const App = () => {
-  const { state, loadomeroTreeData, loadFolderData, loadGroups } =
+  const { state, loadOmeroTreeData, loadFolderData, loadGroups } =
     useAppContext();
 
   useEffect(() => {
-    loadomeroTreeData(); // Load tree data on component mount
+    loadOmeroTreeData(); // Load tree data on component mount
     loadFolderData(); // Load local folder data on component mount
     loadGroups();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -25,15 +26,15 @@ const App = () => {
         )}
       </div>
       <div className="flex space-x-4">
-        <div className="w-1/4">
-          <h1 className="text-base font-bold p-4 pb-0">OMERO Data!!!</h1>
-          {state.omeroTreeData && <OmeroDataBrowser />}
-        </div>
-        <div className="w-1/2">
-          <h1 className="text-base font-bold p-4 pb-0">Local folders</h1>
+        <div className="w-1/3 p-4 overflow-auto">
+          <h1 className="text-base font-bold p-4 pb-0 ">Local folders</h1>
           {state.folderData && <FileBrowser />}
         </div>
-        <div className="w-1/4"></div>
+        <div className="w-1/3 p-4 overflow-auto">
+          <h1 className="text-base font-bold p-4 pb-0 ">OMERO Data</h1>
+          {state.omeroTreeData && <OmeroDataBrowser />}
+        </div>
+        <div className="w-1/3 p-4 overflow-auto"></div>
       </div>
     </div>
   );

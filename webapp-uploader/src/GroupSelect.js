@@ -39,7 +39,7 @@ const GroupSelect = () => {
         onFocus={handleFocus}
         roleStructure="listoption"
         text={item.name}
-        className="text-base"
+        className="text-sm"
       />
     );
   };

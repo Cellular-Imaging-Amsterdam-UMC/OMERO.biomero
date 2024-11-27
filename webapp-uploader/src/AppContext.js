@@ -21,7 +21,7 @@ export const AppProvider = ({ children }) => {
   const [apiError, setError] = useState(null);
 
   // Fetch tree data and update context state
-  const loadomeroTreeData = async () => {
+  const loadOmeroTreeData = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -113,7 +113,7 @@ export const AppProvider = ({ children }) => {
       value={{
         state,
         updateState,
-        loadomeroTreeData,
+        loadOmeroTreeData,
         loadFolderData,
         loadGroups,
         apiLoading,
