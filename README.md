@@ -32,7 +32,8 @@ For development, we use [NL-BIOMERO](https://github.com/Cellular-Imaging-Amsterd
 
 
 ### Setup and development of the plugin frontend
-1. Install Node.js and Yarn.
+1. Install Node.js and Yarn. 
+    - For Windows, install Corepack as superuser, then you can run yarn commands like `corepack yarn install`
 2. Enter `omero-boost` repository and enter the `webapp-uploader` folder.
 3. Run `yarn install` to install the necessary packages.
 4. Run `yarn watch` to watch for changes in the code and automatically rebuild the code on save. Each time code is rebuilt, Webclient server will automatically restart (~30s), which will update JS bundle in the Webclient static folder. Reload the Webclient page to see changes.

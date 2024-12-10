@@ -16,7 +16,7 @@ const App = () => {
   }, []);
 
   return (
-    <div className="bg-[#f0f1f5] w-full h-full absolute top-0">
+    <div className="bg-[#f0f1f5] w-full h-full relative top-0">
       <div className="p-4">
         {state?.user?.groups && (
           <div className="flex items-center">

@@ -120,10 +120,23 @@ def check_directory_access(path):
 @render_response()
 def omero_boost_upload(request, conn=None, **kwargs):
     """Render the server-side browser page."""
+    metabase_site_url = os.environ.get("METABASE_SITE_URL")
+    metabase_secret_key = os.environ.get("METABASE_SECRET_KEY")
+    metabase_dashboard_id = os.environ.get("METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID")
+
     current_user = conn.getUser()
     username = current_user.getName()
     user_id = current_user.getId()
     is_admin = conn.isAdmin()
+    
+    payload = {
+        "resource": {"dashboard": int(metabase_dashboard_id)},
+        "params": {
+            "user_name": [username],
+        },
+        "exp": round(time.time()) + (60 * 30),  # 10 minute expiration
+    }
+    token = jwt.encode(payload, metabase_secret_key, algorithm="HS256")
 
     context = {
         "template": "omeroboost/webclient_plugins/omero_boost_upload.html",
@@ -133,6 +146,8 @@ def omero_boost_upload(request, conn=None, **kwargs):
         "base_dir": os.path.basename(BASE_DIR),
         "main_js": get_react_build_file("main.js"),
         "main_css": get_react_build_file("main.css"),
+        "metabase_site_url": metabase_site_url,
+        "metabase_token": token,
     }
     return context
 

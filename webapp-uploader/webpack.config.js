@@ -26,7 +26,7 @@ module.exports = {
       },
       onBeforeCompile: {
         scripts: [
-          "rm -rf ../omero_boost/static/omero_boost/assets/*",
+          "rimraf ../omero_boost/static/omero_boost/assets",
           "echo 'Cleaning up'",
         ],
       },
