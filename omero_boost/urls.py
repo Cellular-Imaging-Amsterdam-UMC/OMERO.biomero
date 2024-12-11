@@ -16,11 +16,6 @@ urlpatterns = [
         name="local_file_browser",
     ),
     path(
-        "monitor_uploads/",
-        views.omero_boost_monitor_uploads,
-        name="omero_boost_monitor_uploads",
-    ),
-    path(
         "monitor_workflows/",
         views.omero_boost_monitor_workflows,
         name="omero_boost_monitor_workflows",

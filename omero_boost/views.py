@@ -12,7 +12,7 @@ from django.conf import settings
 from omeroweb.webclient.decorators import login_required, render_response
 from omero.gateway import BlitzGateway
 from omero.rtypes import unwrap
-from .utils import get_react_build_file
+from .utils import get_biomero_build_file, get_react_build_file
 
 logger = logging.getLogger(__name__)
 
@@ -265,47 +265,6 @@ def import_selected(request, conn=None, **kwargs):
 
 @login_required()
 @render_response()
-def omero_boost_monitor_uploads(request, conn=None, **kwargs):
-    metabase_site_url = os.environ.get("METABASE_SITE_URL")
-    metabase_secret_key = os.environ.get("METABASE_SECRET_KEY")
-    metabase_dashboard_id = os.environ.get("METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID")
-
-    # Get the current user's information
-    current_user = conn.getUser()
-    username = current_user.getName()
-    user_id = current_user.getId()
-
-    # Check if the user is an admin
-    is_admin = conn.isAdmin()
-
-    # Log admin status
-    if is_admin:
-        logger.info(f"User {username} (ID: {user_id}) is an admin")
-    else:
-        logger.info(f"User {username} (ID: {user_id}) is not an admin")
-
-    payload = {
-        "resource": {"dashboard": int(metabase_dashboard_id)},
-        "params": {
-            "user_name": [username],
-        },
-        "exp": round(time.time()) + (60 * 30),  # 10 minute expiration
-    }
-    token = jwt.encode(payload, metabase_secret_key, algorithm="HS256")
-
-    context = {
-        "metabase_site_url": metabase_site_url,
-        "metabase_token": token,
-        "template": "omeroboost/webclient_plugins/omero_boost_monitor_uploads.html",
-        "user_name": username,
-        "user_id": user_id,
-        "is_admin": is_admin,
-    }
-    return context
-
-
-@login_required()
-@render_response()
 def omero_boost_monitor_workflows(request, conn=None, **kwargs):
     metabase_site_url = os.environ.get("METABASE_SITE_URL")
     metabase_secret_key = os.environ.get("METABASE_SECRET_KEY")
@@ -341,6 +300,8 @@ def omero_boost_monitor_workflows(request, conn=None, **kwargs):
         "user_name": username,
         "user_id": user_id,
         "is_admin": is_admin,
+        "biomero_js": get_biomero_build_file("main.js"),
+        "biomero_css": get_biomero_build_file("main.css"),
     }
     return context
 
