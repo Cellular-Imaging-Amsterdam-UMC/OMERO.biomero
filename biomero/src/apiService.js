@@ -62,3 +62,27 @@ export const fetchGroups = async () => {
   const { urls } = getDjangoConstants();
   return apiRequest(urls.api_get_groups, "GET");
 };
+
+// Fetch scripts from the server
+export const fetchScripts = async () => {
+  const { urls } = getDjangoConstants(); // Get the URLs from Django constants
+  try {
+    const response = await apiRequest(urls.scripts, "GET"); // Assuming `urls.scripts` is the correct endpoint for fetching scripts
+    return response; // Return the fetched data
+  } catch (error) {
+    console.error("Error fetching scripts:", error);
+    throw error; // Rethrow the error to be handled by the caller
+  }
+};
+
+// Fetch script menu data
+export const fetchScriptData = async (scriptId, directory) => {
+  const { urls } = getDjangoConstants();
+  const params = {
+    script_ids: scriptId,
+    directory: directory, // Include the directory as a query parameter
+  };
+
+  return apiRequest(urls.get_script_menu, "GET", null, { params });
+};
+

@@ -17,3 +17,18 @@ else
   echo "Failed to copy files in container $CONTAINER_NAME."
   exit 1
 fi
+
+# Define source and destination directories inside the container
+SRC_DIR="/opt/omero/web/omero-boost/omero_boost/static/biomero/assets"
+DEST_DIR="/opt/omero/web/OMERO.web/var/static/biomero/assets"
+
+# Execute the Docker command to copy files
+docker exec "$CONTAINER_NAME" bash -c "cp -r ${SRC_DIR}/* ${DEST_DIR}/"
+
+# Check if the command was successful
+if [ $? -eq 0 ]; then
+  echo "Files successfully copied from $SRC_DIR to $DEST_DIR in container $CONTAINER_NAME."
+else
+  echo "Failed to copy files in container $CONTAINER_NAME."
+  exit 1
+fi

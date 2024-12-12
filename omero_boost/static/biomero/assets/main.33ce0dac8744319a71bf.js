@@ -11945,7 +11945,17 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _FileBrowser__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./FileBrowser */ "./src/FileBrowser.js");
 /* harmony import */ var _OmeroDataBrowser__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./OmeroDataBrowser */ "./src/OmeroDataBrowser.js");
 /* harmony import */ var _GroupSelect__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./GroupSelect */ "./src/GroupSelect.js");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var _components_ScriptsMenu__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./components/ScriptsMenu */ "./src/components/ScriptsMenu.js");
+/* harmony import */ var _components_TabContainer__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./components/TabContainer */ "./src/components/TabContainer.js");
+/* harmony import */ var _components_SearchBar__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./components/SearchBar */ "./src/components/SearchBar.js");
+/* harmony import */ var _components_UploadButton__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./components/UploadButton */ "./src/components/UploadButton.js");
+/* harmony import */ var _styles_style_css__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./styles/style.css */ "./src/styles/style.css");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+
+
 
 
 
@@ -11957,42 +11967,44 @@ const App = () => {
     state,
     loadOmeroTreeData,
     loadFolderData,
-    loadGroups
+    loadGroups,
+    loadScripts
   } = (0,_AppContext__WEBPACK_IMPORTED_MODULE_1__.useAppContext)();
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
-    loadOmeroTreeData(); // Load tree data on component mount
-    loadFolderData(); // Load local folder data on component mount
+    // Load initial data for OMERO, folders, groups, and scripts
+    loadOmeroTreeData();
+    loadFolderData();
     loadGroups();
+    loadScripts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
-    className: "bg-[#f0f1f5] w-full h-full relative top-0",
-    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("div", {
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsxs)("div", {
+    className: "bg-[#f0f1f5] w-full h-full relative top-0 overflow-y-auto",
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("div", {
       className: "p-4",
-      children: state?.user?.groups && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
-        className: "flex items-center",
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("span", {
-          className: "text-base mr-4",
-          children: "Select group"
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_GroupSelect__WEBPACK_IMPORTED_MODULE_4__["default"], {})]
+      children: state?.user?.groups && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsxs)("div", {
+        className: "flex items-center justify-between",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_components_SearchBar__WEBPACK_IMPORTED_MODULE_7__["default"], {}), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_components_UploadButton__WEBPACK_IMPORTED_MODULE_8__["default"], {
+          uploadUrl: "/script_upload"
+        })]
       })
-    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
-      className: "flex space-x-4",
-      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
-        className: "w-1/3 p-4 overflow-auto",
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("h1", {
-          className: "text-base font-bold p-4 pb-0 ",
-          children: "Local folders"
-        }), state.folderData && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_FileBrowser__WEBPACK_IMPORTED_MODULE_2__["default"], {})]
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
-        className: "w-1/3 p-4 overflow-auto",
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("h1", {
-          className: "text-base font-bold p-4 pb-0 ",
-          children: "OMERO Data"
-        }), state.omeroTreeData && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_OmeroDataBrowser__WEBPACK_IMPORTED_MODULE_3__["default"], {})]
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("div", {
-        className: "w-1/3 p-4 overflow-auto"
-      })]
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("div", {
+      className: "flex flex-col lg:flex-row space-x-4 h-[50vh]",
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("div", {
+        className: "lg:w-1/4 p-4 overflow-auto",
+        children: state.scripts?.length > 0 ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("div", {
+          id: "scripts-menu",
+          className: "h-full",
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("div", {
+            className: "scripts-menu-tabs",
+            children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_components_TabContainer__WEBPACK_IMPORTED_MODULE_6__["default"], {
+              menuData: state.scripts
+            })
+          })
+        }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("p", {
+          children: "Loading scripts..."
+        })
+      })
     })]
   });
 };
@@ -12038,13 +12050,13 @@ const AppProvider = _ref => {
     user,
     urls,
     omeroTreeData: null,
-    folderData: null
+    folderData: null,
+    scripts: [] // Initialize with an empty array for scripts
   });
-  console.log("state", state);
   const [apiLoading, setLoading] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
   const [apiError, setError] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
 
-  // Fetch tree data and update context state
+  // Fetch OMERO tree data
   const loadOmeroTreeData = async () => {
     setLoading(true);
     setError(null);
@@ -12059,47 +12071,39 @@ const AppProvider = _ref => {
       setLoading(false);
     }
   };
+
+  // Fetch folder data
   const loadFolderData = async function () {
     let item = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : null;
     setLoading(true);
     setError(null);
     try {
-      const response = await (0,_apiService__WEBPACK_IMPORTED_MODULE_1__.fetchFolderData)(item); // Fetch folder data from API
-      const contents = response.contents || []; // Extract contents from response
-
-      // Transform the API response into the flat list structure
+      const response = await (0,_apiService__WEBPACK_IMPORTED_MODULE_1__.fetchFolderData)(item);
+      const contents = response.contents || [];
       const formattedData = contents.reduce((acc, content) => {
-        const nodeId = content.id; // Unique node ID
+        const nodeId = content.id;
         acc[nodeId] = {
           index: nodeId,
           isFolder: content.is_folder,
           children: [],
-          // Child nodes will be populated dynamically
           data: content.name,
-          // Node name or label
-          childCount: 0 // Set to 0 initially; update when children are fetched
+          childCount: 0
         };
         return acc;
       }, {});
-
-      // Add the parent folder (e.g., root) and link children
       const parentId = item || "root";
       formattedData[parentId] = {
         index: parentId,
         isFolder: true,
         children: contents.map(content => content.id),
-        // List of child IDs
         data: parentId === "root" ? "Root" : "Folder",
-        // Name for the root or parent folder
         childCount: contents.length
       };
-
-      // Merge with existing folder data
       setState(prevState => ({
         ...prevState,
         folderData: {
           ...prevState.folderData,
-          ...formattedData // Add or update new folder contents
+          ...formattedData
         }
       }));
     } catch (err) {
@@ -12108,14 +12112,14 @@ const AppProvider = _ref => {
       setLoading(false);
     }
   };
+
+  // Fetch groups
   const loadGroups = async () => {
     setLoading(true);
     setError(null);
     try {
       const groupsHtml = await (0,_apiService__WEBPACK_IMPORTED_MODULE_1__.fetchGroups)();
       const groups = (0,_utils__WEBPACK_IMPORTED_MODULE_3__.extractGroups)(groupsHtml);
-      console.log("groups", groups);
-      // Add groups to user obj in state
       setState(prevState => ({
         ...prevState,
         user: {
@@ -12130,9 +12134,76 @@ const AppProvider = _ref => {
     }
   };
 
-  // Function to update the state (optional)
+  // Fetch scripts and update context state
+  const loadScripts = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const scripts = await (0,_apiService__WEBPACK_IMPORTED_MODULE_1__.fetchScripts)();
+      setState(prevState => ({
+        ...prevState,
+        scripts
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch details for a specific script and update context state
+  const fetchScriptDetails = async (scriptId, directory) => {
+    setLoading(true);
+    try {
+      const data = await (0,_apiService__WEBPACK_IMPORTED_MODULE_1__.fetchScriptData)(scriptId, directory);
+      const fetchedScript = {
+        id: scriptId,
+        ...data.script_menu[0]
+      };
+
+      // Helper function to recursively update the nested structure
+      const updateNestedScripts = nodes => nodes.map(node => {
+        if (node.id === scriptId) {
+          // Update the matching script
+          return {
+            ...node,
+            ...fetchedScript
+          };
+        } else if (node.ul) {
+          // Recursively update child nodes if `ul` exists
+          return {
+            ...node,
+            ul: updateNestedScripts(node.ul)
+          };
+        }
+        return node; // No change for non-matching nodes
+      });
+
+      // Update the state with the updated nested scripts
+      setState(prevState => ({
+        ...prevState,
+        scripts: updateNestedScripts(prevState.scripts)
+      }));
+    } catch (err) {
+      setError("Error fetching script data.");
+      console.error("Failed to fetch script data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const openScriptWindow = scriptUrl => {
+    const SCRIPT_WINDOW_WIDTH = 800;
+    const SCRIPT_WINDOW_HEIGHT = 600;
+    const event = {
+      target: {
+        href: scriptUrl
+      }
+    };
+    OME.openScriptWindow(event, SCRIPT_WINDOW_WIDTH, SCRIPT_WINDOW_HEIGHT);
+  };
+
+  // Function to update the state
   const updateState = newState => {
-    console.log("newState", newState);
     setState(prevState => ({
       ...prevState,
       ...newState
@@ -12145,6 +12216,10 @@ const AppProvider = _ref => {
       loadOmeroTreeData,
       loadFolderData,
       loadGroups,
+      loadScripts,
+      fetchScriptDetails,
+      // Now available to consumers
+      openScriptWindow,
       apiLoading,
       apiError
     },
@@ -12497,6 +12572,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   fetchFolderData: () => (/* binding */ fetchFolderData),
 /* harmony export */   fetchGroups: () => (/* binding */ fetchGroups),
 /* harmony export */   fetchProjectData: () => (/* binding */ fetchProjectData),
+/* harmony export */   fetchScriptData: () => (/* binding */ fetchScriptData),
+/* harmony export */   fetchScripts: () => (/* binding */ fetchScripts),
 /* harmony export */   fetchomeroTreeData: () => (/* binding */ fetchomeroTreeData)
 /* harmony export */ });
 /* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! axios */ "./node_modules/axios/lib/axios.js");
@@ -12579,6 +12656,327 @@ const fetchGroups = async () => {
   return apiRequest(urls.api_get_groups, "GET");
 };
 
+// Fetch scripts from the server
+const fetchScripts = async () => {
+  const {
+    urls
+  } = (0,_constants__WEBPACK_IMPORTED_MODULE_0__.getDjangoConstants)(); // Get the URLs from Django constants
+  try {
+    const response = await apiRequest(urls.scripts, "GET"); // Assuming `urls.scripts` is the correct endpoint for fetching scripts
+    return response; // Return the fetched data
+  } catch (error) {
+    console.error("Error fetching scripts:", error);
+    throw error; // Rethrow the error to be handled by the caller
+  }
+};
+
+// Fetch script menu data
+const fetchScriptData = async (scriptId, directory) => {
+  const {
+    urls
+  } = (0,_constants__WEBPACK_IMPORTED_MODULE_0__.getDjangoConstants)();
+  const params = {
+    script_ids: scriptId,
+    directory: directory // Include the directory as a query parameter
+  };
+  return apiRequest(urls.get_script_menu, "GET", null, {
+    params
+  });
+};
+
+/***/ }),
+
+/***/ "./src/components/ScriptCard.js":
+/*!**************************************!*\
+  !*** ./src/components/ScriptCard.js ***!
+  \**************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _AppContext__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../AppContext */ "./src/AppContext.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+const ScriptCard = _ref => {
+  let {
+    script
+  } = _ref;
+  const {
+    openScriptWindow,
+    fetchScriptDetails,
+    state,
+    apiLoading,
+    apiError
+  } = (0,_AppContext__WEBPACK_IMPORTED_MODULE_1__.useAppContext)();
+  const [isCardLoaded, setIsCardLoaded] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    if (!isCardLoaded && !state.scripts.find(s => s.id === script.id)) {
+      // Fetch script details only if not already loaded
+      fetchScriptDetails(script.id, script.name);
+      setIsCardLoaded(true); // Mark the card as loaded
+    }
+  }, [isCardLoaded, script.id, script.name, fetchScriptDetails, state.scripts]);
+
+  // Handle click to open the script in a popup window
+  const handleCardClick = () => {
+    const scriptUrl = `/webclient/script_ui/${script.id}`; // Construct the URL dynamically
+    openScriptWindow(scriptUrl); // Open the script window
+  };
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+    className: "script-card",
+    onClick: handleCardClick,
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+      className: "script-name",
+      children: script.name
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+      className: "script-card-content",
+      children: apiLoading ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+        children: "Loading..."
+      }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(ScriptDetailsContent, {
+        script: script
+      })
+    }), apiError && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+      className: "error",
+      children: apiError
+    })]
+  });
+};
+
+// Subcomponent to format and display the detailed script content
+const ScriptDetailsContent = _ref2 => {
+  let {
+    script
+  } = _ref2;
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+      children: script?.description || "No description available"
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("p", {
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("strong", {
+        children: "Authors:"
+      }), " ", script?.authors || "Unknown"]
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("p", {
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("strong", {
+        children: "Version:"
+      }), " ", script?.version || "Unknown"]
+    })]
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (ScriptCard);
+
+/***/ }),
+
+/***/ "./src/components/ScriptsMenu.js":
+/*!***************************************!*\
+  !*** ./src/components/ScriptsMenu.js ***!
+  \***************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _TabContainer__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./TabContainer */ "./src/components/TabContainer.js");
+/* harmony import */ var _SearchBar__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./SearchBar */ "./src/components/SearchBar.js");
+/* harmony import */ var _UploadButton__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./UploadButton */ "./src/components/UploadButton.js");
+/* harmony import */ var _AppContext__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../AppContext */ "./src/AppContext.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+
+
+
+const ScriptsMenu = () => {
+  const {
+    state
+  } = (0,_AppContext__WEBPACK_IMPORTED_MODULE_4__.useAppContext)();
+  const {
+    scripts,
+    loading
+  } = state;
+  if (loading) {
+    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("div", {
+      children: "Loading..."
+    });
+  }
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+    id: "scripts-menu-draggable",
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+      className: "scripts-menu-window-header",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+        className: "scripts-menu-title-container",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("img", {
+          src: "/static/scriptmenu/img/script-text-play.svg",
+          alt: "Script Icon",
+          className: "scripts-menu-script-icon"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("span", {
+          className: "scripts-menu-window-title",
+          children: "Scripts Menu"
+        })]
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+        className: "scripts-menu-window-controls",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("button", {
+          className: "scripts-menu-maximize-btn",
+          children: "\u25A1"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("button", {
+          className: "scripts-menu-close-btn",
+          children: "\xD7"
+        })]
+      })]
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+      className: "scripts-menu-tabs",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_SearchBar__WEBPACK_IMPORTED_MODULE_2__["default"], {}), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_UploadButton__WEBPACK_IMPORTED_MODULE_3__["default"], {
+        uploadUrl: "/script_upload"
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_TabContainer__WEBPACK_IMPORTED_MODULE_1__["default"], {
+        menuData: scripts
+      })]
+    })]
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (ScriptsMenu);
+
+/***/ }),
+
+/***/ "./src/components/SearchBar.js":
+/*!*************************************!*\
+  !*** ./src/components/SearchBar.js ***!
+  \*************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+const SearchBar = () => {
+  const handleSearch = event => {
+    const query = event.target.value.toLowerCase();
+    // Implement search logic
+    console.log("Searching for:", query);
+  };
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("input", {
+    type: "text",
+    id: "scripts-menu-searchBar",
+    placeholder: "Search scripts...",
+    onChange: handleSearch
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (SearchBar);
+
+/***/ }),
+
+/***/ "./src/components/TabContainer.js":
+/*!****************************************!*\
+  !*** ./src/components/TabContainer.js ***!
+  \****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _ScriptCard__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ScriptCard */ "./src/components/ScriptCard.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+ // Import ScriptCard
+
+const TabContainer = _ref => {
+  let {
+    menuData
+  } = _ref;
+  const [activeTab, setActiveTab] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(menuData[0]?.name || "");
+
+  // Update active tab based on menuData changes
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    if (menuData.length > 0) {
+      setActiveTab(menuData[0].name);
+    }
+  }, [menuData]);
+  const handleTabClick = tabName => {
+    setActiveTab(tabName);
+  };
+  const renderScripts = folder => {
+    return folder.ul?.map(group => {
+      return group.ul?.map(script => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_ScriptCard__WEBPACK_IMPORTED_MODULE_1__["default"], {
+        script: script
+      }, script.id));
+    });
+  };
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+      className: "tab-buttons",
+      children: menuData.map(folder => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("button", {
+        className: `tablink ${folder.name === activeTab ? "active" : ""}`,
+        onClick: () => handleTabClick(folder.name),
+        children: folder.name
+      }, folder.name))
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+      id: "scripts-menu-tabContent",
+      children: menuData.map(folder => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+        id: folder.name,
+        className: "tabcontent",
+        style: {
+          display: folder.name === activeTab ? "block" : "none"
+        },
+        children: renderScripts(folder)
+      }, folder.name))
+    })]
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (TabContainer);
+
+/***/ }),
+
+/***/ "./src/components/UploadButton.js":
+/*!****************************************!*\
+  !*** ./src/components/UploadButton.js ***!
+  \****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+const UploadButton = _ref => {
+  let {
+    uploadUrl
+  } = _ref;
+  const handleUpload = () => {
+    console.log("Redirecting to upload script URL:", uploadUrl);
+  };
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("button", {
+    id: "scripts-menu-uploadButton",
+    className: "scripts-menu-upload-button",
+    onClick: handleUpload,
+    children: "Upload Script"
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (UploadButton);
+
 /***/ }),
 
 /***/ "./src/constants.js":
@@ -12628,7 +13026,9 @@ const getDjangoConstants = () => {
     tree_top_level: WEBCLIENT.URLS.tree_top_level,
     api_experimenter: WEBCLIENT.URLS.api_experimenter,
     api_local_file_browser: "/omero_boost/local_file_browser/",
-    api_get_groups: "/webclient/group_user_content/"
+    api_get_groups: "/webclient/group_user_content/",
+    scripts: "/webclient/list_scripts/",
+    get_script_menu: "/scriptmenu/get_script_menu/"
   };
   return {
     user,
@@ -27596,6 +27996,512 @@ ___CSS_LOADER_EXPORT___.push([module.id, `
 
 /***/ }),
 
+/***/ "./node_modules/css-loader/dist/cjs.js!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[1].use[2]!./src/styles/style.css":
+/*!******************************************************************************************************************************************!*\
+  !*** ./node_modules/css-loader/dist/cjs.js!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[1].use[2]!./src/styles/style.css ***!
+  \******************************************************************************************************************************************/
+/***/ ((module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var _node_modules_css_loader_dist_runtime_sourceMaps_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../node_modules/css-loader/dist/runtime/sourceMaps.js */ "./node_modules/css-loader/dist/runtime/sourceMaps.js");
+/* harmony import */ var _node_modules_css_loader_dist_runtime_sourceMaps_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_css_loader_dist_runtime_sourceMaps_js__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../node_modules/css-loader/dist/runtime/api.js */ "./node_modules/css-loader/dist/runtime/api.js");
+/* harmony import */ var _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1__);
+// Imports
+
+
+var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1___default()((_node_modules_css_loader_dist_runtime_sourceMaps_js__WEBPACK_IMPORTED_MODULE_0___default()));
+// Module
+___CSS_LOADER_EXPORT___.push([module.id, `/* ScriptCard */
+.script-card {
+max-width: 100%;
+transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.script-card:hover {
+transform: translateY(-5px);
+box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+.script-card .script-name {
+font-size: 1.2rem;
+font-weight: bold;
+}
+
+/* Grid Layout */
+.grid-cols-1 {
+grid-template-columns: repeat(1, 1fr);
+}
+.grid-cols-2 {
+grid-template-columns: repeat(2, 1fr);
+}
+.grid-cols-3 {
+grid-template-columns: repeat(3, 1fr);
+}
+.gap-4 {
+gap: 1rem;
+}
+
+/* Flex Layout for Search and Upload */
+.search-upload-container {
+display: flex;
+justify-content: space-between;
+}
+
+/* Tabs */
+.tab-buttons {
+display: flex;
+flex-wrap: wrap;
+gap: 10px;
+margin-bottom: 20px;
+}
+
+.tablink {
+padding: 10px 15px;
+background-color: #f0f1f5;
+border: 1px solid #ddd;
+cursor: pointer;
+font-size: 1rem;
+transition: background-color 0.2s ease;
+}
+
+.tablink.active {
+background-color: #007bff;
+color: white;
+}
+  
+
+html, body {
+    height: 100%;
+    margin: 0;
+    overflow-y: auto; /* Enable vertical scrolling */
+}
+
+#scripts-menu {
+    overflow-y: auto; /* Allow scrolling within the script menu container */
+    max-height: 100vh; /* Ensure it's contained within the viewport */
+}
+
+/* Optional: for inner content areas to scroll independently */
+#scripts-menu .script-cards-container {
+    overflow-y: auto;
+    max-height: 80vh; /* Limit to a percentage of the viewport height */
+}
+
+/* Ensure a scrollable area when there is content overflow */
+#scripts-menu .tabcontent {
+    overflow-y: auto;
+    max-height: 400px; /* Adjust based on design */
+}
+
+
+/* This removes the tab in the righ-hand menu of omero.web */
+#annotation_tabs_list li[aria-controls="scripts%20menu"] {
+    display: none;
+}
+
+/* Add this at the beginning of your CSS file */
+#scripts\\ menu.right_tab_content {
+    height: 0;
+    width: 0;
+    overflow: hidden;
+    position: absolute;
+}
+
+#scripts-menu {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: hsl(210, 20%, 80%);
+}
+
+#scripts-menu #scripts-menu-draggable {
+    position: fixed;
+    bottom: 50px;
+    right: 50px;
+    width: 300px;
+    height: 400px;
+    background-color: lightgrey;
+    border: 1px solid #ccc;
+    z-index: 1000;
+    overflow: hidden;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    min-width: 300px; /* Set minimum width */
+    border-radius: 10px;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: hsl(210, 20%, 80%);
+}
+
+#scripts-menu #scripts-menu-draggable.enlarged {
+    width: calc(100% - 360px);
+    height: calc(100% - 45px);
+    top: 40px;
+    left: 355px;
+    bottom: 5px;
+    right: 5px;
+}
+
+#scripts-menu .scripts-menu-window-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 5px;
+    background-color: #333;
+    color: white;
+    cursor: move;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+}
+
+#scripts-menu .scripts-menu-title-container {
+    display: flex;
+    align-items: center;
+}
+
+#scripts-menu .scripts-menu-window-title {
+    font-size: 1.2em;
+}
+
+#scripts-menu .scripts-menu-script-icon {
+    width: 24px;
+    height: 24px;
+    margin-left: 10px;
+    margin-right: 10px;
+}
+
+#scripts-menu .scripts-menu-window-controls button {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 5px;
+    font-size: 16px;
+}
+
+#scripts-menu .scripts-menu-tabs {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #f1f1f1;
+    border-bottom: 1px solid #ccc;
+    padding: 5px;
+}
+
+#scripts-menu #scripts-menu-tabContainer {
+    display: flex;
+    flex-grow: 1;
+    overflow-x: auto;
+    font-size: 1.1em;
+}
+
+#scripts-menu .scripts-menu-tabs button {
+    background-color: inherit;
+    border: none;
+    border-radius: 5px;
+    margin-right: 1px;
+    outline: none;
+    cursor: pointer;
+    padding: 10px;
+    transition: 0.3s;
+    color: black;
+    font-weight: bold;
+    white-space: nowrap; /* Prevent text wrapping in buttons */
+    flex-shrink: 0; /* Prevent buttons from shrinking */
+    font-size: 1.1em;
+}
+
+#scripts-menu #scripts-menu-searchBar {
+    margin-left: auto;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+    width: 200px;
+    transition: width 0.3s;
+    height: 32px;
+    box-sizing: border-box;
+    font-size: 1.1em;
+}
+
+#scripts-menu #scripts-menu-searchBar.small {
+    width: 100px;
+    font-size: 1.1em;
+}
+
+#scripts-menu .scripts-menu-tabs button:hover {
+    background-color: #fffdfd;
+}
+
+#scripts-menu .scripts-menu-tabs button.active {
+    background-color: rgb(51, 51, 51) !important;
+    color: white;
+    border-radius: 5px;
+}
+
+#scripts-menu .tabcontent {
+    display: none;
+    border: 1px solid #ccc;
+    border-top: none;
+    overflow-y: scroll;
+    padding-bottom: 20px;
+}
+
+#scripts-menu .directory {
+    padding: 5px;
+    margin: 5px;
+    border-radius: 5px;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    background-color: #f1f1f1;
+    transition: background-color 0.3s, margin 0.3s, padding 0.3s;
+}
+
+#scripts-menu .directory.small,
+#scripts-menu .directory.small > * {
+    background-color: transparent !important;
+    margin: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+#scripts-menu .subdirectory-header {
+    background-color: transparent;
+    color: black;
+    padding-bottom: 10px;
+    padding-top: 0;
+    cursor: default;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+@media (max-width: 600px), (max-height: 600px) {
+    #scripts-menu .subdirectory-header {
+        display: none;
+    }
+
+    #scripts-menu .script-card {
+        height: auto;
+        padding: 10px;
+    }
+}
+
+#scripts-menu .script-cards-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    justify-content: flex-start;
+    width: 100%;
+}
+
+/* For containers with only one card */
+#scripts-menu .script-cards-container:only-child {
+    width: 100%;
+}
+
+/* For containers with exactly two cards */
+#scripts-menu .script-cards-container:nth-last-child(2):first-child,
+#scripts-menu .script-cards-container:nth-last-child(2):first-child ~ .script-card {
+    flex-basis: calc(50% - 5px);
+}
+
+/* For containers with exactly three cards */
+#scripts-menu .script-cards-container:nth-last-child(3):first-child,
+#scripts-menu .script-cards-container:nth-last-child(3):first-child ~ .script-card {
+    flex-basis: calc(33.333% - 5px);
+}
+
+#scripts-menu .script-card {
+    background-color: #99ccff;
+    color: black !important;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    flex: 1 0 calc(33.333% - 5px);
+    text-align: left;
+    box-sizing: border-box;
+    min-width: 200px; /* Minimum width to ensure cards are not too small */
+    min-height: 60px; /* Minimum height to ensure title is not cut off */
+    height: 150px; /* Increase height for larger size */
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.3s, border-width 0.3s, font-weight 0.3s, color 0.3s, height 0.3s, padding 0.3s, max-height 0.3s;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+#scripts-menu .custom-script-card {
+    background-color: #cceeff;
+}
+
+#scripts-menu .script-card:hover {
+    background-color: #ffcc99;
+    color: black !important;
+    border-color: black;
+}
+
+#scripts-menu .minimized {
+    width: 30px;
+    height: 30px;
+    background-color: white;
+    border: 1px solid #ccc;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    overflow: hidden;
+    cursor: pointer;
+    resize: none;
+}
+
+#scripts-menu .maximized {
+    width: 100% !important;
+    height: 100% !important;
+    top: 0 !important;
+    left: 0 !important;
+}
+
+#scripts-menu #scripts-menu-draggable.minimized {
+    width: 30px;
+    height: 30px;
+    background-color: white;
+    cursor: pointer;
+}
+
+#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-window-header,
+#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-tabs,
+#scripts-menu #scripts-menu-draggable.minimized .tabcontent {
+    display: none;
+}
+
+#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-restore-btn {
+    display: block;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    line-height: 30px;
+    cursor: pointer;
+}
+
+#scripts-menu .scripts-menu-restore-btn {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#scripts-menu .script-link {
+    text-decoration: none;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    position: relative;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+#scripts-menu .script-link::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    background: linear-gradient(to left, #99ccff, transparent);
+}
+
+#scripts-menu .script-card-content {
+    display: none;
+    position: static;
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    top: 40px;
+    overflow: hidden;
+    display: -webkit-box; /* Use flexbox to align items side by side */
+    -webkit-box-orient: vertical; /* Set box orientation to vertical */
+    -webkit-line-clamp: 6; /* Show up to N lines */
+    line-clamp: 6;
+    align-items: center;
+    white-space: normal;
+    text-overflow: ellipsis; /* Add ellipsis to indicate overflow */
+    font-size: 1em; /* Set smaller font size */
+    font-weight: normal;
+}
+
+#scripts-menu .script-card-content span {
+    padding-top: 5px;
+    margin-right: 10px;
+    padding-bottom: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: normal;
+    display: -webkit-box; /* Use flexbox to align items side by side */
+    -webkit-box-orient: vertical; /* Set box orientation to vertical */
+    -webkit-line-clamp: 9; /* Show up to N lines */
+    line-clamp: 9;
+    font-size: 1em; /* Set smaller font size */
+}
+
+/* Not currently in use*/
+#scripts-menu .script-card-content img {
+    max-width: 50px;
+    max-height: 50px;
+    object-fit: contain;
+    cursor: pointer;
+}
+
+#scripts-menu .script-card.large .script-card-content {
+    display: flex;
+}
+
+#scripts-menu .script-card.small {
+    height: auto;
+    padding: 10px;
+    max-height: 100px;
+}
+
+#scripts-menu .scripts-menu-search-bar.small {
+    width: 100px;
+}
+
+#scripts-menu #scripts-menu-uploadButton {
+    background-color: gray;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 6px 12px;
+    margin-left: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    height: 32px; /* Match the height of the search input */
+    white-space: nowrap;
+    box-sizing: border-box;
+    line-height: 20px;
+    font-size: 1.1em;
+}
+
+#scripts-menu .scroll-padding {
+    height: 100px;
+    width: 100%;
+}
+
+#scripts-menu .bottom-dir-spacer-container {
+    background-color: transparent !important;
+}
+
+#scripts-menu .bottom-dir-spacer {
+    height: 100px;
+    width: 100%;
+    background-color: transparent !important;
+    border: none;
+    margin-top: 20px;
+}
+`, "",{"version":3,"sources":["webpack://./src/styles/style.css"],"names":[],"mappings":"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","sourcesContent":["/* ScriptCard */\n.script-card {\nmax-width: 100%;\ntransition: transform 0.3s ease, box-shadow 0.3s ease;\n}\n.script-card:hover {\ntransform: translateY(-5px);\nbox-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);\n}\n.script-card .script-name {\nfont-size: 1.2rem;\nfont-weight: bold;\n}\n\n/* Grid Layout */\n.grid-cols-1 {\ngrid-template-columns: repeat(1, 1fr);\n}\n.grid-cols-2 {\ngrid-template-columns: repeat(2, 1fr);\n}\n.grid-cols-3 {\ngrid-template-columns: repeat(3, 1fr);\n}\n.gap-4 {\ngap: 1rem;\n}\n\n/* Flex Layout for Search and Upload */\n.search-upload-container {\ndisplay: flex;\njustify-content: space-between;\n}\n\n/* Tabs */\n.tab-buttons {\ndisplay: flex;\nflex-wrap: wrap;\ngap: 10px;\nmargin-bottom: 20px;\n}\n\n.tablink {\npadding: 10px 15px;\nbackground-color: #f0f1f5;\nborder: 1px solid #ddd;\ncursor: pointer;\nfont-size: 1rem;\ntransition: background-color 0.2s ease;\n}\n\n.tablink.active {\nbackground-color: #007bff;\ncolor: white;\n}\n  \n\nhtml, body {\n    height: 100%;\n    margin: 0;\n    overflow-y: auto; /* Enable vertical scrolling */\n}\n\n#scripts-menu {\n    overflow-y: auto; /* Allow scrolling within the script menu container */\n    max-height: 100vh; /* Ensure it's contained within the viewport */\n}\n\n/* Optional: for inner content areas to scroll independently */\n#scripts-menu .script-cards-container {\n    overflow-y: auto;\n    max-height: 80vh; /* Limit to a percentage of the viewport height */\n}\n\n/* Ensure a scrollable area when there is content overflow */\n#scripts-menu .tabcontent {\n    overflow-y: auto;\n    max-height: 400px; /* Adjust based on design */\n}\n\n\n/* This removes the tab in the righ-hand menu of omero.web */\n#annotation_tabs_list li[aria-controls=\"scripts%20menu\"] {\n    display: none;\n}\n\n/* Add this at the beginning of your CSS file */\n#scripts\\ menu.right_tab_content {\n    height: 0;\n    width: 0;\n    overflow: hidden;\n    position: absolute;\n}\n\n#scripts-menu {\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n    color: hsl(210, 20%, 80%);\n}\n\n#scripts-menu #scripts-menu-draggable {\n    position: fixed;\n    bottom: 50px;\n    right: 50px;\n    width: 300px;\n    height: 400px;\n    background-color: lightgrey;\n    border: 1px solid #ccc;\n    z-index: 1000;\n    overflow: hidden;\n    box-shadow: 0 0 10px rgba(0,0,0,0.5);\n    min-width: 300px; /* Set minimum width */\n    border-radius: 10px;\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n    color: hsl(210, 20%, 80%);\n}\n\n#scripts-menu #scripts-menu-draggable.enlarged {\n    width: calc(100% - 360px);\n    height: calc(100% - 45px);\n    top: 40px;\n    left: 355px;\n    bottom: 5px;\n    right: 5px;\n}\n\n#scripts-menu .scripts-menu-window-header {\n    display: flex;\n    justify-content: space-between;\n    align-items: center;\n    padding: 0 5px;\n    background-color: #333;\n    color: white;\n    cursor: move;\n    border-top-left-radius: 10px;\n    border-top-right-radius: 10px;\n}\n\n#scripts-menu .scripts-menu-title-container {\n    display: flex;\n    align-items: center;\n}\n\n#scripts-menu .scripts-menu-window-title {\n    font-size: 1.2em;\n}\n\n#scripts-menu .scripts-menu-script-icon {\n    width: 24px;\n    height: 24px;\n    margin-left: 10px;\n    margin-right: 10px;\n}\n\n#scripts-menu .scripts-menu-window-controls button {\n    background: none;\n    border: none;\n    color: white;\n    cursor: pointer;\n    padding: 5px;\n    font-size: 16px;\n}\n\n#scripts-menu .scripts-menu-tabs {\n    display: flex;\n    justify-content: space-between;\n    align-items: center;\n    background-color: #f1f1f1;\n    border-bottom: 1px solid #ccc;\n    padding: 5px;\n}\n\n#scripts-menu #scripts-menu-tabContainer {\n    display: flex;\n    flex-grow: 1;\n    overflow-x: auto;\n    font-size: 1.1em;\n}\n\n#scripts-menu .scripts-menu-tabs button {\n    background-color: inherit;\n    border: none;\n    border-radius: 5px;\n    margin-right: 1px;\n    outline: none;\n    cursor: pointer;\n    padding: 10px;\n    transition: 0.3s;\n    color: black;\n    font-weight: bold;\n    white-space: nowrap; /* Prevent text wrapping in buttons */\n    flex-shrink: 0; /* Prevent buttons from shrinking */\n    font-size: 1.1em;\n}\n\n#scripts-menu #scripts-menu-searchBar {\n    margin-left: auto;\n    padding: 6px;\n    border: 1px solid #ccc;\n    border-radius: 5px;\n    font-size: 14px;\n    width: 200px;\n    transition: width 0.3s;\n    height: 32px;\n    box-sizing: border-box;\n    font-size: 1.1em;\n}\n\n#scripts-menu #scripts-menu-searchBar.small {\n    width: 100px;\n    font-size: 1.1em;\n}\n\n#scripts-menu .scripts-menu-tabs button:hover {\n    background-color: #fffdfd;\n}\n\n#scripts-menu .scripts-menu-tabs button.active {\n    background-color: rgb(51, 51, 51) !important;\n    color: white;\n    border-radius: 5px;\n}\n\n#scripts-menu .tabcontent {\n    display: none;\n    border: 1px solid #ccc;\n    border-top: none;\n    overflow-y: scroll;\n    padding-bottom: 20px;\n}\n\n#scripts-menu .directory {\n    padding: 5px;\n    margin: 5px;\n    border-radius: 5px;\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n    background-color: #f1f1f1;\n    transition: background-color 0.3s, margin 0.3s, padding 0.3s;\n}\n\n#scripts-menu .directory.small,\n#scripts-menu .directory.small > * {\n    background-color: transparent !important;\n    margin: 0 !important;\n    padding-bottom: 0 !important;\n}\n\n#scripts-menu .subdirectory-header {\n    background-color: transparent;\n    color: black;\n    padding-bottom: 10px;\n    padding-top: 0;\n    cursor: default;\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif !important;\n    font-size: 12px;\n    font-weight: bold;\n}\n\n@media (max-width: 600px), (max-height: 600px) {\n    #scripts-menu .subdirectory-header {\n        display: none;\n    }\n\n    #scripts-menu .script-card {\n        height: auto;\n        padding: 10px;\n    }\n}\n\n#scripts-menu .script-cards-container {\n    display: flex;\n    flex-wrap: wrap;\n    gap: 5px;\n    justify-content: flex-start;\n    width: 100%;\n}\n\n/* For containers with only one card */\n#scripts-menu .script-cards-container:only-child {\n    width: 100%;\n}\n\n/* For containers with exactly two cards */\n#scripts-menu .script-cards-container:nth-last-child(2):first-child,\n#scripts-menu .script-cards-container:nth-last-child(2):first-child ~ .script-card {\n    flex-basis: calc(50% - 5px);\n}\n\n/* For containers with exactly three cards */\n#scripts-menu .script-cards-container:nth-last-child(3):first-child,\n#scripts-menu .script-cards-container:nth-last-child(3):first-child ~ .script-card {\n    flex-basis: calc(33.333% - 5px);\n}\n\n#scripts-menu .script-card {\n    background-color: #99ccff;\n    color: black !important;\n    padding: 10px;\n    border: 1px solid #ccc;\n    border-radius: 5px;\n    flex: 1 0 calc(33.333% - 5px);\n    text-align: left;\n    box-sizing: border-box;\n    min-width: 200px; /* Minimum width to ensure cards are not too small */\n    min-height: 60px; /* Minimum height to ensure title is not cut off */\n    height: 150px; /* Increase height for larger size */\n    overflow: hidden;\n    position: relative;\n    cursor: pointer;\n    transition: background-color 0.3s, border-width 0.3s, font-weight 0.3s, color 0.3s, height 0.3s, padding 0.3s, max-height 0.3s;\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif !important;\n    font-size: 1.2em;\n    font-weight: bold;\n}\n\n#scripts-menu .custom-script-card {\n    background-color: #cceeff;\n}\n\n#scripts-menu .script-card:hover {\n    background-color: #ffcc99;\n    color: black !important;\n    border-color: black;\n}\n\n#scripts-menu .minimized {\n    width: 30px;\n    height: 30px;\n    background-color: white;\n    border: 1px solid #ccc;\n    box-shadow: 0 0 10px rgba(0,0,0,0.5);\n    overflow: hidden;\n    cursor: pointer;\n    resize: none;\n}\n\n#scripts-menu .maximized {\n    width: 100% !important;\n    height: 100% !important;\n    top: 0 !important;\n    left: 0 !important;\n}\n\n#scripts-menu #scripts-menu-draggable.minimized {\n    width: 30px;\n    height: 30px;\n    background-color: white;\n    cursor: pointer;\n}\n\n#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-window-header,\n#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-tabs,\n#scripts-menu #scripts-menu-draggable.minimized .tabcontent {\n    display: none;\n}\n\n#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-restore-btn {\n    display: block;\n    width: 100%;\n    height: 100%;\n    text-align: center;\n    line-height: 30px;\n    cursor: pointer;\n}\n\n#scripts-menu .scripts-menu-restore-btn {\n    display: none;\n    position: absolute;\n    top: 0;\n    left: 0;\n}\n\n#scripts-menu .script-link {\n    text-decoration: none;\n    display: block;\n    white-space: nowrap;\n    overflow: hidden;\n    text-overflow: ellipsis;\n    max-width: 100%;\n    position: relative;\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n}\n\n#scripts-menu .script-link::after {\n    content: '';\n    position: absolute;\n    right: 0;\n    top: 0;\n    bottom: 0;\n    width: 20px;\n    background: linear-gradient(to left, #99ccff, transparent);\n}\n\n#scripts-menu .script-card-content {\n    display: none;\n    position: static;\n    bottom: 10px;\n    left: 10px;\n    right: 10px;\n    top: 40px;\n    overflow: hidden;\n    display: -webkit-box; /* Use flexbox to align items side by side */\n    -webkit-box-orient: vertical; /* Set box orientation to vertical */\n    -webkit-line-clamp: 6; /* Show up to N lines */\n    line-clamp: 6;\n    align-items: center;\n    white-space: normal;\n    text-overflow: ellipsis; /* Add ellipsis to indicate overflow */\n    font-size: 1em; /* Set smaller font size */\n    font-weight: normal;\n}\n\n#scripts-menu .script-card-content span {\n    padding-top: 5px;\n    margin-right: 10px;\n    padding-bottom: 1px;\n    overflow: hidden;\n    text-overflow: ellipsis;\n    white-space: normal;\n    display: -webkit-box; /* Use flexbox to align items side by side */\n    -webkit-box-orient: vertical; /* Set box orientation to vertical */\n    -webkit-line-clamp: 9; /* Show up to N lines */\n    line-clamp: 9;\n    font-size: 1em; /* Set smaller font size */\n}\n\n/* Not currently in use*/\n#scripts-menu .script-card-content img {\n    max-width: 50px;\n    max-height: 50px;\n    object-fit: contain;\n    cursor: pointer;\n}\n\n#scripts-menu .script-card.large .script-card-content {\n    display: flex;\n}\n\n#scripts-menu .script-card.small {\n    height: auto;\n    padding: 10px;\n    max-height: 100px;\n}\n\n#scripts-menu .scripts-menu-search-bar.small {\n    width: 100px;\n}\n\n#scripts-menu #scripts-menu-uploadButton {\n    background-color: gray;\n    color: white;\n    border: none;\n    border-radius: 5px;\n    padding: 6px 12px;\n    margin-left: 5px;\n    cursor: pointer;\n    font-size: 14px;\n    height: 32px; /* Match the height of the search input */\n    white-space: nowrap;\n    box-sizing: border-box;\n    line-height: 20px;\n    font-size: 1.1em;\n}\n\n#scripts-menu .scroll-padding {\n    height: 100px;\n    width: 100%;\n}\n\n#scripts-menu .bottom-dir-spacer-container {\n    background-color: transparent !important;\n}\n\n#scripts-menu .bottom-dir-spacer {\n    height: 100px;\n    width: 100%;\n    background-color: transparent !important;\n    border: none;\n    margin-top: 20px;\n}\n"],"sourceRoot":""}]);
+// Exports
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
+
+
+/***/ }),
+
 /***/ "./node_modules/css-loader/dist/cjs.js!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[1].use[2]!./src/tailwind.css":
 /*!**************************************************************************************************************************************!*\
   !*** ./node_modules/css-loader/dist/cjs.js!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[1].use[2]!./src/tailwind.css ***!
@@ -28116,26 +29022,41 @@ video {
 .top-0 {
   top: 0px;
 }
-.mr-4 {
-  margin-right: 1rem;
+.block {
+  display: block;
 }
 .flex {
   display: flex;
 }
+.grid {
+  display: grid;
+}
 .contents {
   display: contents;
+}
+.h-\\[50vh\\] {
+  height: 50vh;
 }
 .h-full {
   height: 100%;
 }
-.w-1\\/3 {
-  width: 33.333333%;
-}
 .w-full {
   width: 100%;
 }
+.grid-cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+.flex-col {
+  flex-direction: column;
+}
 .items-center {
   align-items: center;
+}
+.justify-between {
+  justify-content: space-between;
+}
+.gap-4 {
+  gap: 1rem;
 }
 .space-x-4 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-x-reverse: 0;
@@ -28145,6 +29066,9 @@ video {
 .overflow-auto {
   overflow: auto;
 }
+.overflow-y-auto {
+  overflow-y: auto;
+}
 .bg-\\[\\#f0f1f5\\] {
   --tw-bg-opacity: 1;
   background-color: rgb(240 241 245 / var(--tw-bg-opacity, 1));
@@ -28152,19 +29076,9 @@ video {
 .p-4 {
   padding: 1rem;
 }
-.pb-0 {
-  padding-bottom: 0px;
-}
-.text-base {
-  font-size: 1rem;
-  line-height: 1.5rem;
-}
 .text-sm {
   font-size: 0.875rem;
   line-height: 1.25rem;
-}
-.font-bold {
-  font-weight: 700;
 }
 .filter {
   filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow);
@@ -28174,7 +29088,33 @@ video {
     padding-left: 0.5rem;
     font-size: 0.75rem;
 }
-`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"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","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n"],"sourceRoot":""}]);
+
+@media (min-width: 640px) {
+
+  .sm\\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+
+  .lg\\:w-1\\/4 {
+    width: 25%;
+  }
+
+  .lg\\:w-3\\/4 {
+    width: 75%;
+  }
+
+  .lg\\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .lg\\:flex-row {
+    flex-direction: row;
+  }
+}
+`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"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","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
@@ -66868,6 +67808,61 @@ var update = _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js
 
 /***/ }),
 
+/***/ "./src/styles/style.css":
+/*!******************************!*\
+  !*** ./src/styles/style.css ***!
+  \******************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! !../../node_modules/style-loader/dist/runtime/injectStylesIntoStyleTag.js */ "./node_modules/style-loader/dist/runtime/injectStylesIntoStyleTag.js");
+/* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _node_modules_style_loader_dist_runtime_styleDomAPI_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/style-loader/dist/runtime/styleDomAPI.js */ "./node_modules/style-loader/dist/runtime/styleDomAPI.js");
+/* harmony import */ var _node_modules_style_loader_dist_runtime_styleDomAPI_js__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_styleDomAPI_js__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _node_modules_style_loader_dist_runtime_insertBySelector_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! !../../node_modules/style-loader/dist/runtime/insertBySelector.js */ "./node_modules/style-loader/dist/runtime/insertBySelector.js");
+/* harmony import */ var _node_modules_style_loader_dist_runtime_insertBySelector_js__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_insertBySelector_js__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _node_modules_style_loader_dist_runtime_setAttributesWithoutAttributes_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! !../../node_modules/style-loader/dist/runtime/setAttributesWithoutAttributes.js */ "./node_modules/style-loader/dist/runtime/setAttributesWithoutAttributes.js");
+/* harmony import */ var _node_modules_style_loader_dist_runtime_setAttributesWithoutAttributes_js__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_setAttributesWithoutAttributes_js__WEBPACK_IMPORTED_MODULE_3__);
+/* harmony import */ var _node_modules_style_loader_dist_runtime_insertStyleElement_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! !../../node_modules/style-loader/dist/runtime/insertStyleElement.js */ "./node_modules/style-loader/dist/runtime/insertStyleElement.js");
+/* harmony import */ var _node_modules_style_loader_dist_runtime_insertStyleElement_js__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_insertStyleElement_js__WEBPACK_IMPORTED_MODULE_4__);
+/* harmony import */ var _node_modules_style_loader_dist_runtime_styleTagTransform_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! !../../node_modules/style-loader/dist/runtime/styleTagTransform.js */ "./node_modules/style-loader/dist/runtime/styleTagTransform.js");
+/* harmony import */ var _node_modules_style_loader_dist_runtime_styleTagTransform_js__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_styleTagTransform_js__WEBPACK_IMPORTED_MODULE_5__);
+/* harmony import */ var _node_modules_css_loader_dist_cjs_js_node_modules_postcss_loader_dist_cjs_js_ruleSet_1_rules_1_use_2_style_css__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! !!../../node_modules/css-loader/dist/cjs.js!../../node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[1].use[2]!./style.css */ "./node_modules/css-loader/dist/cjs.js!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[1].use[2]!./src/styles/style.css");
+
+      
+      
+      
+      
+      
+      
+      
+      
+      
+
+var options = {};
+
+options.styleTagTransform = (_node_modules_style_loader_dist_runtime_styleTagTransform_js__WEBPACK_IMPORTED_MODULE_5___default());
+options.setAttributes = (_node_modules_style_loader_dist_runtime_setAttributesWithoutAttributes_js__WEBPACK_IMPORTED_MODULE_3___default());
+
+      options.insert = _node_modules_style_loader_dist_runtime_insertBySelector_js__WEBPACK_IMPORTED_MODULE_2___default().bind(null, "head");
+    
+options.domAPI = (_node_modules_style_loader_dist_runtime_styleDomAPI_js__WEBPACK_IMPORTED_MODULE_1___default());
+options.insertStyleElement = (_node_modules_style_loader_dist_runtime_insertStyleElement_js__WEBPACK_IMPORTED_MODULE_4___default());
+
+var update = _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default()(_node_modules_css_loader_dist_cjs_js_node_modules_postcss_loader_dist_cjs_js_ruleSet_1_rules_1_use_2_style_css__WEBPACK_IMPORTED_MODULE_6__["default"], options);
+
+
+
+
+       /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (_node_modules_css_loader_dist_cjs_js_node_modules_postcss_loader_dist_cjs_js_ruleSet_1_rules_1_use_2_style_css__WEBPACK_IMPORTED_MODULE_6__["default"] && _node_modules_css_loader_dist_cjs_js_node_modules_postcss_loader_dist_cjs_js_ruleSet_1_rules_1_use_2_style_css__WEBPACK_IMPORTED_MODULE_6__["default"].locals ? _node_modules_css_loader_dist_cjs_js_node_modules_postcss_loader_dist_cjs_js_ruleSet_1_rules_1_use_2_style_css__WEBPACK_IMPORTED_MODULE_6__["default"].locals : undefined);
+
+
+/***/ }),
+
 /***/ "./src/tailwind.css":
 /*!**************************!*\
   !*** ./src/tailwind.css ***!
@@ -74628,4 +75623,4 @@ window.onload = function () {
 
 /******/ })()
 ;
-//# sourceMappingURL=main.a615cedb318cef568f26.js.map
+//# sourceMappingURL=main.33ce0dac8744319a71bf.js.map

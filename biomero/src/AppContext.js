@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from "react";
-import { fetchomeroTreeData, fetchFolderData, fetchGroups } from "./apiService";
+import { fetchomeroTreeData, fetchFolderData, fetchGroups, fetchScripts, fetchScriptData } from "./apiService"; 
 import { getDjangoConstants } from "./constants";
 import { transformStructure, extractGroups } from "./utils";
 
@@ -13,14 +13,13 @@ export const AppProvider = ({ children }) => {
     urls,
     omeroTreeData: null,
     folderData: null,
+    scripts: [], // Initialize with an empty array for scripts
   });
-
-  console.log("state", state);
 
   const [apiLoading, setLoading] = useState(false);
   const [apiError, setError] = useState(null);
 
-  // Fetch tree data and update context state
+  // Fetch OMERO tree data
   const loadOmeroTreeData = async () => {
     setLoading(true);
     setError(null);
@@ -34,43 +33,38 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Fetch folder data
   const loadFolderData = async (item = null) => {
     setLoading(true);
     setError(null);
-
     try {
-      const response = await fetchFolderData(item); // Fetch folder data from API
-      const contents = response.contents || []; // Extract contents from response
-
-      // Transform the API response into the flat list structure
+      const response = await fetchFolderData(item);
+      const contents = response.contents || [];
       const formattedData = contents.reduce((acc, content) => {
-        const nodeId = content.id; // Unique node ID
+        const nodeId = content.id;
         acc[nodeId] = {
           index: nodeId,
           isFolder: content.is_folder,
-          children: [], // Child nodes will be populated dynamically
-          data: content.name, // Node name or label
-          childCount: 0, // Set to 0 initially; update when children are fetched
+          children: [],
+          data: content.name,
+          childCount: 0,
         };
         return acc;
       }, {});
-
-      // Add the parent folder (e.g., root) and link children
       const parentId = item || "root";
       formattedData[parentId] = {
         index: parentId,
         isFolder: true,
-        children: contents.map((content) => content.id), // List of child IDs
-        data: parentId === "root" ? "Root" : "Folder", // Name for the root or parent folder
+        children: contents.map((content) => content.id),
+        data: parentId === "root" ? "Root" : "Folder",
         childCount: contents.length,
       };
 
-      // Merge with existing folder data
       setState((prevState) => ({
         ...prevState,
         folderData: {
           ...prevState.folderData,
-          ...formattedData, // Add or update new folder contents
+          ...formattedData,
         },
       }));
     } catch (err) {
@@ -80,20 +74,16 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Fetch groups
   const loadGroups = async () => {
     setLoading(true);
     setError(null);
     try {
       const groupsHtml = await fetchGroups();
       const groups = extractGroups(groupsHtml);
-      console.log("groups", groups);
-      // Add groups to user obj in state
       setState((prevState) => ({
         ...prevState,
-        user: {
-          ...prevState.user,
-          groups,
-        },
+        user: { ...prevState.user, groups },
       }));
     } catch (err) {
       setError(err.message);
@@ -102,9 +92,69 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Function to update the state (optional)
+  // Fetch scripts and update context state
+  const loadScripts = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const scripts = await fetchScripts();
+      setState((prevState) => ({
+        ...prevState,
+        scripts,
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch details for a specific script and update context state
+  const fetchScriptDetails = async (scriptId, directory) => {
+    setLoading(true);
+    try {
+      const data = await fetchScriptData(scriptId, directory);
+      const fetchedScript = { id: scriptId, ...data.script_menu[0] };
+  
+      // Helper function to recursively update the nested structure
+      const updateNestedScripts = (nodes) =>
+        nodes.map((node) => {
+          if (node.id === scriptId) {
+            // Update the matching script
+            return { ...node, ...fetchedScript };
+          } else if (node.ul) {
+            // Recursively update child nodes if `ul` exists
+            return { ...node, ul: updateNestedScripts(node.ul) };
+          }
+          return node; // No change for non-matching nodes
+        });
+  
+      // Update the state with the updated nested scripts
+      setState((prevState) => ({
+        ...prevState,
+        scripts: updateNestedScripts(prevState.scripts),
+      }));
+    } catch (err) {
+      setError("Error fetching script data.");
+      console.error("Failed to fetch script data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openScriptWindow = (scriptUrl) => {
+    const SCRIPT_WINDOW_WIDTH = 800;
+    const SCRIPT_WINDOW_HEIGHT = 600;
+
+    const event = { target: { href: scriptUrl } };
+    OME.openScriptWindow(event, SCRIPT_WINDOW_WIDTH, SCRIPT_WINDOW_HEIGHT);
+  };
+
+  
+  
+
+  // Function to update the state
   const updateState = (newState) => {
-    console.log("newState", newState);
     setState((prevState) => ({ ...prevState, ...newState }));
   };
 
@@ -116,6 +166,9 @@ export const AppProvider = ({ children }) => {
         loadOmeroTreeData,
         loadFolderData,
         loadGroups,
+        loadScripts,
+        fetchScriptDetails, // Now available to consumers
+        openScriptWindow,
         apiLoading,
         apiError,
       }}
