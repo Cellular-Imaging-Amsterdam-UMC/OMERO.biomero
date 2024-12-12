@@ -11978,23 +11978,21 @@ const App = () => {
     loadScripts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsxs)("div", {
-    className: "bg-[#f0f1f5] w-full h-full relative top-0 overflow-y-auto",
-    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("div", {
-      className: "p-4",
-      children: state?.user?.groups && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsxs)("div", {
-        className: "flex items-center justify-between",
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_components_SearchBar__WEBPACK_IMPORTED_MODULE_7__["default"], {}), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_components_UploadButton__WEBPACK_IMPORTED_MODULE_8__["default"], {
-          uploadUrl: "/script_upload"
-        })]
-      })
-    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("div", {
-      className: "flex flex-col lg:flex-row space-x-4 h-[50vh]",
-      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("div", {
-        className: "lg:w-1/4 p-4 overflow-auto",
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("div", {
+    className: "bg-[#f0f1f5] w-full h-full relative top-0 overflow-hidden",
+    children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsxs)("div", {
+      className: "flex flex-col lg:flex-row h-[50vh]",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsxs)("div", {
+        className: "w-full lg:w-1/3 p-4 overflow-auto",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("h1", {
+          className: "text-base font-bold p-4 pb-0",
+          children: "OMERO Data"
+        }), state.omeroTreeData && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_OmeroDataBrowser__WEBPACK_IMPORTED_MODULE_3__["default"], {})]
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("div", {
+        className: "w-full lg:w-2/3 p-4 flex-1 overflow-hidden",
         children: state.scripts?.length > 0 ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("div", {
           id: "scripts-menu",
-          className: "h-full",
+          className: "h-full overflow-hidden",
           children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("div", {
             className: "scripts-menu-tabs",
             children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_components_TabContainer__WEBPACK_IMPORTED_MODULE_6__["default"], {
@@ -12004,8 +12002,8 @@ const App = () => {
         }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("p", {
           children: "Loading scripts..."
         })
-      })
-    })]
+      })]
+    })
   });
 };
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (App);
@@ -12755,7 +12753,9 @@ const ScriptDetailsContent = _ref2 => {
     script
   } = _ref2;
   return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+    className: "script-details-content",
     children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+      className: "script-description",
       children: script?.description || "No description available"
     }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("p", {
       children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("strong", {
@@ -12873,7 +12873,8 @@ const SearchBar = () => {
     type: "text",
     id: "scripts-menu-searchBar",
     placeholder: "Search scripts...",
-    onChange: handleSearch
+    onChange: handleSearch,
+    className: "w-full sm:w-auto p-2 border rounded-md text-sm"
   });
 };
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (SearchBar);
@@ -12894,9 +12895,13 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _ScriptCard__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ScriptCard */ "./src/components/ScriptCard.js");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var _SearchBar__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./SearchBar */ "./src/components/SearchBar.js");
+/* harmony import */ var _UploadButton__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./UploadButton */ "./src/components/UploadButton.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
 
  // Import ScriptCard
+ // Assuming SearchBar is another component
+ // Assuming UploadButton is another component
 
 const TabContainer = _ref => {
   let {
@@ -12915,28 +12920,38 @@ const TabContainer = _ref => {
   };
   const renderScripts = folder => {
     return folder.ul?.map(group => {
-      return group.ul?.map(script => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_ScriptCard__WEBPACK_IMPORTED_MODULE_1__["default"], {
+      return group.ul?.map(script => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)(_ScriptCard__WEBPACK_IMPORTED_MODULE_1__["default"], {
         script: script
       }, script.id));
     });
   };
-  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
-    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
-      className: "tab-buttons",
-      children: menuData.map(folder => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("button", {
-        className: `tablink ${folder.name === activeTab ? "active" : ""}`,
-        onClick: () => handleTabClick(folder.name),
-        children: folder.name
-      }, folder.name))
-    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)("div", {
+    className: "tab-container h-full",
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)("div", {
+      className: "tab-controls flex justify-between items-center mb-4",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("div", {
+        className: "tab-buttons flex space-x-4",
+        children: menuData.map(folder => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("button", {
+          className: `tablink ${folder.name === activeTab ? "active" : ""}`,
+          onClick: () => handleTabClick(folder.name),
+          children: folder.name
+        }, folder.name))
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)("div", {
+        className: "tab-right-controls flex space-x-4",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)(_SearchBar__WEBPACK_IMPORTED_MODULE_2__["default"], {}), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)(_UploadButton__WEBPACK_IMPORTED_MODULE_3__["default"], {
+          uploadUrl: "/script_upload"
+        })]
+      })]
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("div", {
       id: "scripts-menu-tabContent",
-      children: menuData.map(folder => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+      className: "scripts-content overflow-auto",
+      children: menuData.map(folder => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("div", {
         id: folder.name,
-        className: "tabcontent",
-        style: {
-          display: folder.name === activeTab ? "block" : "none"
-        },
-        children: renderScripts(folder)
+        className: `tabcontent ${folder.name === activeTab ? "block" : "hidden"}`,
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("div", {
+          className: "scripts-grid",
+          children: renderScripts(folder)
+        })
       }, folder.name))
     })]
   });
@@ -12970,7 +12985,7 @@ const UploadButton = _ref => {
   };
   return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("button", {
     id: "scripts-menu-uploadButton",
-    className: "scripts-menu-upload-button",
+    className: "scripts-menu-upload-button p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600",
     onClick: handleUpload,
     children: "Upload Script"
   });
@@ -28016,103 +28031,197 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1___default()((_node_modules_css_loader_dist_runtime_sourceMaps_js__WEBPACK_IMPORTED_MODULE_0___default()));
 // Module
-___CSS_LOADER_EXPORT___.push([module.id, `/* ScriptCard */
-.script-card {
-max-width: 100%;
-transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-.script-card:hover {
-transform: translateY(-5px);
-box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-}
-.script-card .script-name {
-font-size: 1.2rem;
-font-weight: bold;
+___CSS_LOADER_EXPORT___.push([module.id, `/* TabContainer Layout */
+.tab-container {
+    width: 100%;
+    padding: 20px;
 }
 
-/* Grid Layout */
-.grid-cols-1 {
-grid-template-columns: repeat(1, 1fr);
-}
-.grid-cols-2 {
-grid-template-columns: repeat(2, 1fr);
-}
-.grid-cols-3 {
-grid-template-columns: repeat(3, 1fr);
-}
-.gap-4 {
-gap: 1rem;
+.tab-controls {
+    display: flex;
+    justify-content: flex-start;  /* Align buttons to the left */
+    margin-bottom: 20px;
+    align-items: center;
 }
 
-/* Flex Layout for Search and Upload */
-.search-upload-container {
-display: flex;
-justify-content: space-between;
-}
-
-/* Tabs */
 .tab-buttons {
-display: flex;
-flex-wrap: wrap;
-gap: 10px;
-margin-bottom: 20px;
+    display: flex;
+    gap: 15px;
 }
 
 .tablink {
-padding: 10px 15px;
-background-color: #f0f1f5;
-border: 1px solid #ddd;
-cursor: pointer;
-font-size: 1rem;
-transition: background-color 0.2s ease;
+    padding: 10px 15px;
+    background-color: #f0f1f5;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s ease;
 }
 
 .tablink.active {
-background-color: #007bff;
-color: white;
-}
-  
-
-html, body {
-    height: 100%;
-    margin: 0;
-    overflow-y: auto; /* Enable vertical scrolling */
+    background-color: #007bff;
+    color: white;
 }
 
+.scripts-content {
+    margin-top: 20px;
+}
+
+/* Adjust card layout for multiple columns */
+.scripts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Dynamic columns with a minimum of 200px width per card */
+    gap: 1.5rem;  /* Space between cards */
+    width: 100%;
+}
+
+/* When screen width is below 768px, make grid 1 or 2 columns depending on space */
+@media (max-width: 768px) {
+    .scripts-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Cards will now be at least 150px wide */
+        gap: 1rem;  /* Space between cards */
+    }
+}
+
+/* When screen width is below 480px, force single column layout */
+@media (max-width: 480px) {
+    .scripts-grid {
+        grid-template-columns: 1fr; /* Force 1 column when the screen is small enough */
+    }
+}
+
+/* Adjust for search and upload buttons */
+.search-bar, .upload-button {
+    margin-left: 20px; /* Add spacing between the buttons */
+    position: absolute;
+    right: 20px; /* Move buttons to the far right */
+}
+
+.upload-button {
+    margin-left: 40px; /* Extra space between upload and search */
+}
+
+/* ScriptCard */
+.script-card {
+    background-color: #99ccff;
+    color: black !important;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    text-align: left;
+    box-sizing: border-box;
+    min-width: 200px;
+    height: 150px;  /* Adjust card height */
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.3s, box-shadow 0.3s;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.script-card:hover {
+    background-color: #ffcc99;
+    color: black !important;
+    border-color: black;
+}
+
+/* Ensure content is scrollable when needed */
 #scripts-menu {
-    overflow-y: auto; /* Allow scrolling within the script menu container */
+    overflow-y: auto;
     max-height: 100vh; /* Ensure it's contained within the viewport */
 }
 
-/* Optional: for inner content areas to scroll independently */
-#scripts-menu .script-cards-container {
-    overflow-y: auto;
-    max-height: 80vh; /* Limit to a percentage of the viewport height */
+/* Description paragraphs */
+.script-card .description {
+    font-size: 0.9em;  /* Smaller font size for descriptions */
+    line-height: 1.4;
+    max-height: 100px; /* Max height for the description */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;  /* Show 3 lines max, truncate after */
+    -webkit-box-orient: vertical;
 }
 
-/* Ensure a scrollable area when there is content overflow */
+/* Allow full description without truncating the other paragraphs */
+.script-card .description p {
+    font-size: 0.9em; /* Adjust font size */
+    margin: 5px 0;
+}
+
+/* Tabs position adjustment */
+#scripts-menu .scripts-menu-tabs {
+    display: flex;
+    justify-content: flex-start;  /* Left-align tabs */
+    align-items: center;
+    background-color: #f1f1f1;
+    border-bottom: 1px solid #ccc;
+    padding: 5px;
+}
+
+#scripts-menu .scripts-menu-tabs button {
+    background-color: inherit;
+    border: none;
+    border-radius: 5px;
+    margin-right: 1px;
+    padding: 10px;
+    color: black;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 1.1em;
+}
+
+#scripts-menu .scripts-menu-tabs button.active {
+    background-color: rgb(51, 51, 51) !important;
+    color: white;
+    border-radius: 5px;
+}
+
+/* Search Bar */
+#scripts-menu #scripts-menu-searchBar {
+    margin-left: 20px;  /* Align search bar to the right */
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+    width: 200px;
+    transition: width 0.3s;
+    height: 32px;
+    box-sizing: border-box;
+}
+
 #scripts-menu .tabcontent {
     overflow-y: auto;
-    max-height: 400px; /* Adjust based on design */
+    max-height: 400px;
 }
 
-
-/* This removes the tab in the righ-hand menu of omero.web */
-#annotation_tabs_list li[aria-controls="scripts%20menu"] {
-    display: none;
+/* Optional: Ensure scroll for specific areas if content overflows */
+#scripts-menu .script-cards-container {
+    overflow-y: auto;
+    max-height: 80vh;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    justify-content: flex-start;
 }
 
-/* Add this at the beginning of your CSS file */
-#scripts\\ menu.right_tab_content {
-    height: 0;
-    width: 0;
-    overflow: hidden;
-    position: absolute;
+/* Responsive Card Layout */
+#scripts-menu .script-card {
+    flex-basis: calc(33.333% - 5px);  /* 3 cards per row by default */
 }
 
-#scripts-menu {
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    color: hsl(210, 20%, 80%);
+/* Responsive adjustments for mobile */
+@media (max-width: 600px), (max-height: 600px) {
+    #scripts-menu .script-card {
+        flex-basis: 100%;  /* Full width on small screens */
+    }
+}
+
+/* Minimized state for smaller card view */
+#scripts-menu #scripts-menu-draggable.minimized {
+    width: 30px;
+    height: 30px;
 }
 
 #scripts-menu #scripts-menu-draggable {
@@ -28124,12 +28233,9 @@ html, body {
     background-color: lightgrey;
     border: 1px solid #ccc;
     z-index: 1000;
-    overflow: hidden;
     box-shadow: 0 0 10px rgba(0,0,0,0.5);
-    min-width: 300px; /* Set minimum width */
+    min-width: 300px;
     border-radius: 10px;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    color: hsl(210, 20%, 80%);
 }
 
 #scripts-menu #scripts-menu-draggable.enlarged {
@@ -28141,361 +28247,50 @@ html, body {
     right: 5px;
 }
 
-#scripts-menu .scripts-menu-window-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 5px;
-    background-color: #333;
-    color: white;
-    cursor: move;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
-}
-
-#scripts-menu .scripts-menu-title-container {
-    display: flex;
-    align-items: center;
-}
-
-#scripts-menu .scripts-menu-window-title {
-    font-size: 1.2em;
-}
-
-#scripts-menu .scripts-menu-script-icon {
-    width: 24px;
-    height: 24px;
-    margin-left: 10px;
-    margin-right: 10px;
-}
-
-#scripts-menu .scripts-menu-window-controls button {
-    background: none;
-    border: none;
-    color: white;
-    cursor: pointer;
-    padding: 5px;
-    font-size: 16px;
-}
-
-#scripts-menu .scripts-menu-tabs {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: #f1f1f1;
-    border-bottom: 1px solid #ccc;
-    padding: 5px;
-}
-
-#scripts-menu #scripts-menu-tabContainer {
-    display: flex;
-    flex-grow: 1;
-    overflow-x: auto;
-    font-size: 1.1em;
-}
-
-#scripts-menu .scripts-menu-tabs button {
-    background-color: inherit;
-    border: none;
-    border-radius: 5px;
-    margin-right: 1px;
-    outline: none;
-    cursor: pointer;
-    padding: 10px;
-    transition: 0.3s;
-    color: black;
-    font-weight: bold;
-    white-space: nowrap; /* Prevent text wrapping in buttons */
-    flex-shrink: 0; /* Prevent buttons from shrinking */
-    font-size: 1.1em;
-}
-
-#scripts-menu #scripts-menu-searchBar {
-    margin-left: auto;
-    padding: 6px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    font-size: 14px;
-    width: 200px;
-    transition: width 0.3s;
-    height: 32px;
-    box-sizing: border-box;
-    font-size: 1.1em;
-}
-
-#scripts-menu #scripts-menu-searchBar.small {
-    width: 100px;
-    font-size: 1.1em;
-}
-
-#scripts-menu .scripts-menu-tabs button:hover {
-    background-color: #fffdfd;
-}
-
-#scripts-menu .scripts-menu-tabs button.active {
-    background-color: rgb(51, 51, 51) !important;
-    color: white;
-    border-radius: 5px;
-}
-
-#scripts-menu .tabcontent {
-    display: none;
-    border: 1px solid #ccc;
-    border-top: none;
-    overflow-y: scroll;
-    padding-bottom: 20px;
-}
-
-#scripts-menu .directory {
-    padding: 5px;
-    margin: 5px;
-    border-radius: 5px;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    background-color: #f1f1f1;
-    transition: background-color 0.3s, margin 0.3s, padding 0.3s;
-}
-
-#scripts-menu .directory.small,
-#scripts-menu .directory.small > * {
-    background-color: transparent !important;
-    margin: 0 !important;
-    padding-bottom: 0 !important;
-}
-
-#scripts-menu .subdirectory-header {
-    background-color: transparent;
-    color: black;
-    padding-bottom: 10px;
-    padding-top: 0;
-    cursor: default;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-    font-size: 12px;
-    font-weight: bold;
-}
-
-@media (max-width: 600px), (max-height: 600px) {
-    #scripts-menu .subdirectory-header {
-        display: none;
-    }
-
-    #scripts-menu .script-card {
-        height: auto;
-        padding: 10px;
-    }
-}
-
-#scripts-menu .script-cards-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    justify-content: flex-start;
-    width: 100%;
-}
-
-/* For containers with only one card */
-#scripts-menu .script-cards-container:only-child {
-    width: 100%;
-}
-
-/* For containers with exactly two cards */
-#scripts-menu .script-cards-container:nth-last-child(2):first-child,
-#scripts-menu .script-cards-container:nth-last-child(2):first-child ~ .script-card {
-    flex-basis: calc(50% - 5px);
-}
-
-/* For containers with exactly three cards */
-#scripts-menu .script-cards-container:nth-last-child(3):first-child,
-#scripts-menu .script-cards-container:nth-last-child(3):first-child ~ .script-card {
-    flex-basis: calc(33.333% - 5px);
-}
-
-#scripts-menu .script-card {
-    background-color: #99ccff;
-    color: black !important;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    flex: 1 0 calc(33.333% - 5px);
-    text-align: left;
-    box-sizing: border-box;
-    min-width: 200px; /* Minimum width to ensure cards are not too small */
-    min-height: 60px; /* Minimum height to ensure title is not cut off */
-    height: 150px; /* Increase height for larger size */
-    overflow: hidden;
-    position: relative;
-    cursor: pointer;
-    transition: background-color 0.3s, border-width 0.3s, font-weight 0.3s, color 0.3s, height 0.3s, padding 0.3s, max-height 0.3s;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-    font-size: 1.2em;
-    font-weight: bold;
-}
-
-#scripts-menu .custom-script-card {
-    background-color: #cceeff;
-}
-
-#scripts-menu .script-card:hover {
-    background-color: #ffcc99;
-    color: black !important;
-    border-color: black;
-}
-
-#scripts-menu .minimized {
-    width: 30px;
-    height: 30px;
-    background-color: white;
-    border: 1px solid #ccc;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);
-    overflow: hidden;
-    cursor: pointer;
-    resize: none;
-}
-
-#scripts-menu .maximized {
-    width: 100% !important;
-    height: 100% !important;
-    top: 0 !important;
-    left: 0 !important;
-}
-
-#scripts-menu #scripts-menu-draggable.minimized {
-    width: 30px;
-    height: 30px;
-    background-color: white;
-    cursor: pointer;
-}
-
-#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-window-header,
-#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-tabs,
-#scripts-menu #scripts-menu-draggable.minimized .tabcontent {
+/* Tabs hidden in the right-hand menu of omero.web */
+#annotation_tabs_list li[aria-controls="scripts%20menu"] {
     display: none;
 }
 
-#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-restore-btn {
-    display: block;
-    width: 100%;
-    height: 100%;
-    text-align: center;
-    line-height: 30px;
-    cursor: pointer;
-}
-
-#scripts-menu .scripts-menu-restore-btn {
-    display: none;
-    position: absolute;
-    top: 0;
-    left: 0;
-}
-
-#scripts-menu .script-link {
-    text-decoration: none;
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-    position: relative;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-}
-
-#scripts-menu .script-link::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 20px;
-    background: linear-gradient(to left, #99ccff, transparent);
-}
-
+/* Make sure script cards are not hidden by overflow */
 #scripts-menu .script-card-content {
-    display: none;
-    position: static;
-    bottom: 10px;
-    left: 10px;
-    right: 10px;
-    top: 40px;
+    display: block;
+    position: relative;
+    top: 4px;
     overflow: hidden;
-    display: -webkit-box; /* Use flexbox to align items side by side */
-    -webkit-box-orient: vertical; /* Set box orientation to vertical */
-    -webkit-line-clamp: 6; /* Show up to N lines */
-    line-clamp: 6;
-    align-items: center;
-    white-space: normal;
-    text-overflow: ellipsis; /* Add ellipsis to indicate overflow */
-    font-size: 1em; /* Set smaller font size */
+    font-size: 1em;
     font-weight: normal;
 }
 
-#scripts-menu .script-card-content span {
-    padding-top: 5px;
-    margin-right: 10px;
-    padding-bottom: 1px;
+/* Ensure the card content is contained within its fixed size */
+.script-card-content {
+    height: 150px; /* You can adjust this height to fit your design */
+    overflow: hidden; /* Hide overflow */
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* Limit the description to 2/4 of the height */
+  .script-description {
+    flex: 2; /* Takes 2/4 of the total height */
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: normal;
-    display: -webkit-box; /* Use flexbox to align items side by side */
-    -webkit-box-orient: vertical; /* Set box orientation to vertical */
-    -webkit-line-clamp: 9; /* Show up to N lines */
-    line-clamp: 9;
-    font-size: 1em; /* Set smaller font size */
-}
-
-/* Not currently in use*/
-#scripts-menu .script-card-content img {
-    max-width: 50px;
-    max-height: 50px;
-    object-fit: contain;
-    cursor: pointer;
-}
-
-#scripts-menu .script-card.large .script-card-content {
-    display: flex;
-}
-
-#scripts-menu .script-card.small {
-    height: auto;
-    padding: 10px;
-    max-height: 100px;
-}
-
-#scripts-menu .scripts-menu-search-bar.small {
-    width: 100px;
-}
-
-#scripts-menu #scripts-menu-uploadButton {
-    background-color: gray;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    padding: 6px 12px;
-    margin-left: 5px;
-    cursor: pointer;
-    font-size: 14px;
-    height: 32px; /* Match the height of the search input */
-    white-space: nowrap;
-    box-sizing: border-box;
-    line-height: 20px;
-    font-size: 1.1em;
-}
-
-#scripts-menu .scroll-padding {
-    height: 100px;
-    width: 100%;
-}
-
-#scripts-menu .bottom-dir-spacer-container {
-    background-color: transparent !important;
-}
-
-#scripts-menu .bottom-dir-spacer {
-    height: 100px;
-    width: 100%;
-    background-color: transparent !important;
-    border: none;
-    margin-top: 20px;
-}
-`, "",{"version":3,"sources":["webpack://./src/styles/style.css"],"names":[],"mappings":"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","sourcesContent":["/* ScriptCard */\n.script-card {\nmax-width: 100%;\ntransition: transform 0.3s ease, box-shadow 0.3s ease;\n}\n.script-card:hover {\ntransform: translateY(-5px);\nbox-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);\n}\n.script-card .script-name {\nfont-size: 1.2rem;\nfont-weight: bold;\n}\n\n/* Grid Layout */\n.grid-cols-1 {\ngrid-template-columns: repeat(1, 1fr);\n}\n.grid-cols-2 {\ngrid-template-columns: repeat(2, 1fr);\n}\n.grid-cols-3 {\ngrid-template-columns: repeat(3, 1fr);\n}\n.gap-4 {\ngap: 1rem;\n}\n\n/* Flex Layout for Search and Upload */\n.search-upload-container {\ndisplay: flex;\njustify-content: space-between;\n}\n\n/* Tabs */\n.tab-buttons {\ndisplay: flex;\nflex-wrap: wrap;\ngap: 10px;\nmargin-bottom: 20px;\n}\n\n.tablink {\npadding: 10px 15px;\nbackground-color: #f0f1f5;\nborder: 1px solid #ddd;\ncursor: pointer;\nfont-size: 1rem;\ntransition: background-color 0.2s ease;\n}\n\n.tablink.active {\nbackground-color: #007bff;\ncolor: white;\n}\n  \n\nhtml, body {\n    height: 100%;\n    margin: 0;\n    overflow-y: auto; /* Enable vertical scrolling */\n}\n\n#scripts-menu {\n    overflow-y: auto; /* Allow scrolling within the script menu container */\n    max-height: 100vh; /* Ensure it's contained within the viewport */\n}\n\n/* Optional: for inner content areas to scroll independently */\n#scripts-menu .script-cards-container {\n    overflow-y: auto;\n    max-height: 80vh; /* Limit to a percentage of the viewport height */\n}\n\n/* Ensure a scrollable area when there is content overflow */\n#scripts-menu .tabcontent {\n    overflow-y: auto;\n    max-height: 400px; /* Adjust based on design */\n}\n\n\n/* This removes the tab in the righ-hand menu of omero.web */\n#annotation_tabs_list li[aria-controls=\"scripts%20menu\"] {\n    display: none;\n}\n\n/* Add this at the beginning of your CSS file */\n#scripts\\ menu.right_tab_content {\n    height: 0;\n    width: 0;\n    overflow: hidden;\n    position: absolute;\n}\n\n#scripts-menu {\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n    color: hsl(210, 20%, 80%);\n}\n\n#scripts-menu #scripts-menu-draggable {\n    position: fixed;\n    bottom: 50px;\n    right: 50px;\n    width: 300px;\n    height: 400px;\n    background-color: lightgrey;\n    border: 1px solid #ccc;\n    z-index: 1000;\n    overflow: hidden;\n    box-shadow: 0 0 10px rgba(0,0,0,0.5);\n    min-width: 300px; /* Set minimum width */\n    border-radius: 10px;\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n    color: hsl(210, 20%, 80%);\n}\n\n#scripts-menu #scripts-menu-draggable.enlarged {\n    width: calc(100% - 360px);\n    height: calc(100% - 45px);\n    top: 40px;\n    left: 355px;\n    bottom: 5px;\n    right: 5px;\n}\n\n#scripts-menu .scripts-menu-window-header {\n    display: flex;\n    justify-content: space-between;\n    align-items: center;\n    padding: 0 5px;\n    background-color: #333;\n    color: white;\n    cursor: move;\n    border-top-left-radius: 10px;\n    border-top-right-radius: 10px;\n}\n\n#scripts-menu .scripts-menu-title-container {\n    display: flex;\n    align-items: center;\n}\n\n#scripts-menu .scripts-menu-window-title {\n    font-size: 1.2em;\n}\n\n#scripts-menu .scripts-menu-script-icon {\n    width: 24px;\n    height: 24px;\n    margin-left: 10px;\n    margin-right: 10px;\n}\n\n#scripts-menu .scripts-menu-window-controls button {\n    background: none;\n    border: none;\n    color: white;\n    cursor: pointer;\n    padding: 5px;\n    font-size: 16px;\n}\n\n#scripts-menu .scripts-menu-tabs {\n    display: flex;\n    justify-content: space-between;\n    align-items: center;\n    background-color: #f1f1f1;\n    border-bottom: 1px solid #ccc;\n    padding: 5px;\n}\n\n#scripts-menu #scripts-menu-tabContainer {\n    display: flex;\n    flex-grow: 1;\n    overflow-x: auto;\n    font-size: 1.1em;\n}\n\n#scripts-menu .scripts-menu-tabs button {\n    background-color: inherit;\n    border: none;\n    border-radius: 5px;\n    margin-right: 1px;\n    outline: none;\n    cursor: pointer;\n    padding: 10px;\n    transition: 0.3s;\n    color: black;\n    font-weight: bold;\n    white-space: nowrap; /* Prevent text wrapping in buttons */\n    flex-shrink: 0; /* Prevent buttons from shrinking */\n    font-size: 1.1em;\n}\n\n#scripts-menu #scripts-menu-searchBar {\n    margin-left: auto;\n    padding: 6px;\n    border: 1px solid #ccc;\n    border-radius: 5px;\n    font-size: 14px;\n    width: 200px;\n    transition: width 0.3s;\n    height: 32px;\n    box-sizing: border-box;\n    font-size: 1.1em;\n}\n\n#scripts-menu #scripts-menu-searchBar.small {\n    width: 100px;\n    font-size: 1.1em;\n}\n\n#scripts-menu .scripts-menu-tabs button:hover {\n    background-color: #fffdfd;\n}\n\n#scripts-menu .scripts-menu-tabs button.active {\n    background-color: rgb(51, 51, 51) !important;\n    color: white;\n    border-radius: 5px;\n}\n\n#scripts-menu .tabcontent {\n    display: none;\n    border: 1px solid #ccc;\n    border-top: none;\n    overflow-y: scroll;\n    padding-bottom: 20px;\n}\n\n#scripts-menu .directory {\n    padding: 5px;\n    margin: 5px;\n    border-radius: 5px;\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n    background-color: #f1f1f1;\n    transition: background-color 0.3s, margin 0.3s, padding 0.3s;\n}\n\n#scripts-menu .directory.small,\n#scripts-menu .directory.small > * {\n    background-color: transparent !important;\n    margin: 0 !important;\n    padding-bottom: 0 !important;\n}\n\n#scripts-menu .subdirectory-header {\n    background-color: transparent;\n    color: black;\n    padding-bottom: 10px;\n    padding-top: 0;\n    cursor: default;\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif !important;\n    font-size: 12px;\n    font-weight: bold;\n}\n\n@media (max-width: 600px), (max-height: 600px) {\n    #scripts-menu .subdirectory-header {\n        display: none;\n    }\n\n    #scripts-menu .script-card {\n        height: auto;\n        padding: 10px;\n    }\n}\n\n#scripts-menu .script-cards-container {\n    display: flex;\n    flex-wrap: wrap;\n    gap: 5px;\n    justify-content: flex-start;\n    width: 100%;\n}\n\n/* For containers with only one card */\n#scripts-menu .script-cards-container:only-child {\n    width: 100%;\n}\n\n/* For containers with exactly two cards */\n#scripts-menu .script-cards-container:nth-last-child(2):first-child,\n#scripts-menu .script-cards-container:nth-last-child(2):first-child ~ .script-card {\n    flex-basis: calc(50% - 5px);\n}\n\n/* For containers with exactly three cards */\n#scripts-menu .script-cards-container:nth-last-child(3):first-child,\n#scripts-menu .script-cards-container:nth-last-child(3):first-child ~ .script-card {\n    flex-basis: calc(33.333% - 5px);\n}\n\n#scripts-menu .script-card {\n    background-color: #99ccff;\n    color: black !important;\n    padding: 10px;\n    border: 1px solid #ccc;\n    border-radius: 5px;\n    flex: 1 0 calc(33.333% - 5px);\n    text-align: left;\n    box-sizing: border-box;\n    min-width: 200px; /* Minimum width to ensure cards are not too small */\n    min-height: 60px; /* Minimum height to ensure title is not cut off */\n    height: 150px; /* Increase height for larger size */\n    overflow: hidden;\n    position: relative;\n    cursor: pointer;\n    transition: background-color 0.3s, border-width 0.3s, font-weight 0.3s, color 0.3s, height 0.3s, padding 0.3s, max-height 0.3s;\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif !important;\n    font-size: 1.2em;\n    font-weight: bold;\n}\n\n#scripts-menu .custom-script-card {\n    background-color: #cceeff;\n}\n\n#scripts-menu .script-card:hover {\n    background-color: #ffcc99;\n    color: black !important;\n    border-color: black;\n}\n\n#scripts-menu .minimized {\n    width: 30px;\n    height: 30px;\n    background-color: white;\n    border: 1px solid #ccc;\n    box-shadow: 0 0 10px rgba(0,0,0,0.5);\n    overflow: hidden;\n    cursor: pointer;\n    resize: none;\n}\n\n#scripts-menu .maximized {\n    width: 100% !important;\n    height: 100% !important;\n    top: 0 !important;\n    left: 0 !important;\n}\n\n#scripts-menu #scripts-menu-draggable.minimized {\n    width: 30px;\n    height: 30px;\n    background-color: white;\n    cursor: pointer;\n}\n\n#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-window-header,\n#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-tabs,\n#scripts-menu #scripts-menu-draggable.minimized .tabcontent {\n    display: none;\n}\n\n#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-restore-btn {\n    display: block;\n    width: 100%;\n    height: 100%;\n    text-align: center;\n    line-height: 30px;\n    cursor: pointer;\n}\n\n#scripts-menu .scripts-menu-restore-btn {\n    display: none;\n    position: absolute;\n    top: 0;\n    left: 0;\n}\n\n#scripts-menu .script-link {\n    text-decoration: none;\n    display: block;\n    white-space: nowrap;\n    overflow: hidden;\n    text-overflow: ellipsis;\n    max-width: 100%;\n    position: relative;\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n}\n\n#scripts-menu .script-link::after {\n    content: '';\n    position: absolute;\n    right: 0;\n    top: 0;\n    bottom: 0;\n    width: 20px;\n    background: linear-gradient(to left, #99ccff, transparent);\n}\n\n#scripts-menu .script-card-content {\n    display: none;\n    position: static;\n    bottom: 10px;\n    left: 10px;\n    right: 10px;\n    top: 40px;\n    overflow: hidden;\n    display: -webkit-box; /* Use flexbox to align items side by side */\n    -webkit-box-orient: vertical; /* Set box orientation to vertical */\n    -webkit-line-clamp: 6; /* Show up to N lines */\n    line-clamp: 6;\n    align-items: center;\n    white-space: normal;\n    text-overflow: ellipsis; /* Add ellipsis to indicate overflow */\n    font-size: 1em; /* Set smaller font size */\n    font-weight: normal;\n}\n\n#scripts-menu .script-card-content span {\n    padding-top: 5px;\n    margin-right: 10px;\n    padding-bottom: 1px;\n    overflow: hidden;\n    text-overflow: ellipsis;\n    white-space: normal;\n    display: -webkit-box; /* Use flexbox to align items side by side */\n    -webkit-box-orient: vertical; /* Set box orientation to vertical */\n    -webkit-line-clamp: 9; /* Show up to N lines */\n    line-clamp: 9;\n    font-size: 1em; /* Set smaller font size */\n}\n\n/* Not currently in use*/\n#scripts-menu .script-card-content img {\n    max-width: 50px;\n    max-height: 50px;\n    object-fit: contain;\n    cursor: pointer;\n}\n\n#scripts-menu .script-card.large .script-card-content {\n    display: flex;\n}\n\n#scripts-menu .script-card.small {\n    height: auto;\n    padding: 10px;\n    max-height: 100px;\n}\n\n#scripts-menu .scripts-menu-search-bar.small {\n    width: 100px;\n}\n\n#scripts-menu #scripts-menu-uploadButton {\n    background-color: gray;\n    color: white;\n    border: none;\n    border-radius: 5px;\n    padding: 6px 12px;\n    margin-left: 5px;\n    cursor: pointer;\n    font-size: 14px;\n    height: 32px; /* Match the height of the search input */\n    white-space: nowrap;\n    box-sizing: border-box;\n    line-height: 20px;\n    font-size: 1.1em;\n}\n\n#scripts-menu .scroll-padding {\n    height: 100px;\n    width: 100%;\n}\n\n#scripts-menu .bottom-dir-spacer-container {\n    background-color: transparent !important;\n}\n\n#scripts-menu .bottom-dir-spacer {\n    height: 100px;\n    width: 100%;\n    background-color: transparent !important;\n    border: none;\n    margin-top: 20px;\n}\n"],"sourceRoot":""}]);
+    white-space: normal; /* Allow text to wrap to multiple lines */
+    display: -webkit-box;
+    -webkit-line-clamp: 5; /* Allow up to 2 lines before ellipsis (change this to 3 for 3 lines) */
+    -webkit-box-orient: vertical;
+  }
+  
+  /* Limit the other paragraphs (authors, version) to 1/4 of the height */
+  .script-details-content p {
+    flex: 1; /* Take 1/4 of the total height */
+    margin: 0;
+    padding: 0;
+    word-wrap: break-word;
+    font-size: 0.875em; /* Adjust this to your desired size */
+  }
+  
+`, "",{"version":3,"sources":["webpack://./src/styles/style.css"],"names":[],"mappings":"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","sourcesContent":["/* TabContainer Layout */\n.tab-container {\n    width: 100%;\n    padding: 20px;\n}\n\n.tab-controls {\n    display: flex;\n    justify-content: flex-start;  /* Align buttons to the left */\n    margin-bottom: 20px;\n    align-items: center;\n}\n\n.tab-buttons {\n    display: flex;\n    gap: 15px;\n}\n\n.tablink {\n    padding: 10px 15px;\n    background-color: #f0f1f5;\n    border: 1px solid #ddd;\n    cursor: pointer;\n    font-size: 1rem;\n    transition: background-color 0.2s ease;\n}\n\n.tablink.active {\n    background-color: #007bff;\n    color: white;\n}\n\n.scripts-content {\n    margin-top: 20px;\n}\n\n/* Adjust card layout for multiple columns */\n.scripts-grid {\n    display: grid;\n    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Dynamic columns with a minimum of 200px width per card */\n    gap: 1.5rem;  /* Space between cards */\n    width: 100%;\n}\n\n/* When screen width is below 768px, make grid 1 or 2 columns depending on space */\n@media (max-width: 768px) {\n    .scripts-grid {\n        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Cards will now be at least 150px wide */\n        gap: 1rem;  /* Space between cards */\n    }\n}\n\n/* When screen width is below 480px, force single column layout */\n@media (max-width: 480px) {\n    .scripts-grid {\n        grid-template-columns: 1fr; /* Force 1 column when the screen is small enough */\n    }\n}\n\n/* Adjust for search and upload buttons */\n.search-bar, .upload-button {\n    margin-left: 20px; /* Add spacing between the buttons */\n    position: absolute;\n    right: 20px; /* Move buttons to the far right */\n}\n\n.upload-button {\n    margin-left: 40px; /* Extra space between upload and search */\n}\n\n/* ScriptCard */\n.script-card {\n    background-color: #99ccff;\n    color: black !important;\n    padding: 10px;\n    border: 1px solid #ccc;\n    border-radius: 5px;\n    text-align: left;\n    box-sizing: border-box;\n    min-width: 200px;\n    height: 150px;  /* Adjust card height */\n    overflow: hidden;\n    position: relative;\n    cursor: pointer;\n    transition: background-color 0.3s, box-shadow 0.3s;\n    font-size: 1.2em;\n    font-weight: bold;\n}\n\n.script-card:hover {\n    background-color: #ffcc99;\n    color: black !important;\n    border-color: black;\n}\n\n/* Ensure content is scrollable when needed */\n#scripts-menu {\n    overflow-y: auto;\n    max-height: 100vh; /* Ensure it's contained within the viewport */\n}\n\n/* Description paragraphs */\n.script-card .description {\n    font-size: 0.9em;  /* Smaller font size for descriptions */\n    line-height: 1.4;\n    max-height: 100px; /* Max height for the description */\n    overflow: hidden;\n    text-overflow: ellipsis;\n    display: -webkit-box;\n    -webkit-line-clamp: 3;  /* Show 3 lines max, truncate after */\n    -webkit-box-orient: vertical;\n}\n\n/* Allow full description without truncating the other paragraphs */\n.script-card .description p {\n    font-size: 0.9em; /* Adjust font size */\n    margin: 5px 0;\n}\n\n/* Tabs position adjustment */\n#scripts-menu .scripts-menu-tabs {\n    display: flex;\n    justify-content: flex-start;  /* Left-align tabs */\n    align-items: center;\n    background-color: #f1f1f1;\n    border-bottom: 1px solid #ccc;\n    padding: 5px;\n}\n\n#scripts-menu .scripts-menu-tabs button {\n    background-color: inherit;\n    border: none;\n    border-radius: 5px;\n    margin-right: 1px;\n    padding: 10px;\n    color: black;\n    font-weight: bold;\n    cursor: pointer;\n    font-size: 1.1em;\n}\n\n#scripts-menu .scripts-menu-tabs button.active {\n    background-color: rgb(51, 51, 51) !important;\n    color: white;\n    border-radius: 5px;\n}\n\n/* Search Bar */\n#scripts-menu #scripts-menu-searchBar {\n    margin-left: 20px;  /* Align search bar to the right */\n    padding: 6px;\n    border: 1px solid #ccc;\n    border-radius: 5px;\n    font-size: 14px;\n    width: 200px;\n    transition: width 0.3s;\n    height: 32px;\n    box-sizing: border-box;\n}\n\n#scripts-menu .tabcontent {\n    overflow-y: auto;\n    max-height: 400px;\n}\n\n/* Optional: Ensure scroll for specific areas if content overflows */\n#scripts-menu .script-cards-container {\n    overflow-y: auto;\n    max-height: 80vh;\n    display: flex;\n    flex-wrap: wrap;\n    gap: 5px;\n    justify-content: flex-start;\n}\n\n/* Responsive Card Layout */\n#scripts-menu .script-card {\n    flex-basis: calc(33.333% - 5px);  /* 3 cards per row by default */\n}\n\n/* Responsive adjustments for mobile */\n@media (max-width: 600px), (max-height: 600px) {\n    #scripts-menu .script-card {\n        flex-basis: 100%;  /* Full width on small screens */\n    }\n}\n\n/* Minimized state for smaller card view */\n#scripts-menu #scripts-menu-draggable.minimized {\n    width: 30px;\n    height: 30px;\n}\n\n#scripts-menu #scripts-menu-draggable {\n    position: fixed;\n    bottom: 50px;\n    right: 50px;\n    width: 300px;\n    height: 400px;\n    background-color: lightgrey;\n    border: 1px solid #ccc;\n    z-index: 1000;\n    box-shadow: 0 0 10px rgba(0,0,0,0.5);\n    min-width: 300px;\n    border-radius: 10px;\n}\n\n#scripts-menu #scripts-menu-draggable.enlarged {\n    width: calc(100% - 360px);\n    height: calc(100% - 45px);\n    top: 40px;\n    left: 355px;\n    bottom: 5px;\n    right: 5px;\n}\n\n/* Tabs hidden in the right-hand menu of omero.web */\n#annotation_tabs_list li[aria-controls=\"scripts%20menu\"] {\n    display: none;\n}\n\n/* Make sure script cards are not hidden by overflow */\n#scripts-menu .script-card-content {\n    display: block;\n    position: relative;\n    top: 4px;\n    overflow: hidden;\n    font-size: 1em;\n    font-weight: normal;\n}\n\n/* Ensure the card content is contained within its fixed size */\n.script-card-content {\n    height: 150px; /* You can adjust this height to fit your design */\n    overflow: hidden; /* Hide overflow */\n    display: flex;\n    flex-direction: column;\n  }\n  \n  /* Limit the description to 2/4 of the height */\n  .script-description {\n    flex: 2; /* Takes 2/4 of the total height */\n    overflow: hidden;\n    text-overflow: ellipsis;\n    white-space: normal; /* Allow text to wrap to multiple lines */\n    display: -webkit-box;\n    -webkit-line-clamp: 5; /* Allow up to 2 lines before ellipsis (change this to 3 for 3 lines) */\n    -webkit-box-orient: vertical;\n  }\n  \n  /* Limit the other paragraphs (authors, version) to 1/4 of the height */\n  .script-details-content p {\n    flex: 1; /* Take 1/4 of the total height */\n    margin: 0;\n    padding: 0;\n    word-wrap: break-word;\n    font-size: 0.875em; /* Adjust this to your desired size */\n  }\n  \n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
@@ -29022,6 +28817,9 @@ video {
 .top-0 {
   top: 0px;
 }
+.mb-4 {
+  margin-bottom: 1rem;
+}
 .block {
   display: block;
 }
@@ -29034,6 +28832,9 @@ video {
 .contents {
   display: contents;
 }
+.hidden {
+  display: none;
+}
 .h-\\[50vh\\] {
   height: 50vh;
 }
@@ -29042,6 +28843,9 @@ video {
 }
 .w-full {
   width: 100%;
+}
+.flex-1 {
+  flex: 1 1 0%;
 }
 .grid-cols-1 {
   grid-template-columns: repeat(1, minmax(0, 1fr));
@@ -29055,8 +28859,8 @@ video {
 .justify-between {
   justify-content: space-between;
 }
-.gap-4 {
-  gap: 1rem;
+.gap-6 {
+  gap: 1.5rem;
 }
 .space-x-4 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-x-reverse: 0;
@@ -29066,19 +28870,46 @@ video {
 .overflow-auto {
   overflow: auto;
 }
-.overflow-y-auto {
-  overflow-y: auto;
+.overflow-hidden {
+  overflow: hidden;
+}
+.rounded-md {
+  border-radius: 0.375rem;
+}
+.border {
+  border-width: 1px;
 }
 .bg-\\[\\#f0f1f5\\] {
   --tw-bg-opacity: 1;
   background-color: rgb(240 241 245 / var(--tw-bg-opacity, 1));
 }
+.bg-blue-500 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(59 130 246 / var(--tw-bg-opacity, 1));
+}
+.p-2 {
+  padding: 0.5rem;
+}
 .p-4 {
   padding: 1rem;
+}
+.pb-0 {
+  padding-bottom: 0px;
+}
+.text-base {
+  font-size: 1rem;
+  line-height: 1.5rem;
 }
 .text-sm {
   font-size: 0.875rem;
   line-height: 1.25rem;
+}
+.font-bold {
+  font-weight: 700;
+}
+.text-white {
+  --tw-text-opacity: 1;
+  color: rgb(255 255 255 / var(--tw-text-opacity, 1));
 }
 .filter {
   filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow);
@@ -29089,32 +28920,48 @@ video {
     font-size: 0.75rem;
 }
 
+.hover\\:bg-blue-600:hover {
+  --tw-bg-opacity: 1;
+  background-color: rgb(37 99 235 / var(--tw-bg-opacity, 1));
+}
+
 @media (min-width: 640px) {
+
+  .sm\\:w-auto {
+    width: auto;
+  }
 
   .sm\\:grid-cols-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
+@media (min-width: 768px) {
+
+  .md\\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (min-width: 1024px) {
 
-  .lg\\:w-1\\/4 {
-    width: 25%;
+  .lg\\:w-1\\/3 {
+    width: 33.333333%;
   }
 
-  .lg\\:w-3\\/4 {
-    width: 75%;
+  .lg\\:w-2\\/3 {
+    width: 66.666667%;
   }
 
-  .lg\\:grid-cols-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .lg\\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .lg\\:flex-row {
     flex-direction: row;
   }
 }
-`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"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","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n"],"sourceRoot":""}]);
+`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"AAAA;EAAA,wBAAc;EAAd,wBAAc;EAAd,mBAAc;EAAd,mBAAc;EAAd,cAAc;EAAd,cAAc;EAAd,cAAc;EAAd,eAAc;EAAd,eAAc;EAAd,aAAc;EAAd,aAAc;EAAd,kBAAc;EAAd,sCAAc;EAAd,8BAAc;EAAd,6BAAc;EAAd,4BAAc;EAAd,eAAc;EAAd,oBAAc;EAAd,sBAAc;EAAd,uBAAc;EAAd,wBAAc;EAAd,kBAAc;EAAd,2BAAc;EAAd,4BAAc;EAAd,sCAAc;EAAd,kCAAc;EAAd,2BAAc;EAAd,sBAAc;EAAd,8BAAc;EAAd,YAAc;EAAd,kBAAc;EAAd,gBAAc;EAAd,iBAAc;EAAd,kBAAc;EAAd,cAAc;EAAd,gBAAc;EAAd,aAAc;EAAd,mBAAc;EAAd,qBAAc;EAAd,2BAAc;EAAd,yBAAc;EAAd,0BAAc;EAAd,2BAAc;EAAd,uBAAc;EAAd,wBAAc;EAAd,yBAAc;EAAd,sBAAc;EAAd,oBAAc;EAAd,sBAAc;EAAd,qBAAc;EAAd;AAAc;;AAAd;EAAA,wBAAc;EAAd,wBAAc;EAAd,mBAAc;EAAd,mBAAc;EAAd,cAAc;EAAd,cAAc;EAAd,cAAc;EAAd,eAAc;EAAd,eAAc;EAAd,aAAc;EAAd,aAAc;EAAd,kBAAc;EAAd,sCAAc;EAAd,8BAAc;EAAd,6BAAc;EAAd,4BAAc;EAAd,eAAc;EAAd,oBAAc;EAAd,sBAAc;EAAd,uBAAc;EAAd,wBAAc;EAAd,kBAAc;EAAd,2BAAc;EAAd,4BAAc;EAAd,sCAAc;EAAd,kCAAc;EAAd,2BAAc;EAAd,sBAAc;EAAd,8BAAc;EAAd,YAAc;EAAd,kBAAc;EAAd,gBAAc;EAAd,iBAAc;EAAd,kBAAc;EAAd,cAAc;EAAd,gBAAc;EAAd,aAAc;EAAd,mBAAc;EAAd,qBAAc;EAAd,2BAAc;EAAd,yBAAc;EAAd,0BAAc;EAAd,2BAAc;EAAd,uBAAc;EAAd,wBAAc;EAAd,yBAAc;EAAd,sBAAc;EAAd,oBAAc;EAAd,sBAAc;EAAd,qBAAc;EAAd;AAAc,CAAd;;CAAc,CAAd;;;CAAc;;AAAd;;;EAAA,sBAAc,EAAd,MAAc;EAAd,eAAc,EAAd,MAAc;EAAd,mBAAc,EAAd,MAAc;EAAd,qBAAc,EAAd,MAAc;AAAA;;AAAd;;EAAA,gBAAc;AAAA;;AAAd;;;;;;;;CAAc;;AAAd;;EAAA,gBAAc,EAAd,MAAc;EAAd,8BAAc,EAAd,MAAc,EAAd,MAAc;EAAd,WAAc,EAAd,MAAc;EAAd,+HAAc,EAAd,MAAc;EAAd,6BAAc,EAAd,MAAc;EAAd,+BAAc,EAAd,MAAc;EAAd,wCAAc,EAAd,MAAc;AAAA;;AAAd;;;CAAc;;AAAd;EAAA,SAAc,EAAd,MAAc;EAAd,oBAAc,EAAd,MAAc;AAAA;;AAAd;;;;CAAc;;AAAd;EAAA,SAAc,EAAd,MAAc;EAAd,cAAc,EAAd,MAAc;EAAd,qBAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,yCAAc;UAAd,iCAAc;AAAA;;AAAd;;CAAc;;AAAd;;;;;;EAAA,kBAAc;EAAd,oBAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,cAAc;EAAd,wBAAc;AAAA;;AAAd;;CAAc;;AAAd;;EAAA,mBAAc;AAAA;;AAAd;;;;;CAAc;;AAAd;;;;EAAA,+GAAc,EAAd,MAAc;EAAd,6BAAc,EAAd,MAAc;EAAd,+BAAc,EAAd,MAAc;EAAd,cAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,cAAc;AAAA;;AAAd;;CAAc;;AAAd;;EAAA,cAAc;EAAd,cAAc;EAAd,kBAAc;EAAd,wBAAc;AAAA;;AAAd;EAAA,eAAc;AAAA;;AAAd;EAAA,WAAc;AAAA;;AAAd;;;;CAAc;;AAAd;EAAA,cAAc,EAAd,MAAc;EAAd,qBAAc,EAAd,MAAc;EAAd,yBAAc,EAAd,MAAc;AAAA;;AAAd;;;;CAAc;;AAAd;;;;;EAAA,oBAAc,EAAd,MAAc;EAAd,8BAAc,EAAd,MAAc;EAAd,gCAAc,EAAd,MAAc;EAAd,eAAc,EAAd,MAAc;EAAd,oBAAc,EAAd,MAAc;EAAd,oBAAc,EAAd,MAAc;EAAd,uBAAc,EAAd,MAAc;EAAd,cAAc,EAAd,MAAc;EAAd,SAAc,EAAd,MAAc;EAAd,UAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;;EAAA,oBAAc;AAAA;;AAAd;;;CAAc;;AAAd;;;;EAAA,0BAAc,EAAd,MAAc;EAAd,6BAAc,EAAd,MAAc;EAAd,sBAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,aAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,gBAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,wBAAc;AAAA;;AAAd;;CAAc;;AAAd;;EAAA,YAAc;AAAA;;AAAd;;;CAAc;;AAAd;EAAA,6BAAc,EAAd,MAAc;EAAd,oBAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,wBAAc;AAAA;;AAAd;;;CAAc;;AAAd;EAAA,0BAAc,EAAd,MAAc;EAAd,aAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,kBAAc;AAAA;;AAAd;;CAAc;;AAAd;;;;;;;;;;;;;EAAA,SAAc;AAAA;;AAAd;EAAA,SAAc;EAAd,UAAc;AAAA;;AAAd;EAAA,UAAc;AAAA;;AAAd;;;EAAA,gBAAc;EAAd,SAAc;EAAd,UAAc;AAAA;;AAAd;;CAAc;AAAd;EAAA,UAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,gBAAc;AAAA;;AAAd;;;CAAc;;AAAd;;EAAA,UAAc,EAAd,MAAc;EAAd,cAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;;EAAA,eAAc;AAAA;;AAAd;;CAAc;AAAd;EAAA,eAAc;AAAA;;AAAd;;;;CAAc;;AAAd;;;;;;;;EAAA,cAAc,EAAd,MAAc;EAAd,sBAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;;EAAA,eAAc;EAAd,YAAc;AAAA;;AAAd,wEAAc;AAAd;EAAA,aAAc;AAAA;AAEd;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA,uBAAmB;EAAnB,oDAAmB;EAAnB;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA,kBAAmB;EAAnB;AAAmB;AAAnB;EAAA,kBAAmB;EAAnB;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA,eAAmB;EAAnB;AAAmB;AAAnB;EAAA,mBAAmB;EAAnB;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA,oBAAmB;EAAnB;AAAmB;AAAnB;EAAA;AAAmB;;AAEnB;IACI,oBAAoB;IACpB,kBAAkB;AACtB;;AAPA;EAAA,kBAQA;EARA;AAQA;;AARA;;EAAA;IAAA;EAQA;;EARA;IAAA;EAQA;AAAA;;AARA;;EAAA;IAAA;EAQA;AAAA;;AARA;;EAAA;IAAA;EAQA;;EARA;IAAA;EAQA;;EARA;IAAA;EAQA;;EARA;IAAA;EAQA;AAAA","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
@@ -75623,4 +75470,4 @@ window.onload = function () {
 
 /******/ })()
 ;
-//# sourceMappingURL=main.33ce0dac8744319a71bf.js.map
+//# sourceMappingURL=main.e1a93e1d48bce2d87b09.js.map

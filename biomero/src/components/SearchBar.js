@@ -13,7 +13,9 @@ const SearchBar = () => {
             id="scripts-menu-searchBar"
             placeholder="Search scripts..."
             onChange={handleSearch}
+            className="w-full sm:w-auto p-2 border rounded-md text-sm"
         />
+
     );
 };
 

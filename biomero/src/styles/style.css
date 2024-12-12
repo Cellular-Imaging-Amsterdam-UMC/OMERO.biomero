@@ -1,100 +1,194 @@
-/* ScriptCard */
-.script-card {
-max-width: 100%;
-transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-.script-card:hover {
-transform: translateY(-5px);
-box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-}
-.script-card .script-name {
-font-size: 1.2rem;
-font-weight: bold;
+/* TabContainer Layout */
+.tab-container {
+    width: 100%;
+    padding: 20px;
 }
 
-/* Grid Layout */
-.grid-cols-1 {
-grid-template-columns: repeat(1, 1fr);
-}
-.grid-cols-2 {
-grid-template-columns: repeat(2, 1fr);
-}
-.grid-cols-3 {
-grid-template-columns: repeat(3, 1fr);
-}
-.gap-4 {
-gap: 1rem;
+.tab-controls {
+    display: flex;
+    justify-content: flex-start;  /* Align buttons to the left */
+    margin-bottom: 20px;
+    align-items: center;
 }
 
-/* Flex Layout for Search and Upload */
-.search-upload-container {
-display: flex;
-justify-content: space-between;
-}
-
-/* Tabs */
 .tab-buttons {
-display: flex;
-flex-wrap: wrap;
-gap: 10px;
-margin-bottom: 20px;
+    display: flex;
+    gap: 15px;
 }
 
 .tablink {
-padding: 10px 15px;
-background-color: #f0f1f5;
-border: 1px solid #ddd;
-cursor: pointer;
-font-size: 1rem;
-transition: background-color 0.2s ease;
+    padding: 10px 15px;
+    background-color: #f0f1f5;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s ease;
 }
 
 .tablink.active {
-background-color: #007bff;
-color: white;
-}
-  
-
-html, body {
-    height: 100%;
-    margin: 0;
-    overflow-y: auto; /* Enable vertical scrolling */
+    background-color: #007bff;
+    color: white;
 }
 
+.scripts-content {
+    margin-top: 20px;
+}
+
+/* Adjust card layout for multiple columns */
+.scripts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Dynamic columns with a minimum of 200px width per card */
+    gap: 1.5rem;  /* Space between cards */
+    width: 100%;
+}
+
+/* When screen width is below 768px, make grid 1 or 2 columns depending on space */
+@media (max-width: 768px) {
+    .scripts-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Cards will now be at least 150px wide */
+        gap: 1rem;  /* Space between cards */
+    }
+}
+
+/* When screen width is below 480px, force single column layout */
+@media (max-width: 480px) {
+    .scripts-grid {
+        grid-template-columns: 1fr; /* Force 1 column when the screen is small enough */
+    }
+}
+
+/* Adjust for search and upload buttons */
+.search-bar, .upload-button {
+    margin-left: 20px; /* Add spacing between the buttons */
+    position: absolute;
+    right: 20px; /* Move buttons to the far right */
+}
+
+.upload-button {
+    margin-left: 40px; /* Extra space between upload and search */
+}
+
+/* ScriptCard */
+.script-card {
+    background-color: #99ccff;
+    color: black !important;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    text-align: left;
+    box-sizing: border-box;
+    min-width: 200px;
+    height: 150px;  /* Adjust card height */
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.3s, box-shadow 0.3s;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.script-card:hover {
+    background-color: #ffcc99;
+    color: black !important;
+    border-color: black;
+}
+
+/* Ensure content is scrollable when needed */
 #scripts-menu {
-    overflow-y: auto; /* Allow scrolling within the script menu container */
+    overflow-y: auto;
     max-height: 100vh; /* Ensure it's contained within the viewport */
 }
 
-/* Optional: for inner content areas to scroll independently */
-#scripts-menu .script-cards-container {
-    overflow-y: auto;
-    max-height: 80vh; /* Limit to a percentage of the viewport height */
+/* Description paragraphs */
+.script-card .description {
+    font-size: 0.9em;  /* Smaller font size for descriptions */
+    line-height: 1.4;
+    max-height: 100px; /* Max height for the description */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;  /* Show 3 lines max, truncate after */
+    -webkit-box-orient: vertical;
 }
 
-/* Ensure a scrollable area when there is content overflow */
+/* Allow full description without truncating the other paragraphs */
+.script-card .description p {
+    font-size: 0.9em; /* Adjust font size */
+    margin: 5px 0;
+}
+
+/* Tabs position adjustment */
+#scripts-menu .scripts-menu-tabs {
+    display: flex;
+    justify-content: flex-start;  /* Left-align tabs */
+    align-items: center;
+    background-color: #f1f1f1;
+    border-bottom: 1px solid #ccc;
+    padding: 5px;
+}
+
+#scripts-menu .scripts-menu-tabs button {
+    background-color: inherit;
+    border: none;
+    border-radius: 5px;
+    margin-right: 1px;
+    padding: 10px;
+    color: black;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 1.1em;
+}
+
+#scripts-menu .scripts-menu-tabs button.active {
+    background-color: rgb(51, 51, 51) !important;
+    color: white;
+    border-radius: 5px;
+}
+
+/* Search Bar */
+#scripts-menu #scripts-menu-searchBar {
+    margin-left: 20px;  /* Align search bar to the right */
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+    width: 200px;
+    transition: width 0.3s;
+    height: 32px;
+    box-sizing: border-box;
+}
+
 #scripts-menu .tabcontent {
     overflow-y: auto;
-    max-height: 400px; /* Adjust based on design */
+    max-height: 400px;
 }
 
-
-/* This removes the tab in the righ-hand menu of omero.web */
-#annotation_tabs_list li[aria-controls="scripts%20menu"] {
-    display: none;
+/* Optional: Ensure scroll for specific areas if content overflows */
+#scripts-menu .script-cards-container {
+    overflow-y: auto;
+    max-height: 80vh;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    justify-content: flex-start;
 }
 
-/* Add this at the beginning of your CSS file */
-#scripts\ menu.right_tab_content {
-    height: 0;
-    width: 0;
-    overflow: hidden;
-    position: absolute;
+/* Responsive Card Layout */
+#scripts-menu .script-card {
+    flex-basis: calc(33.333% - 5px);  /* 3 cards per row by default */
 }
 
-#scripts-menu {
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    color: hsl(210, 20%, 80%);
+/* Responsive adjustments for mobile */
+@media (max-width: 600px), (max-height: 600px) {
+    #scripts-menu .script-card {
+        flex-basis: 100%;  /* Full width on small screens */
+    }
+}
+
+/* Minimized state for smaller card view */
+#scripts-menu #scripts-menu-draggable.minimized {
+    width: 30px;
+    height: 30px;
 }
 
 #scripts-menu #scripts-menu-draggable {
@@ -106,12 +200,9 @@ html, body {
     background-color: lightgrey;
     border: 1px solid #ccc;
     z-index: 1000;
-    overflow: hidden;
     box-shadow: 0 0 10px rgba(0,0,0,0.5);
-    min-width: 300px; /* Set minimum width */
+    min-width: 300px;
     border-radius: 10px;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    color: hsl(210, 20%, 80%);
 }
 
 #scripts-menu #scripts-menu-draggable.enlarged {
@@ -123,357 +214,46 @@ html, body {
     right: 5px;
 }
 
-#scripts-menu .scripts-menu-window-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 5px;
-    background-color: #333;
-    color: white;
-    cursor: move;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
-}
-
-#scripts-menu .scripts-menu-title-container {
-    display: flex;
-    align-items: center;
-}
-
-#scripts-menu .scripts-menu-window-title {
-    font-size: 1.2em;
-}
-
-#scripts-menu .scripts-menu-script-icon {
-    width: 24px;
-    height: 24px;
-    margin-left: 10px;
-    margin-right: 10px;
-}
-
-#scripts-menu .scripts-menu-window-controls button {
-    background: none;
-    border: none;
-    color: white;
-    cursor: pointer;
-    padding: 5px;
-    font-size: 16px;
-}
-
-#scripts-menu .scripts-menu-tabs {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: #f1f1f1;
-    border-bottom: 1px solid #ccc;
-    padding: 5px;
-}
-
-#scripts-menu #scripts-menu-tabContainer {
-    display: flex;
-    flex-grow: 1;
-    overflow-x: auto;
-    font-size: 1.1em;
-}
-
-#scripts-menu .scripts-menu-tabs button {
-    background-color: inherit;
-    border: none;
-    border-radius: 5px;
-    margin-right: 1px;
-    outline: none;
-    cursor: pointer;
-    padding: 10px;
-    transition: 0.3s;
-    color: black;
-    font-weight: bold;
-    white-space: nowrap; /* Prevent text wrapping in buttons */
-    flex-shrink: 0; /* Prevent buttons from shrinking */
-    font-size: 1.1em;
-}
-
-#scripts-menu #scripts-menu-searchBar {
-    margin-left: auto;
-    padding: 6px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    font-size: 14px;
-    width: 200px;
-    transition: width 0.3s;
-    height: 32px;
-    box-sizing: border-box;
-    font-size: 1.1em;
-}
-
-#scripts-menu #scripts-menu-searchBar.small {
-    width: 100px;
-    font-size: 1.1em;
-}
-
-#scripts-menu .scripts-menu-tabs button:hover {
-    background-color: #fffdfd;
-}
-
-#scripts-menu .scripts-menu-tabs button.active {
-    background-color: rgb(51, 51, 51) !important;
-    color: white;
-    border-radius: 5px;
-}
-
-#scripts-menu .tabcontent {
-    display: none;
-    border: 1px solid #ccc;
-    border-top: none;
-    overflow-y: scroll;
-    padding-bottom: 20px;
-}
-
-#scripts-menu .directory {
-    padding: 5px;
-    margin: 5px;
-    border-radius: 5px;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    background-color: #f1f1f1;
-    transition: background-color 0.3s, margin 0.3s, padding 0.3s;
-}
-
-#scripts-menu .directory.small,
-#scripts-menu .directory.small > * {
-    background-color: transparent !important;
-    margin: 0 !important;
-    padding-bottom: 0 !important;
-}
-
-#scripts-menu .subdirectory-header {
-    background-color: transparent;
-    color: black;
-    padding-bottom: 10px;
-    padding-top: 0;
-    cursor: default;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-    font-size: 12px;
-    font-weight: bold;
-}
-
-@media (max-width: 600px), (max-height: 600px) {
-    #scripts-menu .subdirectory-header {
-        display: none;
-    }
-
-    #scripts-menu .script-card {
-        height: auto;
-        padding: 10px;
-    }
-}
-
-#scripts-menu .script-cards-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    justify-content: flex-start;
-    width: 100%;
-}
-
-/* For containers with only one card */
-#scripts-menu .script-cards-container:only-child {
-    width: 100%;
-}
-
-/* For containers with exactly two cards */
-#scripts-menu .script-cards-container:nth-last-child(2):first-child,
-#scripts-menu .script-cards-container:nth-last-child(2):first-child ~ .script-card {
-    flex-basis: calc(50% - 5px);
-}
-
-/* For containers with exactly three cards */
-#scripts-menu .script-cards-container:nth-last-child(3):first-child,
-#scripts-menu .script-cards-container:nth-last-child(3):first-child ~ .script-card {
-    flex-basis: calc(33.333% - 5px);
-}
-
-#scripts-menu .script-card {
-    background-color: #99ccff;
-    color: black !important;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    flex: 1 0 calc(33.333% - 5px);
-    text-align: left;
-    box-sizing: border-box;
-    min-width: 200px; /* Minimum width to ensure cards are not too small */
-    min-height: 60px; /* Minimum height to ensure title is not cut off */
-    height: 150px; /* Increase height for larger size */
-    overflow: hidden;
-    position: relative;
-    cursor: pointer;
-    transition: background-color 0.3s, border-width 0.3s, font-weight 0.3s, color 0.3s, height 0.3s, padding 0.3s, max-height 0.3s;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-    font-size: 1.2em;
-    font-weight: bold;
-}
-
-#scripts-menu .custom-script-card {
-    background-color: #cceeff;
-}
-
-#scripts-menu .script-card:hover {
-    background-color: #ffcc99;
-    color: black !important;
-    border-color: black;
-}
-
-#scripts-menu .minimized {
-    width: 30px;
-    height: 30px;
-    background-color: white;
-    border: 1px solid #ccc;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);
-    overflow: hidden;
-    cursor: pointer;
-    resize: none;
-}
-
-#scripts-menu .maximized {
-    width: 100% !important;
-    height: 100% !important;
-    top: 0 !important;
-    left: 0 !important;
-}
-
-#scripts-menu #scripts-menu-draggable.minimized {
-    width: 30px;
-    height: 30px;
-    background-color: white;
-    cursor: pointer;
-}
-
-#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-window-header,
-#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-tabs,
-#scripts-menu #scripts-menu-draggable.minimized .tabcontent {
+/* Tabs hidden in the right-hand menu of omero.web */
+#annotation_tabs_list li[aria-controls="scripts%20menu"] {
     display: none;
 }
 
-#scripts-menu #scripts-menu-draggable.minimized .scripts-menu-restore-btn {
-    display: block;
-    width: 100%;
-    height: 100%;
-    text-align: center;
-    line-height: 30px;
-    cursor: pointer;
-}
-
-#scripts-menu .scripts-menu-restore-btn {
-    display: none;
-    position: absolute;
-    top: 0;
-    left: 0;
-}
-
-#scripts-menu .script-link {
-    text-decoration: none;
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-    position: relative;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-}
-
-#scripts-menu .script-link::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 20px;
-    background: linear-gradient(to left, #99ccff, transparent);
-}
-
+/* Make sure script cards are not hidden by overflow */
 #scripts-menu .script-card-content {
-    display: none;
-    position: static;
-    bottom: 10px;
-    left: 10px;
-    right: 10px;
-    top: 40px;
+    display: block;
+    position: relative;
+    top: 4px;
     overflow: hidden;
-    display: -webkit-box; /* Use flexbox to align items side by side */
-    -webkit-box-orient: vertical; /* Set box orientation to vertical */
-    -webkit-line-clamp: 6; /* Show up to N lines */
-    line-clamp: 6;
-    align-items: center;
-    white-space: normal;
-    text-overflow: ellipsis; /* Add ellipsis to indicate overflow */
-    font-size: 1em; /* Set smaller font size */
+    font-size: 1em;
     font-weight: normal;
 }
 
-#scripts-menu .script-card-content span {
-    padding-top: 5px;
-    margin-right: 10px;
-    padding-bottom: 1px;
+/* Ensure the card content is contained within its fixed size */
+.script-card-content {
+    height: 150px; /* You can adjust this height to fit your design */
+    overflow: hidden; /* Hide overflow */
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* Limit the description to 2/4 of the height */
+  .script-description {
+    flex: 2; /* Takes 2/4 of the total height */
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: normal;
-    display: -webkit-box; /* Use flexbox to align items side by side */
-    -webkit-box-orient: vertical; /* Set box orientation to vertical */
-    -webkit-line-clamp: 9; /* Show up to N lines */
-    line-clamp: 9;
-    font-size: 1em; /* Set smaller font size */
-}
-
-/* Not currently in use*/
-#scripts-menu .script-card-content img {
-    max-width: 50px;
-    max-height: 50px;
-    object-fit: contain;
-    cursor: pointer;
-}
-
-#scripts-menu .script-card.large .script-card-content {
-    display: flex;
-}
-
-#scripts-menu .script-card.small {
-    height: auto;
-    padding: 10px;
-    max-height: 100px;
-}
-
-#scripts-menu .scripts-menu-search-bar.small {
-    width: 100px;
-}
-
-#scripts-menu #scripts-menu-uploadButton {
-    background-color: gray;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    padding: 6px 12px;
-    margin-left: 5px;
-    cursor: pointer;
-    font-size: 14px;
-    height: 32px; /* Match the height of the search input */
-    white-space: nowrap;
-    box-sizing: border-box;
-    line-height: 20px;
-    font-size: 1.1em;
-}
-
-#scripts-menu .scroll-padding {
-    height: 100px;
-    width: 100%;
-}
-
-#scripts-menu .bottom-dir-spacer-container {
-    background-color: transparent !important;
-}
-
-#scripts-menu .bottom-dir-spacer {
-    height: 100px;
-    width: 100%;
-    background-color: transparent !important;
-    border: none;
-    margin-top: 20px;
-}
+    white-space: normal; /* Allow text to wrap to multiple lines */
+    display: -webkit-box;
+    -webkit-line-clamp: 5; /* Allow up to 2 lines before ellipsis (change this to 3 for 3 lines) */
+    -webkit-box-orient: vertical;
+  }
+  
+  /* Limit the other paragraphs (authors, version) to 1/4 of the height */
+  .script-details-content p {
+    flex: 1; /* Take 1/4 of the total height */
+    margin: 0;
+    padding: 0;
+    word-wrap: break-word;
+    font-size: 0.875em; /* Adjust this to your desired size */
+  }
+  

@@ -37,8 +37,11 @@ const ScriptCard = ({ script }) => {
 // Subcomponent to format and display the detailed script content
 const ScriptDetailsContent = ({ script }) => {
   return (
-    <div>
-      <p>{script?.description || "No description available"}</p>
+    <div className="script-details-content">
+      {/* Limit description height and add ellipsis */}
+      <p className="script-description">
+        {script?.description || "No description available"}
+      </p>
       <p>
         <strong>Authors:</strong> {script?.authors || "Unknown"}
       </p>
