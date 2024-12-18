@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "../AppContext";
-import { Card, H6, Button } from "@blueprintjs/core"; // Importing Card for the container
+import { Card, Elevation, H6, Button } from "@blueprintjs/core"; // Importing Card for the container
 
 const ScriptCard = ({ script }) => {
   const { openScriptWindow, fetchScriptDetails, state, apiLoading, apiError } = useAppContext();
@@ -21,7 +21,7 @@ const ScriptCard = ({ script }) => {
   const isSlurmWorkflow = script.name === "Slurm Workflow";
 
   return (
-    <Card className="script-card" interactive={true} onClick={handleCardClick} selected={isSlurmWorkflow}>
+    <Card key={script.id} className="script-card" interactive={true} onClick={handleCardClick} selected={isSlurmWorkflow} elevation={Elevation.ONE}>
       <ScriptDetailsContent script={script} apiLoading={apiLoading} handleCardClick={handleCardClick} isSlurmWorkflow={isSlurmWorkflow}/>
       {apiError && <p className="error">{apiError}</p>}
     </Card>

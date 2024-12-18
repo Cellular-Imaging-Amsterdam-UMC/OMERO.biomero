@@ -18,7 +18,7 @@ const ScriptCardGroup = ({ folder }) => {
       <SectionCard padded={false} className={classNames("docs-section-card","docs-section-card-limited-height")}>
         <CardList bordered={false}>
           {folder.ul.map((script) => (
-              <ScriptCard script={script} />
+              <ScriptCard key={script.id} script={script} />
             ))}
         </CardList>
       </SectionCard>
