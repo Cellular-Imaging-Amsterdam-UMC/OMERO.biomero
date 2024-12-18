@@ -21,47 +21,52 @@ import {
 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 
-
+// RunTab Component
 const RunTab = ({ state }) => (
   <div>
     <H4>Run</H4>
     <div className="flex">
-      {/* OMERO Data Browser */}
       <div className="w-1/5 p-4 overflow-auto">
         <h1 className="text-base font-bold p-4 pb-0">OMERO Data</h1>
         {state.omeroTreeData && <OmeroDataBrowser />}
       </div>
-      {/* Run Menu */}
       <div className="w-4/5 p-4 flex-1 overflow-hidden">
-          <RunPanel
-            state={state}
-          /> 
+        <RunPanel state={state} />
       </div>
     </div>
   </div>
 );
 
-const ScriptsPanel = ({ state }) => (
-  <div>
-    <H4>Scripts</H4>
-    <div className="flex">
-      {/* OMERO Data Browser */}
-      <div className="w-1/5 p-4 overflow-auto">
-        <h1 className="text-base font-bold p-4 pb-0">OMERO Data</h1>
-        {state.omeroTreeData && <OmeroDataBrowser />}
-      </div>
-      {/* Scripts Menu */}
-      <div className="w-4/5 p-4 flex-1 overflow-hidden">
-        {state.scripts?.length > 0 ? (
-          <TabContainer menuData={state.scripts} />
-        ) : (
-          <p>Loading scripts...</p>
-        )}
+// ScriptsPanel Component
+const ScriptsPanel = ({ state, loadScriptsData, scriptsLoaded, setScriptsLoaded }) => {
+  useEffect(() => {
+    if (!scriptsLoaded) {
+      loadScriptsData();
+      setScriptsLoaded(true); // Prevent reloading if already loaded
+    }
+  }, [scriptsLoaded, loadScriptsData, setScriptsLoaded]);
+
+  return (
+    <div>
+      <H4>Scripts</H4>
+      <div className="flex">
+        <div className="w-1/5 p-4 overflow-auto">
+          <h1 className="text-base font-bold p-4 pb-0">OMERO Data</h1>
+          {state.omeroTreeData && <OmeroDataBrowser />}
+        </div>
+        <div className="w-4/5 p-4 flex-1 overflow-hidden">
+          {state.scripts?.length > 0 ? (
+            <TabContainer menuData={state.scripts} />
+          ) : (
+            <p>Loading scripts...</p>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
+// StatusPanel Component
 const StatusPanel = ({ iframeUrl, metabaseError, setMetabaseError, isAdmin, metabaseUrl }) => (
   <div>
     <H4>Status</H4>
@@ -90,16 +95,45 @@ const StatusPanel = ({ iframeUrl, metabaseError, setMetabaseError, isAdmin, meta
 const App = () => {
   const { state, loadOmeroTreeData, loadFolderData, loadGroups, loadScripts, loadWorkflows } = useAppContext();
   const [metabaseError, setMetabaseError] = useState(false);
+  const [activeTab, setActiveTab] = useState("Run"); // Track active tab state
+  const [loadedTabs, setLoadedTabs] = useState({
+    Run: true, // Automatically load the first tab
+    Scripts: false,
+    Status: false,
+  });
 
+  // Loading states for each API call
+  const [loadingOmero, setLoadingOmero] = useState(false);
+  const [loadingScripts, setLoadingScripts] = useState(false);
+  const [scriptsLoaded, setScriptsLoaded] = useState(false);
 
+  // Ensure that the Omero data is loaded only once when the app starts
   useEffect(() => {
-    loadOmeroTreeData();
+    if (!loadingOmero) {
+      setLoadingOmero(true);
+      loadOmeroTreeData()
+        .then(() => {
+          setLoadingOmero(false); // Set loading state to false after the API call finishes
+        })
+        .catch(() => {
+          setLoadingOmero(false); // Handle errors and stop loading
+        });
+    }
+
     loadFolderData();
     loadGroups();
-    loadScripts();
     loadWorkflows(); // Fetch workflows for the Scripts tab
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Empty dependency array ensures it's called only once
+
+  // Handle tab change with conditional loading
+  const handleTabChange = (newTabId) => {
+    if (!loadedTabs[newTabId]) {
+      setLoadedTabs((prevState) => ({ ...prevState, [newTabId]: true }));
+    }
+    setActiveTab(newTabId);
+  };
 
   const metabaseUrl = document.getElementById("root").getAttribute("data-metabase-url");
   const metabaseToken = document.getElementById("root").getAttribute("data-metabase-token");
@@ -117,20 +151,25 @@ const App = () => {
 
       {/* Tabs with Panels */}
       <div style={{ padding: "16px" }}>
-        <Tabs id="app-tabs" animate={true} renderActiveTabPanelOnly={false} large={true}>
+        <Tabs
+          id="app-tabs"
+          animate={true}
+          renderActiveTabPanelOnly={false}
+          large={true}
+          selectedTabId={activeTab}
+          onChange={handleTabChange}
+        >
           <Tab
             id="Run"
             title="Run"
             icon="play"
-            panel={
-              <RunTab state={state} />
-            }
+            panel={loadedTabs.Run ? <RunTab state={state} /> : null}
           />
           <Tab
             id="Status"
             title="Status"
             icon="dashboard"
-            panel={
+            panel={loadedTabs.Status ? (
               <StatusPanel
                 iframeUrl={iframeUrl}
                 metabaseError={metabaseError}
@@ -138,13 +177,20 @@ const App = () => {
                 isAdmin={isAdmin}
                 metabaseUrl={metabaseUrl}
               />
-            }
+            ) : null}
           />
           <Tab
             id="Scripts"
             title="Scripts"
             icon="document"
-            panel={<ScriptsPanel state={state} />}
+            panel={loadedTabs.Scripts ? (
+              <ScriptsPanel
+                state={state}
+                loadScriptsData={loadScripts}
+                scriptsLoaded={scriptsLoaded}
+                setScriptsLoaded={setScriptsLoaded}
+              />
+            ) : null}
           />
         </Tabs>
       </div>

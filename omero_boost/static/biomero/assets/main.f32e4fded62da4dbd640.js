@@ -13265,6 +13265,8 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
+// RunTab Component
+
 const RunTab = _ref => {
   let {
     state
@@ -13289,10 +13291,21 @@ const RunTab = _ref => {
     })]
   });
 };
+
+// ScriptsPanel Component
 const ScriptsPanel = _ref2 => {
   let {
-    state
+    state,
+    loadScriptsData,
+    scriptsLoaded,
+    setScriptsLoaded
   } = _ref2;
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    if (!scriptsLoaded) {
+      loadScriptsData();
+      setScriptsLoaded(true); // Prevent reloading if already loaded
+    }
+  }, [scriptsLoaded, loadScriptsData, setScriptsLoaded]);
   return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsxs)("div", {
     children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.H4, {
       children: "Scripts"
@@ -13315,6 +13328,8 @@ const ScriptsPanel = _ref2 => {
     })]
   });
 };
+
+// StatusPanel Component
 const StatusPanel = _ref3 => {
   let {
     iframeUrl,
@@ -13361,14 +13376,46 @@ const App = () => {
     loadWorkflows
   } = (0,_AppContext__WEBPACK_IMPORTED_MODULE_1__.useAppContext)();
   const [metabaseError, setMetabaseError] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const [activeTab, setActiveTab] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)("Run"); // Track active tab state
+  const [loadedTabs, setLoadedTabs] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
+    Run: true,
+    // Automatically load the first tab
+    Scripts: false,
+    Status: false
+  });
+
+  // Loading states for each API call
+  const [loadingOmero, setLoadingOmero] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const [loadingScripts, setLoadingScripts] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const [scriptsLoaded, setScriptsLoaded] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+
+  // Ensure that the Omero data is loaded only once when the app starts
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
-    loadOmeroTreeData();
+    if (!loadingOmero) {
+      setLoadingOmero(true);
+      loadOmeroTreeData().then(() => {
+        setLoadingOmero(false); // Set loading state to false after the API call finishes
+      }).catch(() => {
+        setLoadingOmero(false); // Handle errors and stop loading
+      });
+    }
     loadFolderData();
     loadGroups();
-    loadScripts();
     loadWorkflows(); // Fetch workflows for the Scripts tab
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Empty dependency array ensures it's called only once
+
+  // Handle tab change with conditional loading
+  const handleTabChange = newTabId => {
+    if (!loadedTabs[newTabId]) {
+      setLoadedTabs(prevState => ({
+        ...prevState,
+        [newTabId]: true
+      }));
+    }
+    setActiveTab(newTabId);
+  };
   const metabaseUrl = document.getElementById("root").getAttribute("data-metabase-url");
   const metabaseToken = document.getElementById("root").getAttribute("data-metabase-token");
   const isAdmin = document.getElementById("root").getAttribute("data-is-admin") === "true";
@@ -13390,31 +13437,36 @@ const App = () => {
         animate: true,
         renderActiveTabPanelOnly: false,
         large: true,
+        selectedTabId: activeTab,
+        onChange: handleTabChange,
         children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_12__.Tab, {
           id: "Run",
           title: "Run",
           icon: "play",
-          panel: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(RunTab, {
+          panel: loadedTabs.Run ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(RunTab, {
             state: state
-          })
+          }) : null
         }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_12__.Tab, {
           id: "Status",
           title: "Status",
           icon: "dashboard",
-          panel: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(StatusPanel, {
+          panel: loadedTabs.Status ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(StatusPanel, {
             iframeUrl: iframeUrl,
             metabaseError: metabaseError,
             setMetabaseError: setMetabaseError,
             isAdmin: isAdmin,
             metabaseUrl: metabaseUrl
-          })
+          }) : null
         }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_12__.Tab, {
           id: "Scripts",
           title: "Scripts",
           icon: "document",
-          panel: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(ScriptsPanel, {
-            state: state
-          })
+          panel: loadedTabs.Scripts ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(ScriptsPanel, {
+            state: state,
+            loadScriptsData: loadScripts,
+            scriptsLoaded: scriptsLoaded,
+            setScriptsLoaded: setScriptsLoaded
+          }) : null
         })]
       })
     })]
@@ -76326,4 +76378,4 @@ window.onload = function () {
 
 /******/ })()
 ;
-//# sourceMappingURL=main.dc18ef87d89dde4a60dc.js.map
+//# sourceMappingURL=main.f32e4fded62da4dbd640.js.map
