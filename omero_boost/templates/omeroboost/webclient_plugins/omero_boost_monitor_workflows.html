@@ -78,51 +78,7 @@
         var PAGE_SIZE = {{ page_size }};
     {% endif %}
     window.WEBCLIENT = WEBCLIENT;
-    // JavaScript for Metabase iframe
-    $(document).ready(function() {
-      // Tab switching logic
-      $('.tab-button').on('click', function () {
-          // Remove 'active' class from all buttons and content
-          $('.tab-button').removeClass('active');
-          $('.tab-content').removeClass('active');
-  
-          // Add 'active' class to the clicked button
-          $(this).addClass('active');
-  
-          // Show the corresponding content
-          if ($(this).attr('id') === 'tab-omero') {
-              $('#root').addClass('active');
-          } else if ($(this).attr('id') === 'tab-metabase') {
-              $('#metabase-tab').addClass('active');
-          }
-      });
-  
-      // Initialize the first tab as active
-      $('#tab-omero').addClass('active');
-      $('#root').addClass('active');
-    
-  
-      // JavaScript for Metabase iframe (already in your template)
-      var METABASE_SITE_URL = "{{ metabase_site_url }}";
-      var token = "{{ metabase_token }}";
-      var refreshInterval = 20; // Set the refresh interval to 20 seconds
-      var iframeUrl = METABASE_SITE_URL + "/embed/dashboard/" + token + "#bordered=true&titled=true&refresh=" + refreshInterval;
-  
-      var iframe = $('<iframe>', {
-        src: iframeUrl,
-        frameborder: 0
-      });
-  
-      $('#metabase-dashboard').append(iframe);
-  
-      var loadTimeout = setTimeout(function () {
-        $('#metabase-dashboard').html('<div class="error">Error loading Metabase dashboard. Please try refreshing the page.</div>')
-      }, 30000); // 30 seconds timeout
-  
-      iframe.on('load', function () {
-        clearTimeout(loadTimeout)
-      });
-    });
+
   </script>
 
   <!-- keep-alive ping so that OMERO session doesn't die -->
@@ -134,25 +90,28 @@
   <noscript>You need to enable JavaScript to run this app.</noscript>
   
   <!-- Tab Navigation -->
-  <div class="tabs">
+  {% comment %} <div class="tabs">
     <button class="tab-button active" id="tab-omero">Run</button>
     <button class="tab-button" id="tab-metabase">Monitor</button>
-  </div>
+  </div> {% endcomment %}
   
   <!-- Tab Content -->
-  <div id="root" class="tab-content active">
+  <div id="root" class="tab-content active"
+    data-metabase-url="{{ metabase_site_url }}"
+    data-metabase-token="{{ metabase_token }}"
+    data-is-admin="{% if is_admin %}true{% else %}false{% endif %}">
     <!-- Your OMERO app content goes here (already rendered by React) -->
   </div>
 
   <!-- Second Page Content (Metabase iframe) -->
-  <div id="metabase-tab" class="tab-content">
+  {% comment %} <div id="metabase-tab" class="tab-content">
     <div id="metabase-dashboard"></div>
     <div class="bottom-message">
       {% if is_admin %}
         <a href="{{ metabase_site_url|add:'/' }}" target="_blank">Click here to access the Metabase interface</a>
       {% endif %}
     </div>
-  </div>
+  </div> {% endcomment %}
 {% endblock %} 
 {% comment %} {% block center_details %}
   <div id="metabase-dashboard"></div>

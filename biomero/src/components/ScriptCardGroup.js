@@ -1,16 +1,28 @@
-import React from "react";
-import ScriptCard from "./ScriptCard";
+import classNames from "classnames";
+import React, { useState } from "react";
+import { Card, CardList, Collapse, Section, SectionCard } from "@blueprintjs/core";
+import ScriptCard from "./ScriptCard"; // Keep using the ScriptCard component
+import "@blueprintjs/core/lib/css/blueprint.css";
 
-const ScriptCardGroup = ({ scriptGroup }) => {
+const ScriptCardGroup = ({ folder }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  const toggleFolder = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  const collapseProps =  { isOpen: isExpanded, onToggle: toggleFolder, keepChildrenMounted: true};
+
   return (
-    <div className="script-group">
-      <div className="group-name">{scriptGroup.name}</div>
-      <div className="scripts-container">
-        {scriptGroup.ul.map((script) => (
-          <ScriptCard key={script.id} script={script} />
-        ))}
-      </div>
-    </div>
+    <Section title={folder.name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())} collapsible={true} collapseProps={collapseProps}>
+      <SectionCard padded={false} className={classNames("docs-section-card","docs-section-card-limited-height")}>
+        <CardList bordered={false}>
+          {folder.ul.map((script) => (
+              <ScriptCard script={script} />
+            ))}
+        </CardList>
+      </SectionCard>
+    </Section>
   );
 };
 

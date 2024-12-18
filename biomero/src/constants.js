@@ -37,8 +37,10 @@ export const getDjangoConstants = () => {
     api_local_file_browser: "/omero_boost/local_file_browser/",
     api_get_groups: "/webclient/group_user_content/",
     scripts: "/webclient/list_scripts/",
-    get_script_menu: "/scriptmenu/get_script_menu/"
+    get_script_menu: "/scriptmenu/get_script_menu/",
+    workflows: "/omero_boost/api/biomero/workflows/",
+    workflow_metadata: "/omero_boost/api/biomero/workflows/metadata/",
   };
-
+  
   return { user, urls };
 };

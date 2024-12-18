@@ -10,7 +10,7 @@ CONTAINER_NAME="nl-biomero-omeroweb-1"
 # COMMAND1="/usr/local/bin/entrypoint.sh"
 COMMAND0="chmod a+w /opt/omero/web/OMERO.web/var/static"
 
-COMMAND1="/opt/omero/web/venv3/bin/pip install -e /opt/omero/web/omero-boost"
+COMMAND1="/opt/omero/web/venv3/bin/python3.9 -m pip install -e /opt/omero/web/omero-boost"
 COMMAND2="/opt/omero/web/venv3/bin/omero-boost-setup"
 
 COMMAND3="/opt/omero/web/venv3/bin/omero web stop"

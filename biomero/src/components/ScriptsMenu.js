@@ -31,7 +31,7 @@ const ScriptsMenu = () => {
 
             <div className="scripts-menu-tabs">
                 <SearchBar />
-                <UploadButton uploadUrl="/script_upload" />
+                <UploadButton/>
                 <TabContainer menuData={scripts} />
             </div>
         </div>

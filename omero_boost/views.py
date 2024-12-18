@@ -13,8 +13,44 @@ from omeroweb.webclient.decorators import login_required, render_response
 from omero.gateway import BlitzGateway
 from omero.rtypes import unwrap
 from .utils import get_biomero_build_file, get_react_build_file
+from biomero import SlurmClient
 
 logger = logging.getLogger(__name__)
+
+@login_required()
+@require_http_methods(["GET"])
+def list_workflows(request, conn=None, **kwargs):
+    """
+    List available workflows using SlurmClient.
+    """
+    try:
+        with SlurmClient.from_config(config_only=True) as sc:
+            workflows = list(sc.slurm_model_images.keys())
+        return JsonResponse({"workflows": workflows})
+    except Exception as e:
+        logger.error(f"Error listing workflows: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
+
+@login_required()
+@require_http_methods(["GET"])
+def get_workflow_metadata(request, conn=None, **kwargs):
+    """
+    Get metadata for a specific workflow.
+    """
+    workflow_name = request.GET.get("workflow", None)
+    if not workflow_name:
+        return JsonResponse({"error": "Workflow name is required"}, status=400)
+
+    try:
+        with SlurmClient.from_config(config_only=True) as sc:
+            if workflow_name not in sc.slurm_model_images:
+                return JsonResponse({"error": "Workflow not found"}, status=404)
+            
+            metadata = sc.pull_descriptor_from_github(workflow_name)
+        return JsonResponse({"workflow": workflow_name, "metadata": metadata})
+    except Exception as e:
+        logger.error(f"Error fetching metadata for workflow {workflow_name}: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 @login_required()

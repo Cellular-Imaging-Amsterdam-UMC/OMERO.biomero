@@ -67,8 +67,8 @@ export const fetchGroups = async () => {
 export const fetchScripts = async () => {
   const { urls } = getDjangoConstants(); // Get the URLs from Django constants
   try {
-    const response = await apiRequest(urls.scripts, "GET"); // Assuming `urls.scripts` is the correct endpoint for fetching scripts
-    return response; // Return the fetched data
+    const response = await apiRequest(urls.scripts, "GET");
+    return response;
   } catch (error) {
     console.error("Error fetching scripts:", error);
     throw error; // Rethrow the error to be handled by the caller
@@ -85,4 +85,19 @@ export const fetchScriptData = async (scriptId, directory) => {
 
   return apiRequest(urls.get_script_menu, "GET", null, { params });
 };
+
+// Fetch available workflows
+export const fetchWorkflows = async () => {
+  const { urls } = getDjangoConstants();
+  return apiRequest(urls.workflows, "GET");
+};
+
+// Fetch metadata for a specific workflow
+export const fetchWorkflowMetadata = async (workflow) => {
+  const { urls } = getDjangoConstants();
+  const params = { workflow: workflow };
+  return apiRequest(urls.workflow_metadata, "GET", null, { params });
+};
+
+
 

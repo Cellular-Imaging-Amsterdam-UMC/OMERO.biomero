@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState } from "react";
-import { fetchomeroTreeData, fetchFolderData, fetchGroups, fetchScripts, fetchScriptData } from "./apiService"; 
+import { 
+  fetchomeroTreeData, 
+  fetchFolderData, 
+  fetchGroups, 
+  fetchScripts, 
+  fetchScriptData, 
+  fetchWorkflows, 
+  fetchWorkflowMetadata 
+} from "./apiService";
 import { getDjangoConstants } from "./constants";
 import { transformStructure, extractGroups } from "./utils";
 
@@ -13,11 +21,58 @@ export const AppProvider = ({ children }) => {
     urls,
     omeroTreeData: null,
     folderData: null,
-    scripts: [], // Initialize with an empty array for scripts
+    scripts: [],
+    workflows: null,
+    workflowMetadata: null,
   });
-
   const [apiLoading, setLoading] = useState(false);
   const [apiError, setError] = useState(null);
+
+  // Fetch workflows
+  const loadWorkflows = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetchWorkflows(); // Fetch workflows (as a list of names)
+      const workflows = response?.workflows || []; // Extract the workflows array
+      const metadataPromises = workflows.map((workflow) =>
+        fetchWorkflowMetadata(workflow) // Fetch metadata for each workflow
+      );
+      const metadata = await Promise.all(metadataPromises); // Wait for all metadata to be fetched
+  
+      // Prepare the metadata in a format that matches the workflow names
+      const workflowsWithMetadata = workflows.map((workflow, index) => ({
+        name: workflow,
+        description: metadata[index]?.metadata?.description || 'No description available', // Fallback to default
+        metadata: metadata[index]?.metadata, // Store the full metadata for further use (e.g., for clicking)
+      }));
+  
+      setState((prevState) => ({
+        ...prevState,
+        workflows: workflowsWithMetadata,
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  
+
+  // Fetch workflow metadata
+  const loadWorkflowMetadata = async (workflow) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const metadata = await fetchWorkflowMetadata(workflow);
+      setState((prevState) => ({ ...prevState, workflowMetadata: metadata }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Fetch OMERO tree data
   const loadOmeroTreeData = async () => {
@@ -150,6 +205,14 @@ export const AppProvider = ({ children }) => {
     OME.openScriptWindow(event, SCRIPT_WINDOW_WIDTH, SCRIPT_WINDOW_HEIGHT);
   };
 
+  const openUploadScriptWindow  = (scriptUrl) => {
+    const SCRIPT_WINDOW_WIDTH = 800;
+    const SCRIPT_WINDOW_HEIGHT = 600;
+
+    const event = { target: { href: scriptUrl } };
+    OME.openPopup(WEBCLIENT.URLS.script_upload);
+  };
+
   
   
 
@@ -167,8 +230,11 @@ export const AppProvider = ({ children }) => {
         loadFolderData,
         loadGroups,
         loadScripts,
-        fetchScriptDetails, // Now available to consumers
+        fetchScriptDetails,
         openScriptWindow,
+        openUploadScriptWindow,
+        loadWorkflows,
+        loadWorkflowMetadata,
         apiLoading,
         apiError,
       }}

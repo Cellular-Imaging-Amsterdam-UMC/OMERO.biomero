@@ -1,20 +1,20 @@
 import React from "react";
+import { useAppContext } from "../AppContext";  
+import { Button } from "@blueprintjs/core";
 
-const UploadButton = ({ uploadUrl }) => {
-    const handleUpload = () => {
-        console.log("Redirecting to upload script URL:", uploadUrl);
-    };
+const UploadButton = () => {
+  const { openUploadScriptWindow } = useAppContext();
+  const handleUploadClick = () => {
+    openUploadScriptWindow();
+  };
 
-    return (
-        <button
-            id="scripts-menu-uploadButton"
-            className="scripts-menu-upload-button p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-            onClick={handleUpload}
-            >
-            Upload Script
-        </button>
-
-    );
+  return (
+    <Button icon="document" rightIcon="arrow-right"
+      onClick={handleUploadClick}
+    >
+      Upload Script
+    </Button>
+  );
 };
 
 export default UploadButton;

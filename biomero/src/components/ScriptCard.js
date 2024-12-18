@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "../AppContext";
+import { Card, H6, Button } from "@blueprintjs/core"; // Importing Card for the container
 
 const ScriptCard = ({ script }) => {
   const { openScriptWindow, fetchScriptDetails, state, apiLoading, apiError } = useAppContext();
@@ -7,47 +8,49 @@ const ScriptCard = ({ script }) => {
 
   useEffect(() => {
     if (!isCardLoaded && !state.scripts.find((s) => s.id === script.id)) {
-      // Fetch script details only if not already loaded
       fetchScriptDetails(script.id, script.name);
       setIsCardLoaded(true); // Mark the card as loaded
     }
   }, [isCardLoaded, script.id, script.name, fetchScriptDetails, state.scripts]);
 
-  // Handle click to open the script in a popup window
   const handleCardClick = () => {
-    const scriptUrl = `/webclient/script_ui/${script.id}`; // Construct the URL dynamically
-    openScriptWindow(scriptUrl); // Open the script window
+    const scriptUrl = `/webclient/script_ui/${script.id}`;
+    openScriptWindow(scriptUrl);
   };
 
+  const isSlurmWorkflow = script.name === "Slurm Workflow";
+
   return (
-    <div className="script-card" onClick={handleCardClick}>
-      <div className="script-name">{script.name}</div>
-      <div className="script-card-content">
-        {apiLoading ? (
-          <p>Loading...</p>
-        ) : (
-          <ScriptDetailsContent script={script} />
-        )}
-      </div>
+    <Card className="script-card" interactive={true} onClick={handleCardClick} selected={isSlurmWorkflow}>
+      <ScriptDetailsContent script={script} apiLoading={apiLoading} handleCardClick={handleCardClick} isSlurmWorkflow={isSlurmWorkflow}/>
       {apiError && <p className="error">{apiError}</p>}
-    </div>
+    </Card>
   );
 };
 
-// Subcomponent to format and display the detailed script content
-const ScriptDetailsContent = ({ script }) => {
+const ScriptDetailsContent = ({ script, apiLoading, handleCardClick, isSlurmWorkflow }) => {
   return (
-    <div className="script-details-content">
-      {/* Limit description height and add ellipsis */}
-      <p className="script-description">
+    <div>
+      <H6 className={`script-name ${apiLoading ? "bp5-skeleton" : ""}`}>
+        {apiLoading ? "Loading..." : script.name || "Lorem ipsum dolor"}
+      </H6>
+      <p className={`${apiLoading ? "bp5-skeleton" : ""}`}>
         {script?.description || "No description available"}
       </p>
-      <p>
+      <p className={`${apiLoading ? "bp5-skeleton" : ""}`}>
         <strong>Authors:</strong> {script?.authors || "Unknown"}
       </p>
-      <p>
+      <p className={`${apiLoading ? "bp5-skeleton" : ""}`}>
         <strong>Version:</strong> {script?.version || "Unknown"}
       </p>
+      <Button
+        intent={isSlurmWorkflow ? "success" : "primary"}
+        icon="document"
+        rightIcon="arrow-right"
+        onClick={handleCardClick}
+      >
+        Run script
+      </Button>
     </div>
   );
 };
