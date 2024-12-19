@@ -8,8 +8,11 @@ urlpatterns = [
     path("api/list_dir/", views.list_directory, name="list_directory"),
     path("api/file_info/", views.file_info, name="file_info"),
     path("api/import_selected/", views.import_selected, name="import_selected"),
-    path('api/biomero/workflows/', views.list_workflows, name='list_workflows'),
-    path('api/biomero/workflows/metadata/', views.get_workflow_metadata, name='get_workflow_metadata'),
+    path("api/biomero/workflows/", views.list_workflows, name="list_workflows"),                   # GET /workflows
+    path("api/biomero/workflows/<str:name>/metadata/", views.get_workflow_metadata, name="get_workflow_metadata"),  # GET /workflows/<name>/metadata
+    path("api/biomero/workflows/<str:name>/github/", views.get_workflow_github, name="get_workflow_github"),  # GET /workflows/<name>/github
+    # New API for running scripts
+    path("api/biomero/workflows/run/", views.run_workflow_script, name="run_workflow_script"),  # POST /workflows/run
     # Webclient URLs
     path("upload/", views.omero_boost_upload, name="omero_boost_upload"),
     path(

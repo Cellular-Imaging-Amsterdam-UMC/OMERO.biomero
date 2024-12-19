@@ -46,7 +46,7 @@ const ScriptDetailsContent = ({ script, apiLoading, handleCardClick, isSlurmWork
       <Button
         intent={isSlurmWorkflow ? "success" : "primary"}
         icon="document"
-        rightIcon="arrow-right"
+        rightIcon="take-action"
         onClick={handleCardClick}
       >
         Run script

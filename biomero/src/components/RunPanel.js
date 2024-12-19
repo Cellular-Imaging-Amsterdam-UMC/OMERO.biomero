@@ -1,27 +1,23 @@
 import React, { useState } from "react";
-import { 
-  Card, 
-  Elevation, 
-  InputGroup, 
-  Icon,
-  H5, 
-  H6,
-  Button,
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  Collapse, 
-  Switch,
-  MultistepDialog,
-  DialogStep
- } from "@blueprintjs/core";
- import WorkflowForm from "./WorkflowForm";
+import { useAppContext } from "../AppContext";
+import { Card, Elevation, InputGroup, H5, H6, MultistepDialog, DialogBody, DialogStep, Icon } from "@blueprintjs/core";
+import { FaDocker } from "react-icons/fa6";
+import { IconContext } from "react-icons";
+import WorkflowForm from "./WorkflowForm";
 
-const RunPanel = ({ state }) => {
+const RunPanel = () => {
+  const { state, updateState, toaster, runWorkflowData } = useAppContext();
   const [searchTerm, setSearchTerm] = useState(""); // State for search input
   const [selectedWorkflow, setSelectedWorkflow] = useState(null);  // State for selected workflow
   const [dialogOpen, setDialogOpen] = useState(false);  // State for dialog visibility
-  const [metadataVisible, setMetadataVisible] = useState(false);  // State for toggling metadata visibility
+  const [formData, setFormData] = useState({}); // State to store form data for screen 2
+
+  // Utility to beautify names
+  const beautifyName = (name) => {
+    return name
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
 
   // Filter workflows based on search term
   const filteredWorkflows = state.workflows?.filter((workflow) =>
@@ -34,6 +30,44 @@ const RunPanel = ({ state }) => {
     setSelectedWorkflow(workflow); // Set the selected workflow
     setDialogOpen(true); // Open the dialog
   };
+
+  const handleFinalSubmit = () => {
+    console.log(formData)
+
+    submitWorkflow()
+
+    updateState(
+      { workflowStatusTooltipShown: true }
+    );
+    if (toaster) {
+      toaster.show({
+        intent: "success",
+        icon: "cloud-upload",
+        message: "Submitting workflow to the compute gods...",
+      });
+    } else {
+      console.warn("Toaster not initialized yet.");
+    }
+
+  }
+
+  const submitWorkflow = () => {
+    runWorkflowData('Example_Minimal_Slurm_Script.py', { param1: "value1", param2: "value2" });
+  }
+
+  // Handle form data submission from WorkflowForm
+  const handleFormSubmit = (data) => {
+    setFormData(data); // Update form data in state when the form is submitted
+  };
+
+  const handleStepChange = (stepIndex) => {
+    if (stepIndex === 2) {  // When moving to step 3, submit the form
+      handleFormSubmit(formData);  // Submit the form data
+    }
+  };
+
+  
+  
 
   return (
     <div>
@@ -55,10 +89,47 @@ const RunPanel = ({ state }) => {
                 key={workflow.name} // Use the workflow name as the key
                 interactive
                 elevation={Elevation.TWO}
+                className="flex flex-col gap-2 p-4"
                 onClick={() => handleWorkflowClick(workflow)} // Pass the full metadata for clicking
               >
-                <H5>{workflow.name}</H5>  {/* Show the workflow name */}
-                <p>{workflow.description}</p> {/* Show the description */}
+                {/* Header Section with Title and Icons */}
+                <div className="flex justify-between items-center">
+                  <H5 className="mb-0">{beautifyName(workflow.name)}</H5>
+                  <div className="flex gap-2">
+                    {/* GitHub Icon */}
+                    {workflow.githubUrl && (
+                      <a
+                        href={workflow.githubUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-500 hover:text-blue-600"
+                        title="View GitHub Repository"
+                        onClick={(e) => e.stopPropagation()}  // Stop event propagation
+                      >
+                        <Icon icon="git-branch" iconSize={16} />
+                      </a>
+                    )}
+
+                    {/* Container Image Icon */}
+                    {workflow.metadata?.["container-image"]?.image && (
+                      <a
+                        href={`https://hub.docker.com/r/${workflow.metadata["container-image"].image}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-500 hover:text-blue-600"
+                        title="View Container Image"
+                        onClick={(e) => e.stopPropagation()}  // Stop event propagation
+                      >
+                        <IconContext.Provider value={{ size: 16 }}>
+                          <FaDocker className="text-gray-500 hover:text-blue-600"/>
+                        </IconContext.Provider>
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Description Section */}
+                <p className="text-sm text-gray-600">{workflow.description}</p>
               </Card>
             ))}
           </div>
@@ -71,10 +142,20 @@ const RunPanel = ({ state }) => {
       {selectedWorkflow && (
         <MultistepDialog
           isOpen={dialogOpen}
-          onClose={() => setDialogOpen(false)}
+          onClose={() => {
+            setDialogOpen(false);
+          }}
           initialStepIndex={1}  // Start on Step 2 (Workflow Form)
-          title={selectedWorkflow.name}
-          onChange={(newStep, prevStep) => console.log(`Step changed from ${prevStep} to ${newStep}`)}
+          title={beautifyName(selectedWorkflow.name)}
+          onChange={handleStepChange}
+          finalButtonProps={{
+            text: "Run",  // You can customize the button text here
+            onClick: () => {
+              // Handle the final submit action here
+              handleFinalSubmit();  // Perform the final action
+              setDialogOpen(false); // Close the dialog
+            }
+          }}
         >
           <DialogStep
             id="step1"
@@ -82,7 +163,6 @@ const RunPanel = ({ state }) => {
             panel={
               <DialogBody>
                 <H6>Select the data to proceed (not implemented yet).</H6>
-                {/* Add your "Select Data" content here */}
               </DialogBody>
             }
           />
@@ -93,8 +173,11 @@ const RunPanel = ({ state }) => {
             panel={
               <DialogBody>
                 <H6>{selectedWorkflow.description}</H6>
-                {/* Render the WorkflowForm component */}
-                <WorkflowForm workflowMetadata={selectedWorkflow.metadata} />
+                {/* Pass handleFormSubmit to WorkflowForm to capture the form data */}
+                <WorkflowForm
+                  workflowMetadata={selectedWorkflow.metadata}
+                  onSubmit={handleFormSubmit}  // Pass form submission handler
+                />
               </DialogBody>
             }
           />
@@ -105,11 +188,11 @@ const RunPanel = ({ state }) => {
             panel={
               <DialogBody>
                 <H6>Instructions for how to import data back into OMERO (not implemented yet).</H6>
-                {/* Add your "How to Import Data" content here */}
+                {/* Pass form data to screen 3 */}
+                <p>Form Data Submitted: {JSON.stringify(formData)}</p> {/* Display the form data for demonstration */}
               </DialogBody>
             }
           />
-
         </MultistepDialog>
       )}
     </div>

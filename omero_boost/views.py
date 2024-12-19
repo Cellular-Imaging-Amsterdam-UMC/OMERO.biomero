@@ -5,17 +5,74 @@ import time
 import json
 import logging
 import jwt
+import datetime
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
 from omeroweb.webclient.decorators import login_required, render_response
 from omero.gateway import BlitzGateway
-from omero.rtypes import unwrap
+from omero.rtypes import unwrap, rbool
 from .utils import get_biomero_build_file, get_react_build_file
 from biomero import SlurmClient
 
 logger = logging.getLogger(__name__)
+
+
+@login_required()
+@require_http_methods(["POST"])
+def run_workflow_script(request, conn=None, **kwargs):
+    """
+    Trigger a specific OMERO script to run based on the provided script name and parameters.
+    """
+    try:
+        # Parse the incoming request body for workflow and script details
+        data = json.loads(request.body)
+        script_name = data.get("script_name")
+        if not script_name:
+            return JsonResponse({"error": "script_name is required"}, status=400)
+
+        # Connect to OMERO Script Service
+        svc = conn.getScriptService()
+
+        # Find the script by name
+        scripts = svc.getScripts()
+        script = None
+        for s in scripts:
+            if unwrap(s.getName()) == script_name:
+                script = s
+                break
+
+        if not script:
+            return JsonResponse({"error": "Script not found"}, status=404)
+
+        # Run the script without parameters
+        script_id = int(unwrap(script.id))
+        inputs = {
+            "Run_Python": rbool(False),
+            "Check_SLURM_Status": rbool(True),
+            "Check_Queue": rbool(True)
+        }  # No parameters for now, pass an empty dict
+
+        try:
+            # Use runScript to execute
+            proc = svc.runScript(script_id, inputs, None)
+            omero_job_id = proc.getJob()._id
+            msg = f"Started script {script_id} at {datetime.datetime.now()} with Omero Job ID {omero_job_id}"
+            logger.info(msg)
+            return JsonResponse({"status": "success", "message": f"Script {script_name} started successfully: {msg}"})
+
+        except Exception as e:
+            logger.error(f"Error executing script {script_name}: {str(e)}")
+            return JsonResponse({"error": f"Failed to execute script: {str(e)}"}, status=500)
+
+    except json.JSONDecodeError:
+        logger.error("Invalid JSON data")
+        return JsonResponse({"error": "Invalid JSON data"}, status=400)
+    except Exception as e:
+        logger.error(f"Error processing request: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
+    
 
 @login_required()
 @require_http_methods(["GET"])
@@ -37,7 +94,8 @@ def get_workflow_metadata(request, conn=None, **kwargs):
     """
     Get metadata for a specific workflow.
     """
-    workflow_name = request.GET.get("workflow", None)
+    # workflow_name = request.GET.get("workflow", None)
+    workflow_name = kwargs.get("name")
     if not workflow_name:
         return JsonResponse({"error": "Workflow name is required"}, status=400)
 
@@ -47,10 +105,32 @@ def get_workflow_metadata(request, conn=None, **kwargs):
                 return JsonResponse({"error": "Workflow not found"}, status=404)
             
             metadata = sc.pull_descriptor_from_github(workflow_name)
-        return JsonResponse({"workflow": workflow_name, "metadata": metadata})
+        return JsonResponse(metadata)
     except Exception as e:
         logger.error(f"Error fetching metadata for workflow {workflow_name}: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
+    
+@login_required()
+@require_http_methods(["GET"])
+def get_workflow_github(request, conn=None, **kwargs):
+    """
+    Fetch the GitHub link for a specific workflow.
+    """
+    workflow_name = kwargs.get("name")
+    if not workflow_name:
+        return JsonResponse({"error": "Workflow name is required"}, status=400)
+
+    try:
+        with SlurmClient.from_config(config_only=True) as sc:
+            if workflow_name not in sc.slurm_model_repos:
+                return JsonResponse({"error": "Workflow not found"}, status=404)
+
+            github = sc.slurm_model_repos[workflow_name]
+        return JsonResponse({"url": github})
+    except Exception as e:
+        logger.error(f"Error fetching descriptor for workflow {workflow_name}: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
+
 
 
 @login_required()

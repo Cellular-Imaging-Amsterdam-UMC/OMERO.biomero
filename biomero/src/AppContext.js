@@ -6,10 +6,13 @@ import {
   fetchScripts, 
   fetchScriptData, 
   fetchWorkflows, 
-  fetchWorkflowMetadata 
+  fetchWorkflowMetadata,
+  fetchWorkflowGithub,
+  runWorkflow 
 } from "./apiService";
 import { getDjangoConstants } from "./constants";
 import { transformStructure, extractGroups } from "./utils";
+import { OverlayToaster, Position } from "@blueprintjs/core";
 
 // Create the context
 const AppContext = createContext();
@@ -24,29 +27,59 @@ export const AppProvider = ({ children }) => {
     scripts: [],
     workflows: null,
     workflowMetadata: null,
+    workflowStatusTooltipShown: false,
   });
   const [apiLoading, setLoading] = useState(false);
   const [apiError, setError] = useState(null);
+  const [toaster, setToaster] = useState(null);
 
-  // Fetch workflows
+  // Initialize toaster asynchronously
+  React.useEffect(() => {
+    OverlayToaster.createAsync({ position: Position.TOP }).then(setToaster);
+  }, []);
+
+  const runWorkflowData = async (scriptName, params = {}) => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Call the generic runWorkflow function
+      const response = await runWorkflow(scriptName, params); 
+      
+      console.log(`Workflow run response for ${scriptName}:`, response);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Fetch workflows and metadata including GitHub URLs
   const loadWorkflows = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchWorkflows(); // Fetch workflows (as a list of names)
-      const workflows = response?.workflows || []; // Extract the workflows array
+      const response = await fetchWorkflows(); // Fetch workflows (list of names)
+      const workflows = response?.workflows || []; // Extract workflows array
+
+      // Fetch metadata and GitHub URLs for each workflow
       const metadataPromises = workflows.map((workflow) =>
         fetchWorkflowMetadata(workflow) // Fetch metadata for each workflow
       );
+      const githubPromises = workflows.map((workflow) =>
+        fetchWorkflowGithub(workflow) // Fetch GitHub URL for each workflow
+      );
+
       const metadata = await Promise.all(metadataPromises); // Wait for all metadata to be fetched
-  
-      // Prepare the metadata in a format that matches the workflow names
+      const githubUrls = await Promise.all(githubPromises); // Wait for all GitHub URLs
+
+      // Prepare the metadata and GitHub URLs in the format that matches the workflow names
       const workflowsWithMetadata = workflows.map((workflow, index) => ({
         name: workflow,
-        description: metadata[index]?.metadata?.description || 'No description available', // Fallback to default
-        metadata: metadata[index]?.metadata, // Store the full metadata for further use (e.g., for clicking)
+        description: metadata[index]?.description || 'No description available', // Fallback to default
+        metadata: metadata[index], // Store the full metadata for further use (e.g., for clicking)
+        githubUrl: githubUrls[index]?.url, // Add GitHub URL to workflow data
       }));
-  
+
       setState((prevState) => ({
         ...prevState,
         workflows: workflowsWithMetadata,
@@ -67,6 +100,26 @@ export const AppProvider = ({ children }) => {
     try {
       const metadata = await fetchWorkflowMetadata(workflow);
       setState((prevState) => ({ ...prevState, workflowMetadata: metadata }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch GitHub URL for a specific workflow
+  const loadWorkflowGithub = async (workflow) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const githubUrl = await fetchWorkflowGithub(workflow);
+      setState((prevState) => ({
+        ...prevState,
+        githubUrls: {
+          ...prevState.githubUrls,
+          [workflow]: githubUrl.url, // Store the GitHub URL by workflow name
+        },
+      }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -235,8 +288,10 @@ export const AppProvider = ({ children }) => {
         openUploadScriptWindow,
         loadWorkflows,
         loadWorkflowMetadata,
+        runWorkflowData,
         apiLoading,
         apiError,
+        toaster
       }}
     >
       {children}

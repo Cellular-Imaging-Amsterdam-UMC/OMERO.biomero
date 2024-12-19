@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAppContext } from "../AppContext";
 import ScriptCardGroup from "./ScriptCardGroup";
 import SearchBar from "./SearchBar";
 import UploadButton from "./UploadButton";
@@ -6,10 +7,11 @@ import { getDjangoConstants } from "../constants";
 import { Tabs, Tab, Tag, H4, Icon } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 
-const TabContainer = ({ menuData }) => {
+const TabContainer = () => {
   const { user } = getDjangoConstants();
+  const { state } = useAppContext();
   const [searchQuery, setSearchQuery] = useState(""); // Search query state
-  const [filteredData, setFilteredData] = useState(menuData); // Filtered menu data
+  const [filteredData, setFilteredData] = useState(state.scripts); // Filtered menu data
   const [hasWritePrivileges, setHasWritePrivileges] = useState(false); // State for privileges
 
   // Set user privileges on mount
@@ -19,7 +21,7 @@ const TabContainer = ({ menuData }) => {
 
   // Filter data based on search query and admin privileges
   useEffect(() => {
-    const filteredByAdmin = menuData.map((folder) => ({
+    const filteredByAdmin = state.scripts.map((folder) => ({
       ...folder,
       ul: folder.ul
         ?.map((group) => {
@@ -43,7 +45,7 @@ const TabContainer = ({ menuData }) => {
     })).filter((folder) => folder.ul?.length > 0);
 
     setFilteredData(filtered);
-  }, [searchQuery, menuData, user.isAdmin]);
+  }, [searchQuery, state.scripts, user.isAdmin]);
 
   const getIcon = (folderName) => {
     if (folderName.toLowerCase().includes("biomero")) {

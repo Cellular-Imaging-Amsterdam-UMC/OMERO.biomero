@@ -1,7 +1,7 @@
-import React, { useState } from "react";
-import { FormGroup, InputGroup, NumericInput, Switch, Button } from "@blueprintjs/core";
+import React, { useState, useEffect } from "react";
+import { FormGroup, InputGroup, NumericInput, Switch } from "@blueprintjs/core";
 
-const generateForm = (workflowMetadata) => {
+const generateForm = (workflowMetadata, onSubmit) => {
     // Initialize default values based on the inputs
     const defaultValues = workflowMetadata.inputs.reduce((acc, input) => {
         acc[input.id] = input["default-value"] || (input.type === "Boolean" ? false : "");
@@ -82,21 +82,23 @@ const generateForm = (workflowMetadata) => {
             });
     };
 
+    // Automatically call onSubmit when form data changes (or on step change)
+    useEffect(() => {
+        if (onSubmit) {
+            onSubmit(formData); // Submit form data automatically
+        }
+    }, [formData, onSubmit]); // Submit when form data changes
+
     return (
         <form>
             <h2>{workflowMetadata.workflow}</h2>
             {renderFormFields()}
-            <Button
-                intent="primary"
-                text="Submit"
-                onClick={() => console.log(formData)} // Log the form data when submitted
-            />
         </form>
     );
 };
 
-const WorkflowForm = ({ workflowMetadata }) => {
-    return <div>{generateForm(workflowMetadata)}</div>;
+const WorkflowForm = ({ workflowMetadata, onSubmit }) => {
+    return <div>{generateForm(workflowMetadata, onSubmit)}</div>;
 };
 
 export default WorkflowForm;

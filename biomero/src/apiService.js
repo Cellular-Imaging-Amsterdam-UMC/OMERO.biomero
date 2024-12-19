@@ -95,9 +95,42 @@ export const fetchWorkflows = async () => {
 // Fetch metadata for a specific workflow
 export const fetchWorkflowMetadata = async (workflow) => {
   const { urls } = getDjangoConstants();
-  const params = { workflow: workflow };
-  return apiRequest(urls.workflow_metadata, "GET", null, { params });
+  const workflowMetadataUrl = `${urls.workflows}${workflow}/metadata/`; // Dynamically build the URL
+  return apiRequest(workflowMetadataUrl, "GET");
 };
+
+// Fetch GitHub URL for a specific workflow
+export const fetchWorkflowGithub = async (workflow) => {
+  const { urls } = getDjangoConstants();
+  const workflowGithubUrl = `${urls.workflows}${workflow}/github/`; // Dynamically build the URL
+  return apiRequest(workflowGithubUrl, "GET");
+};
+
+export const runWorkflow = async (scriptName, params = {}) => {
+  const { urls } = getDjangoConstants();  // Base URL for the API from Django constants
+
+  try {
+    // Use the global csrftoken directly from window object
+    const csrfToken = window.csrftoken; 
+
+    // Prepare the payload with script_name and optional params
+    const payload = { script_name: scriptName, params };
+
+    const response = await apiRequest(urls.api_run_workflow, "POST", payload, {
+      headers: {
+        'X-CSRFToken': csrfToken,  // Include CSRF token in request headers
+      },
+    });
+
+    return response;  // Return the API response
+  } catch (error) {
+    console.error("Error running workflow:", error);
+    throw error;
+  }
+};
+
+
+
 
 
 

@@ -18,6 +18,7 @@ import {
   DialogBody,
   DialogFooter,
   Classes,
+  Tooltip,
 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 
@@ -93,7 +94,7 @@ const StatusPanel = ({ iframeUrl, metabaseError, setMetabaseError, isAdmin, meta
 );
 
 const App = () => {
-  const { state, loadOmeroTreeData, loadFolderData, loadGroups, loadScripts, loadWorkflows } = useAppContext();
+  const { state, updateState, loadOmeroTreeData, loadFolderData, loadGroups, loadScripts, loadWorkflows } = useAppContext();
   const [metabaseError, setMetabaseError] = useState(false);
   const [activeTab, setActiveTab] = useState("Run"); // Track active tab state
   const [loadedTabs, setLoadedTabs] = useState({
@@ -143,7 +144,7 @@ const App = () => {
   return (
     <div className="bg-[#f0f1f5] w-full h-full relative top-0 overflow-hidden">
       {/* Navbar */}
-      <Navbar>
+      <Navbar className="z-0">
         <NavbarGroup>
           <NavbarHeading>BIOMERO</NavbarHeading>
         </NavbarGroup>
@@ -167,7 +168,29 @@ const App = () => {
           />
           <Tab
             id="Status"
-            title="Status"
+            title={
+              <Tooltip
+                content={
+                    <span>
+                        View your workflow's progress here
+                    </span>
+                }
+                compact={true}
+                isOpen={state.workflowStatusTooltipShown}
+                intent="success"
+                onOpened={() => {
+                  setTimeout(() => {
+                    updateState(
+                      { workflowStatusTooltipShown: false }
+                    ); // close
+                  }, 5000);  // Adjust the delay as needed
+                }}
+              >
+                <span className="pointer-events-none select-none focus:outline-none">
+                  Status
+                </span>
+              </Tooltip>
+            }
             icon="dashboard"
             panel={loadedTabs.Status ? (
               <StatusPanel

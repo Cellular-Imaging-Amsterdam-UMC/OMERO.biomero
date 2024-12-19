@@ -9,7 +9,7 @@ const UploadButton = () => {
   };
 
   return (
-    <Button icon="document" rightIcon="arrow-right"
+    <Button icon="document" rightIcon="upload"
       onClick={handleUploadClick}
     >
       Upload Script
