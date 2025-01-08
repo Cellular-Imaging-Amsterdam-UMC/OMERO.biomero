@@ -32,7 +32,7 @@ const RunTab = ({ state }) => (
         {state.omeroTreeData && <OmeroDataBrowser />}
       </div>
       <div className="w-4/5 p-4 flex-1 overflow-hidden">
-        <RunPanel state={state} />
+        <RunPanel />
       </div>
     </div>
   </div>

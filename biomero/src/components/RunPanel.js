@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { useAppContext } from "../AppContext";
-import { Card, Elevation, InputGroup, H5, H6, MultistepDialog, DialogBody, DialogStep, Icon } from "@blueprintjs/core";
+import { Card, Elevation, InputGroup, H5, H6, MultistepDialog, DialogBody, DialogStep, Icon, Spinner } from "@blueprintjs/core";
 import { FaDocker } from "react-icons/fa6";
 import { IconContext } from "react-icons";
 import WorkflowForm from "./WorkflowForm";
+import WorkflowOutput from "./WorkflowOutput";
+import OmeroDataBrowser from "../OmeroDataBrowser";
 
 const RunPanel = () => {
   const { state, updateState, toaster, runWorkflowData } = useAppContext();
@@ -31,28 +33,34 @@ const RunPanel = () => {
     setDialogOpen(true); // Open the dialog
   };
 
-  const handleFinalSubmit = () => {
-    console.log(formData)
-
-    submitWorkflow()
+  const handleFinalSubmit = (workflow) => {
+    console.log([workflow, formData])
 
     updateState(
       { workflowStatusTooltipShown: true }
     );
     if (toaster) {
       toaster.show({
-        intent: "success",
-        icon: "cloud-upload",
-        message: "Submitting workflow to the compute gods...",
+        intent: "primary",
+        icon: "cloud-upload", 
+        message: (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <Spinner size={16} intent="warning"/>
+          <span>Submitting workflow to the compute gods...</span>
+        </div>),
       });
     } else {
       console.warn("Toaster not initialized yet.");
     }
 
+    submitWorkflow(workflow.name)
+
   }
 
-  const submitWorkflow = () => {
-    runWorkflowData('Example_Minimal_Slurm_Script.py', { param1: "value1", param2: "value2" });
+  const submitWorkflow = (workflow_name) => {
+    runWorkflowData(
+      workflow_name, 
+      formData);
   }
 
   // Handle form data submission from WorkflowForm
@@ -152,7 +160,7 @@ const RunPanel = () => {
             text: "Run",  // You can customize the button text here
             onClick: () => {
               // Handle the final submit action here
-              handleFinalSubmit();  // Perform the final action
+              handleFinalSubmit(selectedWorkflow);  // Perform the final action
               setDialogOpen(false); // Close the dialog
             }
           }}
@@ -162,7 +170,8 @@ const RunPanel = () => {
             title="Input Data"
             panel={
               <DialogBody>
-                <H6>Select the data to proceed (not implemented yet).</H6>
+                <H6>Select the input data to proceed (not implemented yet).</H6>
+                {state.omeroTreeData && <OmeroDataBrowser />}
               </DialogBody>
             }
           />
@@ -187,12 +196,15 @@ const RunPanel = () => {
             title="Output Data"
             panel={
               <DialogBody>
-                <H6>Instructions for how to import data back into OMERO (not implemented yet).</H6>
-                {/* Pass form data to screen 3 */}
-                <p>Form Data Submitted: {JSON.stringify(formData)}</p> {/* Display the form data for demonstration */}
+                <WorkflowOutput
+                  formData={formData}
+                  updateFormData={setFormData}
+                />
               </DialogBody>
             }
           />
+
+
         </MultistepDialog>
       )}
     </div>

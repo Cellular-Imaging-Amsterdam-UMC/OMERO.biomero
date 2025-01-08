@@ -12,7 +12,7 @@ from django.views.decorators.http import require_http_methods
 from django.conf import settings
 from omeroweb.webclient.decorators import login_required, render_response
 from omero.gateway import BlitzGateway
-from omero.rtypes import unwrap, rbool
+from omero.rtypes import unwrap, rbool, wrap
 from .utils import get_biomero_build_file, get_react_build_file
 from biomero import SlurmClient
 
@@ -28,14 +28,17 @@ def run_workflow_script(request, conn=None, **kwargs):
     try:
         # Parse the incoming request body for workflow and script details
         data = json.loads(request.body)
-        script_name = data.get("script_name")
-        if not script_name:
-            return JsonResponse({"error": "script_name is required"}, status=400)
+        workflow_name = data.get("workflow_name")
+        if not workflow_name:
+            return JsonResponse({"error": "workflow_name is required"}, status=400)
+        params = data.get("params", {})
+        
+        script_name = "SLURM_Run_Workflow.py"
 
         # Connect to OMERO Script Service
         svc = conn.getScriptService()
 
-        # Find the script by name
+        # Find the workflow script by name
         scripts = svc.getScripts()
         script = None
         for s in scripts:
@@ -44,15 +47,15 @@ def run_workflow_script(request, conn=None, **kwargs):
                 break
 
         if not script:
-            return JsonResponse({"error": "Script not found"}, status=404)
+            return JsonResponse({"error": f"Script {script_name} not found on server"}, status=404)
 
-        # Run the script without parameters
-        script_id = int(unwrap(script.id))
-        inputs = {
-            "Run_Python": rbool(False),
-            "Check_SLURM_Status": rbool(True),
-            "Check_Queue": rbool(True)
-        }  # No parameters for now, pass an empty dict
+        # Run the script with parameters
+        script_id = int(unwrap(script.id))        
+        # Convert provided params to OMERO rtypes using wrap
+        inputs = {f"{workflow_name}_|_{key}": wrap(value) for key, value in params.items()}
+        inputs.update({
+            workflow_name: rbool(True)
+        })
 
         try:
             # Use runScript to execute
@@ -60,18 +63,18 @@ def run_workflow_script(request, conn=None, **kwargs):
             omero_job_id = proc.getJob()._id
             msg = f"Started script {script_id} at {datetime.datetime.now()} with Omero Job ID {omero_job_id}"
             logger.info(msg)
-            return JsonResponse({"status": "success", "message": f"Script {script_name} started successfully: {msg}"})
+            return JsonResponse({"status": "success", "message": f"Script {script_name} for {workflow_name} started successfully: {msg}"})
 
         except Exception as e:
-            logger.error(f"Error executing script {script_name}: {str(e)}")
-            return JsonResponse({"error": f"Failed to execute script: {str(e)}"}, status=500)
+            logger.error(f"Error executing script {script_name} for {workflow_name}: {str(e)}")
+            return JsonResponse({"error": f"Failed to execute script {script_name} for {workflow_name}: {str(e)}"}, status=500)
 
     except json.JSONDecodeError:
         logger.error("Invalid JSON data")
         return JsonResponse({"error": "Invalid JSON data"}, status=400)
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
-        return JsonResponse({"error": str(e)}, status=500)
+        return JsonResponse({"error": f"Failed to execute workflow for {workflow_name} {inputs}: {str(e)}"}, status=500)
     
 
 @login_required()

@@ -38,15 +38,32 @@ export const AppProvider = ({ children }) => {
     OverlayToaster.createAsync({ position: Position.TOP }).then(setToaster);
   }, []);
 
-  const runWorkflowData = async (scriptName, params = {}) => {
+  const runWorkflowData = async (workflowName, params = {}) => {
     setLoading(true);
     setError(null);
     try {
       // Call the generic runWorkflow function
-      const response = await runWorkflow(scriptName, params); 
+      const response = await runWorkflow(workflowName, params); 
       
-      console.log(`Workflow run response for ${scriptName}:`, response);
+      console.log(`Workflow run response for ${workflowName}:`, response);
+      
+      const message = response?.message || "Workflow executed successfully.";
+
+      // Show formatted response in the toast
+      toaster.show({
+          intent: "success",
+          icon: "tick-circle",
+          message: `${workflowName}: ${message} (Params: ${JSON.stringify(params, null, 2)})`,
+          timeout: 0,
+      });
     } catch (err) {
+      // Show formatted response in the toast
+      toaster.show({
+        intent: "danger",
+        icon: "error",
+        message: `${workflowName}: ${err.message}: ${err.response?.data?.error} (Params: ${JSON.stringify(params, null, 2)})`,
+        timeout: 0,
+    });
       setError(err.message);
     } finally {
       setLoading(false);

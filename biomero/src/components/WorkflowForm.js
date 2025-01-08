@@ -2,13 +2,27 @@ import React, { useState, useEffect } from "react";
 import { FormGroup, InputGroup, NumericInput, Switch } from "@blueprintjs/core";
 
 const generateForm = (workflowMetadata, onSubmit) => {
-    // Initialize default values based on the inputs
-    const defaultValues = workflowMetadata.inputs.reduce((acc, input) => {
-        acc[input.id] = input["default-value"] || (input.type === "Boolean" ? false : "");
+     // Initialize default values based on the inputs
+     const defaultValues = workflowMetadata.inputs.reduce((acc, input) => {
+        const defaultValue = input["default-value"];
+
+        // Handle 'Number' type separately
+        if (input.type === "Number") {
+            acc[input.id] = defaultValue !== undefined ? Number(defaultValue) : 0;
+        } 
+        // Handle 'Boolean' type separately
+        else if (input.type === "Boolean") {
+            acc[input.id] = defaultValue !== undefined ? Boolean(defaultValue) : false;
+        }
+        // Handle other types like 'String' with default values or empty string
+        else {
+            acc[input.id] = defaultValue || "";
+        }
+
         return acc;
     }, {});
 
-    const [formData, setFormData] = useState(defaultValues); // Initialize formData with default values
+    const [formData, setFormData] = useState(() => ({ ...defaultValues })); // Initialize formData with default values
 
     // Handle change for different input types
     const handleInputChange = (id, value) => {

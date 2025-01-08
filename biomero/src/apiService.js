@@ -106,7 +106,7 @@ export const fetchWorkflowGithub = async (workflow) => {
   return apiRequest(workflowGithubUrl, "GET");
 };
 
-export const runWorkflow = async (scriptName, params = {}) => {
+export const runWorkflow = async (workflowName, params = {}) => {
   const { urls } = getDjangoConstants();  // Base URL for the API from Django constants
 
   try {
@@ -114,7 +114,7 @@ export const runWorkflow = async (scriptName, params = {}) => {
     const csrfToken = window.csrftoken; 
 
     // Prepare the payload with script_name and optional params
-    const payload = { script_name: scriptName, params };
+    const payload = { workflow_name: workflowName, params };
 
     const response = await apiRequest(urls.api_run_workflow, "POST", payload, {
       headers: {
