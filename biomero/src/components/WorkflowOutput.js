@@ -3,8 +3,8 @@ import { InputGroup, FormGroup, Switch, Button, Popover, PopoverInteractionKind,
 import OmeroDataBrowser from "../OmeroDataBrowser";
 import { useAppContext } from "../AppContext";
 
-const WorkflowOutput = ({ formData, updateFormData }) => {
-  const { state } = useAppContext();
+const WorkflowOutput = () => {
+  const { state, updateState } = useAppContext();  // Directly use the context's state and updateState
   const [isPopoverOpen, setPopoverOpen] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState(null); // Store the selected folder
   const [renamePattern, setRenamePattern] = useState(''); // State for the rename pattern
@@ -20,19 +20,20 @@ const WorkflowOutput = ({ formData, updateFormData }) => {
     renamePattern: '', // Default empty renaming pattern
   };
 
-  // Ensure formData has the default values when not set
   useEffect(() => {
-    updateFormData((prevData) => ({
-      ...defaultValues,
-      ...prevData, // This keeps the already set values intact
-    }));
-  }, [updateFormData]);
+    // Merge default values into formData, ensuring missing values are populated
+    updateState({ formData: { ...defaultValues, ...state.formData } });
+  }, [state.formData, updateState]);
+  
+  
 
   const handleInputChange = (key, value) => {
-    updateFormData((prevData) => ({
-      ...prevData,
-      [key]: value,
-    }));
+    updateState({
+      formData: {
+        ...state.formData,
+        [key]: value,
+      }
+    });
   };
 
   const handleKeyDown = (e) => {
@@ -50,10 +51,10 @@ const WorkflowOutput = ({ formData, updateFormData }) => {
   const handleSelectFolder = () => {
     if (selectedFolder) {
       // Add the selected folder as a tag in the TagInput
-      handleInputChange("selectedDatasets", [...formData.selectedDatasets, selectedFolder]);
+      handleInputChange("selectedDatasets", [...state.formData.selectedDatasets, selectedFolder]);
     } else {
-        // Add the selected folder as a tag in the TagInput
-      handleInputChange("selectedDatasets", [...formData.selectedDatasets, "dummyfolder"]);
+      // Add the selected folder as a tag in the TagInput
+      handleInputChange("selectedDatasets", [...state.formData.selectedDatasets, "dummyfolder"]);
     }
     setPopoverOpen(false); // Close the popover after selection
   };
@@ -70,7 +71,7 @@ const WorkflowOutput = ({ formData, updateFormData }) => {
       >
         <Switch
           id="email-notification"
-          checked={formData.receiveEmail ?? defaultValues.receiveEmail} // Default to true if not set
+          checked={state.formData.receiveEmail ?? defaultValues.receiveEmail} // Default to true if not set
           onChange={(e) => handleInputChange("receiveEmail", e.target.checked)}
         />
       </FormGroup>
@@ -89,7 +90,7 @@ const WorkflowOutput = ({ formData, updateFormData }) => {
         >
           <Switch
             id="upload-zip-options"
-            checked={formData.importAsZip ?? defaultValues.importAsZip} // Default to true if not set
+            checked={state.formData.importAsZip ?? defaultValues.importAsZip} // Default to true if not set
             onChange={(e) => handleInputChange("importAsZip", e.target.checked)}
           />
         </FormGroup>
@@ -102,7 +103,7 @@ const WorkflowOutput = ({ formData, updateFormData }) => {
         >
           <Switch
             id="upload-csv-options"
-            checked={formData.uploadCsv ?? defaultValues.uploadCsv} // Default to true if not set
+            checked={state.formData.uploadCsv ?? defaultValues.uploadCsv} // Default to true if not set
             onChange={(e) => handleInputChange("uploadCsv", e.target.checked)}
           />
         </FormGroup>
@@ -115,7 +116,7 @@ const WorkflowOutput = ({ formData, updateFormData }) => {
         >
           <Switch
             id="upload-images-options"
-            checked={formData.attachToOriginalImages ?? defaultValues.attachToOriginalImages} // Default to false if not set
+            checked={state.formData.attachToOriginalImages ?? defaultValues.attachToOriginalImages} // Default to false if not set
             onChange={(e) => handleInputChange("attachToOriginalImages", e.target.checked)}
           />
         </FormGroup>
@@ -127,16 +128,15 @@ const WorkflowOutput = ({ formData, updateFormData }) => {
           helperText="The output images will be organized in an OMERO dataset for viewing and further analysis."
           subLabel="Don't forget to press ENTER if you type a new name!"
         >
-                
           <TagInput
             placeholder="Add new dataset name or select..."
-            values={formData.selectedDatasets || defaultValues.selectedDatasets} // Default to empty array if not set
+            values={state.formData.selectedDatasets || defaultValues.selectedDatasets} // Default to empty array if not set
             onChange={(values) => {
               handleInputChange("selectedDatasets", values); // Keep all selected datasets
             }}
             onKeyDown={handleKeyDown} // Prevent Enter from closing the dialog
             rightElement={
-                <Popover
+              <Popover
                 interactionKind={PopoverInteractionKind.CLICK}
                 isOpen={isPopoverOpen}
                 onInteraction={(state) => setPopoverOpen(state)}
@@ -158,37 +158,35 @@ const WorkflowOutput = ({ formData, updateFormData }) => {
                   <Button icon="database" text="Select Result Dataset" />
                 </Tooltip>
               </Popover>
-              
             }
           />
         </FormGroup>
 
         {/* Optional Image File Renamer */}
-        
         <FormGroup
-            label="Rename result images?"
-            labelFor="image-renaming-pattern"
-            helperText={
-                <>
-                    <div>
-                        Use <code>{'{original_file}'}</code> and <code>{'{ext}'}</code> to create a naming pattern for the new images.
-                    </div>
-                    <div>
-                        For example, if the original image is <code>sample1.tiff</code>, you can name the result image <code>sample1_nuclei_mask.tiff</code> by using the pattern <code>{'{original_file}_nuclei_mask.{ext}'}</code>.
-                    </div>
-                </>
-              }
-            disabled={!formData.selectedDatasets || formData.selectedDatasets.length === 0}
+          label="Rename result images?"
+          labelFor="image-renaming-pattern"
+          helperText={
+            <>
+              <div>
+                Use <code>{'{original_file}'}</code> and <code>{'{ext}'}</code> to create a naming pattern for the new images.
+              </div>
+              <div>
+                For example, if the original image is <code>sample1.tiff</code>, you can name the result image <code>sample1_nuclei_mask.tiff</code> by using the pattern <code>{'{original_file}_nuclei_mask.{ext}'}</code>.
+              </div>
+            </>
+          }
+          disabled={!state.formData.selectedDatasets || state.formData.selectedDatasets.length === 0}
         >
-            <InputGroup
-                id="image-renaming-pattern"
-                placeholder="e.g., {original_file}_nuclei_mask.{ext}"
-                value={renamePattern}
-                onChange={handleRenamePatternChange}
-                fill={true}
-                disabled={!formData.selectedDatasets || formData.selectedDatasets.length === 0}
-                />
-        </FormGroup>        
+          <InputGroup
+            id="image-renaming-pattern"
+            placeholder="e.g., {original_file}_nuclei_mask.{ext}"
+            value={renamePattern}
+            onChange={handleRenamePatternChange}
+            fill={true}
+            disabled={!state.formData.selectedDatasets || state.formData.selectedDatasets.length === 0}
+          />
+        </FormGroup>
       </FormGroup>
     </form>
   );
