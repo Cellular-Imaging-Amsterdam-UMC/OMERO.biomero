@@ -136,21 +136,20 @@ const WorkflowOutput = ({ formData, updateFormData }) => {
             }}
             onKeyDown={handleKeyDown} // Prevent Enter from closing the dialog
             rightElement={
-              <Popover
+                <Popover
                 interactionKind={PopoverInteractionKind.CLICK}
                 isOpen={isPopoverOpen}
                 onInteraction={(state) => setPopoverOpen(state)}
                 content={
-                  <div style={{ padding: "1rem" }}>
+                  <div className="p-4 flex flex-col space-y-4">
                     <OmeroDataBrowser 
-                        // Provide a method to set selected folder
-                        onSelectFolder={(folder) => setSelectedFolder(folder)}
+                      onSelectFolder={(folder) => setSelectedFolder(folder)} 
                     />
-                    {/* TODO: how to get the selected folder out?*/}
                     <Button
-                        style={{ marginTop: "10px", float: "right" }}
-                        text="Select"
-                        onClick={handleSelectFolder} // Handle select button click
+                      className="self-end"
+                      icon="send-message" // BlueprintJS arrow icon
+                      onClick={handleSelectFolder} 
+                      intent="primary"
                     />
                   </div>
                 }
@@ -159,26 +158,37 @@ const WorkflowOutput = ({ formData, updateFormData }) => {
                   <Button icon="database" text="Select Result Dataset" />
                 </Tooltip>
               </Popover>
+              
             }
           />
         </FormGroup>
 
         {/* Optional Image File Renamer */}
-        {formData.selectedDatasets && formData.selectedDatasets.length > 0 && (
-            <FormGroup
+        
+        <FormGroup
             label="Rename result images?"
             labelFor="image-renaming-pattern"
-            helperText="Define a renaming pattern using {original_file} and {ext} placeholders for values from the original input image file."
-            >
+            helperText={
+                <>
+                    <div>
+                        Use <code>{'{original_file}'}</code> and <code>{'{ext}'}</code> to create a naming pattern for the new images.
+                    </div>
+                    <div>
+                        For example, if the original image is <code>sample1.tiff</code>, you can name the result image <code>sample1_nuclei_mask.tiff</code> by using the pattern <code>{'{original_file}_nuclei_mask.{ext}'}</code>.
+                    </div>
+                </>
+              }
+            disabled={!formData.selectedDatasets || formData.selectedDatasets.length === 0}
+        >
             <InputGroup
                 id="image-renaming-pattern"
                 placeholder="e.g., {original_file}_nuclei_mask.{ext}"
                 value={renamePattern}
                 onChange={handleRenamePatternChange}
                 fill={true}
+                disabled={!formData.selectedDatasets || formData.selectedDatasets.length === 0}
                 />
-            </FormGroup>
-        )}
+        </FormGroup>        
       </FormGroup>
     </form>
   );

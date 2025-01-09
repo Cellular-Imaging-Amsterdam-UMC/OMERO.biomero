@@ -5,7 +5,7 @@ import ScriptCard from "./ScriptCard"; // Keep using the ScriptCard component
 import "@blueprintjs/core/lib/css/blueprint.css";
 
 const ScriptCardGroup = ({ folder }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const toggleFolder = () => {
     setIsExpanded(!isExpanded);

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useAppContext } from "../AppContext";
-import { Card, Elevation, InputGroup, H5, H6, MultistepDialog, DialogBody, DialogStep, Icon, Spinner } from "@blueprintjs/core";
+import { Card, Elevation, InputGroup, H5, H6, MultistepDialog, DialogBody, DialogStep, Icon, Spinner, SpinnerSize } from "@blueprintjs/core";
 import { FaDocker } from "react-icons/fa6";
 import { IconContext } from "react-icons";
 import WorkflowForm from "./WorkflowForm";
@@ -142,7 +142,10 @@ const RunPanel = () => {
             ))}
           </div>
         ) : (
-          <p>No workflows found.</p>
+          <Card elevation={Elevation.ONE} className="flex flex-col items-center justify-center p-6 text-center">
+            <Spinner intent="primary" size={SpinnerSize.SMALL} />
+            <p className="text-sm text-gray-600 mt-4">Loading workflows...</p>
+          </Card>
         )}
       </div>
 

@@ -80,13 +80,13 @@ const TabContainer = () => {
           <Tab
             key={folder.name}
             id={folder.name}
-            icon={<Icon icon={getIcon(folder.name)} />}
+            // icon={<Icon icon={getIcon(folder.name)} />}
             title={folder.name}
             tagContent={folder.ul?.reduce((sum, group) => sum + (group.ul?.length || 0), 0)}
             tagProps={{ round: true }}
             panel={
-              <div style={{ padding: "16px" }} className="h-[calc(100vh-300px)] overflow-y-auto">
-                <H4>{folder.name}</H4>
+              <div className="p-4 h-[calc(100vh-300px)] overflow-y-auto">
+                <H4 className="mb-4">{folder.name}</H4>
                 {renderScripts(folder)}
               </div>
             }

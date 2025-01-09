@@ -24,7 +24,7 @@ import "@blueprintjs/core/lib/css/blueprint.css";
 
 // RunTab Component
 const RunTab = ({ state }) => (
-  <div>
+  <div className="h-full overflow-y-auto">
     <H4>Run</H4>
     <div className="flex">
       <div className="w-1/5 p-4 overflow-auto">
@@ -48,7 +48,7 @@ const ScriptsPanel = ({ state, loadScriptsData, scriptsLoaded, setScriptsLoaded 
   }, [scriptsLoaded, loadScriptsData, setScriptsLoaded]);
 
   return (
-    <div>
+    <div className="h-full overflow-y-auto">
       <H4>Scripts</H4>
       <div className="flex">
         <div className="w-1/5 p-4 overflow-auto">
@@ -69,7 +69,7 @@ const ScriptsPanel = ({ state, loadScriptsData, scriptsLoaded, setScriptsLoaded 
 
 // StatusPanel Component
 const StatusPanel = ({ iframeUrl, metabaseError, setMetabaseError, isAdmin, metabaseUrl }) => (
-  <div>
+  <div className="h-full overflow-y-auto"> 
     <H4>Status</H4>
     <div className="p-4 h-full overflow-hidden">
       {!metabaseError ? (
@@ -151,9 +151,10 @@ const App = () => {
       </Navbar>
 
       {/* Tabs with Panels */}
-      <div style={{ padding: "16px" }}>
+      <div className="p-4 h-full overflow-hidden">
         <Tabs
           id="app-tabs"
+          className="h-full"
           animate={true}
           renderActiveTabPanelOnly={false}
           large={true}
