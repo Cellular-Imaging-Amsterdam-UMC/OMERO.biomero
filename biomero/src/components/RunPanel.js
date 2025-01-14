@@ -6,7 +6,7 @@ import { FaDocker } from "react-icons/fa6";
 import { IconContext } from "react-icons";
 import WorkflowForm from "./WorkflowForm";
 import WorkflowOutput from "./WorkflowOutput";
-import OmeroDataBrowser from "../OmeroDataBrowser";
+import WorkflowInput from "./WorkflowInput";
 
 const RunPanel = () => {
   const { state, updateState, toaster, runWorkflowData } = useAppContext();
@@ -19,26 +19,6 @@ const RunPanel = () => {
       .replace(/_/g, " ")
       .replace(/\b\w/g, (char) => char.toUpperCase());
   };
-
-  // Data for the dropdown and search list
-  const [omeroIDs, setOmeroIDs] = useState([]);
-  const [dataTypes, setDataTypes] = useState(["Dataset", "Screen", "Image"]);
-
-  // This effect will run when omeroTreeData changes and it's populated
-  useEffect(() => {
-    if (state.omeroTreeData) {
-      const datasets = Object.values(state.omeroTreeData)
-        .filter(item => item.category === "datasets")
-        .map(item => ({ label: `${item.data} (ID: ${item.id})`, value: item.id }));
-
-      const screens = Object.values(state.omeroTreeData)
-        .filter(item => item.category === "screens")
-        .map(item => ({ label: `${item.data} (ID: ${item.id})`, value: item.id }));
-
-      // Combine datasets and screens
-      setOmeroIDs([...datasets, ...screens]);
-    }
-  }, [state.omeroTreeData]); // Runs whenever omeroTreeData changes
 
   // Filter workflows based on search term
   const filteredWorkflows = state.workflows?.filter((workflow) =>
@@ -93,16 +73,6 @@ const RunPanel = () => {
     if (stepIndex === 2) {  // When moving to step 3, submit the form
       // Handle any specific form submission if necessary
     }
-  };
-
-  // Handle form data change from WorkflowForm
-  const handleFormDataChange = (newFormData) => {
-    updateState({
-      formData: {
-        ...state.formData,
-        ...newFormData, // Merge with existing formData
-      }
-    });
   };
 
   return (
@@ -200,52 +170,10 @@ const RunPanel = () => {
             id="step1"
             title="Input Data"
             panel={
-              <DialogBody>
-                <H6>Select the input data to proceed</H6>
-
-                {/* OMERO ID(s) Search List/Select */}
-                <FormGroup label="OMERO ID(s)" labelFor="omeroID">
-                  <MultiSelect
-                    id="omeroID"
-                    items={omeroIDs} // Use the dynamically populated OMERO IDs list
-                    selectedItems={state.formData.IDs || []}
-                    onItemSelect={(item) => {
-                      handleFormDataChange({
-                        IDs: [...(state.formData.IDs || []), item.value] // Add selected OMERO ID
-                      });
-                    }}
-                    itemRenderer={(item, { handleClick }) => (
-                      <MenuItem
-                        key={item.value}
-                        text={item.label}
-                        onClick={handleClick}
-                      />
-                    )}
-                    noResults={<MenuItem text="No results" />}
-                    tagRenderer={(item) => item.label}
-                    placeholder="Search and select OMERO IDs"
-                  />
-                </FormGroup>
-
-                {/* Data Type Dropdown */}
-                <FormGroup label="Data Type" labelFor="dataType">
-                  <HTMLSelect
-                    id="dataType"
-                    value={state.formData.Data_Type || "Dataset"}
-                    onChange={(e) => handleFormDataChange({ Data_Type: e.target.value })}
-                  >
-                    {dataTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </HTMLSelect>
-                </FormGroup>
-
-                {state.omeroTreeData && <OmeroDataBrowser />}
-              </DialogBody>
+              <WorkflowInput />
             }
           />
+
 
 
           <DialogStep

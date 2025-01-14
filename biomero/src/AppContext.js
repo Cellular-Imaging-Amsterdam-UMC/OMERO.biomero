@@ -8,7 +8,9 @@ import {
   fetchWorkflows, 
   fetchWorkflowMetadata,
   fetchWorkflowGithub,
-  runWorkflow 
+  runWorkflow,
+  fetchThumbnails,
+  fetchImages 
 } from "./apiService";
 import { getDjangoConstants } from "./constants";
 import { transformStructure, extractGroups } from "./utils";
@@ -28,6 +30,7 @@ export const AppProvider = ({ children }) => {
     workflows: null,
     workflowMetadata: null,
     workflowStatusTooltipShown: false,
+    inputDatasets: []
   });
   const [apiLoading, setLoading] = useState(false);
   const [apiError, setError] = useState(null);
@@ -38,6 +41,39 @@ export const AppProvider = ({ children }) => {
     OverlayToaster.createAsync({ position: Position.TOP }).then(setToaster);
   }, []);
 
+  const loadThumbnails = async (imageIds) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const thumbnails = await fetchThumbnails(imageIds);
+      setState((prevState) => ({
+        ...prevState,
+        thumbnails: thumbnails,
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadImagesForDataset = async (datasetId, page = 1, sizeXYZ = false, date = false, group = 0) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const images = await fetchImages(datasetId, page, sizeXYZ, date, group);
+      setState((prevState) => ({
+        ...prevState,
+        images: images,
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  
   const runWorkflowData = async (workflowName, params = {}) => {
     setLoading(true);
     setError(null);
@@ -306,6 +342,8 @@ export const AppProvider = ({ children }) => {
         loadWorkflows,
         loadWorkflowMetadata,
         runWorkflowData,
+        loadThumbnails,
+        loadImagesForDataset,
         apiLoading,
         apiError,
         toaster

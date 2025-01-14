@@ -2,13 +2,11 @@ import React, { useState, useEffect } from "react";
 import { InputGroup, FormGroup, Switch, Button, Popover, PopoverInteractionKind, Tooltip, TagInput } from "@blueprintjs/core";
 import OmeroDataBrowser from "../OmeroDataBrowser";
 import { useAppContext } from "../AppContext";
+import DatasetSelectWithPopover from "./DatasetSelectWithPopover.js";
 
 const WorkflowOutput = () => {
   const { state, updateState } = useAppContext();  // Directly use the context's state and updateState
-  const [isPopoverOpen, setPopoverOpen] = useState(false);
-  const [selectedFolder, setSelectedFolder] = useState(null); // Store the selected folder
   const [renamePattern, setRenamePattern] = useState(''); // State for the rename pattern
-
 
   // Default values for the form fields
   const defaultValues = {
@@ -23,10 +21,8 @@ const WorkflowOutput = () => {
   useEffect(() => {
     // Merge default values into formData, ensuring missing values are populated
     updateState({ formData: { ...defaultValues, ...state.formData } });
-  }, [state.formData, updateState]);
+  }, [state.formData]);
   
-  
-
   const handleInputChange = (key, value) => {
     updateState({
       formData: {
@@ -36,27 +32,10 @@ const WorkflowOutput = () => {
     });
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault(); // Prevent the default behavior (dialog closing)
-    }
-  };
-
   // Handle renaming pattern change
   const handleRenamePatternChange = (e) => {
     setRenamePattern(e.target.value);
     handleInputChange("renamePattern", e.target.value); // Store the rename pattern
-  };
-
-  const handleSelectFolder = () => {
-    if (selectedFolder) {
-      // Add the selected folder as a tag in the TagInput
-      handleInputChange("selectedDatasets", [...state.formData.selectedDatasets, selectedFolder]);
-    } else {
-      // Add the selected folder as a tag in the TagInput
-      handleInputChange("selectedDatasets", [...state.formData.selectedDatasets, "dummyfolder"]);
-    }
-    setPopoverOpen(false); // Close the popover after selection
   };
 
   return (
@@ -122,45 +101,11 @@ const WorkflowOutput = () => {
         </FormGroup>
 
         {/* Dataset Selection with Popover */}
-        <FormGroup
-          label="Add results to a new or existing dataset."
-          labelFor="upload-ex-dataset-options"
-          helperText="The output images will be organized in an OMERO dataset for viewing and further analysis."
-          subLabel="Don't forget to press ENTER if you type a new name!"
-        >
-          <TagInput
-            placeholder="Add new dataset name or select..."
-            values={state.formData.selectedDatasets || defaultValues.selectedDatasets} // Default to empty array if not set
-            onChange={(values) => {
-              handleInputChange("selectedDatasets", values); // Keep all selected datasets
-            }}
-            onKeyDown={handleKeyDown} // Prevent Enter from closing the dialog
-            rightElement={
-              <Popover
-                interactionKind={PopoverInteractionKind.CLICK}
-                isOpen={isPopoverOpen}
-                onInteraction={(state) => setPopoverOpen(state)}
-                content={
-                  <div className="p-4 flex flex-col space-y-4">
-                    <OmeroDataBrowser 
-                      onSelectFolder={(folder) => setSelectedFolder(folder)} 
-                    />
-                    <Button
-                      className="self-end"
-                      icon="send-message" // BlueprintJS arrow icon
-                      onClick={handleSelectFolder} 
-                      intent="primary"
-                    />
-                  </div>
-                }
-              >
-                <Tooltip content="Select the OMERO dataset for your workflow results." placement="bottom">
-                  <Button icon="database" text="Select Result Dataset" />
-                </Tooltip>
-              </Popover>
-            }
-          />
-        </FormGroup>
+        <DatasetSelectWithPopover
+          value={state.formData.selectedDatasets || []}
+          onChange={(values) => handleInputChange("selectedDatasets", values)}
+          multiSelect={false}
+        />
 
         {/* Optional Image File Renamer */}
         <FormGroup

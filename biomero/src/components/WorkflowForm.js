@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { FormGroup, InputGroup, NumericInput, Switch } from "@blueprintjs/core";
-import { useAppContext } from "../AppContext"; // Assuming AppContext exists
+import { useAppContext } from "../AppContext";
 
 const WorkflowForm = () => {
   const { state, updateState } = useAppContext();
@@ -29,7 +29,7 @@ const WorkflowForm = () => {
   useEffect(() => {
     // Update state formData with default values or merged values from existing formData
     updateState({ formData: { ...defaultValues, ...state.formData } });
-  }, [state.formData, updateState, defaultValues]);
+  }, [state.formData]);
 
   // Handle input changes and update the form data in state
   const handleInputChange = (id, value) => {

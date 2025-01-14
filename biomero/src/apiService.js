@@ -106,6 +106,61 @@ export const fetchWorkflowGithub = async (workflow) => {
   return apiRequest(workflowGithubUrl, "GET");
 };
 
+// Fetch thumbnails for imageids
+export const fetchThumbnails = async (imageIds) => {
+  const { urls } = getDjangoConstants(); // Get the URLs from Django constants
+  if (!imageIds || imageIds.length === 0) {
+    console.warn("No image IDs provided, skipping thumbnail fetch.");
+    return []; // Skip the API call if the array is empty
+  }
+
+  try {
+    const queryString = imageIds.map((id) => `id=${id}`).join("&");
+    const endpoint = `${urls.api_thumbnails}?${queryString}`;
+    const response = await apiRequest(endpoint, "GET");
+    return response || [];
+  } catch (error) {
+    console.error("Error fetching thumbnails:", error);
+    throw error; // Rethrow the error to be handled by the caller
+  }
+};
+
+// Fetch images for a dataset
+export const fetchImages = async (datasetId, page = 1, sizeXYZ = false, date = false, group = 0) => {
+  const { urls } = getDjangoConstants(); // Get the URLs from Django constants
+  
+  if (!datasetId) {
+    console.warn("No dataset ID provided, fetching example 6.");
+    // return []; // Skip the API call if the dataset ID is not provided
+    datasetId = 6;
+  }
+
+  try {
+    // Construct the query string
+    const queryString = new URLSearchParams({
+      id: datasetId,
+      page: page,
+      sizeXYZ: sizeXYZ.toString(),
+      date: date.toString(),
+      group: group.toString()
+    }).toString();
+
+    // Construct the endpoint URL
+    const endpoint = `${urls.api_images}?${queryString}`;
+
+    // Make the API call
+    const response = await apiRequest(endpoint, "GET");
+    
+    return response.images || []; // Return the response or an empty array if no response
+  } catch (error) {
+    console.error("Error fetching images:", error);
+    throw error; // Rethrow the error to be handled by the caller
+  }
+};
+
+
+
+
 export const runWorkflow = async (workflowName, params = {}) => {
   const { urls } = getDjangoConstants();  // Base URL for the API from Django constants
 
