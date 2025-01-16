@@ -9,29 +9,26 @@ const DatasetSelectWithPopover = ({
   label = "", 
   helperText = "", 
   subLabel = "",
-  tooltip = ""
+  tooltip = "",
+  buttonText = "Add Dataset"
 }) => {
   
   const [isPopoverOpen, setPopoverOpen] = useState(false);
-  const [selectedFolder, setSelectedFolder] = useState(null);
+  const [selectedFolder, setSelectedFolder] = useState([]);
   const [values, setValues] = useState([]);
 
-  const handleInputChange = (value) => {
+  const handleInputChange = (newValues) => {
     let updatedValues;
     if (multiSelect) {       
-      if (typeof value === "string") {
-        updatedValues = [...values, value]; // Add new value to the array if it's a string
-      } else {
-        updatedValues = value; // If not a string, just assign `value`
-      }      
+      updatedValues = [...values, ...newValues]; // Add new value to the array if it's a string    
       setValues(updatedValues); // Update local state
       onChange(updatedValues); // Pass the updated array to the parent
     } else {
       // If not multiSelect, just set the value as the only item in the list
-      if (typeof value === "string") {
-        updatedValues = [value]; // Make it a single item array
+      if (typeof newValues === "string") {
+        updatedValues = [newValues]; // Make it a single item array
       } else {
-        updatedValues = [value[value.length - 1]]; // Make it a single item array
+        updatedValues = [newValues[newValues.length - 1]]; // Make it a single item array
       }  
       setValues(updatedValues); // Update local state
       onChange(updatedValues); // Pass the updated array to the parent
@@ -39,7 +36,8 @@ const DatasetSelectWithPopover = ({
   };
 
   const handleManualInputChange = (updatedValues) => {
-    handleInputChange(updatedValues)
+    setValues(updatedValues); // Update local state
+    onChange(updatedValues); // Pass the updated array to the parent
   }
 
   const handleKeyDown = (e) => {
@@ -93,7 +91,7 @@ const DatasetSelectWithPopover = ({
             }
           >
             <Tooltip content={tooltip} placement="bottom">
-              <Button icon="folder-open" text="Select Dataset" />
+              <Button icon="folder-open" text={buttonText} />
             </Tooltip>
           </Popover>
         }

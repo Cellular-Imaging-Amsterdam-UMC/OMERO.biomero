@@ -70,7 +70,7 @@ const RunPanel = () => {
   };
 
   const handleStepChange = (stepIndex) => {
-    if (stepIndex === 2) {  // When moving to step 3, submit the form
+    if (stepIndex === "step2") {
       // Handle any specific form submission if necessary
     }
   };
