@@ -368,6 +368,7 @@ def import_selected(request, conn=None, **kwargs):
                 return JsonResponse({"error": "Access denied"}, status=403)
             logger.info(f"Importing: {abs_path}")
             # Add your actual import logic here
+            # TODO access database
 
         return JsonResponse(
             {

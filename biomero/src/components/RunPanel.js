@@ -154,7 +154,7 @@ const RunPanel = () => {
           onClose={() => {
             setDialogOpen(false);
           }}
-          initialStepIndex={1}  // Start on Step 2 (Workflow Form)
+          initialStepIndex={0}  // Start on Step 2 (Workflow Form)
           title={beautifyName(state.selectedWorkflow.name)}
           onChange={handleStepChange}
           finalButtonProps={{

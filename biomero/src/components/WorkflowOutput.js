@@ -102,6 +102,10 @@ const WorkflowOutput = () => {
 
         {/* Dataset Selection with Popover */}
         <DatasetSelectWithPopover
+          label = "Add results to a new or existing dataset."
+          helperText = "The output images will be organized in an OMERO dataset for viewing and further analysis."
+          subLabel = "Don't forget to press ENTER if you type a new name!" 
+          tooltip = "Select the OMERO dataset for your workflow results."
           value={state.formData.selectedDatasets || []}
           onChange={(values) => handleInputChange("selectedDatasets", values)}
           multiSelect={false}

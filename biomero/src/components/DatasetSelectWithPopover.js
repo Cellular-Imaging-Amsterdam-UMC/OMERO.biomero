@@ -6,9 +6,10 @@ const DatasetSelectWithPopover = ({
   value, 
   onChange, 
   multiSelect = true, 
-  label = "Add results to a new or existing dataset.", 
-  helperText = "The output images will be organized in an OMERO dataset for viewing and further analysis.", 
-  subLabel = "Don't forget to press ENTER if you type a new name!" 
+  label = "", 
+  helperText = "", 
+  subLabel = "",
+  tooltip = ""
 }) => {
   
   const [isPopoverOpen, setPopoverOpen] = useState(false);
@@ -52,7 +53,9 @@ const DatasetSelectWithPopover = ({
       handleInputChange(selectedFolder);
     } else {
       // Add the selected folder as a tag in the TagInput
-      handleInputChange("dummyfolder");
+      handleInputChange(
+        "dummyfolder"
+      );
     }
     setPopoverOpen(false); // Close popover once selection is made
     
@@ -78,7 +81,7 @@ const DatasetSelectWithPopover = ({
             content={
               <div className="p-4 flex flex-col space-y-4">
                 <OmeroDataBrowser 
-                  onSelectFolder={(folder) => setSelectedFolder(folder)} 
+                  onSelectCallback={(folders) => setSelectedFolder(folders)} 
                 />
                 <Button
                   className="self-end"
@@ -89,8 +92,8 @@ const DatasetSelectWithPopover = ({
               </div>
             }
           >
-            <Tooltip content="Select the OMERO dataset for your workflow results." placement="bottom">
-              <Button icon="database" text="Select Result Dataset" />
+            <Tooltip content={tooltip} placement="bottom">
+              <Button icon="folder-open" text="Select Dataset" />
             </Tooltip>
           </Popover>
         }

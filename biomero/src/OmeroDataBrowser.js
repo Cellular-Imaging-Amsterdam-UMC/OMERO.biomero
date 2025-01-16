@@ -3,7 +3,9 @@ import { useAppContext } from "./AppContext";
 import FileTree from "./FileTree";
 import { fetchProjectData } from "./apiService";
 
-const OmeroDataBrowser = () => {
+const OmeroDataBrowser = ({
+  onSelectCallback
+}) => {
   const { state, updateState } = useAppContext();
 
   const handleProjectDataFetch = async (node) => {
@@ -12,6 +14,7 @@ const OmeroDataBrowser = () => {
       index: `dataset-${dataset.id}`,
       isFolder: false,
       children: [],
+      childCount: dataset.childCount,
       data: dataset.name,
     }));
 
@@ -43,6 +46,7 @@ const OmeroDataBrowser = () => {
       onExpandCallback={(node, newData) => {
         console.log("Project expanded:", node, newData);
       }}
+      onSelectCallback={(selected) => {onSelectCallback(selected)}}
     />
   );
 };

@@ -109,13 +109,15 @@ export const fetchWorkflowGithub = async (workflow) => {
 // Fetch thumbnails for imageids
 export const fetchThumbnails = async (imageIds) => {
   const { urls } = getDjangoConstants(); // Get the URLs from Django constants
-  if (!imageIds || imageIds.length === 0) {
-    console.warn("No image IDs provided, skipping thumbnail fetch.");
+  const validImageIds = imageIds.filter(id => id != null); // Removes undefined and null
+
+  if (!validImageIds || validImageIds.length === 0) {
+    console.warn("No (valid) image IDs provided, skipping thumbnail fetch.");
     return []; // Skip the API call if the array is empty
   }
 
   try {
-    const queryString = imageIds.map((id) => `id=${id}`).join("&");
+    const queryString = validImageIds.map((id) => `id=${id}`).join("&");
     const endpoint = `${urls.api_thumbnails}?${queryString}`;
     const response = await apiRequest(endpoint, "GET");
     return response || [];
@@ -130,9 +132,10 @@ export const fetchImages = async (datasetId, page = 1, sizeXYZ = false, date = f
   const { urls } = getDjangoConstants(); // Get the URLs from Django constants
   
   if (!datasetId) {
-    console.warn("No dataset ID provided, fetching example 6.");
+    datasetId = 51;//6;
+    console.warn("No dataset ID provided, fetching example:", datasetId);
     // return []; // Skip the API call if the dataset ID is not provided
-    datasetId = 6;
+    
   }
 
   try {

@@ -44,34 +44,83 @@ export const AppProvider = ({ children }) => {
   const loadThumbnails = async (imageIds) => {
     setLoading(true);
     setError(null);
+  
     try {
-      const thumbnails = await fetchThumbnails(imageIds);
+      const batchSize = 50;
+      const thumbnailsMap = {};
+  
+      // Process imageIds in batches of 50
+      for (let i = 0; i < imageIds.length; i += batchSize) {
+        const chunk = imageIds.slice(i, i + batchSize);
+        const fetchedThumbnails = await fetchThumbnails(chunk); // Returns an object mapping imageId -> thumbnail
+        Object.assign(thumbnailsMap, fetchedThumbnails); // Merge batch results into the thumbnailsMap
+      }
+  
+      // Update state with the merged thumbnails map
       setState((prevState) => ({
         ...prevState,
-        thumbnails: thumbnails,
+        thumbnails: { ...prevState.thumbnails, ...thumbnailsMap }, // Merge with existing thumbnails
       }));
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
+  };  
 
-  const loadImagesForDataset = async (datasetId, page = 1, sizeXYZ = false, date = false, group = 0) => {
+  const loadImagesForDataset = async (dataset, page = 1, sizeXYZ = false, date = false, group = 0) => {
     setLoading(true);
     setError(null);
+  
     try {
-      const images = await fetchImages(datasetId, page, sizeXYZ, date, group);
-      setState((prevState) => ({
-        ...prevState,
-        images: images,
-      }));
+      const { index, childCount } = dataset;
+      const [type, id] = index.split("-"); // Split the index into type and ID
+  
+      if (type === "dataset") {
+        const datasetId = parseInt(id, 10);
+        let allImages = [];
+        let currentPage = page;
+        let keepFetching = true;
+  
+        while (keepFetching) {
+          const images = await fetchImages(datasetId, currentPage, sizeXYZ, date, group);
+  
+          if (images.length > 0) {
+            allImages = [...allImages, ...images];
+  
+            // Check if we have fetched enough images
+            if (allImages.length >= childCount) {
+              keepFetching = false; // We fetched enough images
+            } else {
+              currentPage++; // Fetch the next page
+            }
+          } else {
+            keepFetching = false; // No more images to fetch
+          }
+        }
+  
+        // Store images in the parent structure in state.omeroTreeData
+        setState((prevState) => ({
+          ...prevState,
+          omeroTreeData: {
+            ...prevState.omeroTreeData,
+            [index]: {
+              ...dataset,
+              children: allImages, // Attach fetched images to the dataset
+            },
+          },
+          images: [...(prevState.images || []), ...allImages], 
+        }));
+      } else {
+        console.log(`Skipping non-dataset index: ${index}:`, dataset);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
+  
   
   
   const runWorkflowData = async (workflowName, params = {}) => {
