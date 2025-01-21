@@ -86,7 +86,6 @@ const TabContainer = () => {
             tagProps={{ round: true }}
             panel={
               <div className="p-4 h-[calc(100vh-300px)] overflow-y-auto">
-                <H4 className="mb-4">{folder.name}</H4>
                 {renderScripts(folder)}
               </div>
             }

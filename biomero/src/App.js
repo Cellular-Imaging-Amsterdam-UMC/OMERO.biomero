@@ -21,6 +21,7 @@ import {
   Tooltip,
 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
+import SettingsForm from "./components/SettingsForm";
 
 // RunTab Component
 const RunTab = ({ state }) => (
@@ -39,23 +40,26 @@ const RunTab = ({ state }) => (
 );
 
 // ScriptsPanel Component
-const ScriptsPanel = ({ state, loadScriptsData, scriptsLoaded, setScriptsLoaded }) => {
+const AdminPanel = () => {
+  const { state, updateState, loadScripts } = useAppContext();
+  const [scriptsLoaded, setScriptsLoaded] = useState(false);
   useEffect(() => {
     if (!scriptsLoaded) {
-      loadScriptsData();
+      loadScripts();
       setScriptsLoaded(true); // Prevent reloading if already loaded
     }
-  }, [scriptsLoaded, loadScriptsData, setScriptsLoaded]);
+  }, [scriptsLoaded, loadScripts, setScriptsLoaded]);
 
   return (
     <div className="h-full overflow-y-auto">
-      <H4>Scripts</H4>
+      <H4>Admin</H4>
       <div className="flex">
-        <div className="w-1/5 p-4 overflow-auto">
-          <h1 className="text-base font-bold p-4 pb-0">OMERO Data</h1>
-          {state.omeroTreeData && <OmeroDataBrowser />}
+        <div className="w-1/2 p-4 overflow-auto">
+          {/* <h1 className="text-base font-bold p-4 pb-0">OMERO Data</h1>
+          {state.omeroTreeData && <OmeroDataBrowser />} */}
+          <SettingsForm/>
         </div>
-        <div className="w-4/5 p-4 flex-1 overflow-hidden">
+        <div className="w-1/2 p-4 flex-1 overflow-hidden">
           {state.scripts?.length > 0 ? (
             <TabContainer menuData={state.scripts} />
           ) : (
@@ -99,14 +103,13 @@ const App = () => {
   const [activeTab, setActiveTab] = useState("Run"); // Track active tab state
   const [loadedTabs, setLoadedTabs] = useState({
     Run: true, // Automatically load the first tab
-    Scripts: false,
+    Admin: false,
     Status: false,
   });
 
   // Loading states for each API call
   const [loadingOmero, setLoadingOmero] = useState(false);
   const [loadingScripts, setLoadingScripts] = useState(false);
-  const [scriptsLoaded, setScriptsLoaded] = useState(false);
 
   // Ensure that the Omero data is loaded only once when the app starts
   useEffect(() => {
@@ -203,19 +206,17 @@ const App = () => {
               />
             ) : null}
           />
-          <Tab
-            id="Scripts"
-            title="Scripts"
-            icon="document"
-            panel={loadedTabs.Scripts ? (
-              <ScriptsPanel
-                state={state}
-                loadScriptsData={loadScripts}
-                scriptsLoaded={scriptsLoaded}
-                setScriptsLoaded={setScriptsLoaded}
-              />
-            ) : null}
-          />
+          {/* Admin tab */}
+          {state.user.isAdmin && (
+            <Tab
+              id="Admin"
+              title="Admin"
+              icon="settings"
+              panel={loadedTabs.Admin ? (
+                <AdminPanel />
+              ) : null}
+            />
+          )}
         </Tabs>
       </div>
     </div>
