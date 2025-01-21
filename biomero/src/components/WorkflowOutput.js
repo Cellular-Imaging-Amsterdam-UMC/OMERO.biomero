@@ -106,8 +106,11 @@ const WorkflowOutput = () => {
           helperText = "The output images will be organized in an OMERO dataset for viewing and further analysis."
           subLabel = "Don't forget to press ENTER if you type a new name!" 
           tooltip = "Select the OMERO dataset for your workflow results."
+          buttonText = "Select Dataset"
           value={state.formData.selectedDatasets || []}
-          onChange={(values) => handleInputChange("selectedDatasets", values)}
+          onChange={(values) => {
+            const selectedDataset = values.map((dataset) => state.omeroTreeData[dataset].data)
+            handleInputChange("selectedDatasets", selectedDataset)}}
           multiSelect={false}
         />
 

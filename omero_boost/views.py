@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from uuid import uuid4
+from django.http import JsonResponse, HttpResponseBadRequest
 import os
 import time
 import json
@@ -12,7 +14,7 @@ from django.views.decorators.http import require_http_methods
 from django.conf import settings
 from omeroweb.webclient.decorators import login_required, render_response
 from omero.gateway import BlitzGateway
-from omero.rtypes import unwrap, rbool, wrap
+from omero.rtypes import unwrap, rbool, wrap, rlong
 from .utils import get_biomero_build_file, get_react_build_file
 from biomero import SlurmClient
 
@@ -32,7 +34,7 @@ def run_workflow_script(request, conn=None, **kwargs):
         if not workflow_name:
             return JsonResponse({"error": "workflow_name is required"}, status=400)
         params = data.get("params", {})
-        
+
         script_name = "SLURM_Run_Workflow.py"
 
         # Connect to OMERO Script Service
@@ -50,12 +52,40 @@ def run_workflow_script(request, conn=None, **kwargs):
             return JsonResponse({"error": f"Script {script_name} not found on server"}, status=404)
 
         # Run the script with parameters
-        script_id = int(unwrap(script.id))        
+        script_id = int(unwrap(script.id))
+        input_ids = params.get("IDs", [])
+        data_type = params.get("Data_Type", "Image")
+        out_email = params.get("receiveEmail")
+        attach_og = params.get("attachToOriginalImages")
+        import_zp = params.get("importAsZip")
+        uploadcsv = params.get("uploadCsv")
+        output_ds = params.get("selectedDatasets", [])
+        rename_pt = params.get("renamePattern")
+        version = params.get("version")
+
         # Convert provided params to OMERO rtypes using wrap
-        inputs = {f"{workflow_name}_|_{key}": wrap(value) for key, value in params.items()}
+        known_params = ["Data_Type", "IDs", "receiveEmail", "importAsZip",
+                        "uploadCsv", "attachToOriginalImages",
+                        "selectedDatasets", "renamePattern", "workflow_name",
+                        "cytomine_host", "cytomine_id_project", "cytomine_id_software",
+                        "cytomine_private_key", "cytomine_public_key", "version"]
+        inputs = {f"{workflow_name}_|_{key}": wrap(
+            value) for key, value in params.items() if key not in known_params}
         inputs.update({
-            workflow_name: rbool(True)
+            workflow_name: rbool(True),
+            f"{workflow_name}_Version": wrap(version),
+            "IDs": wrap([rlong(i) for i in input_ids]),
+            "Data_Type": wrap(data_type),
+            "E-mail": rbool(out_email),
+            "Select how to import your results (one or more)": rbool(True),
+            "1) Zip attachment to parent": rbool(import_zp),
+            "2) Attach to original images": rbool(attach_og),
+            "3a) Import into NEW Dataset": wrap(output_ds[0]) if output_ds else wrap("--NO THANK YOU--"),
+            "3b) Allow duplicate dataset (name)?": rbool(False),
+            "3c) Rename the imported images": wrap(rename_pt) if rename_pt else wrap("--NO THANK YOU--"),
+            "4) Upload result CSVs as OMERO tables": rbool(uploadcsv)
         })
+        logger.debug(inputs)
 
         try:
             # Use runScript to execute
@@ -67,7 +97,7 @@ def run_workflow_script(request, conn=None, **kwargs):
 
         except Exception as e:
             logger.error(f"Error executing script {script_name} for {workflow_name}: {str(e)}")
-            return JsonResponse({"error": f"Failed to execute script {script_name} for {workflow_name}: {str(e)}"}, status=500)
+            return JsonResponse({"error": f"Failed to execute script {script_name} for {workflow_name}: {str(e)} -- inputs: {inputs}"}, status=500)
 
     except json.JSONDecodeError:
         logger.error("Invalid JSON data")
@@ -75,7 +105,7 @@ def run_workflow_script(request, conn=None, **kwargs):
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
         return JsonResponse({"error": f"Failed to execute workflow for {workflow_name} {inputs}: {str(e)}"}, status=500)
-    
+
 
 @login_required()
 @require_http_methods(["GET"])
@@ -90,6 +120,7 @@ def list_workflows(request, conn=None, **kwargs):
     except Exception as e:
         logger.error(f"Error listing workflows: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
+
 
 @login_required()
 @require_http_methods(["GET"])
@@ -112,7 +143,8 @@ def get_workflow_metadata(request, conn=None, **kwargs):
     except Exception as e:
         logger.error(f"Error fetching metadata for workflow {workflow_name}: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
-    
+
+
 @login_required()
 @require_http_methods(["GET"])
 def get_workflow_github(request, conn=None, **kwargs):
@@ -133,7 +165,6 @@ def get_workflow_github(request, conn=None, **kwargs):
     except Exception as e:
         logger.error(f"Error fetching descriptor for workflow {workflow_name}: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
-
 
 
 @login_required()
@@ -183,7 +214,8 @@ def get_script_menu(request, conn=None, **kwargs):
                     "description": unwrap(params.description)
                     or "No description available",
                     "authors": (
-                        ", ".join(params.authors) if params.authors else "Unknown"
+                        ", ".join(
+                            params.authors) if params.authors else "Unknown"
                     ),
                     "version": params.version or "Unknown",
                 }
@@ -241,13 +273,14 @@ def omero_boost_upload(request, conn=None, **kwargs):
     """Render the server-side browser page."""
     metabase_site_url = os.environ.get("METABASE_SITE_URL")
     metabase_secret_key = os.environ.get("METABASE_SECRET_KEY")
-    metabase_dashboard_id = os.environ.get("METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID")
+    metabase_dashboard_id = os.environ.get(
+        "METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID")
 
     current_user = conn.getUser()
     username = current_user.getName()
     user_id = current_user.getId()
     is_admin = conn.isAdmin()
-    
+
     payload = {
         "resource": {"dashboard": int(metabase_dashboard_id)},
         "params": {
@@ -295,7 +328,8 @@ def list_directory(request, conn=None, **kwargs):
         return JsonResponse({"error": message}, status=403)
 
     if not abs_current_path.startswith(BASE_DIR):
-        logger.warning(f"Access denied - path {abs_current_path} not within {BASE_DIR}")
+        logger.warning(
+            f"Access denied - path {abs_current_path} not within {BASE_DIR}")
         return JsonResponse(
             {"error": "Access denied - path outside of allowed directory"}, status=403
         )
@@ -388,7 +422,8 @@ def import_selected(request, conn=None, **kwargs):
 def omero_boost_monitor_workflows(request, conn=None, **kwargs):
     metabase_site_url = os.environ.get("METABASE_SITE_URL")
     metabase_secret_key = os.environ.get("METABASE_SECRET_KEY")
-    metabase_dashboard_id = os.environ.get("METABASE_WORKFLOWS_DB_PAGE_DASHBOARD_ID")
+    metabase_dashboard_id = os.environ.get(
+        "METABASE_WORKFLOWS_DB_PAGE_DASHBOARD_ID")
 
     # Get the current user's information
     current_user = conn.getUser()
@@ -442,11 +477,6 @@ def workflows_webclient_templates(request, base_template, **kwargs):
     return {"template": template_name}
 
 
-import os
-from django.http import JsonResponse, HttpResponseBadRequest
-from uuid import uuid4
-
-
 @login_required()
 @render_response()
 @require_http_methods(["GET"])
@@ -461,7 +491,8 @@ def get_folder_contents(request, conn=None, **kwargs):
     logger.info(f"Connection: {conn.getUser().getName()}")
 
     # Determine the target directory based on folder_id or default to the root folder
-    target_dir = base_dir if folder_id is None else os.path.join(base_dir, folder_id)
+    target_dir = base_dir if folder_id is None else os.path.join(
+        base_dir, folder_id)
 
     # Validate if the directory exists
     if not os.path.exists(target_dir) or not os.path.isdir(target_dir):
@@ -475,7 +506,8 @@ def get_folder_contents(request, conn=None, **kwargs):
             {
                 "name": item,
                 "is_folder": os.path.isdir(item_path),
-                "id": os.path.relpath(item_path, base_dir),  # Use relative path as ID
+                # Use relative path as ID
+                "id": os.path.relpath(item_path, base_dir),
             }
         )
 
