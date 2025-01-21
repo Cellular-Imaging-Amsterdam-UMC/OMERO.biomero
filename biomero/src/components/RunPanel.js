@@ -33,7 +33,7 @@ const RunPanel = () => {
       selectedWorkflow: workflow, // Set selectedWorkflow in context
       formData: {
         IDs: [],  // Empty or default value
-        Data_Type: "Dataset", // Empty or default value
+        Data_Type: "Image", // Empty or default value
       }
     });
     setDialogOpen(true); // Open the dialog
@@ -157,6 +157,9 @@ const RunPanel = () => {
           initialStepIndex={0}  // Start on Step 2 (Workflow Form)
           title={beautifyName(state.selectedWorkflow.name)}
           onChange={handleStepChange}
+          navigationPosition={"top"}
+          icon="cog"
+          className="w-[calc(100vw-20vw)]"
           finalButtonProps={{
             text: "Run",
             onClick: () => {
