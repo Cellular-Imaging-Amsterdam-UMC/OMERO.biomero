@@ -23,7 +23,9 @@ const ModelCard = ({
   return (
     <Card className="mb-4 shadow">
       <div className="flex justify-between items-center">
-        <h4 className="text-lg font-bold">{model.name || `New Model ${index + 1}`}</h4>
+        <h4 className="text-lg font-bold">
+          {model.name || `New Model ${index + 1}`}
+        </h4>
         <div className="flex space-x-2">
           <Button
             minimal
@@ -35,8 +37,13 @@ const ModelCard = ({
             icon="reset"
             intent="warning"
             onClick={() => onReset(index)}
-            />
-          <Button minimal intent="danger" icon="delete" onClick={() => onDelete(index)} />
+          />
+          <Button
+            minimal
+            intent="danger"
+            icon="delete"
+            onClick={() => onDelete(index)}
+          />
         </div>
       </div>
 
@@ -44,7 +51,7 @@ const ModelCard = ({
         label={
           <span>
             Model Name{" "}
-            <Tooltip content="Enter the name of the model.">
+            <Tooltip content="Provide a unique, lowercase name for this model. It will be used as foldername on Slurm and in the INI file as [name]_job_<parameter>.">
               <Icon icon="help" size={12} />
             </Tooltip>
           </span>
@@ -52,33 +59,63 @@ const ModelCard = ({
       >
         <InputGroup
           value={model.name}
+          placeholder="e.g., cellpose"
           readOnly={!editable}
-          onChange={(e) => onChange(index, "name", e.target.value)}
+          onChange={(e) =>
+            onChange(index, "name", e.target.value.toLowerCase())
+          }
         />
       </FormGroup>
 
       <FormGroup
         label={
-          <span>
+            <span>
             GitHub Repository{" "}
-            <Tooltip content="Specify the versioned GitHub repository for the model.">
-              <Icon icon="help" size={12} />
+            <Tooltip content="Specify the versioned GitHub repository URL for this model. Versions (e.g., /tree/v1.0.0) ensure reproducibility.">
+                <Icon icon="help" size={12} />
             </Tooltip>
-          </span>
+            </span>
         }
-      >
+        >
         <InputGroup
-          value={model.repo}
-          readOnly={!editable}
-          onChange={(e) => onChange(index, "repo", e.target.value)}
-        />
-      </FormGroup>
+            value={model.repo}
+            placeholder="e.g., https://github.com/org/repo/tree/v1.0.0"
+            readOnly={!editable}
+            onChange={(e) => onChange(index, "repo", e.target.value)}
+            rightElement={
+                model.repo ? (
+                model.repo.includes("/tree/v") ? (
+                    <Button
+                    icon="git-branch"
+                    minimal
+                    intent="primary"
+                    title="Test GitHub URL"
+                    onClick={() => window.open(model.repo, "_blank", "noopener,noreferrer")}
+                    />
+                ) : (
+                    <Tooltip
+                    content="URL is missing a version (e.g., /tree/v1.0.0)."
+                    intent="warning"
+                    >
+                    <Button
+                        icon="warning-sign"
+                        minimal
+                        intent="warning"
+                    />
+                    </Tooltip>
+                )
+                ) : null
+            }
+            />
+
+        </FormGroup>
+
 
       <FormGroup
         label={
           <span>
             Slurm Job Script{" "}
-            <Tooltip content="Specify the Slurm job script path or leave blank to use a default (jobs/<model-name>.sh).">
+            <Tooltip content="Specify the relative path to the Slurm job script. Defaults to 'jobs/<model-name>.sh' if left blank.">
               <Icon icon="help" size={12} />
             </Tooltip>
           </span>
@@ -86,6 +123,7 @@ const ModelCard = ({
       >
         <InputGroup
           value={model.job}
+          placeholder="e.g., jobs/cellpose.sh"
           readOnly={!editable}
           onChange={(e) => onChange(index, "job", e.target.value)}
         />
@@ -93,59 +131,57 @@ const ModelCard = ({
 
       <FormGroup
         label={
-            <span>
+          <span>
             Additional Slurm Parameters{" "}
-            <Tooltip content="Add or manage sbatch parameters in key=value format.">
-                <Icon icon="help" size={12} />
+            <Tooltip content="Add parameters in key=value format (e.g., mem=32GB). These will be converted to <name>_job_<key>=<value> in the INI file.">
+              <Icon icon="help" size={12} />
             </Tooltip>
-            </span>
+          </span>
         }
-        >
-        {/* Input for adding new parameters */}
+      >
         <InputGroup
-            placeholder="key=value"
-            disabled={!editable}
-            onKeyDown={(e) => {
+          placeholder="e.g., mem=32GB"
+          disabled={!editable}
+          onKeyDown={(e) => {
             if (e.key === "Enter" && editable) {
-                const [key, value] = e.target.value.split("=");
-                if (key) {
+              const [key, value] = e.target.value.split("=");
+              if (key) {
                 onAddParam(index, key.trim(), value ? value.trim() : "");
                 e.target.value = ""; // Clear the input field after adding
-                }
+              }
             }
-            }}
+          }}
         />
-        </FormGroup>
+      </FormGroup>
 
-        {model.extraParams && (
+      {model.extraParams && (
         <ul className="list-disc list-inside space-y-2">
-            {Object.entries(model.extraParams).map(([key, value]) => (
+          {Object.entries(model.extraParams).map(([key, value]) => (
             <li key={key} className="flex items-center space-x-2">
-                <span className="text-sm font-semibold">{key}:</span>
-                {editable ? (
+              <span className="text-sm font-semibold">{key}:</span>
+              {editable ? (
                 <InputGroup
-                    value={value}
-                    onChange={(e) => onAddParam(index, key, e.target.value)}
-                    className="flex-1"
+                  value={value}
+                  onChange={(e) => onAddParam(index, key, e.target.value)}
+                  className="flex-1"
                 />
-                ) : (
+              ) : (
                 <span>{value}</span>
-                )}
-                {editable && (
+              )}
+              {editable && (
                 <Button
-                    icon="delete"
-                    minimal
-                    intent="danger"
-                    onClick={() => {
-                        onAddParam(index, key, null); // Pass null as the value to trigger deletion
-                      }}
+                  icon="delete"
+                  minimal
+                  intent="danger"
+                  onClick={() => {
+                    onAddParam(index, key, null); // Pass null as the value to trigger deletion
+                  }}
                 />
-                )}
+              )}
             </li>
-            ))}
+          ))}
         </ul>
-        )}
-
+      )}
     </Card>
   );
 };
@@ -156,7 +192,7 @@ const ModelsSection = ({
   onAddModel,
   onAddParam,
   onDeleteModel,
-  onResetModel
+  onResetModel,
 }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [editableIndex, setEditableIndex] = useState(null);
@@ -190,7 +226,9 @@ const ModelsSection = ({
               <h4 className="font-semibold">
                 {model.name || `New Model ${index + 1}`}
               </h4>
-              <Icon icon={expandedIndex === index ? "caret-down" : "caret-right"} />
+              <Icon
+                icon={expandedIndex === index ? "caret-down" : "caret-right"}
+              />
             </div>
             <Collapse isOpen={expandedIndex === index}>
               <ModelCard
@@ -207,7 +245,12 @@ const ModelsSection = ({
           </div>
         ))}
       </div>
-      <Button icon="add" intent="primary" onClick={addModelHandler} className="mt-4">
+      <Button
+        icon="add"
+        intent="primary"
+        onClick={addModelHandler}
+        className="mt-4"
+      >
         Add Model
       </Button>
     </div>

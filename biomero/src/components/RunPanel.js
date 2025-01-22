@@ -1,6 +1,6 @@
 import React, { useState, useEffect  } from "react";
 import { useAppContext } from "../AppContext";
-import { Card, Elevation, InputGroup, FormGroup, HTMLSelect, MenuItem , H5, H6, MultistepDialog, DialogBody, DialogStep, Icon, Spinner, SpinnerSize } from "@blueprintjs/core";
+import { Card, Elevation, InputGroup, Button, H5, H6, MultistepDialog, DialogBody, DialogStep, Spinner, SpinnerSize, ButtonGroup } from "@blueprintjs/core";
 import { MultiSelect } from "@blueprintjs/select";
 import { FaDocker } from "react-icons/fa6";
 import { IconContext } from "react-icons";
@@ -101,37 +101,34 @@ const RunPanel = () => {
                 {/* Header Section with Title and Icons */}
                 <div className="flex justify-between items-center">
                   <H5 className="mb-0">{beautifyName(workflow.name)}</H5>
-                  <div className="flex gap-2">
+                  <ButtonGroup>
                     {/* GitHub Icon */}
                     {workflow.githubUrl && (
-                      <a
-                        href={workflow.githubUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gray-500 hover:text-blue-600"
+                      <Button
+                        icon="git-branch"
+                        minimal
+                        intent="primary"
                         title="View GitHub Repository"
-                        onClick={(e) => e.stopPropagation()}  // Stop event propagation
-                      >
-                        <Icon icon="git-branch" iconSize={16} />
-                      </a>
+                        onClick={(e) => {
+                          e.stopPropagation(); 
+                          window.open(workflow.githubUrl, "_blank", "noopener,noreferrer");}}
+                        />
                     )}
 
                     {/* Container Image Icon */}
                     {workflow.metadata?.["container-image"]?.image && (
-                      <a
-                        href={`https://hub.docker.com/r/${workflow.metadata["container-image"].image}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gray-500 hover:text-blue-600"
+                      <Button
+                        icon={<FaDocker />}
+                        minimal
+                        intent="primary"
                         title="View Container Image"
-                        onClick={(e) => e.stopPropagation()}  // Stop event propagation
-                      >
-                        <IconContext.Provider value={{ size: 16 }}>
-                          <FaDocker className="text-gray-500 hover:text-blue-600"/>
-                        </IconContext.Provider>
-                      </a>
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(`https://hub.docker.com/r/${workflow.metadata["container-image"].image}`, "_blank", "noopener,noreferrer");
+                        }}
+                      />
                     )}
-                  </div>
+                  </ButtonGroup>
                 </div>
 
                 {/* Description Section */}

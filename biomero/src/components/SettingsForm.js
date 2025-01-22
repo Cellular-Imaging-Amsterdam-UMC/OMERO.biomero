@@ -32,8 +32,8 @@ const SettingsForm = () => {
       enableJobProgress: true,
       enableWorkflowAnalytics: true,
       models: [
-        { name: "Cellpose", repo: "https://github.com/TorecLuik/W_NucleiSegmentation-Cellpose/tree/v1.3.1", job: "jobs/cellpose.sh" },
-        { name: "DeepLabCut", repo: "https://github.com/DeepLabCut/DeepLabCut/tree/v2.9.10", job: "jobs/deeplabcut.sh" },
+        { name: "cellpose", repo: "https://github.com/TorecLuik/W_NucleiSegmentation-Cellpose/tree/v1.3.1", job: "jobs/cellpose.sh", extraParams: { cellpose_job_mem: "15GB" } },
+        { name: "deeplabcut", repo: "https://github.com/DeepLabCut/DeepLabCut/tree/v2.9.10", job: "jobs/deeplabcut.sh" },
       ],
     };
     setInitialFormData(fetchedFormState); // Set stable reference
@@ -202,7 +202,7 @@ const SettingsForm = () => {
         onModelChange={(index, field, value) => handleModelChange(index, field, value)}
         onAddModel={addModel}
         onAddParam={(index, key, value) => {
-            const updatedModels = [...settingsForm.models];
+            const updatedModels = structuredClone(settingsForm.models);
           
             if (!key) {
               console.error("Key is required to add or delete parameters.");
