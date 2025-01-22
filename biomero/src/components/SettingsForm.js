@@ -9,7 +9,8 @@ import {
   H4,
   H5,
   H6,
-  Collapse
+  Collapse,
+  ButtonGroup
 } from "@blueprintjs/core";
 import { useAppContext } from "../AppContext";
 import ModelsSection from "./ModelsSection";
@@ -144,9 +145,13 @@ const SettingsForm = () => {
           className="flex-1"
           rightElement={<Button
             icon={editMode[field] ? "tick" : "edit"}
+            intent="primary"
             minimal
+            title={editMode[field] ? "Lock this field" : "Edit this field"}
+            text={editMode[field] ? "lock" : "edit"}
             onClick={() => toggleEdit(field)}
           />}
+        //   disabled={!editMode[field]}
         />        
       </div>
     </FormGroup>
@@ -168,6 +173,10 @@ const SettingsForm = () => {
                 (like a model's <i>Additional Slurm Parameters</i>), 
                 but others might require setup.
                 I would recommend running Slurm Init after changing these settings.
+            </div>
+
+            <div className="bp5-form-helper-text">
+                Please check the <a href="https://nl-bioimaging.github.io/biomero/" target="_blank" rel="noopener noreferrer">BIOMERO documentation</a> for more info.
             </div>
         </div>
       </div>
@@ -489,21 +498,22 @@ const SettingsForm = () => {
         onResetModel={resetModel}
       />
      </CollapsibleSection>
-
-      <Button
-        intent="primary"
-        onClick={() => console.log("Saved settings:", settingsForm)}
-      >
-        Save Settings
-      </Button>
-
-      <Button
-        icon="reset"
-        intent="danger"
-        onClick={resetForm}
+     <ButtonGroup>
+        <Button
+            icon="floppy-disk"
+            intent="primary"
+            onClick={() => console.log("Saved settings:", settingsForm)}
         >
-        Reset All
-      </Button>
+            Save Settings
+        </Button>
+        <Button
+            icon="reset"
+            intent="warning"
+            onClick={resetForm}
+            >
+            Undo All Changes
+        </Button>
+      </ButtonGroup>
     </Card>
   );
 };
