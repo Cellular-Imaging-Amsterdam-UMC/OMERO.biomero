@@ -169,12 +169,11 @@ const RunPanel = () => {
           <DialogStep
             id="step1"
             title="Input Data"
+            className="min-h-[75vh]"
             panel={
               <WorkflowInput />
             }
           />
-
-
 
           <DialogStep
             id="step2"

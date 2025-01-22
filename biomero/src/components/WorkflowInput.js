@@ -109,7 +109,7 @@ const WorkflowInput = () => {
   }, [selectedImageIds]);
 
   return (
-    <DialogBody className="flex flex-col">
+    <DialogBody className="flex flex-col min-h-[75vh]">
       <div className="w-full">
         <H6 className="mb-2">Select Input Data</H6>
         <DatasetSelectWithPopover
@@ -268,7 +268,7 @@ const WorkflowInput = () => {
         parentId="workflow-input-tabs"
         className="overflow-auto"
         panel={
-          <div className="flex flex-col gap-2 overflow-y-auto pt-1 pl-1 h-[calc(100vh-80vh)]">
+          <div className="flex flex-col gap-2 overflow-y-auto pt-1 pl-1 min-h-[calc(100vh-80vh)] max-h-[45vh]">
             {filteredImages.length > 0 ? (
               filteredImages.map((image) => (
                 <div
@@ -307,7 +307,7 @@ const WorkflowInput = () => {
         id="grid"
         selectedTabId={activeTab}
         parentId="workflow-input-tabs"
-        className="overflow-auto"
+        className="overflow-auto min-h-[calc(100vh-80vh)] max-h-[45vh]"
         panel={
           <div className="flex flex-row">
              <div className="basis-1/5">
@@ -328,7 +328,7 @@ const WorkflowInput = () => {
               </FormGroup>
               </div>
             <div 
-              className={`basis-4/5 grid grid-cols-${zoom} gap-2 overflow-y-auto h-[calc(100vh-80vh)] pt-1 pl-1 pr-1`}
+              className={`basis-4/5 grid grid-cols-${zoom} gap-2 overflow-y-auto pt-1 pl-1 pr-1`}
               > {/* Dynamic grid-cols */}
               {filteredImages.length > 0 ? (
                 filteredImages.map((image) => (
