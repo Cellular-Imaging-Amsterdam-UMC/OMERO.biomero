@@ -172,7 +172,10 @@ const SettingsForm = () => {
                 Note that some settings will apply immediately 
                 (like a model's <i>Additional Slurm Parameters</i>), 
                 but others might require setup.
-                I would recommend running Slurm Init after changing these settings.
+            </div>
+
+            <div className="bp5-form-helper-text">
+                I would recommend running the <b>Slurm Init</b> script after changing these settings.
             </div>
 
             <div className="bp5-form-helper-text">
