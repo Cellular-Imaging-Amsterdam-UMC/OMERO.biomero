@@ -203,12 +203,32 @@ const SettingsForm = () => {
         onAddModel={addModel}
         onAddParam={(index, key, value) => {
             const updatedModels = [...settingsForm.models];
-            updatedModels[index].extraParams = {
-            ...updatedModels[index].extraParams,
-            [key]: value,
-            };
+          
+            if (!key) {
+              console.error("Key is required to add or delete parameters.");
+              return;
+            }
+          
+            if (!updatedModels[index].extraParams) {
+              updatedModels[index].extraParams = {};
+            }
+          
+            if (value === null || value === "") {
+              // Handle deletion: remove the key if the value is null or empty
+              delete updatedModels[index].extraParams[key];
+            } else {
+              // Format the key and add/update the parameter
+              const modelName = updatedModels[index].name?.toLowerCase().replace(/\s+/g, "_") || `model_${index + 1}`;
+              const formattedKey = key.startsWith(`${modelName}_job_`) ? key : `${modelName}_job_${key}`;
+          
+              updatedModels[index].extraParams[formattedKey] = value;
+            }
+          
+            // Update the state with modified models
             setSettingsForm((prev) => ({ ...prev, models: updatedModels }));
-        }}
+          }}
+          
+                 
         onDeleteModel={handleDeleteModel}
         onResetModel={resetModel}
       />

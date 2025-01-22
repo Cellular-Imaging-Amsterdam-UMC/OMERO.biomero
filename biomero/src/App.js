@@ -28,11 +28,7 @@ const RunTab = ({ state }) => (
   <div className="h-full overflow-y-auto">
     <H4>Run</H4>
     <div className="flex">
-      <div className="w-1/5 p-4 overflow-auto">
-        <h1 className="text-base font-bold p-4 pb-0">OMERO Data</h1>
-        {state.omeroTreeData && <OmeroDataBrowser />}
-      </div>
-      <div className="w-4/5 p-4 flex-1 overflow-hidden">
+      <div className="w-full p-4 flex-1 overflow-hidden">
         <RunPanel />
       </div>
     </div>

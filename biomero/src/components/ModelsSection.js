@@ -93,35 +93,59 @@ const ModelCard = ({
 
       <FormGroup
         label={
-          <span>
+            <span>
             Additional Slurm Parameters{" "}
-            <Tooltip content="Add any additional sbatch parameters in key=value format.">
-              <Icon icon="help" size={12} />
+            <Tooltip content="Add or manage sbatch parameters in key=value format.">
+                <Icon icon="help" size={12} />
             </Tooltip>
-          </span>
+            </span>
         }
-      >
+        >
+        {/* Input for adding new parameters */}
         <InputGroup
-          placeholder="key=value"
-          disabled={!editable}
-          onBlur={(e) => {
-            const [key, value] = e.target.value.split("=");
-            if (key && value) {
-              onAddParam(index, key, value);
+            placeholder="key=value"
+            disabled={!editable}
+            onKeyDown={(e) => {
+            if (e.key === "Enter" && editable) {
+                const [key, value] = e.target.value.split("=");
+                if (key) {
+                onAddParam(index, key.trim(), value ? value.trim() : "");
+                e.target.value = ""; // Clear the input field after adding
+                }
             }
-          }}
+            }}
         />
-      </FormGroup>
+        </FormGroup>
 
-      {model.extraParams && (
-        <ul className="list-disc list-inside">
-          {Object.entries(model.extraParams).map(([key, value]) => (
-            <li key={key} className="text-sm">
-              {key}: {value}
+        {model.extraParams && (
+        <ul className="list-disc list-inside space-y-2">
+            {Object.entries(model.extraParams).map(([key, value]) => (
+            <li key={key} className="flex items-center space-x-2">
+                <span className="text-sm font-semibold">{key}:</span>
+                {editable ? (
+                <InputGroup
+                    value={value}
+                    onChange={(e) => onAddParam(index, key, e.target.value)}
+                    className="flex-1"
+                />
+                ) : (
+                <span>{value}</span>
+                )}
+                {editable && (
+                <Button
+                    icon="delete"
+                    minimal
+                    intent="danger"
+                    onClick={() => {
+                        onAddParam(index, key, null); // Pass null as the value to trigger deletion
+                      }}
+                />
+                )}
             </li>
-          ))}
+            ))}
         </ul>
-      )}
+        )}
+
     </Card>
   );
 };
