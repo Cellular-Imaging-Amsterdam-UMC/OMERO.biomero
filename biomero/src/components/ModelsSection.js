@@ -6,8 +6,9 @@ import {
   FormGroup,
   InputGroup,
   Tooltip,
-  H3,
   Icon,
+  H4,
+  ButtonGroup,
 } from "@blueprintjs/core";
 
 const ModelCard = ({
@@ -23,28 +24,35 @@ const ModelCard = ({
   return (
     <Card className="mb-4 shadow">
       <div className="flex justify-between items-center">
-        <h4 className="text-lg font-bold">
+        <H4 className="text-lg font-bold">
           {model.name || `New Model ${index + 1}`}
-        </h4>
-        <div className="flex space-x-2">
-          <Button
-            minimal
-            icon={editable ? "tick" : "edit"}
-            onClick={() => setEditable(index, !editable)}
-          />
-          <Button
-            minimal
-            icon="reset"
-            intent="warning"
-            onClick={() => onReset(index)}
-          />
-          <Button
-            minimal
-            intent="danger"
-            icon="delete"
-            onClick={() => onDelete(index)}
-          />
-        </div>
+        </H4>
+        <ButtonGroup>
+          <Tooltip content={editable ? "Lock model" : "Edit model"}>
+            <Button
+              minimal
+              icon={editable ? "tick" : "edit"}
+              onClick={() => setEditable(index, !editable)}
+            />
+          </Tooltip>
+          <Tooltip content="Reset values">
+            <Button
+              minimal
+              icon="reset"
+              intent="warning"
+              onClick={() => onReset(index)}
+            />
+          </Tooltip>
+          <Tooltip content="Delete model">
+            <Button
+              minimal
+              intent="danger"
+              icon="delete"
+              onClick={() => onDelete(index)}
+            />
+          </Tooltip>
+        </ButtonGroup>
+
       </div>
 
       <FormGroup
@@ -56,6 +64,7 @@ const ModelCard = ({
             </Tooltip>
           </span>
         }
+        subLabel="Also the path to store the container on the slurm_images_path."
       >
         <InputGroup
           value={model.name}
@@ -76,6 +85,7 @@ const ModelCard = ({
             </Tooltip>
             </span>
         }
+        subLabel="The repository with the descriptor.json file."
         >
         <InputGroup
             value={model.repo}
@@ -120,6 +130,7 @@ const ModelCard = ({
             </Tooltip>
           </span>
         }
+        subLabel="The jobscript path in the 'slurm_script_repo'. Use jobs/<modelname>.sh, unless you added your own Slurm Script Repository."
       >
         <InputGroup
           value={model.job}
@@ -138,6 +149,22 @@ const ModelCard = ({
             </Tooltip>
           </span>
         }
+        subLabel={
+          <>
+            Override the default job values for this workflow, or add a job value to this workflow.{" "}
+            <div>
+              See Slurm {" "}
+              <a
+                href="https://slurm.schedmd.com/sbatch.html#SECTION_OPTIONS"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                SBATCH parameters
+              </a>{" "}
+              for all options. Always use the extended form here (e.g. <code>cpus-per-task</code>, not <code>c</code>).
+            </div>
+          </>
+        }
       >
         <InputGroup
           placeholder="e.g., mem=32GB"
@@ -153,7 +180,19 @@ const ModelCard = ({
           }}
         />
       </FormGroup>
-
+      <div className="bp5-form-group">
+        <div className="bp5-form-content">
+          <div className="bp5-form-helper-text">
+            <ul>
+              E.g.
+              <li>Run with specific GPU: <code>gres=gpu:1g.10gb:1</code></li>
+              <li>Run on a specific partition: <code>partition=luna-gpu-short</code></li>
+              <li>Use more CPU memory: <code>mem=15GB</code></li>
+              <li>Higher timeout (d-hh:mm:ss): <code>time=08:00:00</code></li>
+            </ul> 
+            </div>
+          </div>
+        </div>
       {model.extraParams && (
         <ul className="list-disc list-inside space-y-2">
           {Object.entries(model.extraParams).map(([key, value]) => (
@@ -213,9 +252,24 @@ const ModelsSection = ({
 
   return (
     <div>
-      <H3 icon="predictive-analysis" className="mb-4">
-        Models
-      </H3>
+      <div className="bp5-form-group">
+        <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+                Settings for models/singularity images that we want to run on Slurm.
+            </div>
+
+            <div className="bp5-form-helper-text">
+                Model names have to be unique, and require a GitHub repository as well.
+            </div>
+
+            <div className="bp5-form-helper-text">
+                Versions for the GitHub repository are highly encouraged! 
+                Latest/master can change and cause issues with reproducability!
+                BIOMERO picks up the container version based on the version of the repository.
+                If you provide no version, BIOMERO will pick up the generic <i>latest</i> container. 
+            </div>
+        </div>
+      </div>
       <div className="space-y-4">
         {models.map((model, index) => (
           <div key={index}>
@@ -223,9 +277,9 @@ const ModelsSection = ({
               className="flex items-center justify-between cursor-pointer"
               onClick={() => toggleModel(index)}
             >
-              <h4 className="font-semibold">
+              <H4 className="font-semibold">
                 {model.name || `New Model ${index + 1}`}
-              </h4>
+              </H4>
               <Icon
                 icon={expandedIndex === index ? "caret-down" : "caret-right"}
               />
@@ -247,7 +301,7 @@ const ModelsSection = ({
       </div>
       <Button
         icon="add"
-        intent="primary"
+        intent="none"
         onClick={addModelHandler}
         className="mt-4"
       >
