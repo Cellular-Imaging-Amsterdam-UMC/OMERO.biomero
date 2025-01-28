@@ -39,6 +39,8 @@ export const getDjangoConstants = () => {
     scripts: "/webclient/list_scripts/",
     get_script_menu: "/omero_boost/get_script_menu/",
     workflows: "/omero_boost/api/biomero/workflows/",
+    config: "/omero_boost/api/biomero/admin/config/",
+    api_save_config: "/omero_boost/api/biomero/admin/config/save/",
     api_run_workflow: "/omero_boost/api/biomero/workflows/run/",
     api_thumbnails: "/webclient/get_thumbnails/"
   };

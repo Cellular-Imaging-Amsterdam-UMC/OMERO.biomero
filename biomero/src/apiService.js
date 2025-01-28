@@ -92,6 +92,11 @@ export const fetchWorkflows = async () => {
   return apiRequest(urls.workflows, "GET");
 };
 
+export const fetchConfig = async () => {
+  const { urls } = getDjangoConstants();
+  return apiRequest(urls.config, "GET");
+};
+
 // Fetch metadata for a specific workflow
 export const fetchWorkflowMetadata = async (workflow) => {
   const { urls } = getDjangoConstants();
@@ -183,6 +188,29 @@ export const runWorkflow = async (workflowName, params = {}) => {
     return response;  // Return the API response
   } catch (error) {
     console.error("Error running workflow:", error);
+    throw error;
+  }
+};
+
+export const postConfig = async (config) => {
+  const { urls } = getDjangoConstants();  // Base URL for the API from Django constants
+
+  try {
+    // Use the global csrftoken directly from window object
+    const csrfToken = window.csrftoken; 
+
+    // Prepare the payload with script_name and optional params
+    const payload = { config };
+
+    const response = await apiRequest(urls.api_save_config, "POST", payload, {
+      headers: {
+        'X-CSRFToken': csrfToken,  // Include CSRF token in request headers
+      },
+    });
+
+    return response;  // Return the API response
+  } catch (error) {
+    console.error("Error saving config:", error);
     throw error;
   }
 };

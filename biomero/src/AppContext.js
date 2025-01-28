@@ -5,10 +5,12 @@ import {
   fetchGroups, 
   fetchScripts, 
   fetchScriptData, 
-  fetchWorkflows, 
+  fetchWorkflows,
+  fetchConfig, 
   fetchWorkflowMetadata,
   fetchWorkflowGithub,
   runWorkflow,
+  postConfig,
   fetchThumbnails,
   fetchImages 
 } from "./apiService";
@@ -138,7 +140,7 @@ export const AppProvider = ({ children }) => {
       toaster.show({
           intent: "success",
           icon: "tick-circle",
-          message: `${workflowName}: ${message} (Params: ${JSON.stringify(params, null, 2)})`,
+          message: `${workflowName}: ${message}`,
           timeout: 0,
       });
     } catch (err) {
@@ -147,6 +149,38 @@ export const AppProvider = ({ children }) => {
         intent: "danger",
         icon: "error",
         message: `${workflowName}: ${err.message}: ${err.response?.data?.error} (Params: ${JSON.stringify(params, null, 2)})`,
+        timeout: 0,
+    });
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveConfigData = async (config) => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Call the generic postConfig function
+      const response = await postConfig(config); 
+      
+      console.log(`Config save response for ${config}:`, response);
+      
+      const message = response?.message || "Config saved successfully.";
+
+      // Show formatted response in the toast
+      toaster.show({
+          intent: "success",
+          icon: "tick-circle",
+          message: `Config response: ${message}`,
+          timeout: 0,
+      });
+    } catch (err) {
+      // Show formatted response in the toast
+      toaster.show({
+        intent: "danger",
+        icon: "error",
+        message: `Config response: ${err.message}: ${err.response?.data?.error} (Params: ${JSON.stringify(config, null, 2)})`,
         timeout: 0,
     });
       setError(err.message);
@@ -194,7 +228,6 @@ export const AppProvider = ({ children }) => {
   };
   
   
-
   // Fetch workflow metadata
   const loadWorkflowMetadata = async (workflow) => {
     setLoading(true);
@@ -202,6 +235,21 @@ export const AppProvider = ({ children }) => {
     try {
       const metadata = await fetchWorkflowMetadata(workflow);
       setState((prevState) => ({ ...prevState, workflowMetadata: metadata }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch biomero config
+  const loadBiomeroConfig = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetchConfig();
+      const config = response.config
+      setState((prevState) => ({ ...prevState, config }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -390,7 +438,9 @@ export const AppProvider = ({ children }) => {
         openUploadScriptWindow,
         loadWorkflows,
         loadWorkflowMetadata,
+        loadBiomeroConfig,
         runWorkflowData,
+        saveConfigData,
         loadThumbnails,
         loadImagesForDataset,
         apiLoading,

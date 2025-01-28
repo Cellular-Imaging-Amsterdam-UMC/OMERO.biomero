@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from uuid import uuid4
-from django.http import JsonResponse, HttpResponseBadRequest
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
 import os
 import time
 import json
@@ -17,8 +17,88 @@ from omero.gateway import BlitzGateway
 from omero.rtypes import unwrap, rbool, wrap, rlong
 from .utils import get_biomero_build_file, get_react_build_file
 from biomero import SlurmClient
+import configparser
 
 logger = logging.getLogger(__name__)
+
+
+@login_required()
+@require_http_methods(["GET"])
+def get_biomero_config(request, conn=None, **kwargs):
+    """
+    Read the biomero config
+    """
+    try:
+        current_user = conn.getUser()
+        username = current_user.getName()
+        user_id = current_user.getId()
+        is_admin = conn.isAdmin()
+        if not is_admin:
+            logger.error(f"Unauthorized request for user {user_id}:{username}")
+            return JsonResponse({"error": "Unauthorized request"}, status=403)
+        # Load the configuration file
+        configs = configparser.ConfigParser(allow_no_value=True)
+        # Loads from default locations and given location, missing files are ok
+        configs.read([os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_1),
+                     os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_2)])
+        # Convert configparser object to JSON-like dict
+        config_dict = {section: dict(configs.items(section)) for section in configs.sections()}
+
+        return JsonResponse({"config": config_dict})
+    except Exception as e:
+        logger.error(f"Error retrieving BIOMERO config: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
+
+@login_required()
+@require_http_methods(["POST"])
+def save_biomero_config(request, conn=None, **kwargs):
+    try:
+        # Parse the incoming JSON payload
+        data = json.loads(request.body)
+        current_user = conn.getUser()
+        username = current_user.getName()
+        user_id = current_user.getId()
+        is_admin = conn.isAdmin()
+        if not is_admin:
+            logger.error(f"Unauthorized request for user {user_id}:{username}")
+            return JsonResponse({"error": "Unauthorized request"}, status=403)
+        
+        # Create a ConfigParser object
+        config = configparser.ConfigParser(allow_no_value=True)
+        
+        # Extract the 'config' section from the incoming data
+        config_data = data.get("config", {})
+        
+        # Populate the config with sections and their key-value pairs
+        for section, settingsd in config_data.items():
+            if not isinstance(settingsd, dict):
+                raise ValueError(f"Section '{section}' must contain key-value pairs.")
+            config[section] = settingsd  # Directly assign the dictionary as key-value pairs
+
+        
+        # Define the file path for saving the configuration
+        # Assuming SlurmClient._DEFAULT_CONFIG_PATH_2 contains a path that might include ~
+        config_path = os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_2)
+        
+        # Save the configuration to a file
+        with open(config_path, "w") as config_file:
+            config_file.write("# This file was automatically generated and may be overwritten automatically.\n")
+            config_file.write("# Please use the (BI)OMERO Web UI to make any config changes instead.\n")
+            config_file.write("\n")  # Add a blank line after the comments
+            config.write(config_file)
+        
+        logger.info(f"Configuration saved successfully to {config_path}")
+        return JsonResponse({"message": "Configuration saved successfully", "path": config_path}, status=200)
+    
+    except json.JSONDecodeError:
+        logger.error("Invalid JSON data in the request")
+        return JsonResponse({"error": "Invalid JSON data"}, status=400)
+    except ValueError as e:
+        logger.error(f"Invalid configuration format: {str(e)}")
+        return JsonResponse({"error": f"Invalid configuration format: {str(e)}"}, status=400)
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        return JsonResponse({"error": f"Failed to save configuration: {str(e)}"}, status=500)
 
 
 @login_required()

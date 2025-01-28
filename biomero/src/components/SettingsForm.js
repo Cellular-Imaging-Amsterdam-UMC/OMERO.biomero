@@ -18,69 +18,96 @@ import CollapsibleSection from "./CollapsibleSection";
 import { FaDocker } from "react-icons/fa6";
 
 const SettingsForm = () => {
-  const { state, updateState } = useAppContext();
+  const { state, updateState, loadBiomeroConfig, saveConfigData } = useAppContext();
   const [settingsForm, setSettingsForm] = useState(null); // Form state
   const [initialFormData, setInitialFormData] = useState(null); // Stable reference to initial data
   const [editMode, setEditMode] = useState({});
 
-  // Fetch the full initial form state (mocked API call for now)
   const fetchInitialFormState = async () => {
-    const fetchedFormState = {
-      sshHost: "localslurm",
-      slurmDataPath: "/data/my-scratch/data",
-      slurmImagesPath: "/data/my-scratch/singularity_images/workflows",
-      slurmScriptPath: "/data/my-scratch/slurm-scripts",
-      slurmScriptRepo: "",
-      trackWorkflows: true,
-      sqlalchemyUrl: "",
-      enableJobAccounting: true,
-      enableJobProgress: true,
-      enableWorkflowAnalytics: true,
-      models: [
-        { name: "cellpose", repo: "https://github.com/TorecLuik/W_NucleiSegmentation-Cellpose/tree/v1.3.1", job: "jobs/cellpose.sh", extraParams: { cellpose_job_mem: "15GB" } },
-        { name: "deeplabcut", repo: "https://github.com/DeepLabCut/DeepLabCut/tree/v2.9.10", job: "jobs/deeplabcut.sh" },
-      ],
-      converters: []
-    };
-    setInitialFormData(fetchedFormState); // Set stable reference
-    setSettingsForm(fetchedFormState); // Set form state
+     if (state.config) {
+      const mappedModels = Object.entries(state.config.MODELS || {})
+        .filter(([key]) => key.endsWith('_repo')) // Filter for relevant keys
+        .map(([key, value]) => {
+          const prefix = key.replace('_repo', ''); // Extract the prefix
+          return {
+            name: state.config.MODELS[prefix], // e.g., "cellpose"
+            repo: value, // e.g., the repo URL
+            job: state.config.MODELS[`${prefix}_job`], // e.g., "jobs/cellpose.sh"
+            extraParams: extractExtraParams(prefix) // Handle the extraParams here
+          };
+        });
+  
+      const mappedConverters = Object.entries(state.config.CONVERTERS || {}).map(
+        ([key, value]) => ({ key, value })
+      );
+      // store a version to 'reset' to
+      setInitialFormData({
+        ...state.config,
+        MODELS: mappedModels,
+        CONVERTERS: mappedConverters,
+      });
+      // the living version to be changed by the UI
+      setSettingsForm({
+        ...state.config,
+        MODELS: mappedModels,
+        CONVERTERS: mappedConverters,
+      });
+    }
+  };
+
+  // Extract extraParams for each model
+  const extractExtraParams = (prefix) => {
+    const extraParams = {};
+    // Find any extra parameters for this model
+    Object.entries(state.config.MODELS).forEach(([key, value]) => {
+      if (key.startsWith(`${prefix}_job_`)) {
+        const paramKey = key;
+        extraParams[paramKey] = value;
+      }
+    });
+    return extraParams;
   };
 
   useEffect(() => {
-    fetchInitialFormState(); // Initial data fetching
-  }, []);
+    loadBiomeroConfig();     
+  }, []); // Empty dependency array ensures it's called only once
+
+  useEffect(() => {
+    fetchInitialFormState();
+  }, [state.config]); // setup our form
+  
 
   const toggleEdit = (field) => {
     setEditMode((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
   const handleModelChange = (index, field, value) => {
-    const updatedModels = structuredClone(settingsForm.models)
+    const updatedModels = structuredClone(settingsForm.MODELS)
     updatedModels[index][field] = value;
     setSettingsForm((prev) => ({ ...prev, 
-        models: updatedModels
+      MODELS: updatedModels
     }));
   };
 
   const handleConverterChange = (index, field, value) => {
-    const updatedConverters = structuredClone(settingsForm.converters);
+    const updatedConverters = structuredClone(settingsForm.CONVERTERS);
     updatedConverters[index][field] = value;
     setSettingsForm((prev) => ({ ...prev, 
-        converters: updatedConverters
+      CONVERTERS: updatedConverters
     }));
   };
 
   const handleAddConverter = () => {
     setSettingsForm((prev) => ({
         ...prev,
-        converters: [...prev.converters, { key: "", value: "" }],
+        CONVERTERS: [...prev.CONVERTERS, { key: "", value: "" }],
       }));
   };
 
   const handleRemoveConverter = (index) => {
     setSettingsForm((prev) => {
-        const updatedConverters = prev.converters.filter((_, i) => i !== index);
-        return { ...prev, converters: updatedConverters };
+        const updatedConverters = prev.CONVERTERS.filter((_, i) => i !== index);
+        return { ...prev, CONVERTERS: updatedConverters };
       });
   };
 
@@ -93,14 +120,14 @@ const SettingsForm = () => {
   const addModel = () => {
     setSettingsForm((prev) => ({
       ...prev,
-      models: [...prev.models, { name: "", repo: "", job: "" }],
+      MODELS: [...prev.MODELS, { name: "", repo: "", job: "" }],
     }));
   };
 
   const handleDeleteModel = (index) => {
     setSettingsForm((prev) => {
-      const updatedModels = prev.models.filter((_, i) => i !== index);
-      return { ...prev, models: updatedModels };
+      const updatedModels = prev.MODELS.filter((_, i) => i !== index);
+      return { ...prev, MODELS: updatedModels };
     });
   };
 
@@ -109,15 +136,15 @@ const SettingsForm = () => {
     if (!initialFormData) return;
   
     setSettingsForm((prev) => {
-      const updatedModels = [...prev.models];
+      const updatedModels = [...prev.MODELS];
       // Check if the model exists in initialFormData, if not, reset it to default
-      if (initialFormData.models[index]) {
-        updatedModels[index] = initialFormData.models[index]; // Restore model from initial data
+      if (initialFormData.MODELS[index]) {
+        updatedModels[index] = initialFormData.MODELS[index]; // Restore model from initial data
       } else {
         updatedModels[index] = { name: "", repo: "", job: "" }; // Reset to default if it's a new model
       }
   
-      return { ...prev, models: updatedModels };
+      return { ...prev, MODELS: updatedModels };
     });
   };
 
@@ -128,17 +155,65 @@ const SettingsForm = () => {
   };
 
   const handleInputChange = (field, value) => {
-    const updatedSettings = { ...settingsForm, [field]: value };
+    const updatedSettings = structuredClone(settingsForm); // Deep clone the settings form
+    const keys = field.split('.'); // Split the field by '.'
+  
+    // Traverse the cloned object to update the nested value
+    let current = updatedSettings;
+    keys.forEach((key, index) => {
+      if (index === keys.length - 1) {
+        current[key] = value; // Update the value at the final key
+      } else {
+        if (!current[key]) current[key] = {}; // Ensure nested objects exist
+        current = current[key];
+      }
+    });
+  
     setSettingsForm(updatedSettings);
     updateState({ settingsForm: updatedSettings }); // Update the global state
-  };  
+  };
+
+  const submitConfig = () => {
+    saveConfigData(
+      transformSettingsFormToPayload(settingsForm)
+    );
+    loadBiomeroConfig()
+  };
+
+  const transformSettingsFormToPayload = (settingsForm) => {
+    // Convert models dynamically
+    const models = settingsForm.MODELS.reduce((acc, model) => {
+      acc[model.name] = model.name; // Add model name
+      acc[`${model.name}_repo`] = model.repo; // Add model repo
+      acc[`${model.name}_job`] = model.job; // Add model job
+      if (model.extraParams) {
+        Object.entries(model.extraParams).forEach(([key, value]) => {
+          acc[key] = value; // Add extra parameters
+        });
+      }
+      return acc;
+    }, {});
+
+    // Convert converters dynamically
+    const converters = settingsForm.CONVERTERS.reduce((acc, converter) => {
+      acc[converter.key] = converter.value; // Map converter name to version
+      return acc;
+    }, {});
+
+    return {
+      ...settingsForm,
+      CONVERTERS: converters,
+      MODELS: models,
+    };
+  };
+  
   
 
   const renderEditableField = (label, field, value, placeholder, explanation) => (
     <FormGroup label={label} helperText={explanation}>
       <div className="flex items-center space-x-2">
         <InputGroup
-          value={value}
+          value={value || ''}
           onChange={(e) => handleInputChange(field, e.target.value)}
           readOnly={!editMode[field]}
           placeholder={placeholder}
@@ -200,8 +275,8 @@ const SettingsForm = () => {
         </div>
         {renderEditableField(
             "SSH Host",
-            "sshHost",
-            settingsForm.sshHost,
+            "SSH.host",
+            settingsForm.SSH.host,
             "Enter SSH Host",
             "The alias for the SSH connection for connecting to Slurm."
         )}
@@ -226,24 +301,24 @@ const SettingsForm = () => {
       </div>
       {renderEditableField(
         "Slurm Data Path",
-        "slurmDataPath",
-        settingsForm.slurmDataPath,
+        "SLURM.slurm_data_path",
+        settingsForm.SLURM.slurm_data_path,
         "/data/my-scratch/data",
         "The path on SLURM entrypoint for storing datafiles"
       )}
 
       {renderEditableField(
         "Slurm Images Path",
-        "slurmImagesPath",
-        settingsForm.slurmImagesPath,
+        "SLURM.slurm_images_path",
+        settingsForm.SLURM.slurm_images_path,
         "/data/my-scratch/singularity_images/workflows",
         "The path on SLURM entrypoint for storing container image files"
       )}
 
       {renderEditableField(
         "Slurm Script Path",
-        "slurmScriptPath",
-        settingsForm.slurmScriptPath,
+        "SLURM.slurm_script_path",
+        settingsForm.SLURM.slurm_script_path,
         "/data/my-scratch/slurm-scripts",
         "The path on SLURM entrypoint for storing the slurm job scripts"
       )}
@@ -268,8 +343,8 @@ const SettingsForm = () => {
       </div>
       {renderEditableField(
         "Slurm Script Repository",
-        "slurmScriptRepo",
-        settingsForm.slurmScriptRepo,
+        "SLURM.slurm_script_repo",
+        settingsForm.SLURM.slurm_script_repo,
         "Enter repository URL",
         "The Git repository to pull the Slurm scripts from. Leave empty (default) for generated scripts."
       )}
@@ -299,9 +374,9 @@ const SettingsForm = () => {
         </div>
       </div>
       <Switch
-        checked={settingsForm.trackWorkflows}
+        checked={settingsForm.ANALYTICS.track_workflows}
         label="Track Workflows"
-        onChange={(e) => handleInputChange("trackWorkflows", e.target.checked)}
+        onChange={(e) => handleInputChange("ANALYTICS.track_workflows", e.target.checked)}
       />
       <H6>Database configuration</H6>
       <div className="bp5-form-group">
@@ -312,7 +387,8 @@ const SettingsForm = () => {
             data. If no value is set here, environment variables will be used as the default.
             </div>
             <div className="bp5-form-helper-text">
-            See <a href="https://docs.sqlalchemy.org/en/20/core/engines.html#database-urls" target="_blank" rel="noopener noreferrer">SQLAlchemy docs</a> for more info and examples of database URLs supported by sqlalchemy
+            See <a href="https://docs.sqlalchemy.org/en/20/core/engines.html#database-urls" target="_blank" rel="noopener noreferrer">SQLAlchemy docs</a> for more info and examples of database URLs supported by sqlalchemy.
+            E.g. postgresql+psycopg2://user:password@localhost:5432/db.
             </div>
             <div className="bp5-form-helper-text">
             Note: If SQLALCHEMY_URL is set as an environment variable, it will override this setting.
@@ -324,8 +400,8 @@ const SettingsForm = () => {
       </div>
       {renderEditableField(
         "SQLAlchemy URL",
-        "sqlalchemyUrl",
-        settingsForm.sqlalchemyUrl,
+        "ANALYTICS.sqlalchemy_url",
+        settingsForm.ANALYTICS.sqlalchemy_url,
         "postgresql+psycopg2://user:password@localhost:5432/db",
         "Database connection string for SQLAlchemy."
       )}
@@ -356,9 +432,9 @@ const SettingsForm = () => {
         </div>
       </div>
       <Switch
-        checked={settingsForm.enableJobAccounting}
+        checked={settingsForm.ANALYTICS.enable_job_accounting}
         label="Enable Job Accounting"
-        onChange={(e) => handleInputChange("enableJobAccounting", e.target.checked)}
+        onChange={(e) => handleInputChange("ANALYTICS.enable_job_accounting", e.target.checked)}
       />
       <b>Job Progress Listener</b>
       <div className="bp5-form-group">
@@ -372,9 +448,9 @@ const SettingsForm = () => {
         </div>
       </div>
       <Switch
-        checked={settingsForm.enableJobProgress}
+        checked={settingsForm.ANALYTICS.enable_job_progress}
         label="Enable Job Progress"
-        onChange={(e) => handleInputChange("enableJobProgress", e.target.checked)}
+        onChange={(e) => handleInputChange("ANALYTICS.enable_job_progress", e.target.checked)}
       />
       <b>Workflow Analytics Listener</b>
       <div className="bp5-form-group">
@@ -388,9 +464,9 @@ const SettingsForm = () => {
         </div>
       </div>
       <Switch
-        checked={settingsForm.enableWorkflowAnalytics}
+        checked={settingsForm.ANALYTICS.enable_workflow_analytics}
         label="Enable Workflow Analytics"
-        onChange={(e) => handleInputChange("enableWorkflowAnalytics", e.target.checked)}
+        onChange={(e) => handleInputChange("ANALYTICS.enable_workflow_analytics", e.target.checked)}
       />
       </CollapsibleSection>
       <CollapsibleSection title="Converters Settings">
@@ -417,7 +493,7 @@ const SettingsForm = () => {
             </div>
         </div>
       </div>
-      {settingsForm.converters?.map((converter, index) => (
+      {settingsForm.CONVERTERS?.map((converter, index) => (
         <div key={index} className="bp5-form-group">
           <FormGroup
             label={`Converter ${index + 1}`}
@@ -466,11 +542,11 @@ const SettingsForm = () => {
       </CollapsibleSection>
       <CollapsibleSection title="Models Settings">
       <ModelsSection
-        models={settingsForm.models}
+        models={settingsForm.MODELS}
         onModelChange={(index, field, value) => handleModelChange(index, field, value)}
         onAddModel={addModel}
         onAddParam={(index, key, value) => {
-            const updatedModels = structuredClone(settingsForm.models);
+            const updatedModels = structuredClone(settingsForm.MODELS);
           
             if (!key) {
               console.error("Key is required to add or delete parameters.");
@@ -493,7 +569,7 @@ const SettingsForm = () => {
             }
           
             // Update the state with modified models
-            setSettingsForm((prev) => ({ ...prev, models: updatedModels }));
+            setSettingsForm((prev) => ({ ...prev, MODELS: updatedModels }));
           }}
           
                  
@@ -505,7 +581,11 @@ const SettingsForm = () => {
         <Button
             icon="floppy-disk"
             intent="primary"
-            onClick={() => console.log("Saved settings:", settingsForm)}
+            onClick={() => {
+              console.log("Saved settings:", settingsForm);
+              console.log("Payload:", transformSettingsFormToPayload(settingsForm));
+              submitConfig();
+            }}
         >
             Save Settings
         </Button>
