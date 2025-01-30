@@ -21,14 +21,20 @@ const ModelCard = ({
   editable,
   setEditable,
 }) => {
+  const [inputValue, setInputValue] = useState("");
+  const [showWarning, setShowWarning] = useState(false);
   return (
     <Card className="mb-4 shadow">
       <div className="flex justify-between items-center">
-        <H4 className="text-lg font-bold">
-          {model.name || `New Model ${index + 1}`}
+        <H4 className={`text-lg font-bold ${model.name ? "" : "text-red-500"}`}>
+          {model.name || `Please fill in a valid name!`}
         </H4>
         <ButtonGroup>
-          <Tooltip content={editable ? "Lock model" : "Edit model"}>
+          <Tooltip 
+            content={editable ? "Lock model" : "Click here to edit the model!"}
+            isOpen={!editable}
+            position="top"
+            >
             <Button
               minimal
               icon={editable ? "tick" : "edit"}
@@ -169,15 +175,37 @@ const ModelCard = ({
         <InputGroup
           placeholder="e.g., mem=32GB"
           disabled={!editable}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onBlur={() => {
+            if (inputValue && !showWarning) {
+              setShowWarning(true);
+            }
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && editable) {
-              const [key, value] = e.target.value.split("=");
+              const [key, value] = inputValue.split("=");
               if (key) {
                 onAddParam(index, key.trim(), value ? value.trim() : "");
-                e.target.value = ""; // Clear the input field after adding
+                setInputValue("");
+                setShowWarning(false);
               }
             }
           }}
+          rightElement={
+            showWarning && editable ? (
+              <Tooltip content="Press Enter or click this button to confirm your changes" intent="warning" isOpen={showWarning && editable}>
+                <Button icon="warning-sign" minimal intent="warning" onClick={() => {
+                  const [key, value] = inputValue.split("=");
+                  if (key) {
+                    onAddParam(index, key.trim(), value ? value.trim() : "");
+                    setInputValue("");
+                    setShowWarning(false);
+                  }}
+                } />
+              </Tooltip>
+            ) : null
+          }
         />
       </FormGroup>
       <div className="bp5-form-group">

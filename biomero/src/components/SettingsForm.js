@@ -10,7 +10,9 @@ import {
   H5,
   H6,
   Collapse,
-  ButtonGroup
+  ButtonGroup,
+  Tooltip,
+  Spinner
 } from "@blueprintjs/core";
 import { useAppContext } from "../AppContext";
 import ModelsSection from "./ModelsSection";
@@ -22,6 +24,20 @@ const SettingsForm = () => {
   const [settingsForm, setSettingsForm] = useState(null); // Form state
   const [initialFormData, setInitialFormData] = useState(null); // Stable reference to initial data
   const [editMode, setEditMode] = useState({});
+
+  const [hasChanges, setHasChanges] = useState(false);
+  const [showSaveTooltip, setShowSaveTooltip] = useState(true);
+  const [showResetTooltip, setShowResetTooltip] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (JSON.stringify(settingsForm) !== JSON.stringify(initialFormData)) {
+      setHasChanges(true);
+    } else {
+      setHasChanges(false);
+    }
+  }, [settingsForm, initialFormData]);
+
 
   const fetchInitialFormState = async () => {
      if (state.config) {
@@ -84,6 +100,11 @@ const SettingsForm = () => {
   const handleModelChange = (index, field, value) => {
     const updatedModels = structuredClone(settingsForm.MODELS)
     updatedModels[index][field] = value;
+
+    if (field === "name" && settingsForm.SLURM.slurm_script_repo === "") {
+      updatedModels[index]["job"] = `jobs/${value}.sh`;
+    }
+
     setSettingsForm((prev) => ({ ...prev, 
       MODELS: updatedModels
     }));
@@ -152,6 +173,7 @@ const SettingsForm = () => {
   // Refetch initial form state to reset the entire form
   const resetForm = () => {
     fetchInitialFormState(); // Re-fetch the initial data when resetting the form
+    setShowSaveTooltip(true);
   };
 
   const handleInputChange = (field, value) => {
@@ -173,11 +195,17 @@ const SettingsForm = () => {
     updateState({ settingsForm: updatedSettings }); // Update the global state
   };
 
-  const submitConfig = () => {
-    saveConfigData(
-      transformSettingsFormToPayload(settingsForm)
-    );
-    loadBiomeroConfig()
+  const submitConfig = async () => {
+    setLoading(true);
+    try {
+      await saveConfigData(
+        transformSettingsFormToPayload(settingsForm)
+      );
+      setShowSaveTooltip(false);  // Hide "Don't forget to save"
+      setShowResetTooltip(true);  // Show "Reload to apply changes"
+    } finally {
+      setLoading(false);
+    }
   };
 
   const transformSettingsFormToPayload = (settingsForm) => {
@@ -250,7 +278,7 @@ const SettingsForm = () => {
             </div>
 
             <div className="bp5-form-helper-text">
-                I would recommend running the <b>Slurm Init</b> script after changing these settings.
+                I would recommend running the <b>Slurm Init</b> script after changing these settings. You can also use <b>Slurm Check Setup</b> to see if its needed. 
             </div>
 
             <div className="bp5-form-helper-text">
@@ -594,26 +622,40 @@ const SettingsForm = () => {
             </div>
         </div>
       </div>
-     <ButtonGroup>
-        <Button
-            icon="floppy-disk"
-            intent="primary"
+      <ButtonGroup>
+        <Tooltip 
+          content="Please save your changes" 
+          intent="none" 
+          isOpen={hasChanges && showSaveTooltip}
+          compact={true}
+          placement="bottom">
+          <Button
+            icon={loading ? <Spinner size={16} /> : "floppy-disk"}
+            intent={hasChanges  && showSaveTooltip ? "primary" : "none"}
             onClick={() => {
-              console.log("Saved settings:", settingsForm);
-              console.log("Payload:", transformSettingsFormToPayload(settingsForm));
               submitConfig();
             }}
-        >
+          >
             Save Settings
-        </Button>
-        <Button
+          </Button>
+        </Tooltip>
+        <Tooltip 
+          content="You can still reset (and save again!) if you made a mistake" 
+          intent="none" 
+          isOpen={hasChanges && showResetTooltip}
+          compact={true}
+          placement="bottom">
+          <Button
             icon="reset"
-            intent="warning"
+            intent={hasChanges ? "warning" : "none"}
+            disabled={!hasChanges}
             onClick={resetForm}
-            >
+          >
             Undo All Changes
-        </Button>
+          </Button>
+        </Tooltip>
       </ButtonGroup>
+
     </Card>
   );
 };

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from collections import defaultdict
 from uuid import uuid4
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
 import os
@@ -18,6 +19,9 @@ from omero.rtypes import unwrap, rbool, wrap, rlong
 from .utils import get_biomero_build_file, get_react_build_file
 from biomero import SlurmClient
 import configparser
+from configupdater import ConfigUpdater, Comment
+import datetime
+
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +44,8 @@ def get_biomero_config(request, conn=None, **kwargs):
         configs = configparser.ConfigParser(allow_no_value=True)
         # Loads from default locations and given location, missing files are ok
         configs.read([os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_1),
-                     os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_2)])
+                     os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_2),
+                     os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_3)])
         # Convert configparser object to JSON-like dict
         config_dict = {section: dict(configs.items(section)) for section in configs.sections()}
 
@@ -48,6 +53,7 @@ def get_biomero_config(request, conn=None, **kwargs):
     except Exception as e:
         logger.error(f"Error retrieving BIOMERO config: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
+
 
 @login_required()
 @require_http_methods(["POST"])
@@ -62,34 +68,128 @@ def save_biomero_config(request, conn=None, **kwargs):
         if not is_admin:
             logger.error(f"Unauthorized request for user {user_id}:{username}")
             return JsonResponse({"error": "Unauthorized request"}, status=403)
-        
-        # Create a ConfigParser object
-        config = configparser.ConfigParser(allow_no_value=True)
+
+        # Define the file path for saving the configuration
+        config_path = os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_3)
+
+        # Create ConfigUpdater object
+        config = ConfigUpdater()
+
+        # Read the existing configuration if the file exists
+        if os.path.exists(config_path):
+            config.read(config_path)
         
         # Extract the 'config' section from the incoming data
         config_data = data.get("config", {})
         
-        # Populate the config with sections and their key-value pairs
+        def generate_model_comment(key):
+            if key.endswith('_job'):
+                c = "# The jobscript in the 'slurm_script_repo'"
+            elif key.endswith('_repo'):
+                c = "# The (e.g. github) repository with the descriptor.json file"
+            else:
+                c = "# Adding or overriding job value for this workflow"
+            return c
+
+        # Update the config with new values
         for section, settingsd in config_data.items():
             if not isinstance(settingsd, dict):
                 raise ValueError(f"Section '{section}' must contain key-value pairs.")
-            config[section] = settingsd  # Directly assign the dictionary as key-value pairs
 
+            # If the section doesn't exist, add it
+            if section not in config:
+                config.add_section(section)
+                
+            if section == "MODELS":
+                # Group keys by prefix (cellpose, stardist, etc.)
+                model_keys = defaultdict(list)
+                for key, value in settingsd.items():
+                    # Split the key on the known suffixes
+                    model_prefix = key
+                    for suffix in ['repo', 'job']:
+                        if f"_{suffix}" in key:
+                            model_prefix = key.split(f"_{suffix}")[0]
+                            break
+                    model_keys[model_prefix].append((key, value))
+
+                # Sort the prefixes and insert the keys in the correct order
+                for model_prefix in sorted(model_keys.keys()):
+                    # Add the model-specific keys
+                    for key, value in model_keys[model_prefix]:
+                        # If the key already exists, just update it
+                        if key in config[section]:
+                            config.set(section, key, value)
+                        else:
+                            if key == model_prefix:
+                                comment = f'''
+# -------------------------------------
+# {model_prefix.capitalize()} (added via web UI)
+# -------------------------------------
+# The path to store the container on the slurm_images_path'''
+                                config.set(section, key, value)
+                                (config[section][model_prefix].add_before
+                                                            .comment(comment))
+                            else:
+                                # For new keys, add the key and a comment before it
+                                model_comment = generate_model_comment(key)
+                                
+                                if "job_" in key:
+                                    (config[section][model_prefix+"_job"].add_after
+                                                            .comment(model_comment)
+                                                            .option(key, value))
+                                elif "_job" in key:
+                                    (config[section][model_prefix+"_repo"].add_after
+                                                            .comment(model_comment)
+                                                            .option(key, value))
+                                else:
+                                    (config[section][model_prefix].add_after
+                                                            .comment(model_comment)
+                                                            .option(key, value))
+                
+                # Check for removing top-level keys and related keys
+                for key in list(config[section].keys()):
+                    model_prefix = key
+                    for suffix in ['repo', 'job']:
+                        if f"_{suffix}" in key:
+                            model_prefix = key.split(f"_{suffix}")[0]
+                            break
+                    if model_prefix not in model_keys:
+                        del config[section][key]  # Remove the unwanted key or subsection
+
+            elif section == "CONVERTERS":
+                # add new or edits as normal
+                for key, value in settingsd.items():
+                    config.set(section, key, value)
+                # Check for removing top-level keys and related keys
+                for key in list(config[section].keys()):
+                    if key not in settingsd.keys():
+                        del config[section][key]
+            else:
+                # Update or add the keys in the section
+                for key, value in settingsd.items():
+                    config.set(section, key, value)
         
-        # Define the file path for saving the configuration
-        # Assuming SlurmClient._DEFAULT_CONFIG_PATH_2 contains a path that might include ~
-        config_path = os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_2)
-        
-        # Save the configuration to a file
+        # Prepare the update timestamp comment
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        change_comment = f"Config automatically updated by {username} ({user_id}) via the web UI on {timestamp}"
+        # Check if the changelog section exists, and create it if not
+        if "changelog" not in config:
+            config.add_section("changelog")
+
+        # Add the change comment as the first block of the changelog section
+        changelog_section = config["changelog"]
+        if isinstance(changelog_section.first_block, Comment):
+            changelog_section.first_block.detach()
+        changelog_section.add_after.comment(change_comment)
+            
+
+        # Save the updated configuration while preserving comments
         with open(config_path, "w") as config_file:
-            config_file.write("# This file was automatically generated and may be overwritten automatically.\n")
-            config_file.write("# Please use the (BI)OMERO Web UI to make any config changes instead.\n")
-            config_file.write("\n")  # Add a blank line after the comments
             config.write(config_file)
-        
+
         logger.info(f"Configuration saved successfully to {config_path}")
         return JsonResponse({"message": "Configuration saved successfully", "path": config_path}, status=200)
-    
+
     except json.JSONDecodeError:
         logger.error("Invalid JSON data in the request")
         return JsonResponse({"error": "Invalid JSON data"}, status=400)

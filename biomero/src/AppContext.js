@@ -172,7 +172,7 @@ export const AppProvider = ({ children }) => {
       toaster.show({
           intent: "success",
           icon: "tick-circle",
-          message: `Config response: ${message}`,
+          message: `${message}`,
           timeout: 0,
       });
     } catch (err) {
