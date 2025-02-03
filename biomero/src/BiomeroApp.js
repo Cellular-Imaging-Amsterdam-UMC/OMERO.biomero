@@ -19,6 +19,8 @@ import {
   DialogFooter,
   Classes,
   Tooltip,
+  NavbarDivider,
+  Icon,
 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 import SettingsForm from "./components/SettingsForm";
@@ -145,6 +147,10 @@ const BiomeroApp = () => {
       {/* Navbar */}
       <Navbar className="z-0">
         <NavbarGroup>
+          <Icon icon="style" className="mr-[7px]"/>
+          <NavbarHeading>CANVAS</NavbarHeading>
+          <NavbarDivider />
+          <Icon icon="predictive-analysis" className="mr-[7px]"/>
           <NavbarHeading>BIOMERO</NavbarHeading>
         </NavbarGroup>
       </Navbar>
