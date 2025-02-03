@@ -120,14 +120,7 @@ const UploaderApp = () => {
           {/* Monitor Tab */}
           <Tab
             id="Monitor"
-            title={
-              <Tooltip
-                content="Monitor upload progress"
-                compact={true}
-              >
-                <span>Monitor</span>
-              </Tooltip>
-            }
+            title="Monitor"
             icon="dashboard"
             panel={loadedTabs.Monitor ? (
               <MonitorPanel
