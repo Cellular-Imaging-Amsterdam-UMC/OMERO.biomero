@@ -454,7 +454,8 @@ def omero_boost_upload(request, conn=None, **kwargs):
     metabase_site_url = os.environ.get("METABASE_SITE_URL")
     metabase_secret_key = os.environ.get("METABASE_SECRET_KEY")
     metabase_dashboard_id = os.environ.get(
-        "METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID")
+        "METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID"
+    )
 
     current_user = conn.getUser()
     username = current_user.getName()
@@ -463,23 +464,22 @@ def omero_boost_upload(request, conn=None, **kwargs):
 
     payload = {
         "resource": {"dashboard": int(metabase_dashboard_id)},
-        "params": {
-            "user_name": [username],
-        },
-        "exp": round(time.time()) + (60 * 30),  # 10 minute expiration
+        "params": {"user_name": [username]},
+        "exp": round(time.time()) + (60 * 30),  # 30-minute expiration
     }
     token = jwt.encode(payload, metabase_secret_key, algorithm="HS256")
 
     context = {
-        "template": "omeroboost/webclient_plugins/omero_boost_upload.html",
+        "template": "omeroboost/webclient_plugins/react_app.html",  # Unified template
         "user_name": username,
         "user_id": user_id,
         "is_admin": is_admin,
-        "base_dir": os.path.basename(BASE_DIR),
-        "main_js": get_react_build_file("main.js"),
-        "main_css": get_react_build_file("main.css"),
         "metabase_site_url": metabase_site_url,
         "metabase_token": token,
+        "app_name": "uploader",  # Pass different app name
+        "main_js": get_react_build_file("main.js"),  # Unified JS key
+        "main_css": get_react_build_file("main.css"),  # Unified CSS key
+        "title": "Server Side Browser & Imports Database",
     }
     return context
 
@@ -603,40 +603,32 @@ def omero_boost_monitor_workflows(request, conn=None, **kwargs):
     metabase_site_url = os.environ.get("METABASE_SITE_URL")
     metabase_secret_key = os.environ.get("METABASE_SECRET_KEY")
     metabase_dashboard_id = os.environ.get(
-        "METABASE_WORKFLOWS_DB_PAGE_DASHBOARD_ID")
+        "METABASE_WORKFLOWS_DB_PAGE_DASHBOARD_ID"
+    )
 
-    # Get the current user's information
     current_user = conn.getUser()
     username = current_user.getName()
     user_id = current_user.getId()
-
-    # Check if the user is an admin
     is_admin = conn.isAdmin()
-
-    # Log admin status
-    if is_admin:
-        logger.info(f"User {username} (ID: {user_id}) is an admin")
-    else:
-        logger.info(f"User {username} (ID: {user_id}) is not an admin")
 
     payload = {
         "resource": {"dashboard": int(metabase_dashboard_id)},
-        "params": {
-            "user": [user_id],
-        },
-        "exp": round(time.time()) + (60 * 30),  # 10 minute expiration
+        "params": {"user": [user_id]},
+        "exp": round(time.time()) + (60 * 30),
     }
     token = jwt.encode(payload, metabase_secret_key, algorithm="HS256")
 
     context = {
         "metabase_site_url": metabase_site_url,
         "metabase_token": token,
-        "template": "omeroboost/webclient_plugins/omero_boost_monitor_workflows.html",
+        "template": "omeroboost/webclient_plugins/react_app.html",
         "user_name": username,
         "user_id": user_id,
         "is_admin": is_admin,
-        "biomero_js": get_biomero_build_file("main.js"),
-        "biomero_css": get_biomero_build_file("main.css"),
+        "main_js": get_react_build_file("main.js"),
+        "main_css": get_react_build_file("main.css"),
+        "title": "BIOMERO Workflows",
+        "app_name": "biomero",  # BiomeroApp
     }
     return context
 

@@ -1,6 +1,6 @@
 {
   "name": "biomero",
-  "homepage": "biomero/assets",
+  "homepage": "omero_boost/assets",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -26,7 +26,7 @@
     "react-icons": "^5.4.0"
   },
   "scripts": {
-    "clear-assets": "rimraf ../omero_boost/static/biomero/assets",
+    "clear-assets": "rimraf ../omero_boost/static/omero_boost/assets",
     "watch": "yarn clear-assets && webpack --mode=development --color --progress -w",
     "start": "react-scripts start",
     "build": "yarn clear-assets && webpack --mode=production --color --progress",

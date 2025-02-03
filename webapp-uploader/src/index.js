@@ -1,16 +1,20 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
-import App from "./App";
 import "./tailwind.css";
 import { AppProvider } from "./AppContext";
+import BiomeroApp from "./BiomeroApp";
+import UploaderApp from "./UploaderApp";
 
 window.onload = function () {
-  const root = ReactDOM.createRoot(document.getElementById("root"));
+  const rootElement = document.getElementById("root");
+  const appName = rootElement.dataset.app || "biomero"; // Default to "biomero"
+
+  const root = ReactDOM.createRoot(rootElement);
   root.render(
     <React.StrictMode>
       <AppProvider>
-        <App />
+        {appName === "biomero" ? <BiomeroApp /> : <UploaderApp />}
       </AppProvider>
     </React.StrictMode>
   );

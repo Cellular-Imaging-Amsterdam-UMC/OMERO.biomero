@@ -6,7 +6,7 @@ module.exports = {
   devtool: "source-map",
   entry: "./src/index.js",
   output: {
-    path: path.resolve(__dirname, "../omero_boost/static/biomero/assets/"),
+    path: path.resolve(__dirname, "../omero_boost/static/omero_boost/assets/"),
     filename: "main.[contenthash].js",
   },
   mode: "development", // Switch to 'production' for optimized builds
@@ -14,9 +14,9 @@ module.exports = {
     new WebpackManifestPlugin({
       fileName: path.resolve(
         __dirname,
-        "../omero_boost/static/biomero/assets/asset-manifest.json"
+        "../omero_boost/static/omero_boost/assets/asset-manifest.json"
       ),
-      publicPath: "/biomero/assets/",
+      publicPath: "/omero_boost/assets/",
     }),
     new WebpackShellPluginNext({
       onAfterDone: {
@@ -26,7 +26,7 @@ module.exports = {
       },
       onBeforeCompile: {
         scripts: [
-          "rimraf ../omero_boost/static/biomero/assets",
+          "rimraf ../omero_boost/static/omero_boost/assets",
           "echo 'Cleaning up'",
         ],
       },
