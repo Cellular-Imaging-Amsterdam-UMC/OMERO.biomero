@@ -26,7 +26,7 @@ import SettingsForm from "./components/SettingsForm";
 // RunTab Component
 const RunTab = ({ state }) => (
   <div className="h-full overflow-y-auto">
-    <H4>Run</H4>
+    <H4>Run image analysis workflows</H4>
     <div className="flex">
       <div className="w-full p-4 flex-1 overflow-hidden">
         <RunPanel />
