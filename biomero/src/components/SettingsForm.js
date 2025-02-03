@@ -609,16 +609,18 @@ const SettingsForm = () => {
      <div className="bp5-form-group">
         <div className="bp5-form-content">
             <div className="bp5-form-helper-text">
-                Note that there are possibly <b>multiple</b> config files that BIOMERO reads from. By default (in this order):
+                Note that there are possibly <b>multiple</b> config files that BIOMERO reads from and combines into 1 final configuration.
             </div>
             <div className="bp5-form-helper-text">
+            By default (in this order):
                 <ol>
-                  <li> <code>/etc/slurm-config.ini</code> </li>
-                  <li> and <code>~/slurm-config.ini</code> </li>
+                  <li> (1) <code>/etc/slurm-config.ini</code> </li>
+                  <li> (2) and <code>~/slurm-config.ini</code> </li>
+                  <li> (3) and environment variables that you set </li>
                 </ol> 
             </div><div className="bp5-form-helper-text">
-                We write the values from this UI in the local <code>~/slurm-config.ini</code>, but read also from the global <code>/etc/slurm-config.ini</code>. 
-                So it could be that <b>removing</b> some setting doesn't work because they are set in <code>/etc/slurm-config.ini</code>: if so, please contact your system administrator to change that file. <b>Adding</b> and/or <b>overwriting</b> values should always work, because <code>~/slurm-config.ini</code> is applied last.
+                We write these values in (2) the local <code>~/slurm-config.ini</code>, but read also from (1) the system-wide <code>/etc/slurm-config.ini</code>. 
+                So it could be that <b>removing</b> some setting here doesn't work because they are set in <code>/etc/slurm-config.ini</code>: if so, please contact your system administrator to change that file. <b>Adding</b> and/or <b>overwriting</b> values should always work, because <code>~/slurm-config.ini</code> is read and applied last (but before environment variables).
             </div>
         </div>
       </div>
