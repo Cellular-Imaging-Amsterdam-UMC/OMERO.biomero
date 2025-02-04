@@ -15,7 +15,7 @@ COMMAND4="/opt/omero/web/omero-boost/startup.sh"
 
 # Monitor for changes
 inotifywait -m -r -e close_write --format '%w%f' \
-  --exclude './webapp-uploader(/.*)?' "$WATCHED_DIR" |
+  --exclude './canvas(/.*)?' "$WATCHED_DIR" |
 while read FILE; do
   echo "File changed: $FILE"
 

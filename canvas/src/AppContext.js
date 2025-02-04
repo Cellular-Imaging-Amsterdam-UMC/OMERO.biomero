@@ -1,0 +1,459 @@
+import React, { createContext, useContext, useState } from "react";
+import { 
+  fetchomeroTreeData, 
+  fetchFolderData, 
+  fetchGroups, 
+  fetchScripts, 
+  fetchScriptData, 
+  fetchWorkflows,
+  fetchConfig, 
+  fetchWorkflowMetadata,
+  fetchWorkflowGithub,
+  runWorkflow,
+  postConfig,
+  fetchThumbnails,
+  fetchImages 
+} from "./apiService";
+import { getDjangoConstants } from "./constants";
+import { transformStructure, extractGroups } from "./utils";
+import { OverlayToaster, Position } from "@blueprintjs/core";
+
+// Create the context
+const AppContext = createContext();
+
+export const AppProvider = ({ children }) => {
+  const { user, urls } = getDjangoConstants();
+  const [state, setState] = useState({
+    user,
+    urls,
+    omeroTreeData: null,
+    folderData: null,
+    scripts: [],
+    workflows: null,
+    workflowMetadata: null,
+    workflowStatusTooltipShown: false,
+    inputDatasets: []
+  });
+  const [apiLoading, setLoading] = useState(false);
+  const [apiError, setError] = useState(null);
+  const [toaster, setToaster] = useState(null);
+
+  // Initialize toaster asynchronously
+  React.useEffect(() => {
+    OverlayToaster.createAsync({ position: Position.TOP }).then(setToaster);
+  }, []);
+
+  const loadThumbnails = async (imageIds) => {
+    setLoading(true);
+    setError(null);
+  
+    try {
+      const batchSize = 50;
+      const thumbnailsMap = {};
+  
+      // Process imageIds in batches of 50
+      for (let i = 0; i < imageIds.length; i += batchSize) {
+        const chunk = imageIds.slice(i, i + batchSize);
+        const fetchedThumbnails = await fetchThumbnails(chunk); // Returns an object mapping imageId -> thumbnail
+        Object.assign(thumbnailsMap, fetchedThumbnails); // Merge batch results into the thumbnailsMap
+      }
+  
+      // Update state with the merged thumbnails map
+      setState((prevState) => ({
+        ...prevState,
+        thumbnails: { ...prevState.thumbnails, ...thumbnailsMap }, // Merge with existing thumbnails
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };  
+
+  const loadImagesForDataset = async (dataset, page = 1, sizeXYZ = false, date = false, group = 0) => {
+    setLoading(true);
+    setError(null);
+  
+    try {
+      const { index, childCount } = dataset;
+      const [type, id] = index.split("-"); // Split the index into type and ID
+  
+      if (type === "dataset") {
+        const datasetId = parseInt(id, 10);
+        let allImages = [];
+        let currentPage = page;
+        let keepFetching = true;
+  
+        while (keepFetching) {
+          const images = await fetchImages(datasetId, currentPage, sizeXYZ, date, group);
+  
+          if (images.length > 0) {
+            allImages = [...allImages, ...images];
+  
+            // Check if we have fetched enough images
+            if (allImages.length >= childCount) {
+              keepFetching = false; // We fetched enough images
+            } else {
+              currentPage++; // Fetch the next page
+            }
+          } else {
+            keepFetching = false; // No more images to fetch
+          }
+        }
+  
+        // Store images in the parent structure in state.omeroTreeData
+        setState((prevState) => ({
+          ...prevState,
+          omeroTreeData: {
+            ...prevState.omeroTreeData,
+            [index]: {
+              ...dataset,
+              children: allImages, // Attach fetched images to the dataset
+            },
+          },
+          images: [...(prevState.images || []), ...allImages], 
+        }));
+      } else {
+        console.log(`Skipping non-dataset index: ${index}:`, dataset);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  
+  
+  const runWorkflowData = async (workflowName, params = {}) => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Call the generic runWorkflow function
+      const response = await runWorkflow(workflowName, params); 
+      
+      console.log(`Workflow run response for ${workflowName}:`, response);
+      
+      const message = response?.message || "Workflow executed successfully.";
+
+      // Show formatted response in the toast
+      toaster.show({
+          intent: "success",
+          icon: "tick-circle",
+          message: `${workflowName}: ${message}`,
+          timeout: 0,
+      });
+    } catch (err) {
+      // Show formatted response in the toast
+      toaster.show({
+        intent: "danger",
+        icon: "error",
+        message: `${workflowName}: ${err.message}: ${err.response?.data?.error} (Params: ${JSON.stringify(params, null, 2)})`,
+        timeout: 0,
+    });
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveConfigData = async (config) => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Call the generic postConfig function
+      const response = await postConfig(config); 
+      
+      console.log(`Config save response for ${config}:`, response);
+      
+      const message = response?.message || "Config saved successfully.";
+
+      // Show formatted response in the toast
+      toaster.show({
+          intent: "success",
+          icon: "tick-circle",
+          message: `${message}`,
+          timeout: 0,
+      });
+    } catch (err) {
+      // Show formatted response in the toast
+      toaster.show({
+        intent: "danger",
+        icon: "error",
+        message: `Config response: ${err.message}: ${err.response?.data?.error} (Params: ${JSON.stringify(config, null, 2)})`,
+        timeout: 0,
+    });
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Fetch workflows and metadata including GitHub URLs
+  const loadWorkflows = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetchWorkflows(); // Fetch workflows (list of names)
+      const workflows = response?.workflows || []; // Extract workflows array
+
+      // Fetch metadata and GitHub URLs for each workflow
+      const metadataPromises = workflows.map((workflow) =>
+        fetchWorkflowMetadata(workflow) // Fetch metadata for each workflow
+      );
+      const githubPromises = workflows.map((workflow) =>
+        fetchWorkflowGithub(workflow) // Fetch GitHub URL for each workflow
+      );
+
+      const metadata = await Promise.all(metadataPromises); // Wait for all metadata to be fetched
+      const githubUrls = await Promise.all(githubPromises); // Wait for all GitHub URLs
+
+      // Prepare the metadata and GitHub URLs in the format that matches the workflow names
+      const workflowsWithMetadata = workflows.map((workflow, index) => ({
+        name: workflow,
+        description: metadata[index]?.description || 'No description available', // Fallback to default
+        metadata: metadata[index], // Store the full metadata for further use (e.g., for clicking)
+        githubUrl: githubUrls[index]?.url, // Add GitHub URL to workflow data
+      }));
+
+      setState((prevState) => ({
+        ...prevState,
+        workflows: workflowsWithMetadata,
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  
+  // Fetch workflow metadata
+  const loadWorkflowMetadata = async (workflow) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const metadata = await fetchWorkflowMetadata(workflow);
+      setState((prevState) => ({ ...prevState, workflowMetadata: metadata }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch biomero config
+  const loadBiomeroConfig = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetchConfig();
+      const config = response.config
+      setState((prevState) => ({ ...prevState, config }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch GitHub URL for a specific workflow
+  const loadWorkflowGithub = async (workflow) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const githubUrl = await fetchWorkflowGithub(workflow);
+      setState((prevState) => ({
+        ...prevState,
+        githubUrls: {
+          ...prevState.githubUrls,
+          [workflow]: githubUrl.url, // Store the GitHub URL by workflow name
+        },
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch OMERO tree data
+  const loadOmeroTreeData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const omeroTreeData = await fetchomeroTreeData();
+      updateState({ omeroTreeData: transformStructure(omeroTreeData) });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch folder data
+  const loadFolderData = async (item = null) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetchFolderData(item);
+      const contents = response.contents || [];
+      const formattedData = contents.reduce((acc, content) => {
+        const nodeId = content.id;
+        acc[nodeId] = {
+          index: nodeId,
+          isFolder: content.is_folder,
+          children: [],
+          data: content.name,
+          childCount: 0,
+        };
+        return acc;
+      }, {});
+      const parentId = item || "root";
+      formattedData[parentId] = {
+        index: parentId,
+        isFolder: true,
+        children: contents.map((content) => content.id),
+        data: parentId === "root" ? "Root" : "Folder",
+        childCount: contents.length,
+      };
+
+      setState((prevState) => ({
+        ...prevState,
+        folderData: {
+          ...prevState.folderData,
+          ...formattedData,
+        },
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch groups
+  const loadGroups = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const groupsHtml = await fetchGroups();
+      const groups = extractGroups(groupsHtml);
+      setState((prevState) => ({
+        ...prevState,
+        user: { ...prevState.user, groups },
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch scripts and update context state
+  const loadScripts = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const scripts = await fetchScripts();
+      setState((prevState) => ({
+        ...prevState,
+        scripts,
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch details for a specific script and update context state
+  const fetchScriptDetails = async (scriptId, directory) => {
+    setLoading(true);
+    try {
+      const data = await fetchScriptData(scriptId, directory);
+      const fetchedScript = { id: scriptId, ...data.script_menu[0] };
+  
+      // Helper function to recursively update the nested structure
+      const updateNestedScripts = (nodes) =>
+        nodes.map((node) => {
+          if (node.id === scriptId) {
+            // Update the matching script
+            return { ...node, ...fetchedScript };
+          } else if (node.ul) {
+            // Recursively update child nodes if `ul` exists
+            return { ...node, ul: updateNestedScripts(node.ul) };
+          }
+          return node; // No change for non-matching nodes
+        });
+  
+      // Update the state with the updated nested scripts
+      setState((prevState) => ({
+        ...prevState,
+        scripts: updateNestedScripts(prevState.scripts),
+      }));
+    } catch (err) {
+      setError("Error fetching script data.");
+      console.error("Failed to fetch script data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openScriptWindow = (scriptUrl) => {
+    const SCRIPT_WINDOW_WIDTH = 800;
+    const SCRIPT_WINDOW_HEIGHT = 600;
+
+    const event = { target: { href: scriptUrl } };
+    OME.openScriptWindow(event, SCRIPT_WINDOW_WIDTH, SCRIPT_WINDOW_HEIGHT);
+  };
+
+  const openUploadScriptWindow  = (scriptUrl) => {
+    const SCRIPT_WINDOW_WIDTH = 800;
+    const SCRIPT_WINDOW_HEIGHT = 600;
+
+    const event = { target: { href: scriptUrl } };
+    OME.openPopup(WEBCLIENT.URLS.script_upload);
+  };
+
+  
+  
+
+  // Function to update the state
+  const updateState = (newState) => {
+    setState((prevState) => ({ ...prevState, ...newState }));
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        state,
+        updateState,
+        loadOmeroTreeData,
+        loadFolderData,
+        loadGroups,
+        loadScripts,
+        fetchScriptDetails,
+        openScriptWindow,
+        openUploadScriptWindow,
+        loadWorkflows,
+        loadWorkflowMetadata,
+        loadBiomeroConfig,
+        runWorkflowData,
+        saveConfigData,
+        loadThumbnails,
+        loadImagesForDataset,
+        apiLoading,
+        apiError,
+        toaster
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+// Custom hook to use the AppContext
+export const useAppContext = () => {
+  return useContext(AppContext);
+};
