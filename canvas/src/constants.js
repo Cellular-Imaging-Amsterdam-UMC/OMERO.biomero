@@ -41,6 +41,7 @@ export const getDjangoConstants = () => {
     workflows: "/omero_boost/api/biomero/workflows/",
     config: "/omero_boost/api/biomero/admin/config/",
     api_save_config: "/omero_boost/api/biomero/admin/config/save/",
+    api_import_selected: "/omero_boost/api/import_selected/",
     api_run_workflow: "/omero_boost/api/biomero/workflows/run/",
     api_thumbnails: "/webclient/get_thumbnails/"
   };

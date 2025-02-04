@@ -215,6 +215,29 @@ export const postConfig = async (config) => {
   }
 };
 
+export const postUpload = async (upload) => {
+  const { urls } = getDjangoConstants();  // Base URL for the API from Django constants
+
+  try {
+    // Use the global csrftoken directly from window object
+    const csrfToken = window.csrftoken; 
+
+    // Prepare the payload with script_name and optional params
+    const payload = { upload };
+
+    const response = await apiRequest(urls.api_import_selected, "POST", payload, {
+      headers: {
+        'X-CSRFToken': csrfToken,  // Include CSRF token in request headers
+      },
+    });
+
+    return response;  // Return the API response
+  } catch (error) {
+    console.error("Error saving config:", error);
+    throw error;
+  }
+};
+
 
 
 

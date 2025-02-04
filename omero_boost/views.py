@@ -558,10 +558,10 @@ def file_info(request, conn=None, **kwargs):
 @require_http_methods(["POST"])
 def import_selected(request, conn=None, **kwargs):
     try:
-        import json
-
         data = json.loads(request.body)
-        selected_items = data.get("selected", [])
+        upload = data.get("upload", {})
+        selected_items = upload.get("selectedLocal", [])
+        selected_destinations = upload.get("selectedOmero", [])
 
         if not selected_items:
             return JsonResponse({"error": "No items selected"}, status=400)

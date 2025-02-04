@@ -11,6 +11,7 @@ import {
   fetchWorkflowGithub,
   runWorkflow,
   postConfig,
+  postUpload,
   fetchThumbnails,
   fetchImages 
 } from "./apiService";
@@ -181,6 +182,39 @@ export const AppProvider = ({ children }) => {
         intent: "danger",
         icon: "error",
         message: `Config response: ${err.message}: ${err.response?.data?.error} (Params: ${JSON.stringify(config, null, 2)})`,
+        timeout: 0,
+    });
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  const uploadSelectedData = async (upload) => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Call the generic postConfig function
+      const response = await postUpload(upload); 
+      
+      console.log(`Upload selected response for ${upload}:`, response);
+      
+      const message = response?.message || "Files upload started successfully. Follow the progress on the Monitor tab!";
+
+      // Show formatted response in the toast
+      toaster.show({
+          intent: "success",
+          icon: "tick-circle",
+          message: `${message}`,
+          timeout: 0,
+      });
+    } catch (err) {
+      // Show formatted response in the toast
+      toaster.show({
+        intent: "danger",
+        icon: "error",
+        message: `Upload response: ${err.message}: ${err.response?.data?.error} (Params: ${JSON.stringify(upload, null, 2)})`,
         timeout: 0,
     });
       setError(err.message);
@@ -441,6 +475,7 @@ export const AppProvider = ({ children }) => {
         loadBiomeroConfig,
         runWorkflowData,
         saveConfigData,
+        uploadSelectedData,
         loadThumbnails,
         loadImagesForDataset,
         apiLoading,

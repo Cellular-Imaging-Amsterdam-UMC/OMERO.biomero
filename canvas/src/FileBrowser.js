@@ -3,7 +3,9 @@ import { useAppContext } from "./AppContext";
 import FileTree from "./FileTree";
 import { fetchFolderData } from "./apiService";
 
-const FileBrowser = () => {
+const FileBrowser = ({
+  onSelectCallback
+}) => {
   const { state, updateState } = useAppContext();
 
   const handleFolderDataFetch = async (node) => {
@@ -47,6 +49,7 @@ const FileBrowser = () => {
       onExpandCallback={(node, newData) => {
         console.log("Folder expanded:", node, newData);
       }}
+      onSelectCallback={(selected) => {onSelectCallback(selected)}}
     />
   );
 };
