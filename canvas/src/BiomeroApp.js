@@ -142,7 +142,7 @@ const BiomeroApp = () => {
   return (
     <div className="bg-[#f0f1f5] w-full h-full relative top-0 overflow-hidden">
       {/* Navbar */}
-      <Navbar className="z-0">
+      <Navbar className="z-[1]" >
         <NavbarGroup>
           <Icon icon="style" className="mr-[7px]"/>
           <NavbarHeading>CANVAS</NavbarHeading>

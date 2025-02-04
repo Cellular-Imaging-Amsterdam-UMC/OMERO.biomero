@@ -328,7 +328,7 @@ const WorkflowInput = () => {
               </FormGroup>
               </div>
             <div 
-              className={`basis-4/5 grid grid-cols-${zoom} gap-2 overflow-y-auto pt-1 pl-1 pr-1`}
+              className={`basis-4/5 grid grid-cols-${zoom} gap-2 overflow-y-auto p-1`}
               > {/* Dynamic grid-cols */}
               {filteredImages.length > 0 ? (
                 filteredImages.map((image) => (
