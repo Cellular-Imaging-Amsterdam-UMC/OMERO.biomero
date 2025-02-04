@@ -16,7 +16,7 @@ from django.conf import settings
 from omeroweb.webclient.decorators import login_required, render_response
 from omero.gateway import BlitzGateway
 from omero.rtypes import unwrap, rbool, wrap, rlong
-from .utils import get_biomero_build_file, get_react_build_file
+from .utils import get_react_build_file
 from biomero import SlurmClient
 import configparser
 from configupdater import ConfigUpdater, Comment
