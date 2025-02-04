@@ -109,7 +109,7 @@ const UploaderApp = () => {
                 </div>
                 <div className="w-1/3 p-4 overflow-auto">
                   <h1 className="text-base font-bold p-4 pb-0 ">OMERO Data</h1>
-                  {state.omeroTreeData && <OmeroDataBrowser />}
+                  {state.omeroTreeData && <OmeroDataBrowser onSelectCallback={(folders) => console.log(folders)}  />}
                 </div>
                 <div className="w-1/3 p-4 overflow-auto"></div>
               </div>
