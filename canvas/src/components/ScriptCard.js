@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "../AppContext";
-import { Card, Elevation, H6, Button } from "@blueprintjs/core"; // Importing Card for the container
+import { Card, Elevation, H6, Button } from "@blueprintjs/core";
 
 const ScriptCard = ({ script }) => {
   const { openScriptWindow, fetchScriptDetails, state, apiLoading, apiError } = useAppContext();
@@ -9,7 +9,7 @@ const ScriptCard = ({ script }) => {
   useEffect(() => {
     if (!isCardLoaded && !state.scripts.find((s) => s.id === script.id)) {
       fetchScriptDetails(script.id, script.name);
-      setIsCardLoaded(true); // Mark the card as loaded
+      setIsCardLoaded(true);
     }
   }, [isCardLoaded, script.id, script.name, fetchScriptDetails, state.scripts]);
 

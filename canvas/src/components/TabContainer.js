@@ -4,22 +4,20 @@ import ScriptCardGroup from "./ScriptCardGroup";
 import SearchBar from "./SearchBar";
 import UploadButton from "./UploadButton";
 import { getDjangoConstants } from "../constants";
-import { Tabs, Tab, Tag, H4, Icon } from "@blueprintjs/core";
+import { Tabs, Tab, Icon } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 
 const TabContainer = () => {
   const { user } = getDjangoConstants();
   const { state } = useAppContext();
-  const [searchQuery, setSearchQuery] = useState(""); // Search query state
-  const [filteredData, setFilteredData] = useState(state.scripts); // Filtered menu data
-  const [hasWritePrivileges, setHasWritePrivileges] = useState(false); // State for privileges
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredData, setFilteredData] = useState(state.scripts);
+  const [hasWritePrivileges, setHasWritePrivileges] = useState(false);
 
-  // Set user privileges on mount
   useEffect(() => {
     setHasWritePrivileges(user.isAdmin);
   }, [user.isAdmin]);
 
-  // Filter data based on search query and admin privileges
   useEffect(() => {
     const filteredByAdmin = state.scripts.map((folder) => ({
       ...folder,
@@ -47,16 +45,6 @@ const TabContainer = () => {
     setFilteredData(filtered);
   }, [searchQuery, state.scripts, user.isAdmin]);
 
-  const getIcon = (folderName) => {
-    if (folderName.toLowerCase().includes("biomero")) {
-      return <Icon icon="predictive-analysis" />;
-    }
-    if (folderName.toLowerCase().includes("omero")) {
-      return <Icon icon="wrench" />;
-    }
-    return <Icon icon="document" />; // Default fallback
-  };
-
   const renderScripts = (folder) => (
     <div className="folders-list" >
       {folder.ul?.map((group) => (
@@ -80,7 +68,6 @@ const TabContainer = () => {
           <Tab
             key={folder.name}
             id={folder.name}
-            // icon={<Icon icon={getIcon(folder.name)} />}
             title={folder.name}
             tagContent={folder.ul?.reduce((sum, group) => sum + (group.ul?.length || 0), 0)}
             tagProps={{ round: true }}

@@ -6,10 +6,8 @@ import {
   Button,
   Switch,
   H3,
-  H4,
   H5,
   H6,
-  Collapse,
   ButtonGroup,
   Tooltip,
   Spinner
@@ -21,7 +19,7 @@ import { FaDocker } from "react-icons/fa6";
 
 const SettingsForm = () => {
   const { state, updateState, loadBiomeroConfig, saveConfigData } = useAppContext();
-  const [settingsForm, setSettingsForm] = useState(null); // Form state
+  const [settingsForm, setSettingsForm] = useState(null);
   const [initialFormData, setInitialFormData] = useState(null); // Stable reference to initial data
   const [editMode, setEditMode] = useState({});
 
@@ -71,10 +69,8 @@ const SettingsForm = () => {
     }
   };
 
-  // Extract extraParams for each model
   const extractExtraParams = (prefix) => {
     const extraParams = {};
-    // Find any extra parameters for this model
     Object.entries(state.config.MODELS).forEach(([key, value]) => {
       if (key.startsWith(`${prefix}_job_`)) {
         const paramKey = key;
@@ -86,7 +82,7 @@ const SettingsForm = () => {
 
   useEffect(() => {
     loadBiomeroConfig();     
-  }, []); // Empty dependency array ensures it's called only once
+  }, []); // called only once
 
   useEffect(() => {
     fetchInitialFormState();
@@ -152,13 +148,11 @@ const SettingsForm = () => {
     });
   };
 
-  // Reset a specific model card
   const resetModel = (index) => {
     if (!initialFormData) return;
   
     setSettingsForm((prev) => {
       const updatedModels = [...prev.MODELS];
-      // Check if the model exists in initialFormData, if not, reset it to default
       if (initialFormData.MODELS[index]) {
         updatedModels[index] = initialFormData.MODELS[index]; // Restore model from initial data
       } else {
@@ -169,16 +163,14 @@ const SettingsForm = () => {
     });
   };
 
-
-  // Refetch initial form state to reset the entire form
   const resetForm = () => {
-    fetchInitialFormState(); // Re-fetch the initial data when resetting the form
+    fetchInitialFormState();
     setShowSaveTooltip(true);
   };
 
   const handleInputChange = (field, value) => {
     const updatedSettings = structuredClone(settingsForm); // Deep clone the settings form
-    const keys = field.split('.'); // Split the field by '.'
+    const keys = field.split('.');
   
     // Traverse the cloned object to update the nested value
     let current = updatedSettings;
@@ -192,7 +184,7 @@ const SettingsForm = () => {
     });
   
     setSettingsForm(updatedSettings);
-    updateState({ settingsForm: updatedSettings }); // Update the global state
+    updateState({ settingsForm: updatedSettings });
   };
 
   const submitConfig = async () => {
@@ -209,22 +201,20 @@ const SettingsForm = () => {
   };
 
   const transformSettingsFormToPayload = (settingsForm) => {
-    // Convert models dynamically
     const models = settingsForm.MODELS.reduce((acc, model) => {
-      acc[model.name] = model.name; // Add model name
-      acc[`${model.name}_repo`] = model.repo; // Add model repo
-      acc[`${model.name}_job`] = model.job; // Add model job
+      acc[model.name] = model.name;
+      acc[`${model.name}_repo`] = model.repo;
+      acc[`${model.name}_job`] = model.job;
       if (model.extraParams) {
         Object.entries(model.extraParams).forEach(([key, value]) => {
-          acc[key] = value; // Add extra parameters
+          acc[key] = value;
         });
       }
       return acc;
     }, {});
 
-    // Convert converters dynamically
     const converters = settingsForm.CONVERTERS.reduce((acc, converter) => {
-      acc[converter.key] = converter.value; // Map converter name to version
+      acc[converter.key] = converter.value;
       return acc;
     }, {});
 
@@ -234,8 +224,6 @@ const SettingsForm = () => {
       MODELS: models,
     };
   };
-  
-  
 
   const renderEditableField = (label, field, value, placeholder, explanation) => (
     <FormGroup label={label} helperText={explanation}>
@@ -254,13 +242,12 @@ const SettingsForm = () => {
             text={editMode[field] ? "lock" : "edit"}
             onClick={() => toggleEdit(field)}
           />}
-        //   disabled={!editMode[field]}
         />        
       </div>
     </FormGroup>
   );
 
-  if (!settingsForm) return <div>Loading...</div>; // Handle loading state
+  if (!settingsForm) return <div>Loading...</div>;
 
   return (
     <Card>
@@ -586,17 +573,14 @@ const SettingsForm = () => {
             }
           
             if (value === null || value === "") {
-              // Handle deletion: remove the key if the value is null or empty
               delete updatedModels[index].extraParams[key];
             } else {
-              // Format the key and add/update the parameter
               const modelName = updatedModels[index].name?.toLowerCase().replace(/\s+/g, "_") || `model_${index + 1}`;
               const formattedKey = key.startsWith(`${modelName}_job_`) ? key : `${modelName}_job_${key}`;
           
               updatedModels[index].extraParams[formattedKey] = value;
             }
           
-            // Update the state with modified models
             setSettingsForm((prev) => ({ ...prev, MODELS: updatedModels }));
           }}
           

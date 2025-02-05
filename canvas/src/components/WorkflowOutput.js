@@ -1,21 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { InputGroup, FormGroup, Switch, Button, Popover, PopoverInteractionKind, Tooltip, TagInput } from "@blueprintjs/core";
-import OmeroDataBrowser from "../OmeroDataBrowser";
+import { InputGroup, FormGroup, Switch } from "@blueprintjs/core";
 import { useAppContext } from "../AppContext";
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover.js";
 
 const WorkflowOutput = () => {
-  const { state, updateState } = useAppContext();  // Directly use the context's state and updateState
-  const [renamePattern, setRenamePattern] = useState(''); // State for the rename pattern
-
-  // Default values for the form fields
+  const { state, updateState } = useAppContext();
+  const [renamePattern, setRenamePattern] = useState('');
   const defaultValues = {
     receiveEmail: true,
     importAsZip: true,
     uploadCsv: true,
     attachToOriginalImages: false,
     selectedDatasets: [],
-    renamePattern: '', // Default empty renaming pattern
+    renamePattern: '',
   };
 
   useEffect(() => {
@@ -32,10 +29,9 @@ const WorkflowOutput = () => {
     });
   };
 
-  // Handle renaming pattern change
   const handleRenamePatternChange = (e) => {
     setRenamePattern(e.target.value);
-    handleInputChange("renamePattern", e.target.value); // Store the rename pattern
+    handleInputChange("renamePattern", e.target.value);
   };
 
   return (
@@ -50,7 +46,7 @@ const WorkflowOutput = () => {
       >
         <Switch
           id="email-notification"
-          checked={state.formData.receiveEmail ?? defaultValues.receiveEmail} // Default to true if not set
+          checked={state.formData.receiveEmail ?? defaultValues.receiveEmail}
           onChange={(e) => handleInputChange("receiveEmail", e.target.checked)}
         />
       </FormGroup>
@@ -69,7 +65,7 @@ const WorkflowOutput = () => {
         >
           <Switch
             id="upload-zip-options"
-            checked={state.formData.importAsZip ?? defaultValues.importAsZip} // Default to true if not set
+            checked={state.formData.importAsZip ?? defaultValues.importAsZip}
             onChange={(e) => handleInputChange("importAsZip", e.target.checked)}
           />
         </FormGroup>
@@ -82,7 +78,7 @@ const WorkflowOutput = () => {
         >
           <Switch
             id="upload-csv-options"
-            checked={state.formData.uploadCsv ?? defaultValues.uploadCsv} // Default to true if not set
+            checked={state.formData.uploadCsv ?? defaultValues.uploadCsv}
             onChange={(e) => handleInputChange("uploadCsv", e.target.checked)}
           />
         </FormGroup>
@@ -95,7 +91,7 @@ const WorkflowOutput = () => {
         >
           <Switch
             id="upload-images-options"
-            checked={state.formData.attachToOriginalImages ?? defaultValues.attachToOriginalImages} // Default to false if not set
+            checked={state.formData.attachToOriginalImages ?? defaultValues.attachToOriginalImages}
             onChange={(e) => handleInputChange("attachToOriginalImages", e.target.checked)}
           />
         </FormGroup>

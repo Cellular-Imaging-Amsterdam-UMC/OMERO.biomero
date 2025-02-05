@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button, Popover, PopoverInteractionKind, Tooltip, TagInput, FormGroup } from "@blueprintjs/core";
-import OmeroDataBrowser from "../OmeroDataBrowser"; 
+import OmeroDataBrowser from "./OmeroDataBrowser"; 
 
 const DatasetSelectWithPopover = ({ 
   value, 

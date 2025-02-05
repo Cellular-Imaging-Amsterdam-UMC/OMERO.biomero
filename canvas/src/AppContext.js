@@ -130,14 +130,10 @@ export const AppProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      // Call the generic runWorkflow function
       const response = await runWorkflow(workflowName, params); 
-      
-      console.log(`Workflow run response for ${workflowName}:`, response);
       
       const message = response?.message || "Workflow executed successfully.";
 
-      // Show formatted response in the toast
       toaster.show({
           intent: "success",
           icon: "tick-circle",
@@ -145,7 +141,6 @@ export const AppProvider = ({ children }) => {
           timeout: 0,
       });
     } catch (err) {
-      // Show formatted response in the toast
       toaster.show({
         intent: "danger",
         icon: "error",
@@ -162,14 +157,10 @@ export const AppProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      // Call the generic postConfig function
       const response = await postConfig(config); 
-      
-      console.log(`Config save response for ${config}:`, response);
       
       const message = response?.message || "Config saved successfully.";
 
-      // Show formatted response in the toast
       toaster.show({
           intent: "success",
           icon: "tick-circle",
@@ -177,7 +168,6 @@ export const AppProvider = ({ children }) => {
           timeout: 0,
       });
     } catch (err) {
-      // Show formatted response in the toast
       toaster.show({
         intent: "danger",
         icon: "error",
@@ -195,14 +185,10 @@ export const AppProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      // Call the generic postConfig function
-      const response = await postUpload(upload); 
-      
-      console.log(`Upload selected response for ${upload}:`, response);
+      const response = await postUpload(upload);
       
       const message = response?.message || "Files upload started successfully. Follow the progress on the Monitor tab!";
 
-      // Show formatted response in the toast
       toaster.show({
           intent: "success",
           icon: "tick-circle",
@@ -210,7 +196,6 @@ export const AppProvider = ({ children }) => {
           timeout: 0,
       });
     } catch (err) {
-      // Show formatted response in the toast
       toaster.show({
         intent: "danger",
         icon: "error",
@@ -223,31 +208,30 @@ export const AppProvider = ({ children }) => {
     }
   };
   
-  // Fetch workflows and metadata including GitHub URLs
   const loadWorkflows = async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await fetchWorkflows(); // Fetch workflows (list of names)
-      const workflows = response?.workflows || []; // Extract workflows array
+      const workflows = response?.workflows || [];
 
       // Fetch metadata and GitHub URLs for each workflow
       const metadataPromises = workflows.map((workflow) =>
-        fetchWorkflowMetadata(workflow) // Fetch metadata for each workflow
+        fetchWorkflowMetadata(workflow)
       );
       const githubPromises = workflows.map((workflow) =>
-        fetchWorkflowGithub(workflow) // Fetch GitHub URL for each workflow
+        fetchWorkflowGithub(workflow)
       );
 
-      const metadata = await Promise.all(metadataPromises); // Wait for all metadata to be fetched
-      const githubUrls = await Promise.all(githubPromises); // Wait for all GitHub URLs
+      const metadata = await Promise.all(metadataPromises);
+      const githubUrls = await Promise.all(githubPromises);
 
       // Prepare the metadata and GitHub URLs in the format that matches the workflow names
       const workflowsWithMetadata = workflows.map((workflow, index) => ({
         name: workflow,
-        description: metadata[index]?.description || 'No description available', // Fallback to default
-        metadata: metadata[index], // Store the full metadata for further use (e.g., for clicking)
-        githubUrl: githubUrls[index]?.url, // Add GitHub URL to workflow data
+        description: metadata[index]?.description || 'No description available',
+        metadata: metadata[index],
+        githubUrl: githubUrls[index]?.url,
       }));
 
       setState((prevState) => ({
@@ -261,8 +245,6 @@ export const AppProvider = ({ children }) => {
     }
   };
   
-  
-  // Fetch workflow metadata
   const loadWorkflowMetadata = async (workflow) => {
     setLoading(true);
     setError(null);
@@ -276,7 +258,6 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Fetch biomero config
   const loadBiomeroConfig = async () => {
     setLoading(true);
     setError(null);
@@ -291,7 +272,6 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Fetch GitHub URL for a specific workflow
   const loadWorkflowGithub = async (workflow) => {
     setLoading(true);
     setError(null);
@@ -301,7 +281,7 @@ export const AppProvider = ({ children }) => {
         ...prevState,
         githubUrls: {
           ...prevState.githubUrls,
-          [workflow]: githubUrl.url, // Store the GitHub URL by workflow name
+          [workflow]: githubUrl.url,
         },
       }));
     } catch (err) {
@@ -311,7 +291,6 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Fetch OMERO tree data
   const loadOmeroTreeData = async () => {
     setLoading(true);
     setError(null);
@@ -325,7 +304,6 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Fetch folder data
   const loadFolderData = async (item = null) => {
     setLoading(true);
     setError(null);
@@ -366,7 +344,6 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Fetch groups
   const loadGroups = async () => {
     setLoading(true);
     setError(null);
@@ -384,7 +361,6 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Fetch scripts and update context state
   const loadScripts = async () => {
     setLoading(true);
     setError(null);
@@ -401,7 +377,6 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Fetch details for a specific script and update context state
   const fetchScriptDetails = async (scriptId, directory) => {
     setLoading(true);
     try {
@@ -450,10 +425,6 @@ export const AppProvider = ({ children }) => {
     OME.openPopup(WEBCLIENT.URLS.script_upload);
   };
 
-  
-  
-
-  // Function to update the state
   const updateState = (newState) => {
     setState((prevState) => ({ ...prevState, ...newState }));
   };

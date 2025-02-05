@@ -20,8 +20,8 @@ const WorkflowInput = () => {
   
     // Remove images of datasets not in inputDatasets
     const filteredImages = Object.entries(state.omeroTreeData)
-      .filter(([key]) => currentDatasetIds.includes(key)) // Keep only datasets still in inputDatasets
-      .flatMap(([_, datasetNode]) => datasetNode.children || []); // Flatten all images from valid datasets
+      .filter(([key]) => currentDatasetIds.includes(key))
+      .flatMap(([_, datasetNode]) => datasetNode.children || []);
   
     updateState({ images: filteredImages });
   
@@ -41,7 +41,7 @@ const WorkflowInput = () => {
       const imageIds = state.images.map((image) => image.id);
       loadThumbnails(imageIds);
       setSelectedImageIds(imageIds); // Default: all selected
-      setFilteredImages(state.images); // Initialize filtered images
+      setFilteredImages(state.images);
     }
   }, [state.images]);
 
@@ -76,12 +76,10 @@ const WorkflowInput = () => {
   const handleUncheckAll = () => setSelectedImageIds([]);
 
   const handleCheckAllFiltered = () => {
-    // Select all filtered images that are not disabled (isDisabled === false)
     const allEnabledIds = filteredImages
-      .filter((image) => !image.isDisabled)  // Filter out disabled images
-      .map((image) => image.id);            // Map to image IDs
+      .filter((image) => !image.isDisabled)
+      .map((image) => image.id);
     
-    // Add the filtered image IDs to the selected list
     setSelectedImageIds((prev) => [...new Set([...prev, ...allEnabledIds])]);
   };
   
@@ -91,9 +89,8 @@ const WorkflowInput = () => {
   };
   
   const handleUncheckAllFiltered = () => {
-    // Uncheck only the filtered images that are not disabled (isDisabled === false)
     const updatedSet = selectedImageIds.filter(
-      (id) => !filteredImages.some((image) => image.id === id && !image.isDisabled) // Only uncheck non-disabled filtered images
+      (id) => !filteredImages.some((image) => image.id === id && !image.isDisabled)
     );
     setSelectedImageIds(updatedSet);
   };
@@ -279,7 +276,7 @@ const WorkflowInput = () => {
                   <Switch
                     checked={selectedImageIds.includes(image.id)}
                     onChange={() => handleToggleImage(image.id)}
-                    disabled={image.isDisabled} // Disable the switch for non-matching images
+                    disabled={image.isDisabled}
                   >
                     {image.name}
                   </Switch>
@@ -336,11 +333,10 @@ const WorkflowInput = () => {
                     className: image.isDisabled ? 'cursor-not-allowed' : '',
                   }}>
                     <Card
-                      interactive={true} // Disable the switch for non-matching images
-                      elevation={image.isDisabled ? 1 : 3} // Set lowest elevation for disabled images and highest for non-disabled
-                      className={`p-1 flex flex-col items-center justify-between ${image.isDisabled ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}`} // Add blue border if selected
-                      // className="p-1 flex flex-col items-center justify-between"
-                      onClick={() => !image.isDisabled && handleToggleImage(image.id)} // Disable onClick for disabled images
+                      interactive={true}
+                      elevation={image.isDisabled ? 1 : 3}
+                      className={`p-1 flex flex-col items-center justify-between ${image.isDisabled ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}`}
+                      onClick={() => !image.isDisabled && handleToggleImage(image.id)}
                       selected={selectedImageIds.includes(image.id)}
                     >
                       {state.thumbnails?.[image.id] ? (

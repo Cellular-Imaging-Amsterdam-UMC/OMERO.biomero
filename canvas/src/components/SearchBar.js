@@ -1,5 +1,5 @@
 import React from "react";
-import { InputGroup } from "@blueprintjs/core"; // Import the InputGroup component
+import { InputGroup } from "@blueprintjs/core";
 
 const SearchBar = ({ searchQuery, setSearchQuery }) => {
   const handleSearch = (event) => {
@@ -9,10 +9,10 @@ const SearchBar = ({ searchQuery, setSearchQuery }) => {
 
   return (
     <InputGroup
-      large // Apply large size
+      large
       type="search"
       placeholder="Search scripts..."
-      value={searchQuery} // Controlled input to reflect current query
+      value={searchQuery}
       onChange={handleSearch}
       id="scripts-menu-searchBar"
     />

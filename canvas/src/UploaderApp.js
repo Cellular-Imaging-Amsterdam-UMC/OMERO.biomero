@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "./AppContext";
-import FileBrowser from "./FileBrowser";
-import OmeroDataBrowser from "./OmeroDataBrowser";
-import GroupSelect from "./GroupSelect";
+import FileBrowser from "./components/FileBrowser";
+import OmeroDataBrowser from "./components/OmeroDataBrowser";
+import GroupSelect from "./components/GroupSelect";
 import { Tabs, Tab, H4, Navbar, NavbarGroup, NavbarHeading, NavbarDivider, Icon, Button } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 
@@ -13,10 +13,10 @@ const MonitorPanel = ({ iframeUrl, metabaseError, setMetabaseError, isAdmin, met
       {!metabaseError ? (
         <iframe
           src={iframeUrl}
+          className="w-full h-[800px]"
           frameBorder="0"
           onError={() => setMetabaseError(true)}
-          style={{ width: "100%", height: "800px" }}
-        />
+        />      
       ) : (
         <div className="error">Error loading Metabase dashboard. Please try refreshing the page.</div>
       )}
@@ -49,7 +49,6 @@ const UploaderApp = () => {
     console.log("Uploading", uploadData);
     try {
       await uploadSelectedData(uploadData)
-      console.log("Uploaded data", uploadData);
     } finally {
       setUploading(false)
     }

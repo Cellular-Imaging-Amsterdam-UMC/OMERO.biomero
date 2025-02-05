@@ -1,9 +1,7 @@
 import React, { useState, useEffect  } from "react";
 import { useAppContext } from "../AppContext";
 import { Card, Elevation, InputGroup, Button, H5, H6, MultistepDialog, DialogBody, DialogStep, Spinner, SpinnerSize, ButtonGroup } from "@blueprintjs/core";
-import { MultiSelect } from "@blueprintjs/select";
 import { FaDocker } from "react-icons/fa6";
-import { IconContext } from "react-icons";
 import WorkflowForm from "./WorkflowForm";
 import WorkflowOutput from "./WorkflowOutput";
 import WorkflowInput from "./WorkflowInput";
@@ -40,21 +38,20 @@ const RunPanel = () => {
   };
 
   const handleFinalSubmit = (workflow) => {
-    console.log([workflow, state.formData])
-
     updateState(
       { workflowStatusTooltipShown: true }
     );
     if (toaster) {
       toaster.show({
         intent: "primary",
-        icon: "cloud-upload", 
+        icon: "cloud-upload",
         message: (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <Spinner size={16} intent="warning"/>
-          <span>Submitting workflow to the compute gods...</span>
-        </div>),
-      });
+          <div className="flex items-center gap-2">
+            <Spinner size={16} intent="warning" />
+            <span>Submitting workflow to the compute gods...</span>
+          </div>
+        ),
+      });      
     } else {
       console.warn("Toaster not initialized yet.");
     }

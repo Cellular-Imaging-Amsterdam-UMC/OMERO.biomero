@@ -9,14 +9,6 @@ import {
   Navbar,
   NavbarGroup,
   NavbarHeading,
-  Alignment,
-  Card,
-  Elevation,
-  Button,
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  Classes,
   Tooltip,
   NavbarDivider,
   Icon,
@@ -24,8 +16,7 @@ import {
 import "@blueprintjs/core/lib/css/blueprint.css";
 import SettingsForm from "./components/SettingsForm";
 
-// RunTab Component
-const RunTab = ({ state }) => (
+const RunTab = () => (
   <div className="h-full overflow-y-auto">
     <H4>Run image analysis workflows</H4>
     <div className="flex">
@@ -36,9 +27,8 @@ const RunTab = ({ state }) => (
   </div>
 );
 
-// ScriptsPanel Component
 const AdminPanel = () => {
-  const { state, updateState, loadScripts } = useAppContext();
+  const { state, loadScripts } = useAppContext();
   const [scriptsLoaded, setScriptsLoaded] = useState(false);
   useEffect(() => {
     if (!scriptsLoaded) {
@@ -66,7 +56,6 @@ const AdminPanel = () => {
   );
 };
 
-// StatusPanel Component
 const StatusPanel = ({ iframeUrl, metabaseError, setMetabaseError, isAdmin, metabaseUrl }) => (
   <div className="h-full overflow-y-auto"> 
     <H4>Status</H4>
@@ -74,9 +63,9 @@ const StatusPanel = ({ iframeUrl, metabaseError, setMetabaseError, isAdmin, meta
       {!metabaseError ? (
         <iframe
           src={iframeUrl}
+          className="w-full h-[800px]"
           frameBorder="0"
           onError={() => setMetabaseError(true)}
-          style={{ width: "100%", height: "800px" }}
         />
       ) : (
         <div className="error">Error loading Metabase dashboard. Please try refreshing the page.</div>
@@ -93,9 +82,9 @@ const StatusPanel = ({ iframeUrl, metabaseError, setMetabaseError, isAdmin, meta
 );
 
 const BiomeroApp = () => {
-  const { state, updateState, loadOmeroTreeData, loadFolderData, loadGroups, loadScripts, loadWorkflows } = useAppContext();
+  const { state, updateState, loadOmeroTreeData, loadFolderData, loadGroups, loadWorkflows } = useAppContext();
   const [metabaseError, setMetabaseError] = useState(false);
-  const [activeTab, setActiveTab] = useState("Run"); // Track active tab state
+  const [activeTab, setActiveTab] = useState("Run");
   const [loadedTabs, setLoadedTabs] = useState({
     Run: true, // Automatically load the first tab
     Admin: false,
@@ -104,29 +93,26 @@ const BiomeroApp = () => {
 
   // Loading states for each API call
   const [loadingOmero, setLoadingOmero] = useState(false);
-  const [loadingScripts, setLoadingScripts] = useState(false);
 
-  // Ensure that the Omero data is loaded only once when the app starts
   useEffect(() => {
     if (!loadingOmero) {
       setLoadingOmero(true);
       loadOmeroTreeData()
         .then(() => {
-          setLoadingOmero(false); // Set loading state to false after the API call finishes
+          setLoadingOmero(false);
         })
         .catch(() => {
-          setLoadingOmero(false); // Handle errors and stop loading
+          setLoadingOmero(false);
         });
     }
 
     loadFolderData();
     loadGroups();
-    loadWorkflows(); // Fetch workflows for the Scripts tab
+    loadWorkflows();
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array ensures it's called only once
+  }, []); // called only once
 
-  // Handle tab change with conditional loading
   const handleTabChange = (newTabId) => {
     if (!loadedTabs[newTabId]) {
       setLoadedTabs((prevState) => ({ ...prevState, [newTabId]: true }));
@@ -185,8 +171,8 @@ const BiomeroApp = () => {
                   setTimeout(() => {
                     updateState(
                       { workflowStatusTooltipShown: false }
-                    ); // close
-                  }, 5000);  // Adjust the delay as needed
+                    );
+                  }, 5000);
                 }}
               >
                 <span className="pointer-events-none select-none focus:outline-none">

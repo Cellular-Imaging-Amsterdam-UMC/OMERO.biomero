@@ -1,7 +1,6 @@
-import classNames from "classnames";
 import React, { useState } from "react";
-import { Card, CardList, Collapse, Section, SectionCard } from "@blueprintjs/core";
-import ScriptCard from "./ScriptCard"; // Keep using the ScriptCard component
+import { CardList, Section, SectionCard } from "@blueprintjs/core";
+import ScriptCard from "./ScriptCard";
 import "@blueprintjs/core/lib/css/blueprint.css";
 
 const ScriptCardGroup = ({ folder }) => {
