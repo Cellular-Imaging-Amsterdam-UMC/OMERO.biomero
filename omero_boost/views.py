@@ -203,7 +203,7 @@ def save_biomero_config(request, conn=None, **kwargs):
 
 @login_required()
 @require_http_methods(["POST"])
-def run_workflow_script(request, conn=None, **kwargs):
+def run_workflow_script(request, conn=None, script_name = "SLURM_Run_Workflow.py", **kwargs):
     """
     Trigger a specific OMERO script to run based on the provided script name and parameters.
     """
@@ -214,8 +214,6 @@ def run_workflow_script(request, conn=None, **kwargs):
         if not workflow_name:
             return JsonResponse({"error": "workflow_name is required"}, status=400)
         params = data.get("params", {})
-
-        script_name = "SLURM_Run_Workflow.py"
 
         # Connect to OMERO Script Service
         svc = conn.getScriptService()
@@ -670,6 +668,7 @@ def get_folder_contents(request, conn=None, **kwargs):
     if not os.path.exists(target_dir) or not os.path.isdir(target_dir):
         return HttpResponseBadRequest("Invalid folder ID or path does not exist.")
 
+    # TODO: if xlef etc file, then "get the contents of that folder"
     # Get the contents of the folder
     contents = []
     for item in os.listdir(target_dir):

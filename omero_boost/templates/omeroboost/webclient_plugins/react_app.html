@@ -94,31 +94,13 @@
   {% csrf_token %}
   <noscript>You need to enable JavaScript to run this app.</noscript>
   
-  <!-- Tab Navigation -->
-  {% comment %} <div class="tabs">
-    <button class="tab-button active" id="tab-omero">Run</button>
-    <button class="tab-button" id="tab-metabase">Monitor</button>
-  </div> {% endcomment %}
-  
   <!-- Tab Content -->
-  <div id="root" class="tab-content active"
+  <div id="root"
     data-app="{{ app_name }}"
     data-metabase-url="{{ metabase_site_url }}"
     data-metabase-token="{{ metabase_token }}"
     data-is-admin="{% if is_admin %}true{% else %}false{% endif %}">
-    <!-- Your OMERO app content goes here (already rendered by React) -->
+    <!-- Your OMERO app content goes here (rendered by React) -->
   </div>
 
-  <!-- Second Page Content (Metabase iframe) -->
-  {% comment %} <div id="metabase-tab" class="tab-content">
-    <div id="metabase-dashboard"></div>
-    <div class="bottom-message">
-      {% if is_admin %}
-        <a href="{{ metabase_site_url|add:'/' }}" target="_blank">Click here to access the Metabase interface</a>
-      {% endif %}
-    </div>
-  </div> {% endcomment %}
 {% endblock %} 
-{% comment %} {% block center_details %}
-  <div id="metabase-dashboard"></div>
-{% endblock %} {% endcomment %}
