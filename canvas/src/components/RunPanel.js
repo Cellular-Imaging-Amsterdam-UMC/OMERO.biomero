@@ -8,8 +8,9 @@ import WorkflowInput from "./WorkflowInput";
 
 const RunPanel = () => {
   const { state, updateState, toaster, runWorkflowData } = useAppContext();
-  const [searchTerm, setSearchTerm] = useState(""); // State for search input
-  const [dialogOpen, setDialogOpen] = useState(false); // State for dialog visibility
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isNextDisabled, setIsNextDisabled] = useState(true);
 
   // Utility to beautify names
   const beautifyName = (name) => {
@@ -168,8 +169,13 @@ const RunPanel = () => {
             title="Input Data"
             className="min-h-[75vh]"
             panel={
-              <WorkflowInput />
+              <WorkflowInput onSelectionChange={(selectedImages) => {
+                setIsNextDisabled(selectedImages.length === 0);
+              }} />
             }
+            nextButtonProps={{
+              disabled: isNextDisabled,
+            }}
           />
 
           <DialogStep

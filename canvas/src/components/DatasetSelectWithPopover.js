@@ -90,7 +90,7 @@ const DatasetSelectWithPopover = ({
               </div>
             }
           >
-            <Tooltip content={tooltip} placement="bottom">
+            <Tooltip content={tooltip} placement="bottom" defaultIsOpen={true} usePortal={false}>
               <Button icon="folder-open" text={buttonText} />
             </Tooltip>
           </Popover>

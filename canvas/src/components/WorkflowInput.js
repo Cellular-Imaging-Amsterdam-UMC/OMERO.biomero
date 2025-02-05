@@ -6,13 +6,17 @@ import {
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover";
 import { useAppContext } from "../AppContext";
 
-const WorkflowInput = () => {
+const WorkflowInput = ({ onSelectionChange }) => {
   const { state, updateState, loadThumbnails, loadImagesForDataset } = useAppContext();
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredImages, setFilteredImages] = useState([]);
   const [selectedImageIds, setSelectedImageIds] = useState([]);
   const [activeTab, setActiveTab] = useState("list"); // Tabs: "list" or "grid"
   const [zoom, setZoom] = useState(7); // Starting size 65px, like OMERO
+
+  useEffect(() => {
+    onSelectionChange(selectedImageIds);  
+  }, [selectedImageIds, onSelectionChange]);
 
   // Load images when datasets change
   useEffect(() => {
