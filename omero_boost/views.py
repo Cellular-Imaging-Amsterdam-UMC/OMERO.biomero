@@ -597,11 +597,14 @@ def import_selected(request, conn=None, **kwargs):
 
 @login_required()
 @render_response()
-def omero_boost_monitor_workflows(request, conn=None, **kwargs):
+def canvas(request, conn=None, **kwargs):
     metabase_site_url = os.environ.get("METABASE_SITE_URL")
     metabase_secret_key = os.environ.get("METABASE_SECRET_KEY")
-    metabase_dashboard_id = os.environ.get(
+    metabase_dashboard_id_monitor_workflows = os.environ.get(
         "METABASE_WORKFLOWS_DB_PAGE_DASHBOARD_ID"
+    )
+    metabase_dashboard_id_imports = os.environ.get(
+        "METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID"
     )
 
     current_user = conn.getUser()
@@ -609,16 +612,28 @@ def omero_boost_monitor_workflows(request, conn=None, **kwargs):
     user_id = current_user.getId()
     is_admin = conn.isAdmin()
 
-    payload = {
-        "resource": {"dashboard": int(metabase_dashboard_id)},
+    payload_monitor_workflows = {
+        "resource": {"dashboard": int(metabase_dashboard_id_monitor_workflows)},
         "params": {"user": [user_id]},
         "exp": round(time.time()) + (60 * 30),
     }
-    token = jwt.encode(payload, metabase_secret_key, algorithm="HS256")
+    token_monitor_workflows = jwt.encode(
+        payload_monitor_workflows, metabase_secret_key, algorithm="HS256"
+    )
+
+    payload_imports = {
+        "resource": {"dashboard": int(metabase_dashboard_id_imports)},
+        "params": {"user": [user_id]},
+        "exp": round(time.time()) + (60 * 30),
+    }
+    token_imports = jwt.encode(
+        payload_imports, metabase_secret_key, algorithm="HS256"
+    )
 
     context = {
         "metabase_site_url": metabase_site_url,
-        "metabase_token": token,
+        "metabase_token_monitor_workflows": token_monitor_workflows,
+        "metabase_token_imports": token_imports,
         "template": "omeroboost/webclient_plugins/react_app.html",
         "user_name": username,
         "user_id": user_id,

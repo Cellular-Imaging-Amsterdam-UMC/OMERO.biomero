@@ -33,16 +33,16 @@ urlpatterns = [
          views.save_biomero_config,
          name="save_biomero_config"),  # POST
     # Webclient URLs
-    path("upload/",
-         views.omero_boost_upload,
-         name="omero_boost_upload"),
+#     path("upload/",
+#          views.omero_boost_upload,
+#          name="omero_boost_upload"),
     path("local_file_browser/",
          views.get_folder_contents,
          name="local_file_browser",
          ),
-    path("monitor_workflows/",
-         views.omero_boost_monitor_workflows,
-         name="omero_boost_monitor_workflows",
+    path("canvas/",
+         views.canvas,
+         name="canvas",
          ),
     # Webclient templates and script menu
     re_path(r"^webclient_templates/(?P<base_template>[a-z0-9_]+)/",

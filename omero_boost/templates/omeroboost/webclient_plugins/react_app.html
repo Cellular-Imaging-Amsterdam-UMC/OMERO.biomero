@@ -10,6 +10,9 @@
     body {
         min-width: 1010px;
     }
+    html {
+        overflow: hidden;
+    }
     </style>
 {% endblock %}
 {% block script %}
@@ -96,9 +99,16 @@
   
   <!-- Tab Content -->
   <div id="root"
+    style="
+      height: calc(100vh - 35px);
+      top: 0px;
+      position: absolute;
+      width: 100vw;
+    "
     data-app="{{ app_name }}"
     data-metabase-url="{{ metabase_site_url }}"
-    data-metabase-token="{{ metabase_token }}"
+    data-metabase-token-monitor-workflows="{{ metabase_token_monitor_workflows }}"
+    data-metabase-token-imports="{{ metabase_token_imports }}"
     data-is-admin="{% if is_admin %}true{% else %}false{% endif %}">
     <!-- Your OMERO app content goes here (rendered by React) -->
   </div>
