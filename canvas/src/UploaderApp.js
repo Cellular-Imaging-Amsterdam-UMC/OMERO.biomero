@@ -11,6 +11,8 @@ import {
   CardList,
   Card,
   Callout,
+  Divider,
+  Icon,
 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 
@@ -183,76 +185,95 @@ const UploaderApp = () => {
             icon="upload"
             panel={
               loadedTabs.Upload ? (
-                <div className="flex space-x-4">
-                  <div className="w-2/5 overflow-auto">
-                    <div className="flex space-x-4 items-center">
-                      <h1 className="text-base font-bold p-0 m-0 inline-block">
-                        Select files to upload
-                      </h1>
-                      <Button
-                        onClick={addUploadItems}
-                        disabled={selectedLocal.length === 0}
-                        rightIcon="plus"
-                        intent="success"
-                        loading={uploading}
-                      >
-                        Add to upload list
-                      </Button>
+                <div className="h-full">
+                  <div className="flex space-x-4">
+                    <div className="w-1/3 overflow-auto">
+                      <div className="flex space-x-4 items-center">
+                        <h1 className="text-base font-bold p-0 m-0 inline-block">
+                          Select files to upload
+                        </h1>
+                        <Button
+                          onClick={addUploadItems}
+                          disabled={selectedLocal.length === 0}
+                          rightIcon="plus"
+                          intent="success"
+                          loading={uploading}
+                        >
+                          Add to upload list
+                        </Button>
+                      </div>
+                      {state.folderData && (
+                        <div className="mt-4">
+                          <FileBrowser
+                            onSelectCallback={handleLocalSelection}
+                          />
+                        </div>
+                      )}
                     </div>
-                    {state.folderData && (
-                      <div className="mt-4">
-                        <FileBrowser onSelectCallback={handleLocalSelection} />
+                    <div className="w-1/3 overflow-auto">
+                      <div className="flex space-x-4 items-center">
+                        <h1 className="text-base font-bold p-0 m-0 inline-block">
+                          Upload list
+                        </h1>
+                        <Button
+                          onClick={removeUploadItems}
+                          disabled={!areUploadItemsSelected}
+                          rightIcon="plus"
+                          intent="success"
+                          loading={uploading}
+                        >
+                          Remove from upload list
+                        </Button>
                       </div>
-                    )}
-                  </div>
-                  <div className="w-2/5 overflow-auto">
-                    <div className="flex space-x-4 items-center">
-                      <h1 className="text-base font-bold p-0 m-0 inline-block">
-                        Upload list
-                      </h1>
-                      <Button
-                        onClick={removeUploadItems}
-                        disabled={!areUploadItemsSelected}
-                        rightIcon="plus"
-                        intent="success"
-                        loading={uploading}
-                      >
-                        Remove from upload list
-                      </Button>
+                      {uploadList.length ? (
+                        <div className="mt-4">
+                          <CardList bordered={false}>{renderCards()}</CardList>
+                        </div>
+                      ) : (
+                        <div className="flex p-8">
+                          <Callout intent="primary">No files selected</Callout>
+                        </div>
+                      )}
                     </div>
-                    {uploadList.length ? (
-                      <div className="mt-4">
-                        <CardList bordered={false}>{renderCards()}</CardList>
-                      </div>
-                    ) : (
-                      <div className="flex p-8">
-                        <Callout intent="primary">No files selected</Callout>
-                      </div>
-                    )}
+                    <div className="w-1/3 overflow-auto">
+                      <h1 className="text-base font-bold p-0 m-0">
+                        Select destination in OMERO
+                      </h1>
+                      {state.omeroTreeData && (
+                        <div className="mt-4">
+                          <OmeroDataBrowser
+                            onSelectCallback={handleOmeroSelection}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="w-2/5 overflow-auto">
-                    <h1 className="text-base font-bold p-0 m-0">
-                      Select destination in OMERO
-                    </h1>
-                    {state.omeroTreeData && (
-                      <div className="mt-4">
-                        <OmeroDataBrowser
-                          onSelectCallback={handleOmeroSelection}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  <div className="w-1/5 flex items-center justify-center">
+                  <Divider className="my-10" />
+                  <div className="flex items-center place-content-between">
+                    <Card className="ml-12">
+                      <span className="text-base">{`${uploadList.length} file${
+                        uploadList.length > 1 || uploadList.length === 0
+                          ? "s"
+                          : ""
+                      } selected for upload`}</span>
+                    </Card>
+                    <Icon icon="circle-arrow-right" size={24} color="grey" />
+                    <Card>
+                      <span className="text-base">{`Upload destination: ${selectedOmero[0]}`}</span>
+                    </Card>
+                    <Icon icon="circle-arrow-right" size={24} color="grey" />
                     <Button
                       onClick={handleUpload}
                       disabled={
-                        selectedLocal.length === 0 && selectedOmero.length === 0
+                        selectedLocal.length === 0 || selectedOmero.length === 0
                       }
-                      rightIcon="upload"
+                      rightIcon="plus"
                       intent="success"
                       loading={uploading}
+                      large={true}
+                      className="mr-12"
                     >
-                      Upload
+                      Add to upload queue
                     </Button>
                   </div>
                 </div>
