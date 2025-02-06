@@ -13,9 +13,12 @@ import {
   Spinner
 } from "@blueprintjs/core";
 import { useAppContext } from "../AppContext";
-import ModelsSection from "./ModelsSection";
+import ModelsSection from "./ConfigSection";
 import CollapsibleSection from "./CollapsibleSection";
 import { FaDocker } from "react-icons/fa6";
+import ConfigSection from "./ConfigSection";
+import ModelCard from "./ModelCard.js";
+import ConverterCard from "./ConverterCard.js";
 
 const SettingsForm = () => {
   const { state, updateState, loadBiomeroConfig, saveConfigData } = useAppContext();
@@ -27,6 +30,9 @@ const SettingsForm = () => {
   const [showSaveTooltip, setShowSaveTooltip] = useState(true);
   const [showResetTooltip, setShowResetTooltip] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const [converters, setConverters] = useState([]);
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     if (JSON.stringify(settingsForm) !== JSON.stringify(initialFormData)) {
@@ -66,6 +72,8 @@ const SettingsForm = () => {
         MODELS: mappedModels,
         CONVERTERS: mappedConverters,
       });
+
+      setConverters(mappedConverters);
     }
   };
 
@@ -106,27 +114,81 @@ const SettingsForm = () => {
     }));
   };
 
+  // Regex for validation
+  const converterKeyRegex = /^[a-zA-Z0-9]+_to_[a-zA-Z0-9]+$/;
+  const dockerImageRegex = /^[a-zA-Z0-9-_]+\/[a-zA-Z0-9-_]+(:[a-zA-Z0-9-_.]+)?$/;
+  const validateField = (index, field, value) => {
+    let newErrors = { ...errors };
+  
+    if (field === "key") {
+      if (!converterKeyRegex.test(value)) {
+        newErrors[index] = { ...newErrors[index], key: "Invalid format: should be X_to_Y" };
+      } else {
+        delete newErrors[index]?.key;
+      }
+    }
+  
+    if (field === "value") {
+      if (!dockerImageRegex.test(value)) {
+        newErrors[index] = { ...newErrors[index], value: "Invalid Docker image format" };
+      } else {
+        delete newErrors[index]?.value;
+  
+        // Warn if missing a version
+        if (!value.includes(":")) {
+          newErrors[index] = { ...newErrors[index], valueWarning: "No version tag specified (defaulting to latest)" };
+        } else {
+          delete newErrors[index]?.valueWarning;
+        }
+      }
+    }
+  
+    setErrors(newErrors);
+  };
+
   const handleConverterChange = (index, field, value) => {
-    const updatedConverters = structuredClone(settingsForm.CONVERTERS);
-    updatedConverters[index][field] = value;
-    setSettingsForm((prev) => ({ ...prev, 
-      CONVERTERS: updatedConverters
-    }));
+    // const updatedConverters = structuredClone(settingsForm.CONVERTERS);
+    // updatedConverters[index][field] = value;
+    // setSettingsForm((prev) => ({ ...prev, 
+    //   CONVERTERS: updatedConverters
+    // }));
+    const newConverters = [...converters];
+    newConverters[index] = { ...newConverters[index], [field]: value };
+    setConverters(newConverters);
   };
 
   const handleAddConverter = () => {
-    setSettingsForm((prev) => ({
-        ...prev,
-        CONVERTERS: [...prev.CONVERTERS, { key: "", value: "" }],
-      }));
+    // setSettingsForm((prev) => ({
+    //     ...prev,
+    //     CONVERTERS: [...prev.CONVERTERS, { key: "", value: "" }],
+    //   }));
+    setConverters([...converters, { key: "", value: "" }]);
   };
 
   const handleRemoveConverter = (index) => {
-    setSettingsForm((prev) => {
-        const updatedConverters = prev.CONVERTERS.filter((_, i) => i !== index);
-        return { ...prev, CONVERTERS: updatedConverters };
-      });
+    setConverters(converters.filter((_, i) => i !== index));
+    setErrors((prevErrors) => {
+      const newErrors = { ...prevErrors };
+      delete newErrors[index];
+      return newErrors;
+    });
   };
+
+  const resetConverter = (index) => {
+    if (!initialFormData) return;
+  
+    setConverters((prev) => {
+      const updatedConverters = [...prev];
+      if (initialFormData.CONVERTERS[index]) {
+        updatedConverters[index] = initialFormData.CONVERTERS[index]; // Restore from initial data
+      } else {
+        updatedConverters[index] = { key: "", value: "" }; // Reset to default if it's a new converter
+      }
+  
+      return updatedConverters;
+    });
+  };
+  
 
   const openDockerHub = (image) => {
     const [repo, version] = image.split(":");
@@ -190,6 +252,13 @@ const SettingsForm = () => {
   const submitConfig = async () => {
     setLoading(true);
     try {
+      // Ensure no errors before saving converters too
+      if (Object.keys(errors).length === 0) {
+        setSettingsForm((prev) => ({
+          ...prev,
+          CONVERTERS: converters,
+        }));
+      }
       await saveConfigData(
         transformSettingsFormToPayload(settingsForm)
       );
@@ -225,8 +294,8 @@ const SettingsForm = () => {
     };
   };
 
-  const renderEditableField = (label, field, value, placeholder, explanation) => (
-    <FormGroup label={label} helperText={explanation}>
+  const renderEditableField = (label, field, value, placeholder, explanation, intent='') => (
+    <FormGroup label={label} helperText={explanation} intent={intent}>
       <div className="flex items-center space-x-2">
         <InputGroup
           value={value || ''}
@@ -361,7 +430,8 @@ const SettingsForm = () => {
         "SLURM.slurm_script_repo",
         settingsForm.SLURM.slurm_script_repo,
         "Enter repository URL",
-        "The Git repository to pull the Slurm scripts from. Leave empty (default) for generated scripts."
+        "The Git repository to pull the Slurm scripts from. Recommended to leave this empty (default) to work with generated job scripts.",
+        "danger"
       )}
       </CollapsibleSection>
       <CollapsibleSection title="Analytics Settings">
@@ -380,10 +450,10 @@ const SettingsForm = () => {
             on workflow execution, job statuses, and related analytics.
             This is the main switch to enable or disable workflow tracking as a whole.
             </div>
-            <div className="bp5-form-helper-text">
+            <div className="bp5-form-helper-text font-bold text-red-500">
             Note that this tracking data is a requirement for adding metadata in OMERO and viewing the dashboard in the Status tab (above).
             </div>
-            <div className="bp5-form-helper-text">
+            <div className="bp5-form-helper-text font-bold text-red-500">
             If disabled, none of the listeners below will be activated, regardless of their individual settings.
             </div>
         </div>
@@ -399,14 +469,15 @@ const SettingsForm = () => {
             <div className="bp5-form-helper-text">
             SQLAlchemy database connection URL for persisting workflow analytics data. This setting allows configuring 
             the database connection for storing the tracking and analytics 
-            data. If no value is set here, environment variables will be used as the default.
+            data. Environment variables will be used as the default, which is a bit safer.
             </div>
             <div className="bp5-form-helper-text">
             See <a href="https://docs.sqlalchemy.org/en/20/core/engines.html#database-urls" target="_blank" rel="noopener noreferrer">SQLAlchemy docs</a> for more info and examples of database URLs supported by sqlalchemy.
             E.g. postgresql+psycopg2://user:password@localhost:5432/db.
             </div>
-            <div className="bp5-form-helper-text">
-            Note: If SQLALCHEMY_URL is set as an environment variable, it will override this setting.
+            <div className="bp5-form-helper-text font-bold text-red-500">
+            Note: If SQLALCHEMY_URL is set as an environment variable on the BIOMERO server, it will override this setting.
+            That is the recommended approach, but you could also set it here.
             </div>
             <div className="bp5-form-helper-text">
             Note2: This has to be a postgresql database.
@@ -418,7 +489,8 @@ const SettingsForm = () => {
         "ANALYTICS.sqlalchemy_url",
         settingsForm.ANALYTICS.sqlalchemy_url,
         "postgresql+psycopg2://user:password@localhost:5432/db",
-        "Database connection string for SQLAlchemy."
+        "Database connection string for SQLAlchemy.",
+        "danger"
       )}
       <H6>Listener Settings</H6>
       <div className="bp5-form-group">
@@ -485,81 +557,29 @@ const SettingsForm = () => {
       />
       </CollapsibleSection>
       <CollapsibleSection title="Converters Settings">
-      <div className="bp5-form-group">
-        <div className="bp5-form-content">
-            <div className="bp5-form-helper-text">
-            Settings for linking to external data format converters for running on Slurm.
-            </div>
-            <div className="bp5-form-helper-text">
-            By default, BIOMERO exports images as ZARR to the HPC.
-            But, the workflow you want to execute might require 
-            a different filetype. E.g. most of our example workflows
-            require TIFF input files. This is the default for BIAFLOWS.
-            </div>
-            <div className="bp5-form-helper-text">
-            If you provide nothing, BIOMERO will build a converter on Slurm for you.
-            Instead, you can add converters here to pull
-            those instead. These should be available on DockerHub as a container image.
-            If you don't have singularity build rights on Slurm, you can also use this field instead to pull.
-            </div>
-            <div className="bp5-form-helper-text">
-            Please pin it to a specific version to reduce unforeseen errors.
-            Key should be the types "X_to_Y" and value should be the docker image, for example <code>zarr_to_tiff=cellularimagingcf/convert_zarr_to_tiff:1.14.0</code>
-            </div>
-        </div>
-      </div>
-      {settingsForm.CONVERTERS?.map((converter, index) => (
-        <div key={index} className="bp5-form-group">
-          <FormGroup
-            label={`Converter ${index + 1}`}
-            labelFor={`converter-key-${index}`}
-            labelInfo="(required)"
-          >
-            <div className="bp5-input-group-wrapper">
-              <InputGroup
-                id={`converter-key-${index}`}
-                placeholder="Enter key (e.g. zarr_to_tiff)"
-                value={converter.key}
-                onChange={(e) => handleConverterChange(index, "key", e.target.value)}
-              />
-              <InputGroup
-                id={`converter-value-${index}`}
-                placeholder="Enter Docker image (e.g. cellularimagingcf/convert_zarr_to_tiff:1.14.0)"
-                value={converter.value}
-                onChange={(e) => handleConverterChange(index, "value", e.target.value)}
-                rightElement={
-                    converter.value ? (
-                    <Button
-                        icon={<FaDocker />}
-                        intent="primary"
-                        onClick={() => openDockerHub(converter.value)}
-                        title="View Container Image"
-                    />): null
-                }
-              />
-            </div>
-            <Button
-                icon="delete"
-                minimal
-                intent="danger"
-                onClick={() => handleRemoveConverter(index)}
-                className="bp5-button-remove"
-            />
-          </FormGroup>
-        </div>
-      ))}
-      <Button
-        icon="add"
-        text="Add Converter"
-        onClick={handleAddConverter}
-        intent="none"
-      />
+        <ConfigSection
+          items={converters}
+          onItemChange={handleConverterChange}
+          onAddItem={handleAddConverter}
+          onDeleteItem={handleRemoveConverter}
+          onResetItem={resetConverter}
+          CardComponent={ConverterCard}
+          title="Converter"
+          description={[
+            "Settings for linking to external data format converters for running on Slurm.",
+            "By default, BIOMERO exports images as ZARR to the HPC. But, the workflow you want to execute might require a different filetype. E.g. most of our example workflows require TIFF input files. This is the default for BIAFLOWS.",
+            "If you provide nothing, BIOMERO will build a converter on Slurm for you. Instead, you can add converters here to pull those instead. These should be available on DockerHub as a container image. If you don't have singularity build rights on Slurm, you can also use this field instead to pull.",
+            "Please pin it to a specific version to reduce unforeseen errors. Key should be the types 'X_to_Y' and value should be the docker image, for example `zarr_to_tiff=cellularimagingcf/convert_zarr_to_tiff:1.14.0`"
+          ]}
+          errors={errors} // Pass errors to ConfigSection
+          validateField={validateField} // Pass validation function to ConfigSection
+        />
       </CollapsibleSection>
       <CollapsibleSection title="Models Settings">
-      <ModelsSection
-        models={settingsForm.MODELS}
-        onModelChange={(index, field, value) => handleModelChange(index, field, value)}
-        onAddModel={addModel}
+      <ConfigSection
+        items={settingsForm.MODELS}
+        onItemChange={(index, field, value) => handleModelChange(index, field, value)}
+        onAddItem={addModel}
         onAddParam={(index, key, value) => {
             const updatedModels = structuredClone(settingsForm.MODELS);
           
@@ -582,11 +602,18 @@ const SettingsForm = () => {
             }
           
             setSettingsForm((prev) => ({ ...prev, MODELS: updatedModels }));
-          }}
-          
-                 
-        onDeleteModel={handleDeleteModel}
-        onResetModel={resetModel}
+          }}        
+        onDeleteItem={handleDeleteModel}
+        onResetItem={resetModel}
+        CardComponent={ModelCard}
+        title="Model"
+        description={[
+          "Settings for models/singularity images that we want to run on Slurm.",
+          "Model names have to be unique, and require a GitHub repository as well.",
+          "Versions for the GitHub repository are highly encouraged! Latest/master can change and cause issues with reproducability! BIOMERO picks up the container version based on the version of the repository. If you provide no version, BIOMERO will pick up the generic latest container.",
+        ]}
+        errors={null}  // No error handling for models yet
+        validateField={null} // No validation for models yet
       />
      </CollapsibleSection>
      <H5>Note on saving BIOMERO settings</H5>

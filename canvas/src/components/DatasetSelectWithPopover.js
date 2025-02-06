@@ -10,7 +10,8 @@ const DatasetSelectWithPopover = ({
   helperText = "", 
   subLabel = "",
   tooltip = "",
-  buttonText = "Add Dataset"
+  buttonText = "Add Dataset",
+  intent = "",
 }) => {
   
   const [isPopoverOpen, setPopoverOpen] = useState(false);
@@ -65,12 +66,14 @@ const DatasetSelectWithPopover = ({
       labelFor="upload-ex-dataset-options"
       helperText={helperText}
       subLabel={subLabel}
+      intent={intent}
     >
       <TagInput
         placeholder="Add new dataset name or select..."
         values={value || []} // Pass value as prop to handle the input state
         onChange={handleManualInputChange}
         onKeyDown={handleKeyDown}
+        intent={intent}
         rightElement={
           <Popover
             interactionKind={PopoverInteractionKind.CLICK}

@@ -11,6 +11,7 @@ const RunPanel = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isNextDisabled, setIsNextDisabled] = useState(true);
+  const [isRunDisabled, setIsRunDisabled] = useState(false);
 
   // Utility to beautify names
   const beautifyName = (name) => {
@@ -156,6 +157,7 @@ const RunPanel = () => {
           icon="cog"
           className="w-[calc(100vw-20vw)]"
           finalButtonProps={{
+            disabled: isRunDisabled,
             text: "Run",
             onClick: () => {
               // Handle the final submit action here
@@ -194,7 +196,9 @@ const RunPanel = () => {
             title="Output Data"
             panel={
               <DialogBody>
-                <WorkflowOutput/>
+                <WorkflowOutput onSelectionChange={(selectedOutput) => {
+                  setIsRunDisabled(!selectedOutput);}} 
+                  />
               </DialogBody>
             }
           />

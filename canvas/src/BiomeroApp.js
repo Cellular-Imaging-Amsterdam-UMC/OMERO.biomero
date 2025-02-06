@@ -35,7 +35,7 @@ const AdminPanel = () => {
       loadScripts();
       setScriptsLoaded(true); // Prevent reloading if already loaded
     }
-  }, [scriptsLoaded, loadScripts, setScriptsLoaded]);
+  }, []);
 
   return (
     <div className="h-full overflow-y-auto">
