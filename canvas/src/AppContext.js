@@ -437,14 +437,19 @@ export const AppProvider = ({ children }) => {
     const SCRIPT_WINDOW_HEIGHT = 600;
 
     const event = { target: { href: scriptUrl } };
+    // eslint-disable-next-line no-undef
     OME.openScriptWindow(event, SCRIPT_WINDOW_WIDTH, SCRIPT_WINDOW_HEIGHT);
   };
 
   const openUploadScriptWindow = (scriptUrl) => {
+    // eslint-disable-next-line no-unused-vars
     const SCRIPT_WINDOW_WIDTH = 800;
+    // eslint-disable-next-line no-unused-vars
     const SCRIPT_WINDOW_HEIGHT = 600;
 
+    // eslint-disable-next-line no-unused-vars
     const event = { target: { href: scriptUrl } };
+    // eslint-disable-next-line no-undef
     OME.openPopup(WEBCLIENT.URLS.script_upload);
   };
 
