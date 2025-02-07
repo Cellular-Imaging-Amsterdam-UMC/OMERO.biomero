@@ -53,11 +53,13 @@ const MonitorPanel = ({
 const UploaderApp = () => {
   const {
     state,
+    updateState,
     loadOmeroTreeData,
     loadFolderData,
     loadGroups,
     uploadSelectedData,
   } = useAppContext();
+
   const [activeTab, setActiveTab] = useState("Upload");
   const [metabaseError, setMetabaseError] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -65,24 +67,34 @@ const UploaderApp = () => {
     Upload: true,
     Monitor: false,
   });
-  const [selectedLocal, setSelectedLocal] = useState([]);
-  const [selectedOmero, setSelectedOmero] = useState([]);
   const [uploadList, setUploadList] = useState([]);
   const [areUploadItemsSelected, setAreUploadItemsSelected] = useState(false);
 
-  const handleLocalSelection = (items) => {
-    const selectedItems = items.map((item) => {
-      return { value: item, isSelected: false };
-    });
+  const handleFileTreeSelection = (nodeData, type) => {
+    const nodeId = nodeData.id;
+    const selectionKey =
+      type === "local" ? "localFileTreeSelection" : "omeroFileTreeSelection";
+    let updatedSelection;
 
-    setSelectedLocal(selectedItems);
+    if (state[selectionKey].includes(nodeId)) {
+      // Remove the node if it was already selected
+      updatedSelection = state[selectionKey].filter((id) => id !== nodeId);
+    } else {
+      // Add the node, with single selection for OMERO
+      if (type === "omero") {
+        updatedSelection = [nodeId];
+      } else {
+        updatedSelection = [...state[selectionKey], nodeId];
+      }
+    }
+    updateState({ [selectionKey]: updatedSelection });
   };
-  const handleOmeroSelection = (items) => setSelectedOmero(items);
 
   const handleUpload = async () => {
     setUploading(true);
+    const selectedLocal = state.localFileTreeSelection;
+    const selectedOmero = state.omeroFileTreeSelection;
     const uploadData = { selectedLocal, selectedOmero };
-    console.log("Uploading", uploadData);
     try {
       await uploadSelectedData(uploadData);
     } finally {
@@ -92,19 +104,23 @@ const UploaderApp = () => {
 
   // We need to make sure only unique items are added to the upload list
   const addUploadItems = () => {
-    const newUploadList = selectedLocal
+    const newUploadList = state.localFileTreeSelection
       .filter(
-        (item) =>
-          !uploadList.some((uploadItem) => uploadItem.value === item.value)
+        (item) => !uploadList.some((uploadItem) => uploadItem.value === item)
       )
-      .map((item) => ({ value: item.value, isSelected: false }));
+      .map((item) => ({ value: item, isSelected: false }));
     setUploadList([...uploadList, ...newUploadList]);
-    setSelectedLocal([]);
+    updateState({ localFileTreeSelection: [] });
   };
 
   const removeUploadItems = () => {
     const newUploadList = uploadList.filter((item) => !item.isSelected);
     setUploadList(newUploadList);
+    setAreUploadItemsSelected(false);
+  };
+
+  const removeAllUploadItems = () => {
+    setUploadList([]);
     setAreUploadItemsSelected(false);
   };
 
@@ -194,7 +210,7 @@ const UploaderApp = () => {
                         </h1>
                         <Button
                           onClick={addUploadItems}
-                          disabled={selectedLocal.length === 0}
+                          disabled={state.localFileTreeSelection.length === 0}
                           rightIcon="plus"
                           intent="success"
                           loading={uploading}
@@ -202,10 +218,12 @@ const UploaderApp = () => {
                           Add to upload list
                         </Button>
                       </div>
-                      {state.folderData && (
+                      {state.localFileTreeData && (
                         <div className="mt-4">
                           <FileBrowser
-                            onSelectCallback={handleLocalSelection}
+                            onSelectCallback={(nodeData) =>
+                              handleFileTreeSelection(nodeData, "local")
+                            }
                           />
                         </div>
                       )}
@@ -218,11 +236,20 @@ const UploaderApp = () => {
                         <Button
                           onClick={removeUploadItems}
                           disabled={!areUploadItemsSelected}
-                          rightIcon="plus"
+                          rightIcon="minus"
                           intent="success"
                           loading={uploading}
                         >
-                          Remove from upload list
+                          Remove selected
+                        </Button>
+                        <Button
+                          onClick={removeAllUploadItems}
+                          disabled={!uploadList.length}
+                          rightIcon="minus"
+                          intent="success"
+                          loading={uploading}
+                        >
+                          Remove all
                         </Button>
                       </div>
                       {uploadList.length ? (
@@ -239,10 +266,12 @@ const UploaderApp = () => {
                       <h1 className="text-base font-bold p-0 m-0">
                         Select destination in OMERO
                       </h1>
-                      {state.omeroTreeData && (
+                      {state.omeroFileTreeData && (
                         <div className="mt-4">
                           <OmeroDataBrowser
-                            onSelectCallback={handleOmeroSelection}
+                            onSelectCallback={(nodeData) =>
+                              handleFileTreeSelection(nodeData, "omero")
+                            }
                           />
                         </div>
                       )}
@@ -259,15 +288,16 @@ const UploaderApp = () => {
                     </Card>
                     <Icon icon="circle-arrow-right" size={24} color="grey" />
                     <Card>
-                      <span className="text-base">{`Upload destination: ${selectedOmero[0]}`}</span>
+                      <span className="text-base">{`Upload destination: ${state.omeroFileTreeSelection[0]}`}</span>
                     </Card>
                     <Icon icon="circle-arrow-right" size={24} color="grey" />
                     <Button
                       onClick={handleUpload}
                       disabled={
-                        selectedLocal.length === 0 || selectedOmero.length === 0
+                        !uploadList.length ||
+                        !state.omeroFileTreeSelection.length
                       }
-                      rightIcon="plus"
+                      rightIcon="cloud-upload"
                       intent="success"
                       loading={uploading}
                       large={true}

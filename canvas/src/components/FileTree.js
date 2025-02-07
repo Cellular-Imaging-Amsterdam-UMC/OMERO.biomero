@@ -8,9 +8,9 @@ const FileTree = ({
   dataStructure,
   onExpandCallback,
   onSelectCallback,
+  selectedItems,
 }) => {
   const [expandedItems, setExpandedItems] = useState(["root"]);
-  const [selectedItems, setSelectedItems] = useState([]);
 
   const handleNodeExpand = async (nodeData) => {
     const nodeId = nodeData.id;
@@ -29,26 +29,6 @@ const FileTree = ({
   const handleNodeCollapse = (nodeData) => {
     const nodeId = nodeData.id;
     setExpandedItems(expandedItems.filter((id) => id !== nodeId));
-  };
-
-  const handleNodeClick = (nodeData) => {
-    const nodeId = nodeData.id;
-    let updatedSelection;
-
-    if (selectedItems.includes(nodeId)) {
-      // Remove the node if it was already selected
-      updatedSelection = selectedItems.filter((id) => id !== nodeId);
-    } else {
-      // Add the node if it wasn't already selected
-      updatedSelection = [...selectedItems, nodeId];
-    }
-
-    setSelectedItems(updatedSelection);
-
-    // Ensure the callback reflects the new selection state
-    if (onSelectCallback) {
-      onSelectCallback(updatedSelection);
-    }
   };
 
   const buildTreeNodes = (itemIndex = initialDataKey) => {
@@ -96,7 +76,7 @@ const FileTree = ({
           contents={treeNodes}
           onNodeExpand={handleNodeExpand}
           onNodeCollapse={handleNodeCollapse}
-          onNodeClick={handleNodeClick}
+          onNodeClick={onSelectCallback}
         />
       ) : (
         <div>Loading...</div>

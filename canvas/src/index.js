@@ -44,7 +44,7 @@ function AppRouter() {
             <Button
               className="bp5-minimal focus:ring-0 focus:ring-offset-0"
               icon="data-sync"
-              text="Biomero"
+              text="Analyze"
               onClick={() => navigate("?tab=biomero")}
               outlined={appName === "biomero"}
             />

@@ -46,7 +46,7 @@ const GroupSelect = () => {
 
   const handleItemSelect = (item) => {
     // Change the active group and navigate
-    window.location.href = `/webclient/active_group/?active_group=${item.id}&url=/omero_boost/upload/`;
+    window.location.href = `/webclient/active_group/?active_group=${item.id}&url=/omero_boost/canvas/?tab=upload`;
     if (onSelect) {
       onSelect(item);
       setSelectedOption(item);
