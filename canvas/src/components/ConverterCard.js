@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, Button, FormGroup, InputGroup, ButtonGroup } from "@blueprintjs/core";
+import { Card, Button, FormGroup, InputGroup, ButtonGroup, Tooltip, H4 } from "@blueprintjs/core";
 import { FaDocker } from "react-icons/fa";
 
 const ConverterCard = ({
@@ -20,6 +20,41 @@ const ConverterCard = ({
   };
   return (
     <Card className="p-4 shadow-md">
+      <div className="flex justify-between items-center">
+        <H4 className={`text-lg font-bold ${item.key ? "" : "text-red-500"}`}>
+          {item.key || `Please fill in a valid name!`}
+        </H4>
+        {/* Action Buttons */}
+        <ButtonGroup>
+          <Tooltip
+            content={editable ? "Lock model" : "Click here to edit the converter!"}
+            isOpen={!editable}
+            position="top"
+          >
+            <Button
+              minimal
+              icon={editable ? "tick" : "edit"}
+              onClick={() => setEditable(index, !editable)}
+            />
+          </Tooltip>
+          <Tooltip content="Reset values">
+            <Button
+              minimal
+              icon="reset"
+              intent="warning"
+              onClick={() => onReset(index)}
+            />
+          </Tooltip>
+          <Tooltip content="Delete converter">
+            <Button
+              minimal
+              intent="danger"
+              icon="delete"
+              onClick={() => onDelete(index)}
+            />
+          </Tooltip>
+        </ButtonGroup>
+      </div>
       {/* Converter Name */}
       <FormGroup
         label="Converter Name"
@@ -68,23 +103,6 @@ const ConverterCard = ({
         {errors?.value && <div className="text-red-500 text-sm">{errors?.value}</div>}
         {errors?.valueWarning && <div className="text-yellow-500 text-sm">{errors?.valueWarning}</div>}
       </FormGroup>
-
-      {/* Action Buttons */}
-      <ButtonGroup>
-        <Button
-          icon="edit"
-          intent="primary"
-          onClick={() => setEditable(index, !editable)}
-        >
-          {editable ? "Save" : "Edit"}
-        </Button>
-        <Button icon="reset" intent="warning" onClick={() => onReset(index)}>
-          Reset
-        </Button>
-        <Button icon="trash" intent="danger" onClick={() => onDelete(index)}>
-          Delete
-        </Button>
-      </ButtonGroup>
     </Card>
   );
 };

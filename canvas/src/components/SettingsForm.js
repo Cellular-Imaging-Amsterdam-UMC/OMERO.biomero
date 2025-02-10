@@ -38,9 +38,13 @@ const SettingsForm = () => {
     if (JSON.stringify(settingsForm) !== JSON.stringify(initialFormData)) {
       setHasChanges(true);
     } else {
-      setHasChanges(false);
+      if (JSON.stringify(converters) !== JSON.stringify(initialFormData?.CONVERTERS)) {
+        setHasChanges(true);
+      } else {
+        setHasChanges(false);
+      }
     }
-  }, [settingsForm, initialFormData]);
+  }, [settingsForm, initialFormData, converters]);
 
 
   const fetchInitialFormState = async () => {

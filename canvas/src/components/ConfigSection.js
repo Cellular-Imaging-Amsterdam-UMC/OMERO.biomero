@@ -83,7 +83,7 @@ const ConfigSection = ({
         icon="add"
         intent="none"
         onClick={addItemHandler}
-        className="mt-4"
+        className="mt-4 mb-4"
       >
         Add {title}
       </Button>
