@@ -3,9 +3,7 @@ import { useAppContext } from "../AppContext";
 import FileTree from "./FileTree";
 import { fetchProjectData } from "../apiService";
 
-const OmeroDataBrowser = ({
-  onSelectCallback
-}) => {
+const OmeroDataBrowser = ({ onSelectCallback }) => {
   const { state, updateState } = useAppContext();
 
   const handleProjectDataFetch = async (node) => {
@@ -19,7 +17,7 @@ const OmeroDataBrowser = ({
     }));
 
     const updatedNode = {
-      ...state.omeroTreeData[node.index],
+      ...state.omeroFileTreeData[node.index],
       children: datasets.map((dataset) => dataset.index),
     };
 
@@ -29,8 +27,8 @@ const OmeroDataBrowser = ({
     }, {});
 
     updateState({
-      omeroTreeData: {
-        ...state.omeroTreeData,
+      omeroFileTreeData: {
+        ...state.omeroFileTreeData,
         ...newNodes,
         [node.index]: updatedNode,
       },
@@ -42,11 +40,12 @@ const OmeroDataBrowser = ({
     <FileTree
       fetchData={handleProjectDataFetch}
       initialDataKey="root"
-      dataStructure={state.omeroTreeData}
+      dataStructure={state.omeroFileTreeData}
       onExpandCallback={(node, newData) => {
         console.log("Project expanded:", node, newData);
       }}
-      onSelectCallback={(selected) => {onSelectCallback(selected)}}
+      onSelectCallback={onSelectCallback}
+      selectedItems={state.omeroFileTreeSelection}
     />
   );
 };

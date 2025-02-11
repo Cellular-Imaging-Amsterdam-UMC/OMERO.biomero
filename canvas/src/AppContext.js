@@ -1,19 +1,19 @@
 import React, { createContext, useContext, useState } from "react";
-import { 
-  fetchomeroTreeData, 
-  fetchFolderData, 
-  fetchGroups, 
-  fetchScripts, 
-  fetchScriptData, 
+import {
+  fetchomeroFileTreeData,
+  fetchFolderData,
+  fetchGroups,
+  fetchScripts,
+  fetchScriptData,
   fetchWorkflows,
-  fetchConfig, 
+  fetchConfig,
   fetchWorkflowMetadata,
   fetchWorkflowGithub,
   runWorkflow,
   postConfig,
   postUpload,
   fetchThumbnails,
-  fetchImages 
+  fetchImages,
 } from "./apiService";
 import { getDjangoConstants } from "./constants";
 import { transformStructure, extractGroups } from "./utils";
@@ -27,70 +27,95 @@ export const AppProvider = ({ children }) => {
   const [state, setState] = useState({
     user,
     urls,
-    omeroTreeData: null,
-    folderData: null,
     scripts: [],
     workflows: null,
     workflowMetadata: null,
     workflowStatusTooltipShown: false,
-    inputDatasets: []
+    inputDatasets: [],
+    omeroFileTreeData: null,
+    localFileTreeData: null,
+    omeroFileTreeSelection: [],
+    localFileTreeSelection: [],
   });
   const [apiLoading, setLoading] = useState(false);
   const [apiError, setError] = useState(null);
   const [toaster, setToaster] = useState(null);
 
+  const updateState = (newState) => {
+    setState((prevState) => {
+      return { ...prevState, ...newState };
+    });
+  };
+
   // Initialize toaster asynchronously
   React.useEffect(() => {
-    OverlayToaster.createAsync({ position: Position.TOP }).then(setToaster);
+    async function initializeToaster() {
+      const toaster = await OverlayToaster.createAsync({
+        position: Position.TOP,
+      });
+      setToaster(toaster);
+    }
+    initializeToaster();
   }, []);
 
   const loadThumbnails = async (imageIds) => {
     setLoading(true);
     setError(null);
-  
+
     try {
       const batchSize = 50;
       const thumbnailsMap = {};
-  
+
       // Process imageIds in batches of 50
       for (let i = 0; i < imageIds.length; i += batchSize) {
         const chunk = imageIds.slice(i, i + batchSize);
         const fetchedThumbnails = await fetchThumbnails(chunk); // Returns an object mapping imageId -> thumbnail
         Object.assign(thumbnailsMap, fetchedThumbnails); // Merge batch results into the thumbnailsMap
       }
-  
+
       // Update state with the merged thumbnails map
-      setState((prevState) => ({
-        ...prevState,
-        thumbnails: { ...prevState.thumbnails, ...thumbnailsMap }, // Merge with existing thumbnails
-      }));
+      updateState({
+        thumbnails: { ...state.thumbnails, ...thumbnailsMap }, // Merge with existing thumbnails
+      });
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  };  
+  };
 
-  const loadImagesForDataset = async (dataset, page = 1, sizeXYZ = false, date = false, group = 0) => {
+  const loadImagesForDataset = async (
+    dataset,
+    page = 1,
+    sizeXYZ = false,
+    date = false,
+    group = 0
+  ) => {
     setLoading(true);
     setError(null);
-  
+
     try {
       const { index, childCount } = dataset;
       const [type, id] = index.split("-"); // Split the index into type and ID
-  
+
       if (type === "dataset") {
         const datasetId = parseInt(id, 10);
         let allImages = [];
         let currentPage = page;
         let keepFetching = true;
-  
+
         while (keepFetching) {
-          const images = await fetchImages(datasetId, currentPage, sizeXYZ, date, group);
-  
+          const images = await fetchImages(
+            datasetId,
+            currentPage,
+            sizeXYZ,
+            date,
+            group
+          );
+
           if (images.length > 0) {
             allImages = [...allImages, ...images];
-  
+
             // Check if we have fetched enough images
             if (allImages.length >= childCount) {
               keepFetching = false; // We fetched enough images
@@ -101,19 +126,18 @@ export const AppProvider = ({ children }) => {
             keepFetching = false; // No more images to fetch
           }
         }
-  
-        // Store images in the parent structure in state.omeroTreeData
-        setState((prevState) => ({
-          ...prevState,
-          omeroTreeData: {
-            ...prevState.omeroTreeData,
+
+        // Store images in the parent structure in state.omeroFileTreeData
+        updateState({
+          omeroFileTreeData: {
+            ...state.omeroFileTreeData,
             [index]: {
               ...dataset,
               children: allImages, // Attach fetched images to the dataset
             },
           },
-          images: [...(prevState.images || []), ...allImages], 
-        }));
+          images: [...(state.images || []), ...allImages],
+        });
       } else {
         console.log(`Skipping non-dataset index: ${index}:`, dataset);
       }
@@ -123,30 +147,30 @@ export const AppProvider = ({ children }) => {
       setLoading(false);
     }
   };
-  
-  
-  
+
   const runWorkflowData = async (workflowName, params = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await runWorkflow(workflowName, params); 
-      
+      const response = await runWorkflow(workflowName, params);
+
       const message = response?.message || "Workflow executed successfully.";
 
       toaster.show({
-          intent: "success",
-          icon: "tick-circle",
-          message: `${workflowName}: ${message}`,
-          timeout: 0,
+        intent: "success",
+        icon: "tick-circle",
+        message: `${workflowName}: ${message}`,
+        timeout: 0,
       });
     } catch (err) {
       toaster.show({
         intent: "danger",
         icon: "error",
-        message: `${workflowName}: ${err.message}: ${err.response?.data?.error} (Params: ${JSON.stringify(params, null, 2)})`,
+        message: `${workflowName}: ${err.message}: ${
+          err.response?.data?.error
+        } (Params: ${JSON.stringify(params, null, 2)})`,
         timeout: 0,
-    });
+      });
       setError(err.message);
     } finally {
       setLoading(false);
@@ -157,57 +181,62 @@ export const AppProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await postConfig(config); 
-      
+      const response = await postConfig(config);
+
       const message = response?.message || "Config saved successfully.";
 
       toaster.show({
-          intent: "success",
-          icon: "tick-circle",
-          message: `${message}`,
-          timeout: 0,
+        intent: "success",
+        icon: "tick-circle",
+        message: `${message}`,
+        timeout: 0,
       });
     } catch (err) {
       toaster.show({
         intent: "danger",
         icon: "error",
-        message: `Config response: ${err.message}: ${err.response?.data?.error} (Params: ${JSON.stringify(config, null, 2)})`,
+        message: `Config response: ${err.message}: ${
+          err.response?.data?.error
+        } (Params: ${JSON.stringify(config, null, 2)})`,
         timeout: 0,
-    });
+      });
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
-
 
   const uploadSelectedData = async (upload) => {
     setLoading(true);
     setError(null);
     try {
       const response = await postUpload(upload);
-      
-      const message = response?.message || "Files upload started successfully. Follow the progress on the Monitor tab!";
+
+      const message =
+        response?.message ||
+        "Files upload started successfully. Follow the progress on the Monitor tab!";
 
       toaster.show({
-          intent: "success",
-          icon: "tick-circle",
-          message: `${message}`,
-          timeout: 0,
+        intent: "success",
+        icon: "tick-circle",
+        message: `${message}`,
+        timeout: 0,
       });
     } catch (err) {
       toaster.show({
         intent: "danger",
         icon: "error",
-        message: `Upload response: ${err.message}: ${err.response?.data?.error} (Params: ${JSON.stringify(upload, null, 2)})`,
+        message: `Upload response: ${err.message}: ${
+          err.response?.data?.error
+        } (Params: ${JSON.stringify(upload, null, 2)})`,
         timeout: 0,
-    });
+      });
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
-  
+
   const loadWorkflows = async () => {
     setLoading(true);
     setError(null);
@@ -229,28 +258,27 @@ export const AppProvider = ({ children }) => {
       // Prepare the metadata and GitHub URLs in the format that matches the workflow names
       const workflowsWithMetadata = workflows.map((workflow, index) => ({
         name: workflow,
-        description: metadata[index]?.description || 'No description available',
+        description: metadata[index]?.description || "No description available",
         metadata: metadata[index],
         githubUrl: githubUrls[index]?.url,
       }));
 
-      setState((prevState) => ({
-        ...prevState,
+      updateState({
         workflows: workflowsWithMetadata,
-      }));
+      });
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
-  
+
   const loadWorkflowMetadata = async (workflow) => {
     setLoading(true);
     setError(null);
     try {
       const metadata = await fetchWorkflowMetadata(workflow);
-      setState((prevState) => ({ ...prevState, workflowMetadata: metadata }));
+      updateState({ workflowMetadata: metadata });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -263,8 +291,8 @@ export const AppProvider = ({ children }) => {
     setError(null);
     try {
       const response = await fetchConfig();
-      const config = response.config
-      setState((prevState) => ({ ...prevState, config }));
+      const config = response.config;
+      updateState({ config });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -277,13 +305,12 @@ export const AppProvider = ({ children }) => {
     setError(null);
     try {
       const githubUrl = await fetchWorkflowGithub(workflow);
-      setState((prevState) => ({
-        ...prevState,
+      updateState({
         githubUrls: {
-          ...prevState.githubUrls,
+          ...state.githubUrls,
           [workflow]: githubUrl.url,
         },
-      }));
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -295,8 +322,8 @@ export const AppProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const omeroTreeData = await fetchomeroTreeData();
-      updateState({ omeroTreeData: transformStructure(omeroTreeData) });
+      const omeroFileTreeData = await fetchomeroFileTreeData();
+      updateState({ omeroFileTreeData: transformStructure(omeroFileTreeData) });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -330,13 +357,12 @@ export const AppProvider = ({ children }) => {
         childCount: contents.length,
       };
 
-      setState((prevState) => ({
-        ...prevState,
-        folderData: {
-          ...prevState.folderData,
+      updateState({
+        localFileTreeData: {
+          ...state.localFileTreeData,
           ...formattedData,
         },
-      }));
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -350,10 +376,9 @@ export const AppProvider = ({ children }) => {
     try {
       const groupsHtml = await fetchGroups();
       const groups = extractGroups(groupsHtml);
-      setState((prevState) => ({
-        ...prevState,
-        user: { ...prevState.user, groups },
-      }));
+      updateState({
+        user: { ...state.user, groups },
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -366,10 +391,9 @@ export const AppProvider = ({ children }) => {
     setError(null);
     try {
       const scripts = await fetchScripts();
-      setState((prevState) => ({
-        ...prevState,
+      updateState({
         scripts,
-      }));
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -382,7 +406,7 @@ export const AppProvider = ({ children }) => {
     try {
       const data = await fetchScriptData(scriptId, directory);
       const fetchedScript = { id: scriptId, ...data.script_menu[0] };
-  
+
       // Helper function to recursively update the nested structure
       const updateNestedScripts = (nodes) =>
         nodes.map((node) => {
@@ -395,12 +419,11 @@ export const AppProvider = ({ children }) => {
           }
           return node; // No change for non-matching nodes
         });
-  
+
       // Update the state with the updated nested scripts
-      setState((prevState) => ({
-        ...prevState,
-        scripts: updateNestedScripts(prevState.scripts),
-      }));
+      updateState({
+        scripts: updateNestedScripts(state.scripts),
+      });
     } catch (err) {
       setError("Error fetching script data.");
       console.error("Failed to fetch script data:", err);
@@ -414,19 +437,20 @@ export const AppProvider = ({ children }) => {
     const SCRIPT_WINDOW_HEIGHT = 600;
 
     const event = { target: { href: scriptUrl } };
+    // eslint-disable-next-line no-undef
     OME.openScriptWindow(event, SCRIPT_WINDOW_WIDTH, SCRIPT_WINDOW_HEIGHT);
   };
 
-  const openUploadScriptWindow  = (scriptUrl) => {
+  const openUploadScriptWindow = (scriptUrl) => {
+    // eslint-disable-next-line no-unused-vars
     const SCRIPT_WINDOW_WIDTH = 800;
+    // eslint-disable-next-line no-unused-vars
     const SCRIPT_WINDOW_HEIGHT = 600;
 
+    // eslint-disable-next-line no-unused-vars
     const event = { target: { href: scriptUrl } };
+    // eslint-disable-next-line no-undef
     OME.openPopup(WEBCLIENT.URLS.script_upload);
-  };
-
-  const updateState = (newState) => {
-    setState((prevState) => ({ ...prevState, ...newState }));
   };
 
   return (
@@ -451,7 +475,7 @@ export const AppProvider = ({ children }) => {
         loadImagesForDataset,
         apiLoading,
         apiError,
-        toaster
+        toaster,
       }}
     >
       {children}

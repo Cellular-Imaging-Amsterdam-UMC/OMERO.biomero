@@ -5,7 +5,7 @@ import DatasetSelectWithPopover from "./DatasetSelectWithPopover.js";
 
 const WorkflowOutput = ({ onSelectionChange }) => {
   const { state, updateState } = useAppContext();
-  const [renamePattern, setRenamePattern] = useState('');
+  const [renamePattern, setRenamePattern] = useState("");
   const [hasOutputSelection, setHasOutputSelection] = useState(true);
   const outputOptions = ["importAsZip", "uploadCsv", "attachToOriginalImages", "selectedDatasets"];
   const defaultValues = {
@@ -14,7 +14,7 @@ const WorkflowOutput = ({ onSelectionChange }) => {
     uploadCsv: true,
     attachToOriginalImages: false,
     selectedDatasets: [],
-    renamePattern: '',
+    renamePattern: "",
   };
 
   useEffect(() => {
@@ -117,23 +117,31 @@ const WorkflowOutput = ({ onSelectionChange }) => {
         >
           <Switch
             id="upload-images-options"
-            checked={state.formData.attachToOriginalImages ?? defaultValues.attachToOriginalImages}
-            onChange={(e) => handleInputChange("attachToOriginalImages", e.target.checked)}
+            checked={
+              state.formData.attachToOriginalImages ??
+              defaultValues.attachToOriginalImages
+            }
+            onChange={(e) =>
+              handleInputChange("attachToOriginalImages", e.target.checked)
+            }
             intent={hasOutputSelection ? '' : 'danger'}
           />
         </FormGroup>
 
         {/* Dataset Selection with Popover */}
         <DatasetSelectWithPopover
-          label = "Add results to a new or existing dataset."
-          helperText = "The output images will be organized in an OMERO dataset for viewing and further analysis."
-          subLabel = "Don't forget to press ENTER if you type a new name!" 
-          tooltip = "Select the OMERO dataset for your workflow results."
-          buttonText = "Select Dataset"
+          label="Add results to a new or existing dataset."
+          helperText="The output images will be organized in an OMERO dataset for viewing and further analysis."
+          subLabel="Don't forget to press ENTER if you type a new name!"
+          tooltip="Select the OMERO dataset for your workflow results."
+          buttonText="Select Dataset"
           value={state.formData.selectedDatasets || []}
           onChange={(values) => {
-            const selectedDataset = values.map((dataset) => state.omeroTreeData[dataset].data)
-            handleInputChange("selectedDatasets", selectedDataset)}}
+            const selectedDataset = values.map(
+              (dataset) => state.omeroFileTreeData[dataset].data
+            );
+            handleInputChange("selectedDatasets", selectedDataset);
+          }}
           multiSelect={false}
           intent={hasOutputSelection ? '' : 'danger'}
         />
@@ -145,14 +153,21 @@ const WorkflowOutput = ({ onSelectionChange }) => {
           helperText={
             <>
               <div>
-                Use <code>{'{original_file}'}</code> and <code>{'{ext}'}</code> to create a naming pattern for the new images.
+                Use <code>{"{original_file}"}</code> and <code>{"{ext}"}</code>{" "}
+                to create a naming pattern for the new images.
               </div>
               <div>
-                For example, if the original image is <code>sample1.tiff</code>, you can name the result image <code>sample1_nuclei_mask.tiff</code> by using the pattern <code>{'{original_file}_nuclei_mask.{ext}'}</code>.
+                For example, if the original image is <code>sample1.tiff</code>,
+                you can name the result image{" "}
+                <code>sample1_nuclei_mask.tiff</code> by using the pattern{" "}
+                <code>{"{original_file}_nuclei_mask.{ext}"}</code>.
               </div>
             </>
           }
-          disabled={!state.formData.selectedDatasets || state.formData.selectedDatasets.length === 0}
+          disabled={
+            !state.formData.selectedDatasets ||
+            state.formData.selectedDatasets.length === 0
+          }
         >
           <InputGroup
             id="image-renaming-pattern"
@@ -160,7 +175,10 @@ const WorkflowOutput = ({ onSelectionChange }) => {
             value={renamePattern}
             onChange={handleRenamePatternChange}
             fill={true}
-            disabled={!state.formData.selectedDatasets || state.formData.selectedDatasets.length === 0}
+            disabled={
+              !state.formData.selectedDatasets ||
+              state.formData.selectedDatasets.length === 0
+            }
           />
         </FormGroup>
       </FormGroup>

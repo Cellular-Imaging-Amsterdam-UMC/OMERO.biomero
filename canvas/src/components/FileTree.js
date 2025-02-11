@@ -7,10 +7,10 @@ const FileTree = ({
   initialDataKey,
   dataStructure,
   onExpandCallback,
-  onSelectCallback
+  onSelectCallback,
+  selectedItems,
 }) => {
   const [expandedItems, setExpandedItems] = useState(["root"]);
-  const [selectedItems, setSelectedItems] = useState([]);
 
   const handleNodeExpand = async (nodeData) => {
     const nodeId = nodeData.id;
@@ -30,27 +30,6 @@ const FileTree = ({
     const nodeId = nodeData.id;
     setExpandedItems(expandedItems.filter((id) => id !== nodeId));
   };
-
-  const handleNodeClick = (nodeData) => {
-    const nodeId = nodeData.id;
-    let updatedSelection;
-  
-    if (selectedItems.includes(nodeId)) {
-      // Remove the node if it was already selected
-      updatedSelection = selectedItems.filter((id) => id !== nodeId);
-    } else {
-      // Add the node if it wasn't already selected
-      updatedSelection = [...selectedItems, nodeId];
-    }
-  
-    setSelectedItems(updatedSelection);
-  
-    // Ensure the callback reflects the new selection state
-    if (onSelectCallback) {
-      onSelectCallback(updatedSelection);
-    }
-  };
-  
 
   const buildTreeNodes = (itemIndex = initialDataKey) => {
     if (!dataStructure[itemIndex]) return null; // Guard against missing data
@@ -87,16 +66,17 @@ const FileTree = ({
   const treeNodes = useMemo(() => {
     const rootNode = buildTreeNodes(initialDataKey);
     return rootNode ? [rootNode] : [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataStructure, expandedItems, selectedItems]);
 
   return (
-    <div className="p-4">
+    <div>
       {treeNodes.length > 0 ? (
         <Tree
           contents={treeNodes}
           onNodeExpand={handleNodeExpand}
           onNodeCollapse={handleNodeCollapse}
-          onNodeClick={handleNodeClick}
+          onNodeClick={onSelectCallback}
         />
       ) : (
         <div>Loading...</div>

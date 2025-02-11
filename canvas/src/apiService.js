@@ -23,7 +23,7 @@ export const apiRequest = async (
 };
 
 // Specific API calls
-export const fetchomeroTreeData = async () => {
+export const fetchomeroFileTreeData = async () => {
   const { user, urls } = getDjangoConstants();
   const params = {
     id: user.active_user.id,
@@ -114,7 +114,7 @@ export const fetchWorkflowGithub = async (workflow) => {
 // Fetch thumbnails for imageids
 export const fetchThumbnails = async (imageIds) => {
   const { urls } = getDjangoConstants(); // Get the URLs from Django constants
-  const validImageIds = imageIds.filter(id => id != null); // Removes undefined and null
+  const validImageIds = imageIds.filter((id) => id != null); // Removes undefined and null
 
   if (!validImageIds || validImageIds.length === 0) {
     console.warn("No (valid) image IDs provided, skipping thumbnail fetch.");
@@ -133,14 +133,19 @@ export const fetchThumbnails = async (imageIds) => {
 };
 
 // Fetch images for a dataset
-export const fetchImages = async (datasetId, page = 1, sizeXYZ = false, date = false, group = 0) => {
+export const fetchImages = async (
+  datasetId,
+  page = 1,
+  sizeXYZ = false,
+  date = false,
+  group = 0
+) => {
   const { urls } = getDjangoConstants(); // Get the URLs from Django constants
-  
+
   if (!datasetId) {
-    datasetId = 51;//6;
+    datasetId = 51; //6;
     console.warn("No dataset ID provided, fetching example:", datasetId);
     // return []; // Skip the API call if the dataset ID is not provided
-    
   }
 
   try {
@@ -150,7 +155,7 @@ export const fetchImages = async (datasetId, page = 1, sizeXYZ = false, date = f
       page: page,
       sizeXYZ: sizeXYZ.toString(),
       date: date.toString(),
-      group: group.toString()
+      group: group.toString(),
     }).toString();
 
     // Construct the endpoint URL
@@ -158,7 +163,7 @@ export const fetchImages = async (datasetId, page = 1, sizeXYZ = false, date = f
 
     // Make the API call
     const response = await apiRequest(endpoint, "GET");
-    
+
     return response.images || []; // Return the response or an empty array if no response
   } catch (error) {
     console.error("Error fetching images:", error);
@@ -166,26 +171,23 @@ export const fetchImages = async (datasetId, page = 1, sizeXYZ = false, date = f
   }
 };
 
-
-
-
 export const runWorkflow = async (workflowName, params = {}) => {
-  const { urls } = getDjangoConstants();  // Base URL for the API from Django constants
+  const { urls } = getDjangoConstants(); // Base URL for the API from Django constants
 
   try {
     // Use the global csrftoken directly from window object
-    const csrfToken = window.csrftoken; 
+    const csrfToken = window.csrftoken;
 
     // Prepare the payload with script_name and optional params
     const payload = { workflow_name: workflowName, params };
 
     const response = await apiRequest(urls.api_run_workflow, "POST", payload, {
       headers: {
-        'X-CSRFToken': csrfToken,  // Include CSRF token in request headers
+        "X-CSRFToken": csrfToken, // Include CSRF token in request headers
       },
     });
 
-    return response;  // Return the API response
+    return response; // Return the API response
   } catch (error) {
     console.error("Error running workflow:", error);
     throw error;
@@ -193,22 +195,22 @@ export const runWorkflow = async (workflowName, params = {}) => {
 };
 
 export const postConfig = async (config) => {
-  const { urls } = getDjangoConstants();  // Base URL for the API from Django constants
+  const { urls } = getDjangoConstants(); // Base URL for the API from Django constants
 
   try {
     // Use the global csrftoken directly from window object
-    const csrfToken = window.csrftoken; 
+    const csrfToken = window.csrftoken;
 
     // Prepare the payload with script_name and optional params
     const payload = { config };
 
     const response = await apiRequest(urls.api_save_config, "POST", payload, {
       headers: {
-        'X-CSRFToken': csrfToken,  // Include CSRF token in request headers
+        "X-CSRFToken": csrfToken, // Include CSRF token in request headers
       },
     });
 
-    return response;  // Return the API response
+    return response; // Return the API response
   } catch (error) {
     console.error("Error saving config:", error);
     throw error;
@@ -216,30 +218,29 @@ export const postConfig = async (config) => {
 };
 
 export const postUpload = async (upload) => {
-  const { urls } = getDjangoConstants();  // Base URL for the API from Django constants
+  const { urls } = getDjangoConstants(); // Base URL for the API from Django constants
 
   try {
     // Use the global csrftoken directly from window object
-    const csrfToken = window.csrftoken; 
+    const csrfToken = window.csrftoken;
 
     // Prepare the payload with script_name and optional params
     const payload = { upload };
 
-    const response = await apiRequest(urls.api_import_selected, "POST", payload, {
-      headers: {
-        'X-CSRFToken': csrfToken,  // Include CSRF token in request headers
-      },
-    });
+    const response = await apiRequest(
+      urls.api_import_selected,
+      "POST",
+      payload,
+      {
+        headers: {
+          "X-CSRFToken": csrfToken, // Include CSRF token in request headers
+        },
+      }
+    );
 
-    return response;  // Return the API response
+    return response; // Return the API response
   } catch (error) {
     console.error("Error saving config:", error);
     throw error;
   }
 };
-
-
-
-
-
-

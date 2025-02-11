@@ -42,7 +42,7 @@ const AdminPanel = () => {
       <H4>Admin</H4>
       <div className="flex">
         <div className="w-1/2 p-4 overflow-auto">
-          <SettingsForm/>
+          <SettingsForm />
         </div>
         <div className="w-1/2 p-4 flex-1 overflow-hidden">
           {state.scripts?.length > 0 ? (
@@ -56,8 +56,14 @@ const AdminPanel = () => {
   );
 };
 
-const StatusPanel = ({ iframeUrl, metabaseError, setMetabaseError, isAdmin, metabaseUrl }) => (
-  <div className="h-full overflow-y-auto"> 
+const StatusPanel = ({
+  iframeUrl,
+  metabaseError,
+  setMetabaseError,
+  isAdmin,
+  metabaseUrl,
+}) => (
+  <div className="h-full overflow-y-auto">
     <H4>Status</H4>
     <div className="bp5-form-group">
         <div className="bp5-form-content">
@@ -72,13 +78,15 @@ const StatusPanel = ({ iframeUrl, metabaseError, setMetabaseError, isAdmin, meta
     <div className="p-4 h-full overflow-hidden">
       {!metabaseError ? (
         <iframe
+          title="Metabase dashboard"
           src={iframeUrl}
           className="w-full h-[800px]"
-          frameBorder="0"
           onError={() => setMetabaseError(true)}
         />
       ) : (
-        <div className="error">Error loading Metabase dashboard. Please try refreshing the page.</div>
+        <div className="error">
+          Error loading Metabase dashboard. Please try refreshing the page.
+        </div>
       )}
       {isAdmin && (
         <div className="bottom-message">
@@ -92,7 +100,14 @@ const StatusPanel = ({ iframeUrl, metabaseError, setMetabaseError, isAdmin, meta
 );
 
 const BiomeroApp = () => {
-  const { state, updateState, loadOmeroTreeData, loadFolderData, loadGroups, loadWorkflows } = useAppContext();
+  const {
+    state,
+    updateState,
+    loadOmeroTreeData,
+    loadFolderData,
+    loadGroups,
+    loadWorkflows,
+  } = useAppContext();
   const [metabaseError, setMetabaseError] = useState(false);
   const [activeTab, setActiveTab] = useState("Run");
   const [loadedTabs, setLoadedTabs] = useState({
@@ -130,24 +145,18 @@ const BiomeroApp = () => {
     setActiveTab(newTabId);
   };
 
-  const metabaseUrl = document.getElementById("root").getAttribute("data-metabase-url");
-  const metabaseToken = document.getElementById("root").getAttribute("data-metabase-token");
-  const isAdmin = document.getElementById("root").getAttribute("data-is-admin") === "true";
+  const metabaseUrl = document
+    .getElementById("root")
+    .getAttribute("data-metabase-url");
+  const metabaseToken = document
+    .getElementById("root")
+    .getAttribute("data-metabase-token-monitor-workflows");
+  const isAdmin =
+    document.getElementById("root").getAttribute("data-is-admin") === "true";
   const iframeUrl = `${metabaseUrl}/embed/dashboard/${metabaseToken}#bordered=true&titled=true&refresh=20`;
 
   return (
-    <div className="bg-[#f0f1f5] w-full h-full relative top-0 overflow-hidden">
-      {/* Navbar */}
-      <Navbar className="z-[1]" >
-        <NavbarGroup>
-          <Icon icon="style" className="mr-[7px]"/>
-          <NavbarHeading>CANVAS</NavbarHeading>
-          <NavbarDivider />
-          <Icon icon="predictive-analysis" className="mr-[7px]"/>
-          <NavbarHeading>BIOMERO</NavbarHeading>
-        </NavbarGroup>
-      </Navbar>
-
+    <div>
       {/* Tabs with Panels */}
       <div className="p-4 h-full overflow-hidden">
         <Tabs
@@ -169,19 +178,13 @@ const BiomeroApp = () => {
             id="Status"
             title={
               <Tooltip
-                content={
-                    <span>
-                        View your workflow's progress here
-                    </span>
-                }
+                content={<span>View your workflow's progress here</span>}
                 compact={true}
                 isOpen={state.workflowStatusTooltipShown}
                 intent="success"
                 onOpened={() => {
                   setTimeout(() => {
-                    updateState(
-                      { workflowStatusTooltipShown: false }
-                    );
+                    updateState({ workflowStatusTooltipShown: false });
                   }, 5000);
                 }}
               >
@@ -191,15 +194,17 @@ const BiomeroApp = () => {
               </Tooltip>
             }
             icon="dashboard"
-            panel={loadedTabs.Status ? (
-              <StatusPanel
-                iframeUrl={iframeUrl}
-                metabaseError={metabaseError}
-                setMetabaseError={setMetabaseError}
-                isAdmin={isAdmin}
-                metabaseUrl={metabaseUrl}
-              />
-            ) : null}
+            panel={
+              loadedTabs.Status ? (
+                <StatusPanel
+                  iframeUrl={iframeUrl}
+                  metabaseError={metabaseError}
+                  setMetabaseError={setMetabaseError}
+                  isAdmin={isAdmin}
+                  metabaseUrl={metabaseUrl}
+                />
+              ) : null
+            }
           />
           {/* Admin tab */}
           {state.user.isAdmin && (
@@ -207,9 +212,7 @@ const BiomeroApp = () => {
               id="Admin"
               title="Admin"
               icon="settings"
-              panel={loadedTabs.Admin ? (
-                <AdminPanel />
-              ) : null}
+              panel={loadedTabs.Admin ? <AdminPanel /> : null}
             />
           )}
         </Tabs>

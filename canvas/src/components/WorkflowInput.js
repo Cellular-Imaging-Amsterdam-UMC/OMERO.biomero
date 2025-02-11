@@ -18,7 +18,7 @@ import {
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover";
 import { useAppContext } from "../AppContext";
 
-const WorkflowInput = ({ onSelectionChange }) => {
+const WorkflowInput = () => {
   const { state, updateState, loadThumbnails, loadImagesForDataset } =
     useAppContext();
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,15 +36,15 @@ const WorkflowInput = ({ onSelectionChange }) => {
     const currentDatasetIds = state.inputDatasets?.map((ds) => ds.index) || [];
 
     // Remove images of datasets not in inputDatasets
-    const filteredImages = Object.entries(state.omeroTreeData)
+    const filteredImages = Object.entries(state.omeroFileTreeData)
       .filter(([key]) => currentDatasetIds.includes(key))
       .flatMap(([_, datasetNode]) => datasetNode.children || []);
 
     updateState({ images: filteredImages });
 
-    // Load images for datasets missing children in omeroTreeData
+    // Load images for datasets missing children in omeroFileTreeData
     state.inputDatasets?.forEach((dataset) => {
-      const treeNode = state.omeroTreeData[dataset.index];
+      const treeNode = state.omeroFileTreeData[dataset.index];
 
       if (!treeNode || !treeNode.children || treeNode.children.length === 0) {
         loadImagesForDataset(dataset); // Fetch only if not already loaded
@@ -145,8 +145,8 @@ const WorkflowInput = ({ onSelectionChange }) => {
               .map((dataset) => {
                 // Handle both `index` (dataset key) and `data` (dataset value)
                 const resolvedDataset =
-                  state.omeroTreeData[dataset] || // Case 1: dataset is already the key/index
-                  Object.values(state.omeroTreeData).find(
+                  state.omeroFileTreeData[dataset] || // Case 1: dataset is already the key/index
+                  Object.values(state.omeroFileTreeData).find(
                     (node) => node.data === dataset
                   ); // Case 2: dataset is the data value
                 return resolvedDataset;

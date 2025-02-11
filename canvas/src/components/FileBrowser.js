@@ -3,13 +3,10 @@ import { useAppContext } from "../AppContext";
 import FileTree from "./FileTree";
 import { fetchFolderData } from "../apiService";
 
-const FileBrowser = ({
-  onSelectCallback
-}) => {
+const FileBrowser = ({ onSelectCallback }) => {
   const { state, updateState } = useAppContext();
 
   const handleFolderDataFetch = async (node) => {
-    console.log("Fetching folder data for node:", node);
     const response = await fetchFolderData(node.index);
     const contents = response.contents || [];
 
@@ -17,22 +14,20 @@ const FileBrowser = ({
       acc[item.id] = {
         index: item.id,
         isFolder: item.is_folder,
-        children: [], // Ensure this gets updated later
+        children: [],
         data: item.name,
       };
       return acc;
     }, {});
 
-    console.log("New nodes:", newNodes);
-
     const updatedNode = {
-      ...state.folderData[node.index],
-      children: contents.map((item) => item.id), // This should correctly update children
+      ...state.localFileTreeData[node.index],
+      children: contents.map((item) => item.id),
     };
 
     updateState({
-      folderData: {
-        ...state.folderData,
+      localFileTreeData: {
+        ...state.localFileTreeData,
         ...newNodes,
         [node.index]: updatedNode,
       },
@@ -45,11 +40,12 @@ const FileBrowser = ({
     <FileTree
       fetchData={handleFolderDataFetch}
       initialDataKey="root"
-      dataStructure={state.folderData}
+      dataStructure={state.localFileTreeData}
       onExpandCallback={(node, newData) => {
         console.log("Folder expanded:", node, newData);
       }}
-      onSelectCallback={(selected) => {onSelectCallback(selected)}}
+      onSelectCallback={onSelectCallback}
+      selectedItems={state.localFileTreeSelection}
     />
   );
 };
