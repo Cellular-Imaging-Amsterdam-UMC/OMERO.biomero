@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Button, Popover, PopoverInteractionKind, Tooltip, TagInput, FormGroup } from "@blueprintjs/core";
 import OmeroDataBrowser from "./OmeroDataBrowser"; 
+import { useAppContext } from "../AppContext";
 
 const DatasetSelectWithPopover = ({ 
   value, 
@@ -13,32 +14,33 @@ const DatasetSelectWithPopover = ({
   buttonText = "Add Dataset",
   intent = "",
 }) => {
-  
+  const {
+      state,
+      updateState,
+    } = useAppContext();
   const [isPopoverOpen, setPopoverOpen] = useState(false);
-  const [selectedFolder, setSelectedFolder] = useState([]);
   const [values, setValues] = useState([]);
 
-  const handleInputChange = (newValues) => {
-    let updatedValues;
-    if (multiSelect) {       
-      updatedValues = [...values, ...newValues]; // Add new value to the array if it's a string    
-      setValues(updatedValues); // Update local state
-      onChange(updatedValues); // Pass the updated array to the parent
+  const handleInputChange = (nodeData) => {
+    const nodeId = nodeData.id;
+    let updatedSelection;
+    if (state.omeroFileTreeSelection.includes(nodeId)) {
+      // Remove the node if it was already selected
+      updatedSelection = state.omeroFileTreeSelection.filter((id) => id !== nodeId);
     } else {
-      // If not multiSelect, just set the value as the only item in the list
-      if (typeof newValues === "string") {
-        updatedValues = [newValues]; // Make it a single item array
+      // Add the node, with multi selection maybe
+      if (!multiSelect) {
+        updatedSelection = [nodeId];
       } else {
-        updatedValues = [newValues[newValues.length - 1]]; // Make it a single item array
-      }  
-      setValues(updatedValues); // Update local state
-      onChange(updatedValues); // Pass the updated array to the parent
+        updatedSelection = [...state.omeroFileTreeSelection, nodeId];
+      }
     }
+    updateState({["omeroFileTreeSelection"]: updatedSelection}); // update selector
   };
 
   const handleManualInputChange = (updatedValues) => {
     setValues(updatedValues); // Update local state
-    onChange(updatedValues); // Pass the updated array to the parent
+    onChange(updatedValues, "manual"); // Pass the full array to the parent
   }
 
   const handleKeyDown = (e) => {
@@ -48,16 +50,9 @@ const DatasetSelectWithPopover = ({
   };
 
   const handleSelectFolder = () => {
-    if (selectedFolder) {
-      handleInputChange(selectedFolder);
-    } else {
-      // Add the selected folder as a tag in the TagInput
-      handleInputChange(
-        "dummyfolder"
-      );
-    }
+    onChange(state.omeroFileTreeSelection); // Pass the updated array to the parent
     setPopoverOpen(false); // Close popover once selection is made
-    
+    updateState({ omeroFileTreeSelection: [] });
   };
 
   return (
@@ -82,11 +77,11 @@ const DatasetSelectWithPopover = ({
             content={
               <div className="p-4 flex flex-col space-y-4">
                 <OmeroDataBrowser 
-                  onSelectCallback={(folders) => setSelectedFolder(folders)} 
+                  onSelectCallback={(folder) => handleInputChange(folder)}
                 />
                 <Button
                   className="self-end"
-                  icon="send-message" // BlueprintJS arrow icon
+                  icon="send-message"
                   onClick={handleSelectFolder} 
                   intent="primary"
                 />

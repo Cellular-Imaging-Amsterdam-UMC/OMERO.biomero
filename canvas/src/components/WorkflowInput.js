@@ -27,10 +27,6 @@ const WorkflowInput = () => {
   const [activeTab, setActiveTab] = useState("list"); // Tabs: "list" or "grid"
   const [zoom, setZoom] = useState(7); // Starting size 65px, like OMERO
 
-  useEffect(() => {
-    onSelectionChange(selectedImageIds);
-  }, [selectedImageIds, onSelectionChange]);
-
   // Load images when datasets change
   useEffect(() => {
     const currentDatasetIds = state.inputDatasets?.map((ds) => ds.index) || [];
@@ -140,7 +136,7 @@ const WorkflowInput = () => {
           value={state.inputDatasets.map((dataset) => dataset?.data) || []}
           label="Select dataset or screen"
           tooltip="Select the OMERO dataset or screen as workflow input."
-          onChange={(datasets) => {
+          onChange={(datasets, type) => {
             const inputDatasets = datasets
               .map((dataset) => {
                 // Handle both `index` (dataset key) and `data` (dataset value)
@@ -148,11 +144,18 @@ const WorkflowInput = () => {
                   state.omeroFileTreeData[dataset] || // Case 1: dataset is already the key/index
                   Object.values(state.omeroFileTreeData).find(
                     (node) => node.data === dataset
-                  ); // Case 2: dataset is the data value
+                  ); // Case 2: dataset is the data value (e.g. name typed by user)
                 return resolvedDataset;
               })
               .filter(Boolean); // Filter out any unresolved datasets
-            updateState({ inputDatasets });
+            if (type === "manual") {
+              updateState({ inputDatasets }) // full info
+            } else {
+              updateState({ inputDatasets: [ // Adding, keep unique
+                ...new Map([...state.inputDatasets, ...inputDatasets].map(item => [item.index, item])).values()
+              ] });
+            }
+            
           }}
           multiSelect={true}
         />

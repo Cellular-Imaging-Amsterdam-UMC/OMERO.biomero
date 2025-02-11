@@ -46,7 +46,7 @@ const AdminPanel = () => {
         </div>
         <div className="w-1/2 p-4 flex-1 overflow-hidden">
           {state.scripts?.length > 0 ? (
-            <TabContainer menuData={state.scripts} />
+            <TabContainer />
           ) : (
             <p>Loading scripts...</p>
           )}

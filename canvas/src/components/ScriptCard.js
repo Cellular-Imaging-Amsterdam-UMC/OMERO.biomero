@@ -11,7 +11,7 @@ const ScriptCard = ({ script }) => {
       fetchScriptDetails(script.id, script.name);
       setIsCardLoaded(true);
     }
-  }, [isCardLoaded, script.id, script.name, fetchScriptDetails, state.scripts]);
+  }, []);
 
   const handleCardClick = () => {
     const scriptUrl = `/webclient/script_ui/${script.id}`;

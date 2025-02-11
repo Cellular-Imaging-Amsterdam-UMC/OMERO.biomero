@@ -420,10 +420,12 @@ export const AppProvider = ({ children }) => {
           return node; // No change for non-matching nodes
         });
 
+      const updatedScripts = updateNestedScripts(state.scripts)
       // Update the state with the updated nested scripts
-      updateState({
-        scripts: updateNestedScripts(state.scripts),
-      });
+      setState((prevState) => ({
+        ...prevState,
+        scripts: updateNestedScripts(prevState.scripts),
+      }));
     } catch (err) {
       setError("Error fetching script data.");
       console.error("Failed to fetch script data:", err);

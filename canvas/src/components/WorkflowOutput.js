@@ -136,11 +136,15 @@ const WorkflowOutput = ({ onSelectionChange }) => {
           tooltip="Select the OMERO dataset for your workflow results."
           buttonText="Select Dataset"
           value={state.formData.selectedDatasets || []}
-          onChange={(values) => {
-            const selectedDataset = values.map(
-              (dataset) => state.omeroFileTreeData[dataset].data
-            );
-            handleInputChange("selectedDatasets", selectedDataset);
+          onChange={(values, type) => {
+            if (type === "manual") {
+              handleInputChange("selectedDatasets", values?.length ? [values[values.length - 1]] : [])
+            } else {
+              const selectedDataset = values.map(
+                (dataset) => state.omeroFileTreeData[dataset].data
+              );
+              handleInputChange("selectedDatasets", selectedDataset);
+            }
           }}
           multiSelect={false}
           intent={hasOutputSelection ? '' : 'danger'}

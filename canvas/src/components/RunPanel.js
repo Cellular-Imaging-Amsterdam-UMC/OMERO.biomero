@@ -25,6 +25,10 @@ const RunPanel = () => {
     workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     workflow.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  useEffect(() => {
+    setIsNextDisabled(state.formData?.IDs?.length === 0);
+  }, [state.formData?.IDs]); 
   
   // Handle workflow click
   const handleWorkflowClick = (workflow) => {
