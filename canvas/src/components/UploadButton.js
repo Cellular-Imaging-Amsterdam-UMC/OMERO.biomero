@@ -1,5 +1,5 @@
 import React from "react";
-import { useAppContext } from "../AppContext";  
+import { useAppContext } from "../AppContext";
 import { Button } from "@blueprintjs/core";
 
 const UploadButton = () => {
@@ -9,9 +9,7 @@ const UploadButton = () => {
   };
 
   return (
-    <Button icon="document" rightIcon="upload"
-      onClick={handleUploadClick}
-    >
+    <Button icon="document" rightIcon="upload" onClick={handleUploadClick}>
       Upload Script
     </Button>
   );

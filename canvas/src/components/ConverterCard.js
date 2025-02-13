@@ -1,5 +1,13 @@
 import React from "react";
-import { Card, Button, FormGroup, InputGroup, ButtonGroup, Tooltip, H4 } from "@blueprintjs/core";
+import {
+  Card,
+  Button,
+  FormGroup,
+  InputGroup,
+  ButtonGroup,
+  Tooltip,
+  H4,
+} from "@blueprintjs/core";
 import { FaDocker } from "react-icons/fa";
 
 const ConverterCard = ({
@@ -16,7 +24,7 @@ const ConverterCard = ({
   const openDockerHub = (image) => {
     const [repo, version] = image.split(":");
     const url = `https://hub.docker.com/r/${repo}/tags?page=1&name=${version}`;
-    window.open(url, "_blank", "noopener,noreferrer")
+    window.open(url, "_blank", "noopener,noreferrer");
   };
   return (
     <Card className="p-4 shadow-md">
@@ -27,7 +35,9 @@ const ConverterCard = ({
         {/* Action Buttons */}
         <ButtonGroup>
           <Tooltip
-            content={editable ? "Lock model" : "Click here to edit the converter!"}
+            content={
+              editable ? "Lock model" : "Click here to edit the converter!"
+            }
             isOpen={!editable}
             position="top"
           >
@@ -71,7 +81,9 @@ const ConverterCard = ({
           intent={errors?.key ? "danger" : "none"}
           readOnly={!editable}
         />
-        {errors?.key && <div className="text-red-500 text-sm">{errors?.key}</div>}
+        {errors?.key && (
+          <div className="text-red-500 text-sm">{errors?.key}</div>
+        )}
       </FormGroup>
 
       {/* Docker Image */}
@@ -100,8 +112,12 @@ const ConverterCard = ({
             ) : null
           }
         />
-        {errors?.value && <div className="text-red-500 text-sm">{errors?.value}</div>}
-        {errors?.valueWarning && <div className="text-yellow-500 text-sm">{errors?.valueWarning}</div>}
+        {errors?.value && (
+          <div className="text-red-500 text-sm">{errors?.value}</div>
+        )}
+        {errors?.valueWarning && (
+          <div className="text-yellow-500 text-sm">{errors?.valueWarning}</div>
+        )}
       </FormGroup>
     </Card>
   );

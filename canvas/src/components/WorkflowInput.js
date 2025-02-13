@@ -149,13 +149,20 @@ const WorkflowInput = () => {
               })
               .filter(Boolean); // Filter out any unresolved datasets
             if (type === "manual") {
-              updateState({ inputDatasets }) // full info
+              updateState({ inputDatasets }); // full info
             } else {
-              updateState({ inputDatasets: [ // Adding, keep unique
-                ...new Map([...state.inputDatasets, ...inputDatasets].map(item => [item.index, item])).values()
-              ] });
+              updateState({
+                inputDatasets: [
+                  // Adding, keep unique
+                  ...new Map(
+                    [...state.inputDatasets, ...inputDatasets].map((item) => [
+                      item.index,
+                      item,
+                    ])
+                  ).values(),
+                ],
+              });
             }
-            
           }}
           multiSelect={true}
         />
@@ -395,17 +402,19 @@ const WorkflowInput = () => {
               id="list"
               title="Image List"
               tagContent={selectedImageIds.length}
-              tagProps={{ 
+              tagProps={{
                 round: true,
-                className: selectedImageIds.length === 0 ? 'bg-red-500 text-white' : ''
+                className:
+                  selectedImageIds.length === 0 ? "bg-red-500 text-white" : "",
               }}
             />
             <Tab
               id="grid"
               tagContent={selectedImageIds.length}
-              tagProps={{ 
+              tagProps={{
                 round: true,
-                className: selectedImageIds.length === 0 ? 'bg-red-500 text-white' : ''
+                className:
+                  selectedImageIds.length === 0 ? "bg-red-500 text-white" : "",
               }}
               title="Thumbnail Grid"
             />

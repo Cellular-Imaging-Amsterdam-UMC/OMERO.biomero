@@ -5,7 +5,7 @@ import { useAppContext } from "../AppContext";
 const WorkflowForm = () => {
   const { state, updateState } = useAppContext();
 
-  const ghURL = state.selectedWorkflow?.githubUrl 
+  const ghURL = state.selectedWorkflow?.githubUrl;
   const versionMatch = ghURL?.match(/\/tree\/(v[\d.]+)/);
   const version = versionMatch ? versionMatch[1] : "";
   const workflowMetadata = state.selectedWorkflow?.metadata;
@@ -16,11 +16,12 @@ const WorkflowForm = () => {
 
   const defaultValues = workflowMetadata.inputs.reduce((acc, input) => {
     const defaultValue = input["default-value"];
-    
+
     if (input.type === "Number") {
       acc[input.id] = defaultValue !== undefined ? Number(defaultValue) : 0;
     } else if (input.type === "Boolean") {
-      acc[input.id] = defaultValue !== undefined ? Boolean(defaultValue) : false;
+      acc[input.id] =
+        defaultValue !== undefined ? Boolean(defaultValue) : false;
     } else {
       acc[input.id] = defaultValue || "";
     }
@@ -36,13 +37,13 @@ const WorkflowForm = () => {
       formData: {
         ...state.formData,
         [id]: value,
-      }
+      },
     });
   };
 
   const renderFormFields = () => {
     return workflowMetadata.inputs
-      .filter(input => !input.id.startsWith("cytomine")) // Ignore fields starting with "cytomine"
+      .filter((input) => !input.id.startsWith("cytomine")) // Ignore fields starting with "cytomine"
       .map((input) => {
         const { id, name, description, type, optional } = input;
         const defaultValue = input["default-value"];
@@ -50,7 +51,12 @@ const WorkflowForm = () => {
         switch (type) {
           case "String":
             return (
-              <FormGroup key={id} label={name} labelFor={id} helperText={description || ""}>
+              <FormGroup
+                key={id}
+                label={name}
+                labelFor={id}
+                helperText={description || ""}
+              >
                 <InputGroup
                   id={id}
                   value={state.formData[id] || ""}
@@ -61,7 +67,12 @@ const WorkflowForm = () => {
             );
           case "Number":
             return (
-              <FormGroup key={id} label={name} labelFor={id} helperText={description || ""}>
+              <FormGroup
+                key={id}
+                label={name}
+                labelFor={id}
+                helperText={description || ""}
+              >
                 <NumericInput
                   id={id}
                   value={state.formData[id] || defaultValue || 0}
@@ -72,10 +83,19 @@ const WorkflowForm = () => {
             );
           case "Boolean":
             return (
-              <FormGroup key={id} label={name} labelFor={id} helperText={description || ""}>
+              <FormGroup
+                key={id}
+                label={name}
+                labelFor={id}
+                helperText={description || ""}
+              >
                 <Switch
                   id={id}
-                  checked={state.formData[id] !== undefined ? state.formData[id] : defaultValue || false}
+                  checked={
+                    state.formData[id] !== undefined
+                      ? state.formData[id]
+                      : defaultValue || false
+                  }
                   onChange={(e) => handleInputChange(id, e.target.checked)}
                   label={name}
                 />

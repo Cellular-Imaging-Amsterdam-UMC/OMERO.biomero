@@ -3,7 +3,8 @@ import { useAppContext } from "../AppContext";
 import { Card, Elevation, H6, Button } from "@blueprintjs/core";
 
 const ScriptCard = ({ script }) => {
-  const { openScriptWindow, fetchScriptDetails, state, apiLoading, apiError } = useAppContext();
+  const { openScriptWindow, fetchScriptDetails, state, apiLoading, apiError } =
+    useAppContext();
   const [isCardLoaded, setIsCardLoaded] = useState(false);
 
   useEffect(() => {
@@ -21,14 +22,31 @@ const ScriptCard = ({ script }) => {
   const isSlurmWorkflow = script.name === "Slurm Workflow";
 
   return (
-    <Card key={script.id} className="script-card" interactive={true} onClick={handleCardClick} selected={isSlurmWorkflow} elevation={Elevation.ONE}>
-      <ScriptDetailsContent script={script} apiLoading={apiLoading} handleCardClick={handleCardClick} isSlurmWorkflow={isSlurmWorkflow}/>
+    <Card
+      key={script.id}
+      className="script-card"
+      interactive={true}
+      onClick={handleCardClick}
+      selected={isSlurmWorkflow}
+      elevation={Elevation.ONE}
+    >
+      <ScriptDetailsContent
+        script={script}
+        apiLoading={apiLoading}
+        handleCardClick={handleCardClick}
+        isSlurmWorkflow={isSlurmWorkflow}
+      />
       {apiError && <p className="error">{apiError}</p>}
     </Card>
   );
 };
 
-const ScriptDetailsContent = ({ script, apiLoading, handleCardClick, isSlurmWorkflow }) => {
+const ScriptDetailsContent = ({
+  script,
+  apiLoading,
+  handleCardClick,
+  isSlurmWorkflow,
+}) => {
   return (
     <div>
       <H6 className={`script-name ${apiLoading ? "bp5-skeleton" : ""}`}>

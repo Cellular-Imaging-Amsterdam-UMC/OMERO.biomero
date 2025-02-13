@@ -6,12 +6,7 @@ import {
   Tabs,
   Tab,
   H4,
-  Navbar,
-  NavbarGroup,
-  NavbarHeading,
   Tooltip,
-  NavbarDivider,
-  Icon,
 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 import SettingsForm from "./components/SettingsForm";
@@ -66,15 +61,18 @@ const StatusPanel = ({
   <div className="h-full overflow-y-auto">
     <H4>Status</H4>
     <div className="bp5-form-group">
-        <div className="bp5-form-content">
-            <div className="bp5-form-helper-text">
-            View your active BIOMERO workflow progress, or browse some historical data, here on this dashboard. 
-            </div>
-            <div className="bp5-form-helper-text">
-            Tip: When a workflow is <b>DONE</b>, you can find your result images (if any) by pasting the <b>Workflow ID</b> in OMERO's search bar at the top of your screen.
-            </div>
+      <div className="bp5-form-content">
+        <div className="bp5-form-helper-text">
+          View your active BIOMERO workflow progress, or browse some historical
+          data, here on this dashboard.
+        </div>
+        <div className="bp5-form-helper-text">
+          Tip: When a workflow is <b>DONE</b>, you can find your result images
+          (if any) by pasting the <b>Workflow ID</b> in OMERO's search bar at
+          the top of your screen.
         </div>
       </div>
+    </div>
     <div className="p-4 h-full overflow-hidden">
       {!metabaseError ? (
         <iframe

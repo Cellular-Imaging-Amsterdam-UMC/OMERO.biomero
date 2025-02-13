@@ -1,11 +1,5 @@
 import React, { useState } from "react";
-import {
-  Card,
-  Collapse,
-  Button,
-  H4,
-  Icon,
-} from "@blueprintjs/core";
+import { Collapse, Button, H4, Icon } from "@blueprintjs/core";
 
 const ConfigSection = ({
   items,
@@ -72,7 +66,7 @@ const ConfigSection = ({
                 onReset={onResetItem}
                 editable={editableIndex === index}
                 setEditable={setEditable}
-                errors={errors ? errors[index] : null}  // Safely handle null errors
+                errors={errors ? errors[index] : null} // Safely handle null errors
                 validateField={validateField} // Pass validation function
               />
             </Collapse>

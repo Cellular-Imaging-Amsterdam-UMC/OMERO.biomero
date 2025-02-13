@@ -1,6 +1,19 @@
-import React, { useState, useEffect  } from "react";
+import React, { useState, useEffect } from "react";
 import { useAppContext } from "../AppContext";
-import { Card, Elevation, InputGroup, Button, H5, H6, MultistepDialog, DialogBody, DialogStep, Spinner, SpinnerSize, ButtonGroup } from "@blueprintjs/core";
+import {
+  Card,
+  Elevation,
+  InputGroup,
+  Button,
+  H5,
+  H6,
+  MultistepDialog,
+  DialogBody,
+  DialogStep,
+  Spinner,
+  SpinnerSize,
+  ButtonGroup,
+} from "@blueprintjs/core";
 import { FaDocker } from "react-icons/fa6";
 import WorkflowForm from "./WorkflowForm";
 import WorkflowOutput from "./WorkflowOutput";
@@ -21,32 +34,31 @@ const RunPanel = () => {
   };
 
   // Filter workflows based on search term
-  const filteredWorkflows = state.workflows?.filter((workflow) =>
-    workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    workflow.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredWorkflows = state.workflows?.filter(
+    (workflow) =>
+      workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      workflow.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   useEffect(() => {
     setIsNextDisabled(state.formData?.IDs?.length === 0);
-  }, [state.formData?.IDs]); 
-  
+  }, [state.formData?.IDs]);
+
   // Handle workflow click
   const handleWorkflowClick = (workflow) => {
     // Set selected workflow in the global state context
     updateState({
       selectedWorkflow: workflow, // Set selectedWorkflow in context
       formData: {
-        IDs: [],  // Empty or default value
+        IDs: [], // Empty or default value
         Data_Type: "Image", // Empty or default value
-      }
+      },
     });
     setDialogOpen(true); // Open the dialog
   };
 
   const handleFinalSubmit = (workflow) => {
-    updateState(
-      { workflowStatusTooltipShown: true }
-    );
+    updateState({ workflowStatusTooltipShown: true });
     if (toaster) {
       toaster.show({
         intent: "primary",
@@ -57,19 +69,16 @@ const RunPanel = () => {
             <span>Submitting workflow to the compute gods...</span>
           </div>
         ),
-      });      
+      });
     } else {
       console.warn("Toaster not initialized yet.");
     }
 
-    submitWorkflow(workflow.name)
+    submitWorkflow(workflow.name);
   };
 
   const submitWorkflow = (workflow_name) => {
-    runWorkflowData(
-      workflow_name, 
-      state.formData
-    );
+    runWorkflowData(workflow_name, state.formData);
   };
 
   const handleStepChange = (stepIndex) => {
@@ -87,7 +96,7 @@ const RunPanel = () => {
             leftIcon="search"
             placeholder="Search workflows..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}  // Update search term on input change
+            onChange={(e) => setSearchTerm(e.target.value)} // Update search term on input change
           />
         </div>
 
@@ -113,9 +122,14 @@ const RunPanel = () => {
                         intent="primary"
                         title="View GitHub Repository"
                         onClick={(e) => {
-                          e.stopPropagation(); 
-                          window.open(workflow.githubUrl, "_blank", "noopener,noreferrer");}}
-                        />
+                          e.stopPropagation();
+                          window.open(
+                            workflow.githubUrl,
+                            "_blank",
+                            "noopener,noreferrer"
+                          );
+                        }}
+                      />
                     )}
 
                     {/* Container Image Icon */}
@@ -127,7 +141,11 @@ const RunPanel = () => {
                         title="View Container Image"
                         onClick={(e) => {
                           e.stopPropagation();
-                          window.open(`https://hub.docker.com/r/${workflow.metadata["container-image"].image}`, "_blank", "noopener,noreferrer");
+                          window.open(
+                            `https://hub.docker.com/r/${workflow.metadata["container-image"].image}`,
+                            "_blank",
+                            "noopener,noreferrer"
+                          );
                         }}
                       />
                     )}
@@ -140,7 +158,10 @@ const RunPanel = () => {
             ))}
           </div>
         ) : (
-          <Card elevation={Elevation.ONE} className="flex flex-col items-center justify-center p-6 text-center">
+          <Card
+            elevation={Elevation.ONE}
+            className="flex flex-col items-center justify-center p-6 text-center"
+          >
             <Spinner intent="primary" size={SpinnerSize.SMALL} />
             <p className="text-sm text-gray-600 mt-4">Loading workflows...</p>
           </Card>
@@ -154,7 +175,7 @@ const RunPanel = () => {
           onClose={() => {
             setDialogOpen(false);
           }}
-          initialStepIndex={0}  // Start on Step 2 (Workflow Form)
+          initialStepIndex={0} // Start on Step 2 (Workflow Form)
           title={beautifyName(state.selectedWorkflow.name)}
           onChange={handleStepChange}
           navigationPosition={"top"}
@@ -165,9 +186,9 @@ const RunPanel = () => {
             text: "Run",
             onClick: () => {
               // Handle the final submit action here
-              handleFinalSubmit(state.selectedWorkflow);  // Perform the final action
+              handleFinalSubmit(state.selectedWorkflow); // Perform the final action
               setDialogOpen(false); // Close the dialog
-            }
+            },
           }}
         >
           <DialogStep
@@ -175,9 +196,11 @@ const RunPanel = () => {
             title="Input Data"
             className="min-h-[75vh]"
             panel={
-              <WorkflowInput onSelectionChange={(selectedImages) => {
-                setIsNextDisabled(selectedImages.length === 0);
-              }} />
+              <WorkflowInput
+                onSelectionChange={(selectedImages) => {
+                  setIsNextDisabled(selectedImages.length === 0);
+                }}
+              />
             }
             nextButtonProps={{
               disabled: isNextDisabled,
@@ -190,7 +213,7 @@ const RunPanel = () => {
             panel={
               <DialogBody>
                 <H6>{state.selectedWorkflow.description}</H6>
-                <WorkflowForm/>
+                <WorkflowForm />
               </DialogBody>
             }
           />
@@ -200,9 +223,11 @@ const RunPanel = () => {
             title="Output Data"
             panel={
               <DialogBody>
-                <WorkflowOutput onSelectionChange={(selectedOutput) => {
-                  setIsRunDisabled(!selectedOutput);}} 
-                  />
+                <WorkflowOutput
+                  onSelectionChange={(selectedOutput) => {
+                    setIsRunDisabled(!selectedOutput);
+                  }}
+                />
               </DialogBody>
             }
           />

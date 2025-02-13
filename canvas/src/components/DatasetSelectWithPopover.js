@@ -1,23 +1,27 @@
 import React, { useState } from "react";
-import { Button, Popover, PopoverInteractionKind, Tooltip, TagInput, FormGroup } from "@blueprintjs/core";
-import OmeroDataBrowser from "./OmeroDataBrowser"; 
+import {
+  Button,
+  Popover,
+  PopoverInteractionKind,
+  Tooltip,
+  TagInput,
+  FormGroup,
+} from "@blueprintjs/core";
+import OmeroDataBrowser from "./OmeroDataBrowser";
 import { useAppContext } from "../AppContext";
 
-const DatasetSelectWithPopover = ({ 
-  value, 
-  onChange, 
-  multiSelect = true, 
-  label = "", 
-  helperText = "", 
+const DatasetSelectWithPopover = ({
+  value,
+  onChange,
+  multiSelect = true,
+  label = "",
+  helperText = "",
   subLabel = "",
   tooltip = "",
   buttonText = "Add Dataset",
   intent = "",
 }) => {
-  const {
-      state,
-      updateState,
-    } = useAppContext();
+  const { state, updateState } = useAppContext();
   const [isPopoverOpen, setPopoverOpen] = useState(false);
   const [values, setValues] = useState([]);
 
@@ -26,7 +30,9 @@ const DatasetSelectWithPopover = ({
     let updatedSelection;
     if (state.omeroFileTreeSelection.includes(nodeId)) {
       // Remove the node if it was already selected
-      updatedSelection = state.omeroFileTreeSelection.filter((id) => id !== nodeId);
+      updatedSelection = state.omeroFileTreeSelection.filter(
+        (id) => id !== nodeId
+      );
     } else {
       // Add the node, with multi selection maybe
       if (!multiSelect) {
@@ -35,13 +41,13 @@ const DatasetSelectWithPopover = ({
         updatedSelection = [...state.omeroFileTreeSelection, nodeId];
       }
     }
-    updateState({["omeroFileTreeSelection"]: updatedSelection}); // update selector
+    updateState({ ["omeroFileTreeSelection"]: updatedSelection }); // update selector
   };
 
   const handleManualInputChange = (updatedValues) => {
     setValues(updatedValues); // Update local state
     onChange(updatedValues, "manual"); // Pass the full array to the parent
-  }
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
@@ -76,19 +82,24 @@ const DatasetSelectWithPopover = ({
             onInteraction={(state) => setPopoverOpen(state)}
             content={
               <div className="p-4 flex flex-col space-y-4">
-                <OmeroDataBrowser 
+                <OmeroDataBrowser
                   onSelectCallback={(folder) => handleInputChange(folder)}
                 />
                 <Button
                   className="self-end"
                   icon="send-message"
-                  onClick={handleSelectFolder} 
+                  onClick={handleSelectFolder}
                   intent="primary"
                 />
               </div>
             }
           >
-            <Tooltip content={tooltip} placement="bottom" defaultIsOpen={true} usePortal={false}>
+            <Tooltip
+              content={tooltip}
+              placement="bottom"
+              defaultIsOpen={true}
+              usePortal={false}
+            >
               <Button icon="folder-open" text={buttonText} />
             </Tooltip>
           </Popover>

@@ -7,7 +7,12 @@ const WorkflowOutput = ({ onSelectionChange }) => {
   const { state, updateState } = useAppContext();
   const [renamePattern, setRenamePattern] = useState("");
   const [hasOutputSelection, setHasOutputSelection] = useState(true);
-  const outputOptions = ["importAsZip", "uploadCsv", "attachToOriginalImages", "selectedDatasets"];
+  const outputOptions = [
+    "importAsZip",
+    "uploadCsv",
+    "attachToOriginalImages",
+    "selectedDatasets",
+  ];
   const defaultValues = {
     receiveEmail: true,
     importAsZip: true,
@@ -25,8 +30,8 @@ const WorkflowOutput = ({ onSelectionChange }) => {
   useEffect(() => {
     // Tell the parent
     onSelectionChange(hasOutputSelection);
-  }, [hasOutputSelection])
-  
+  }, [hasOutputSelection]);
+
   const handleInputChange = (key, value) => {
     // Compute new state immediately
     const updatedFormData = {
@@ -38,10 +43,12 @@ const WorkflowOutput = ({ onSelectionChange }) => {
 
     if (outputOptions.includes(key)) {
       // Check if at least one of the output options is still selected
-      const hasSelection = outputOptions.some(opt => 
-        Array.isArray(updatedFormData[opt]) ? updatedFormData[opt].length > 0 : !!updatedFormData[opt]
+      const hasSelection = outputOptions.some((opt) =>
+        Array.isArray(updatedFormData[opt])
+          ? updatedFormData[opt].length > 0
+          : !!updatedFormData[opt]
       );
-      setHasOutputSelection(hasSelection)
+      setHasOutputSelection(hasSelection);
     }
   };
 
@@ -73,23 +80,30 @@ const WorkflowOutput = ({ onSelectionChange }) => {
         labelFor="import-options"
         subLabel={
           <span>
-            Select <strong className={hasOutputSelection ? '' : 'font-bold text-red-500'}>one or more</strong> options below for how you want the data resulting from this workflow imported back into OMERO
+            Select{" "}
+            <strong
+              className={hasOutputSelection ? "" : "font-bold text-red-500"}
+            >
+              one or more
+            </strong>{" "}
+            options below for how you want the data resulting from this workflow
+            imported back into OMERO
           </span>
         }
-        intent={hasOutputSelection ? '' : 'danger'}
+        intent={hasOutputSelection ? "" : "danger"}
       >
         {/* Zip File Option */}
         <FormGroup
           label="Add results as a zip file archive."
           labelFor="upload-zip-options"
           helperText="Archive the output package (e.g., images, CSVs) as a zip file attached to the parent dataset/project."
-          intent={hasOutputSelection ? '' : 'danger'}
+          intent={hasOutputSelection ? "" : "danger"}
         >
           <Switch
             id="upload-zip-options"
             checked={state.formData.importAsZip ?? defaultValues.importAsZip}
             onChange={(e) => handleInputChange("importAsZip", e.target.checked)}
-            intent={hasOutputSelection ? '' : 'danger'}
+            intent={hasOutputSelection ? "" : "danger"}
           />
         </FormGroup>
 
@@ -98,13 +112,13 @@ const WorkflowOutput = ({ onSelectionChange }) => {
           label="Add results as OMERO tables."
           labelFor="upload-csv-options"
           helperText="Upload the output CSVs as interactive OMERO tables for further analysis."
-          intent={hasOutputSelection ? '' : 'danger'}
+          intent={hasOutputSelection ? "" : "danger"}
         >
           <Switch
             id="upload-csv-options"
             checked={state.formData.uploadCsv ?? defaultValues.uploadCsv}
             onChange={(e) => handleInputChange("uploadCsv", e.target.checked)}
-            intent={hasOutputSelection ? '' : 'danger'}
+            intent={hasOutputSelection ? "" : "danger"}
           />
         </FormGroup>
 
@@ -113,7 +127,7 @@ const WorkflowOutput = ({ onSelectionChange }) => {
           label="Add results as attachments to input images."
           labelFor="upload-images-options"
           helperText="Attach the output images (e.g., masks) to the original input images to track their provenance."
-          intent={hasOutputSelection ? '' : 'danger'}
+          intent={hasOutputSelection ? "" : "danger"}
         >
           <Switch
             id="upload-images-options"
@@ -124,7 +138,7 @@ const WorkflowOutput = ({ onSelectionChange }) => {
             onChange={(e) =>
               handleInputChange("attachToOriginalImages", e.target.checked)
             }
-            intent={hasOutputSelection ? '' : 'danger'}
+            intent={hasOutputSelection ? "" : "danger"}
           />
         </FormGroup>
 
@@ -138,7 +152,10 @@ const WorkflowOutput = ({ onSelectionChange }) => {
           value={state.formData.selectedDatasets || []}
           onChange={(values, type) => {
             if (type === "manual") {
-              handleInputChange("selectedDatasets", values?.length ? [values[values.length - 1]] : [])
+              handleInputChange(
+                "selectedDatasets",
+                values?.length ? [values[values.length - 1]] : []
+              );
             } else {
               const selectedDataset = values.map(
                 (dataset) => state.omeroFileTreeData[dataset].data
@@ -147,7 +164,7 @@ const WorkflowOutput = ({ onSelectionChange }) => {
             }
           }}
           multiSelect={false}
-          intent={hasOutputSelection ? '' : 'danger'}
+          intent={hasOutputSelection ? "" : "danger"}
         />
 
         {/* Optional Image File Renamer */}
@@ -186,7 +203,11 @@ const WorkflowOutput = ({ onSelectionChange }) => {
           />
         </FormGroup>
       </FormGroup>
-      {!hasOutputSelection && <div className="text-red-500 text-sm">Please select at least one output option</div>}
+      {!hasOutputSelection && (
+        <div className="text-red-500 text-sm">
+          Please select at least one output option
+        </div>
+      )}
     </form>
   );
 };
