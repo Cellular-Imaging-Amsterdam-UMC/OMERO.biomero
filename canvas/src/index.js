@@ -11,8 +11,8 @@ import {
 import "./index.css";
 import "./tailwind.css";
 import { AppProvider } from "./AppContext";
-import BiomeroApp from "./BiomeroApp";
-import UploaderApp from "./UploaderApp";
+import BiomeroApp from "./biomero/BiomeroApp";
+import UploaderApp from "./uploader/UploaderApp";
 import {
   Navbar,
   NavbarGroup,
