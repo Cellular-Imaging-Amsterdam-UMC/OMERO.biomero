@@ -2,12 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAppContext } from "./AppContext";
 import TabContainer from "./components/TabContainer";
 import RunPanel from "./components/RunPanel";
-import {
-  Tabs,
-  Tab,
-  H4,
-  Tooltip,
-} from "@blueprintjs/core";
+import { Tabs, Tab, H4, Tooltip, H6 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 import SettingsForm from "./components/SettingsForm";
 
@@ -19,6 +14,16 @@ const RunTab = () => (
         <RunPanel />
       </div>
     </div>
+    <H6>
+      Powered by{" "}
+      <a
+        href="https://github.com/NL-BioImaging/biomero"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        BIOMERO
+      </a>
+    </H6>
   </div>
 );
 

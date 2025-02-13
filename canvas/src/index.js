@@ -28,8 +28,8 @@ function AppRouter() {
 
   return (
     <AppProvider>
-      <div className="bg-[#f0f1f5] w-full h-full relative top-0 overflow-hidden">
-        <Navbar className="z-[1]">
+      <div className="bg-[#f0f1f5] w-full h-full relative top-0">
+        <Navbar className="z-[1] top-[35px]" fixedToTop>
           <NavbarGroup>
             <Icon icon="style" className="mr-[7px]" />
             <NavbarHeading>CANVAS</NavbarHeading>
@@ -50,7 +50,9 @@ function AppRouter() {
             />
           </NavbarGroup>
         </Navbar>
-        {appName === "biomero" ? <BiomeroApp /> : <UploaderApp />}
+        <div className="pt-[50px]">
+          {appName === "biomero" ? <BiomeroApp /> : <UploaderApp />}
+        </div>
       </div>
     </AppProvider>
   );
