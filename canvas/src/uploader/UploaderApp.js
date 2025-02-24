@@ -92,15 +92,22 @@ const UploaderApp = () => {
 
   const handleUpload = async () => {
     setUploading(true);
-    const selectedLocal = state.localFileTreeSelection;
-    const selectedOmero = state.omeroFileTreeSelection;
+
+    const selectedLocal = uploadList.map(item => item.value);
+    const selectedOmero = state.omeroFileTreeSelection.map(index => {
+      const omeroItem = state.omeroFileTreeData[index]; 
+      return omeroItem ? [omeroItem.category, omeroItem.id] : null;
+    }).filter(Boolean); // Remove any null values  
+
     const uploadData = { selectedLocal, selectedOmero };
+
     try {
-      await uploadSelectedData(uploadData);
+        await uploadSelectedData(uploadData);
     } finally {
-      setUploading(false);
+        setUploading(false);
     }
   };
+
 
   // We need to make sure only unique items are added to the upload list
   const addUploadItems = () => {

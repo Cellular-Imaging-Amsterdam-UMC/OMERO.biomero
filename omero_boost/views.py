@@ -16,11 +16,14 @@ from django.conf import settings
 from omeroweb.webclient.decorators import login_required, render_response
 from omero.gateway import BlitzGateway
 from omero.rtypes import unwrap, rbool, wrap, rlong
-from .utils import get_react_build_file
 from biomero import SlurmClient
+from .utils import create_upload_order, get_react_build_file
 import configparser
 from configupdater import ConfigUpdater, Comment
 import datetime
+import uuid
+from collections import defaultdict
+from omero_adi.utils.ingest_tracker import initialize_ingest_tracker
 
 
 logger = logging.getLogger(__name__)
@@ -426,6 +429,31 @@ logger.info(
 )
 
 
+def ready():
+    """
+    Called when the app is ready. We initialize the IngestTracker using an environment variable.
+    """
+    db_url = os.getenv('INGEST_TRACKING_DB_URL')
+    if not db_url:
+        logger.error("Environment variable 'INGEST_TRACKING_DB_URL' not set")
+        return
+
+    config = {'ingest_tracking_db': db_url}
+
+    try:
+        if initialize_ingest_tracker(config):
+            logger.info("IngestTracker initialized successfully")
+        else:
+            logger.error("Failed to initialize IngestTracker")
+    except Exception as e:
+        logger.error(f"Unexpected error during IngestTracker initialization: {e}", exc__info=True)
+
+
+logger.info("Setting up IngestTracker for imports")
+ready()
+logger.info("IngestTracker ready")
+
+
 def check_directory_access(path):
     """Check if a directory exists and is accessible."""
     try:
@@ -563,24 +591,22 @@ def import_selected(request, conn=None, **kwargs):
 
         if not selected_items:
             return JsonResponse({"error": "No items selected"}, status=400)
+        if not selected_destinations:
+            return JsonResponse({"error": "No destinations selected"}, status=400)
 
         # Get the current user's information for logging
         current_user = conn.getUser()
         username = current_user.getName()
         user_id = current_user.getId()
+        group = conn.getGroupFromContext().getName()
 
         # Log the import attempt
         logger.info(
-            f"User {username} (ID: {user_id}) attempting to import {len(selected_items)} items"
+            f"User {username} (ID: {user_id}, group: {group}) attempting to import {len(selected_items)} items"
         )
 
-        for item in selected_items:
-            abs_path = os.path.abspath(os.path.join(BASE_DIR, item))
-            if not abs_path.startswith(BASE_DIR):
-                return JsonResponse({"error": "Access denied"}, status=403)
-            logger.info(f"Importing: {abs_path}")
-            # Add your actual import logic here
-            # TODO access database
+        # Call the process_files function to handle file processing and order creation
+        process_files(selected_items, selected_destinations, group, username)
 
         return JsonResponse(
             {
@@ -593,6 +619,70 @@ def import_selected(request, conn=None, **kwargs):
     except Exception as e:
         logger.error(f"Import error: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
+
+
+def process_files(selected_items, selected_destinations, group, username):
+    """
+    Process the selected files and destinations to create upload orders with appropriate preprocessing.
+    """
+    files_by_preprocessing = defaultdict(list)  # Group files by preprocessing config
+
+    for item in selected_items:
+        abs_path = os.path.abspath(os.path.join(BASE_DIR, item))
+        if not abs_path.startswith(BASE_DIR):  # we just joined it 1 line above, why this?
+            return JsonResponse({"error": "Access denied"}, status=403)
+
+        logger.info(f"Importing: {abs_path} to {selected_destinations}")
+
+        for (sample_parent_type, sample_parent_id) in selected_destinations:
+            if sample_parent_type in ("screens", "Screen"):
+                sample_parent_type = "Screen"
+                if item.endswith(".db"):
+                    preprocessing_key = "screen_db"
+                else:
+                    preprocessing_key = "screen_no_preprocessing"
+            elif sample_parent_type in ("datasets", "Dataset"):
+                sample_parent_type = "Dataset"
+                # Placeholder for custom criteria
+                # if some_other_criteria(item):
+                if item.endswith(".xlef"):
+                    preprocessing_key = "dataset_custom_preprocessing"
+                else:
+                    preprocessing_key = "dataset_no_preprocessing"
+            else:
+                raise ValueError(f"Unknown type {sample_parent_type} for id {sample_parent_id}")
+
+            # Group files by preprocessing key
+            files_by_preprocessing[(sample_parent_type, sample_parent_id, preprocessing_key)].append(abs_path)
+
+    # Now create orders for each group
+    for (sample_parent_type, sample_parent_id, preprocessing_key), files in files_by_preprocessing.items():
+        order_info = {
+            "Group": group,
+            "Username": username,
+            "DestinationID": sample_parent_id,
+            "DestinationType": sample_parent_type,
+            "UUID": str(uuid.uuid4()),
+            "Files": files
+        }
+
+        # Apply preprocessing based on key
+        if preprocessing_key == "screen_db":
+            order_info["preprocessing_container"] = "cellularimagingcf/cimagexpresstoometiff:v0.7"
+            order_info["preprocessing_inputfile"] = "{Files}"
+            order_info["preprocessing_outputfolder"] = "/data"
+            order_info["preprocessing_altoutputfolder"] = "/out"
+            order_info["extra_params"] = {"saveoption": "single"}
+
+        elif preprocessing_key == "dataset_custom_preprocessing":
+            order_info["preprocessing_container"] = "some-other-container"
+            order_info["preprocessing_inputfile"] = "{Files}"
+            order_info["preprocessing_outputfolder"] = "/custom-output-folder"
+            order_info["preprocessing_altoutputfolder"] = "/custom-alt-output"
+            order_info["extra_params"] = {"custom_param": "value"}
+
+        # No preprocessing for other cases
+        create_upload_order(order_info)
 
 
 @login_required()
@@ -669,7 +759,7 @@ def get_folder_contents(request, conn=None, **kwargs):
     """
     Handles the GET request to retrieve folder contents.
     """
-    base_dir = "/tmp"  # Path to root folder from settings
+    base_dir = os.getenv("IMPORT_MOUNT_PATH", "/L-Drive")  # Path to root folder from settings
 
     # Extract the folder ID from the request
     folder_id = request.GET.get("folder_id", None)
@@ -678,6 +768,7 @@ def get_folder_contents(request, conn=None, **kwargs):
     # Determine the target directory based on folder_id or default to the root folder
     target_dir = base_dir if folder_id is None else os.path.join(
         base_dir, folder_id)
+    logger.info(f"Target folder: {target_dir}")
 
     # Validate if the directory exists
     if not os.path.exists(target_dir) or not os.path.isdir(target_dir):

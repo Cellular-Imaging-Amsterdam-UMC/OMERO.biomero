@@ -1,6 +1,10 @@
 import json
 import os
 from django.conf import settings
+from omero_adi.utils.ingest_tracker import (
+    log_ingestion_step, 
+    STAGE_NEW_ORDER, 
+)
 
 
 def get_react_build_file(logical_name):
@@ -25,3 +29,6 @@ def get_react_build_file(logical_name):
         return logical_name
 
 
+def create_upload_order(order_dict):
+    # Log the new order using the original attributes.
+    log_ingestion_step(order_dict, STAGE_NEW_ORDER)
