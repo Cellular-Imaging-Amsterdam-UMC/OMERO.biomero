@@ -25,6 +25,19 @@ const MonitorPanel = ({
 }) => (
   <div className="h-full overflow-y-auto">
     <H4>Monitor</H4>
+    <div className="bp5-form-group">
+      <div className="bp5-form-content">
+        <div className="bp5-form-helper-text">
+          View your active import progress, or browse some historical data, here
+          on this dashboard.
+        </div>
+        <div className="bp5-form-helper-text">
+          Tip: When an import is <b>Import Completed</b>, you can find your
+          result images by pasting the <b>UUID</b> in OMERO's search bar at the
+          top of your screen.
+        </div>
+      </div>
+    </div>
     <div className="p-4 h-full overflow-hidden">
       {!metabaseError ? (
         <iframe
@@ -33,6 +46,7 @@ const MonitorPanel = ({
           className="w-full h-[800px]"
           frameBorder="0"
           onError={() => setMetabaseError(true)}
+          onload="iFrameResize({}, this)"
         />
       ) : (
         <div className="error">
@@ -93,21 +107,23 @@ const UploaderApp = () => {
   const handleUpload = async () => {
     setUploading(true);
 
-    const selectedLocal = uploadList.map(item => item.value);
-    const selectedOmero = state.omeroFileTreeSelection.map(index => {
-      const omeroItem = state.omeroFileTreeData[index]; 
-      return omeroItem ? [omeroItem.category, omeroItem.id] : null;
-    }).filter(Boolean); // Remove any null values  
+    const selectedLocal = uploadList.map((item) => item.value);
+    const selectedOmero = state.omeroFileTreeSelection
+      .map((index) => {
+        const omeroItem = state.omeroFileTreeData[index];
+        return omeroItem ? [omeroItem.category, omeroItem.id] : null;
+      })
+      .filter(Boolean); // Remove any null values
 
     const uploadData = { selectedLocal, selectedOmero };
 
     try {
-        await uploadSelectedData(uploadData);
+      await uploadSelectedData(uploadData);
     } finally {
-        setUploading(false);
+      setUploading(false);
+      removeAllUploadItems();
     }
   };
-
 
   // We need to make sure only unique items are added to the upload list
   const addUploadItems = () => {
@@ -175,7 +191,7 @@ const UploaderApp = () => {
     .getAttribute("data-metabase-token-imports");
   const isAdmin =
     document.getElementById("root").getAttribute("data-is-admin") === "true";
-  const iframeUrl = `${metabaseUrl}/embed/dashboard/${metabaseToken}#bordered=true&titled=true&refresh=20`;
+  const iframeUrl = `${metabaseUrl}/embed/dashboard/${metabaseToken}#bordered=true&titled=false&refresh=20`;
 
   useEffect(() => {
     loadOmeroTreeData();

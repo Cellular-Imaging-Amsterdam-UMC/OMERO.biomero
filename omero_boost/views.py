@@ -50,7 +50,8 @@ def get_biomero_config(request, conn=None, **kwargs):
                      os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_2),
                      os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_3)])
         # Convert configparser object to JSON-like dict
-        config_dict = {section: dict(configs.items(section)) for section in configs.sections()}
+        config_dict = {section: dict(configs.items(section))
+                       for section in configs.sections()}
 
         return JsonResponse({"config": config_dict})
     except Exception as e:
@@ -81,10 +82,10 @@ def save_biomero_config(request, conn=None, **kwargs):
         # Read the existing configuration if the file exists
         if os.path.exists(config_path):
             config.read(config_path)
-        
+
         # Extract the 'config' section from the incoming data
         config_data = data.get("config", {})
-        
+
         def generate_model_comment(key):
             if key.endswith('_job'):
                 c = "# The jobscript in the 'slurm_script_repo'"
@@ -97,12 +98,13 @@ def save_biomero_config(request, conn=None, **kwargs):
         # Update the config with new values
         for section, settingsd in config_data.items():
             if not isinstance(settingsd, dict):
-                raise ValueError(f"Section '{section}' must contain key-value pairs.")
+                raise ValueError(
+                    f"Section '{section}' must contain key-value pairs.")
 
             # If the section doesn't exist, add it
             if section not in config:
                 config.add_section(section)
-                
+
             if section == "MODELS":
                 # Group keys by prefix (cellpose, stardist, etc.)
                 model_keys = defaultdict(list)
@@ -131,24 +133,24 @@ def save_biomero_config(request, conn=None, **kwargs):
 # The path to store the container on the slurm_images_path'''
                                 config.set(section, key, value)
                                 (config[section][model_prefix].add_before
-                                                            .comment(comment))
+                                 .comment(comment))
                             else:
                                 # For new keys, add the key and a comment before it
                                 model_comment = generate_model_comment(key)
-                                
+
                                 if "job_" in key:
                                     (config[section][model_prefix+"_job"].add_after
-                                                            .comment(model_comment)
-                                                            .option(key, value))
+                                     .comment(model_comment)
+                                     .option(key, value))
                                 elif "_job" in key:
                                     (config[section][model_prefix+"_repo"].add_after
-                                                            .comment(model_comment)
-                                                            .option(key, value))
+                                     .comment(model_comment)
+                                     .option(key, value))
                                 else:
                                     (config[section][model_prefix].add_after
-                                                            .comment(model_comment)
-                                                            .option(key, value))
-                
+                                     .comment(model_comment)
+                                     .option(key, value))
+
                 # Check for removing top-level keys and related keys
                 for key in list(config[section].keys()):
                     model_prefix = key
@@ -157,7 +159,8 @@ def save_biomero_config(request, conn=None, **kwargs):
                             model_prefix = key.split(f"_{suffix}")[0]
                             break
                     if model_prefix not in model_keys:
-                        del config[section][key]  # Remove the unwanted key or subsection
+                        # Remove the unwanted key or subsection
+                        del config[section][key]
 
             elif section == "CONVERTERS":
                 # add new or edits as normal
@@ -171,7 +174,7 @@ def save_biomero_config(request, conn=None, **kwargs):
                 # Update or add the keys in the section
                 for key, value in settingsd.items():
                     config.set(section, key, value)
-        
+
         # Prepare the update timestamp comment
         timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         change_comment = f"Config automatically updated by {username} ({user_id}) via the web UI on {timestamp}"
@@ -184,7 +187,6 @@ def save_biomero_config(request, conn=None, **kwargs):
         if isinstance(changelog_section.first_block, Comment):
             changelog_section.first_block.detach()
         changelog_section.add_after.comment(change_comment)
-            
 
         # Save the updated configuration while preserving comments
         with open(config_path, "w") as config_file:
@@ -206,7 +208,7 @@ def save_biomero_config(request, conn=None, **kwargs):
 
 @login_required()
 @require_http_methods(["POST"])
-def run_workflow_script(request, conn=None, script_name = "SLURM_Run_Workflow.py", **kwargs):
+def run_workflow_script(request, conn=None, script_name="SLURM_Run_Workflow.py", **kwargs):
     """
     Trigger a specific OMERO script to run based on the provided script name and parameters.
     """
@@ -277,7 +279,8 @@ def run_workflow_script(request, conn=None, script_name = "SLURM_Run_Workflow.py
             return JsonResponse({"status": "success", "message": f"Script {script_name} for {workflow_name} started successfully: {msg}"})
 
         except Exception as e:
-            logger.error(f"Error executing script {script_name} for {workflow_name}: {str(e)}")
+            logger.error(
+                f"Error executing script {script_name} for {workflow_name}: {str(e)}")
             return JsonResponse({"error": f"Failed to execute script {script_name} for {workflow_name}: {str(e)} -- inputs: {inputs}"}, status=500)
 
     except json.JSONDecodeError:
@@ -318,11 +321,12 @@ def get_workflow_metadata(request, conn=None, **kwargs):
         with SlurmClient.from_config(config_only=True) as sc:
             if workflow_name not in sc.slurm_model_images:
                 return JsonResponse({"error": "Workflow not found"}, status=404)
-            
+
             metadata = sc.pull_descriptor_from_github(workflow_name)
         return JsonResponse(metadata)
     except Exception as e:
-        logger.error(f"Error fetching metadata for workflow {workflow_name}: {str(e)}")
+        logger.error(
+            f"Error fetching metadata for workflow {workflow_name}: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
 
 
@@ -344,7 +348,8 @@ def get_workflow_github(request, conn=None, **kwargs):
             github = sc.slurm_model_repos[workflow_name]
         return JsonResponse({"url": github})
     except Exception as e:
-        logger.error(f"Error fetching descriptor for workflow {workflow_name}: {str(e)}")
+        logger.error(
+            f"Error fetching descriptor for workflow {workflow_name}: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
 
 
@@ -446,7 +451,8 @@ def ready():
         else:
             logger.error("Failed to initialize IngestTracker")
     except Exception as e:
-        logger.error(f"Unexpected error during IngestTracker initialization: {e}", exc__info=True)
+        logger.error(
+            f"Unexpected error during IngestTracker initialization: {e}", exc__info=True)
 
 
 logger.info("Setting up IngestTracker for imports")
@@ -625,12 +631,12 @@ def process_files(selected_items, selected_destinations, group, username):
     """
     Process the selected files and destinations to create upload orders with appropriate preprocessing.
     """
-    files_by_preprocessing = defaultdict(list)  # Group files by preprocessing config
-
+    files_by_preprocessing = defaultdict(
+        list)  # Group files by preprocessing config
+    # Path to root folder from settings
+    base_dir = os.getenv("IMPORT_MOUNT_PATH", "/L-Drive")
     for item in selected_items:
-        abs_path = os.path.abspath(os.path.join(BASE_DIR, item))
-        if not abs_path.startswith(BASE_DIR):  # we just joined it 1 line above, why this?
-            return JsonResponse({"error": "Access denied"}, status=403)
+        abs_path = os.path.abspath(os.path.join(base_dir, item))
 
         logger.info(f"Importing: {abs_path} to {selected_destinations}")
 
@@ -650,10 +656,12 @@ def process_files(selected_items, selected_destinations, group, username):
                 else:
                     preprocessing_key = "dataset_no_preprocessing"
             else:
-                raise ValueError(f"Unknown type {sample_parent_type} for id {sample_parent_id}")
+                raise ValueError(
+                    f"Unknown type {sample_parent_type} for id {sample_parent_id}")
 
             # Group files by preprocessing key
-            files_by_preprocessing[(sample_parent_type, sample_parent_id, preprocessing_key)].append(abs_path)
+            files_by_preprocessing[(
+                sample_parent_type, sample_parent_id, preprocessing_key)].append(abs_path)
 
     # Now create orders for each group
     for (sample_parent_type, sample_parent_id, preprocessing_key), files in files_by_preprocessing.items():
@@ -713,7 +721,7 @@ def canvas(request, conn=None, **kwargs):
 
     payload_imports = {
         "resource": {"dashboard": int(metabase_dashboard_id_imports)},
-        "params": {"user": [user_id]},
+        "params": {"user_name": [username]},
         "exp": round(time.time()) + (60 * 30),
     }
     token_imports = jwt.encode(
@@ -730,7 +738,7 @@ def canvas(request, conn=None, **kwargs):
         "is_admin": is_admin,
         "main_js": get_react_build_file("main.js"),
         "main_css": get_react_build_file("main.css"),
-        "title": "BIOMERO Workflows",
+        "title": "CANVAS ft. BIOMERO",
         "app_name": "biomero",  # BiomeroApp
     }
     return context
@@ -759,7 +767,8 @@ def get_folder_contents(request, conn=None, **kwargs):
     """
     Handles the GET request to retrieve folder contents.
     """
-    base_dir = os.getenv("IMPORT_MOUNT_PATH", "/L-Drive")  # Path to root folder from settings
+    base_dir = os.getenv("IMPORT_MOUNT_PATH",
+                         "/L-Drive")  # Path to root folder from settings
 
     # Extract the folder ID from the request
     folder_id = request.GET.get("folder_id", None)

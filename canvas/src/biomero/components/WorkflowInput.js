@@ -43,7 +43,10 @@ const WorkflowInput = () => {
       const treeNode = state.omeroFileTreeData[dataset.index];
 
       if (!treeNode || !treeNode.children || treeNode.children.length === 0) {
-        loadImagesForDataset(dataset); // Fetch only if not already loaded
+        loadImagesForDataset({
+          dataset: dataset,
+          group: state.user.active_group_id,
+        }); // Fetch only if not already loaded
       }
     });
   }, [state.inputDatasets]);

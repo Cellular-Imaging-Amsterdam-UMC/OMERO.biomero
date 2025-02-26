@@ -138,7 +138,7 @@ export const fetchImages = async (
   page = 1,
   sizeXYZ = false,
   date = false,
-  group = 0
+  group = -1
 ) => {
   const { urls } = getDjangoConstants(); // Get the URLs from Django constants
 

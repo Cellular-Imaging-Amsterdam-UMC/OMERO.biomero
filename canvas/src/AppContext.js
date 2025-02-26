@@ -84,13 +84,13 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const loadImagesForDataset = async (
+  const loadImagesForDataset = async ({
     dataset,
     page = 1,
     sizeXYZ = false,
     date = false,
-    group = 0
-  ) => {
+    group = -1,
+  }) => {
     setLoading(true);
     setError(null);
 
@@ -420,7 +420,7 @@ export const AppProvider = ({ children }) => {
           return node; // No change for non-matching nodes
         });
 
-      const updatedScripts = updateNestedScripts(state.scripts)
+      const updatedScripts = updateNestedScripts(state.scripts);
       // Update the state with the updated nested scripts
       setState((prevState) => ({
         ...prevState,
