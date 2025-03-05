@@ -14,6 +14,7 @@ const ConverterCard = ({
   item,
   index,
   onChange,
+  onAddParam,
   onDelete,
   onReset,
   editable,
