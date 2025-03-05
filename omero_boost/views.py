@@ -417,15 +417,6 @@ def get_workflow_github(request, conn=None, **kwargs):
 
 
 @login_required()
-@render_response()
-def webclient_templates(request, base_template, **kwargs):
-    """Simply return the named template. Similar functionality to
-    django.views.generic.simple.direct_to_template"""
-    template_name = "scriptmenu/webgateway/%s.html" % base_template
-    return {"template": template_name}
-
-
-@login_required()
 def get_script_menu(request, conn=None, **kwargs):
     script_ids = request.GET.get("script_ids", "").split(",")
     script_ids = [int(id) for id in script_ids if id.isdigit()]
@@ -630,23 +621,6 @@ def list_directory(request, conn=None, **kwargs):
 
 
 @login_required()
-@require_http_methods(["GET"])
-def file_info(request, conn=None, **kwargs):
-    file_path = request.GET.get("path", "")
-    abs_file_path = os.path.abspath(os.path.join(BASE_DIR, file_path))
-
-    if not abs_file_path.startswith(BASE_DIR):
-        return JsonResponse({"error": "Access denied"}, status=403)
-
-    try:
-        size = os.path.getsize(abs_file_path)
-        modified_time = time.ctime(os.path.getmtime(abs_file_path))
-        return JsonResponse({"size": f"{size} bytes", "modified": modified_time})
-    except OSError as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
-
-@login_required()
 @require_http_methods(["POST"])
 def import_selected(request, conn=None, **kwargs):
     try:
@@ -807,29 +781,6 @@ def canvas(request, conn=None, **kwargs):
         "app_name": "biomero",  # BiomeroApp
     }
     return context
-
-
-@login_required()
-@render_response()
-def imports_webclient_templates(request, base_template, **kwargs):
-    """Simply return the named template for imports database."""
-    template_name = f"omeroboost/webgateway/{base_template}.html"
-    return {"template": template_name}
-
-
-@login_required()
-@render_response()
-def workflows_webclient_templates(request, base_template, **kwargs):
-    """Simply return the named template for workflows database."""
-    template_name = f"omeroboost/webgateway/{base_template}.html"
-    return {"template": template_name}
-
-
-def process_leica_metadata(metadata):
-    """
-    Process the metadata for Leica files.
-    """
-    metadata_dict = json.loads(metadata)
 
 
 @login_required()

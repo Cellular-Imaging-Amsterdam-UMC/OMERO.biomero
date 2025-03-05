@@ -56,7 +56,7 @@ export const fetchFolderData = async (itemId = null, isFolder = true) => {
     is_folder: isFolder,
     _: new Date().getTime(),
   };
-  return apiRequest(urls.api_local_file_browser, "GET", null, { params });
+  return apiRequest(urls.api_get_folder_contents, "GET", null, { params });
 };
 
 export const fetchGroups = async () => {

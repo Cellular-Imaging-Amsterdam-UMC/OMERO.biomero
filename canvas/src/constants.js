@@ -34,7 +34,7 @@ export const getDjangoConstants = () => {
     initially_open: WEBCLIENT.initially_open,
     tree_top_level: WEBCLIENT.URLS.tree_top_level,
     api_experimenter: WEBCLIENT.URLS.api_experimenter,
-    api_local_file_browser: "/omero_boost/local_file_browser/",
+    api_get_folder_contents: "/omero_boost/get_folder_contents/",
     api_get_groups: "/webclient/group_user_content/",
     scripts: "/webclient/list_scripts/",
     get_script_menu: "/omero_boost/get_script_menu/",
