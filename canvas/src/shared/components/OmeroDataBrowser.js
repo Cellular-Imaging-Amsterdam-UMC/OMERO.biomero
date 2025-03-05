@@ -9,6 +9,8 @@ const OmeroDataBrowser = ({ onSelectCallback }) => {
   const handleProjectDataFetch = async (node) => {
     const response = await fetchProjectData(node);
     const datasets = (response.datasets || []).map((dataset) => ({
+      id: dataset.id,
+      category: "datasets",
       index: `dataset-${dataset.id}`,
       isFolder: false,
       children: [],
