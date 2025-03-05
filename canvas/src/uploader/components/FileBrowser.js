@@ -7,15 +7,17 @@ const FileBrowser = ({ onSelectCallback }) => {
   const { state, updateState } = useAppContext();
 
   const handleFolderDataFetch = async (node) => {
-    const response = await fetchFolderData(node.index);
+    const response = await fetchFolderData(node.index, node.isFolder);
     const contents = response.contents || [];
 
+    console.log("Folder data fetched:", node, contents);
     const newNodes = contents.reduce((acc, item) => {
       acc[item.id] = {
         index: item.id,
         isFolder: item.is_folder,
         children: [],
         data: item.name,
+        metadata: item.metadata,
       };
       return acc;
     }, {});
@@ -41,8 +43,8 @@ const FileBrowser = ({ onSelectCallback }) => {
       fetchData={handleFolderDataFetch}
       initialDataKey="root"
       dataStructure={state.localFileTreeData}
-      onExpandCallback={(node, newData) => {
-        console.log("Folder expanded:", node, newData);
+      onExpandCallback={(node, newData, e) => {
+        console.log("Folder expanded:", node, newData, e);
       }}
       onSelectCallback={onSelectCallback}
       selectedItems={state.localFileTreeSelection}

@@ -47,12 +47,13 @@ export const fetchProjectData = async (item) => {
   return apiRequest(urls.api_datasets, "GET", null, { params });
 };
 
-export const fetchFolderData = async (folderId = null) => {
+export const fetchFolderData = async (itemId = null, isFolder = true) => {
   const { urls, user } = getDjangoConstants();
   const params = {
-    folder_id: folderId,
+    item_id: itemId,
     page: 0,
     group: user.active_group_id,
+    is_folder: isFolder,
     _: new Date().getTime(),
   };
   return apiRequest(urls.api_local_file_browser, "GET", null, { params });

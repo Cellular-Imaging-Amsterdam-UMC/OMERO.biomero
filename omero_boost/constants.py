@@ -1,0 +1,3 @@
+BROWSABLE_FILE_EXTENSIONS = [
+    ".lif",
+]

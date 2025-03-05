@@ -90,6 +90,12 @@ const UploaderApp = () => {
       type === "local" ? "localFileTreeSelection" : "omeroFileTreeSelection";
     let updatedSelection;
 
+    const itemData = state.localFileTreeData[nodeId];
+    if (itemData && itemData.isFolder) {
+      // Do not allow selection of folders
+      return;
+    }
+
     if (state[selectionKey].includes(nodeId)) {
       // Remove the node if it was already selected
       updatedSelection = state[selectionKey].filter((id) => id !== nodeId);
