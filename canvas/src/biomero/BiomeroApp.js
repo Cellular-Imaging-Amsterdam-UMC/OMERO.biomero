@@ -22,8 +22,22 @@ const RunTab = () => (
         rel="noopener noreferrer"
       >
         BIOMERO
-      </a>
+      </a>.
     </H6>
+    <div className="bp5-form-group">
+        <div className="bp5-form-content">
+          <div className="bp5-form-helper-text">
+            If you use this software in your work, please cite it using the following metadata:
+          </div>      
+          <div className="bp5-form-helper-text">
+            Luik, T. T., Rosas-Bertolini, R., Reits, E. A., Hoebe, R. A., & Krawczyk, P. M. (2024). BIOMERO: A scalable and extensible image analysis framework. Patterns, 5(8). <a
+              href="https://doi.org/10.1016/j.patter.2024.101024"
+              target="_blank"
+              rel="noopener noreferrer"
+            >https://doi.org/10.1016/j.patter.2024.101024</a>
+          </div>
+        </div>
+      </div>
   </div>
 );
 
