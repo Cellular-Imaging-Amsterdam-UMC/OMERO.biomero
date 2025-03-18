@@ -49,7 +49,7 @@ setup(
         "pyjwt",
         "biomero>=2.0.0-alpha.3",
         "configupdater>=3.2",
-        "omero_adi @ git+https://github.com/Cellular-Imaging-Amsterdam-UMC/OMERO-Automated-Data-Import.git@mergebranch",
+        "omero_adi @ git+https://github.com/Cellular-Imaging-Amsterdam-UMC/OMERO-Automated-Data-Import.git@main",
     ],
     python_requires=">=3",
     include_package_data=True,

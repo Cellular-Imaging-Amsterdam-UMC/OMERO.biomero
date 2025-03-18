@@ -274,7 +274,7 @@ def run_workflow_script(request, conn=None, script_name="SLURM_Run_Workflow.py",
             # Use runScript to execute
             proc = svc.runScript(script_id, inputs, None)
             omero_job_id = proc.getJob()._id
-            msg = f"Started script {script_id} at {datetime.datetime.now()} with Omero Job ID {omero_job_id}"
+            msg = f"Started script {script_id} at {datetime.datetime.now()} with OMERO Job ID {unwrap(omero_job_id)}"
             logger.info(msg)
             return JsonResponse({"status": "success", "message": f"Script {script_name} for {workflow_name} started successfully: {msg}"})
 
