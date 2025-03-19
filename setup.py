@@ -47,7 +47,7 @@ setup(
     install_requires=[
         "omero-web>=5.6.0", 
         "pyjwt",
-        "biomero>=2.0.0-alpha.3",
+        "biomero>=2.0.0-alpha.4",
         "configupdater>=3.2",
         "omero_adi @ git+https://github.com/Cellular-Imaging-Amsterdam-UMC/OMERO-Automated-Data-Import.git@main",
     ],
