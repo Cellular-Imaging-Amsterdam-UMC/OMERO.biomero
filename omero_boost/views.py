@@ -161,6 +161,10 @@ def save_biomero_config(request, conn=None, **kwargs):
                     if model_prefix not in model_keys:
                         # Remove the unwanted key or subsection
                         del config[section][key]
+                
+                for key in list(config[section].keys()):
+                    if key not in settingsd:  # If key isn't in new settings, remove it
+                        del config[section][key]
 
             elif section == "CONVERTERS":
                 # add new or edits as normal
