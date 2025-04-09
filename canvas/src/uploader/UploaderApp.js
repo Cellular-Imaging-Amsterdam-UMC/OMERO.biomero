@@ -3,6 +3,7 @@ import { useAppContext } from "../AppContext";
 import FileBrowser from "./components/FileBrowser";
 import OmeroDataBrowser from "../shared/components/OmeroDataBrowser";
 import GroupSelect from "./components/GroupSelect";
+import AdminPanel from "./components/AdminPanel";
 import {
   Tabs,
   Tab,
@@ -80,6 +81,7 @@ const UploaderApp = () => {
   const [loadedTabs, setLoadedTabs] = useState({
     Upload: true,
     Monitor: false,
+    Admin: false,
   });
   const [uploadList, setUploadList] = useState([]);
   const [areUploadItemsSelected, setAreUploadItemsSelected] = useState(false);
@@ -350,6 +352,19 @@ const UploaderApp = () => {
               ) : null
             }
           />
+
+          {state?.user?.isAdmin && (
+            <Tab
+              id="Admin"
+              title="Admin"
+              icon="settings"
+              panel={
+                loadedTabs.Admin ? (
+                  <AdminPanel />
+                ) : null
+              }
+            />
+          )}
         </Tabs>
       </div>
     </div>
