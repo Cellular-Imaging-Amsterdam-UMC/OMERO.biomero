@@ -244,3 +244,24 @@ export const postUpload = async (upload) => {
     throw error;
   }
 };
+
+export const fetchGroupMappings = async () => {
+  const { urls } = getDjangoConstants();
+  return apiRequest(urls.api_group_mappings, "GET");
+};
+
+export const postGroupMappings = async (mappings) => {
+  const { urls } = getDjangoConstants();
+  try {
+    const csrfToken = window.csrftoken;
+    const response = await apiRequest(urls.api_group_mappings, "POST", { mappings }, {
+      headers: {
+        "X-CSRFToken": csrfToken,
+      },
+    });
+    return response;
+  } catch (error) {
+    console.error("Error saving group mappings:", error);
+    throw error;
+  }
+};

@@ -25,8 +25,10 @@ import uuid
 from collections import defaultdict
 from omero_adi.utils.ingest_tracker import initialize_ingest_tracker
 
-
 logger = logging.getLogger(__name__)
+
+# Add near other constants at the top # TODO replace with postgres entries
+MAPPINGS_FILE = os.path.join(os.path.dirname(__file__), 'group_mappings.json')
 
 
 @login_required()
@@ -802,3 +804,51 @@ def get_folder_contents(request, conn=None, **kwargs):
         )
 
     return {"contents": contents, "folder_id": folder_id}
+
+
+@login_required()
+@require_http_methods(["GET", "POST"])
+def group_mappings(request, conn=None, **kwargs):
+    """Handle group mappings GET and POST requests."""
+    try:
+        if request.method == "GET":
+            # Read mappings from file if it exists
+            if os.path.exists(MAPPINGS_FILE):
+                with open(MAPPINGS_FILE, 'r') as f:
+                    mappings = json.load(f)
+            else:
+                mappings = {}
+            
+            return JsonResponse({"mappings": mappings})
+
+        elif request.method == "POST":
+            # Get the current user info
+            current_user = conn.getUser()
+            username = current_user.getName()
+            user_id = current_user.getId()
+            is_admin = conn.isAdmin()
+
+            # Only allow admins to update mappings
+            if not is_admin:
+                return JsonResponse(
+                    {"error": "Only administrators can update group mappings"}, 
+                    status=403
+                )
+
+            try:
+                data = json.loads(request.body)
+                mappings = data.get('mappings', {})
+
+                # Save mappings to file
+                with open(MAPPINGS_FILE, 'w') as f:
+                    json.dump(mappings, f, indent=2)
+
+                logger.info(f"Group mappings updated by {username} (ID: {user_id})")
+                return JsonResponse({"message": "Mappings saved successfully"})
+
+            except json.JSONDecodeError:
+                return JsonResponse({"error": "Invalid JSON data"}, status=400)
+
+    except Exception as e:
+        logger.error(f"Error handling group mappings: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)

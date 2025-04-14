@@ -72,6 +72,7 @@ const UploaderApp = () => {
     loadOmeroTreeData,
     loadFolderData,
     loadGroups,
+    loadGroupMappings,
     uploadSelectedData,
   } = useAppContext();
 
@@ -85,6 +86,12 @@ const UploaderApp = () => {
   });
   const [uploadList, setUploadList] = useState([]);
   const [areUploadItemsSelected, setAreUploadItemsSelected] = useState(false);
+
+  const getCurrentGroupFolder = () => {
+    const activeGroupId = state.user.active_group_id;
+    const mapping = state.groupFolderMappings[activeGroupId];
+    return mapping?.folder || "root";  // Default to "root" if no mapping exists
+  };
 
   const handleFileTreeSelection = (nodeData, type) => {
     const nodeId = nodeData.id;
@@ -199,6 +206,7 @@ const UploaderApp = () => {
     loadOmeroTreeData();
     loadFolderData();
     loadGroups();
+    loadGroupMappings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -249,6 +257,7 @@ const UploaderApp = () => {
                             onSelectCallback={(nodeData) =>
                               handleFileTreeSelection(nodeData, "local")
                             }
+                            rootFolder={getCurrentGroupFolder()}
                           />
                         </div>
                       )}

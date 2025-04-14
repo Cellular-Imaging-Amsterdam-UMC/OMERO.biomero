@@ -32,6 +32,9 @@ urlpatterns = [
     path("api/biomero/admin/config/save/",
          views.save_biomero_config,
          name="save_biomero_config"),  # POST
+    path("api/group_mappings/",
+         views.group_mappings,
+         name="group_mappings"),  # Will handle both GET and POST
     # Webclient URLs
 #     path("upload/",
 #          views.omero_boost_upload,

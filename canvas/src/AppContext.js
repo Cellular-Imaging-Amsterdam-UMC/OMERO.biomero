@@ -14,6 +14,8 @@ import {
   postUpload,
   fetchThumbnails,
   fetchImages,
+  fetchGroupMappings,
+  postGroupMappings,
 } from "./apiService";
 import { getDjangoConstants } from "./constants";
 import { transformStructure, extractGroups } from "./utils";
@@ -36,6 +38,7 @@ export const AppProvider = ({ children }) => {
     localFileTreeData: null,
     omeroFileTreeSelection: [],
     localFileTreeSelection: [],
+    groupFolderMappings: {},
   });
   const [apiLoading, setLoading] = useState(false);
   const [apiError, setError] = useState(null);
@@ -455,6 +458,47 @@ export const AppProvider = ({ children }) => {
     OME.openPopup(WEBCLIENT.URLS.script_upload);
   };
 
+  const loadGroupMappings = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetchGroupMappings();
+      updateState({ groupFolderMappings: response.mappings });
+    } catch (err) {
+      setError(err.message);
+      toaster?.show({
+        intent: "danger",
+        icon: "error",
+        message: `Failed to load group mappings: ${err.message}`,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveGroupMappings = async (mappings) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await postGroupMappings(mappings);
+      updateState({ groupFolderMappings: mappings });
+      toaster?.show({
+        intent: "success",
+        icon: "tick-circle",
+        message: "Group mappings saved successfully",
+      });
+    } catch (err) {
+      setError(err.message);
+      toaster?.show({
+        intent: "danger",
+        icon: "error",
+        message: `Failed to save group mappings: ${err.message}`,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -475,6 +519,8 @@ export const AppProvider = ({ children }) => {
         uploadSelectedData,
         loadThumbnails,
         loadImagesForDataset,
+        loadGroupMappings,
+        saveGroupMappings,
         apiLoading,
         apiError,
         toaster,
