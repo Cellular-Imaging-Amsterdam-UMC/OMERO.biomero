@@ -600,32 +600,39 @@ def import_selected(request, conn=None, **kwargs):
         upload = data.get("upload", {})
         selected_items = upload.get("selectedLocal", [])
         selected_destinations = upload.get("selectedOmero", [])
+        selected_group = upload.get("group")  # Get group from request
 
         if not selected_items:
             return JsonResponse({"error": "No items selected"}, status=400)
         if not selected_destinations:
             return JsonResponse({"error": "No destinations selected"}, status=400)
+        if not selected_group:
+            return JsonResponse({"error": "No group specified"}, status=400)
 
-        # Get the current user's information for logging
+        # Get the current user's information
         current_user = conn.getUser()
         username = current_user.getName()
         user_id = current_user.getId()
-        group = conn.getGroupFromContext().getName()
+
+        # Validate the group
+        available_groups = [g.getName() for g in conn.getGroupsMemberOf()]
+        if selected_group not in available_groups:
+            return JsonResponse({
+                "error": f"User is not a member of group: {selected_group}"
+            }, status=403)
 
         # Log the import attempt
         logger.info(
-            f"User {username} (ID: {user_id}, group: {group}) attempting to import {len(selected_items)} items"
+            f"User {username} (ID: {user_id}, group: {selected_group}) attempting to import {len(selected_items)} items"
         )
 
-        # Call the process_files function to handle file processing and order creation
-        process_files(selected_items, selected_destinations, group, username)
+        # Call process_files with validated group
+        process_files(selected_items, selected_destinations, selected_group, username)
 
-        return JsonResponse(
-            {
-                "status": "success",
-                "message": f"Successfully queued {len(selected_items)} items for import",
-            }
-        )
+        return JsonResponse({
+            "status": "success",
+            "message": f"Successfully queued {len(selected_items)} items for import",
+        })
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON data"}, status=400)
     except Exception as e:

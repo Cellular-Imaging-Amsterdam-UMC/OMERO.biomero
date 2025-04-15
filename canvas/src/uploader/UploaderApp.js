@@ -122,9 +122,13 @@ const UploaderApp = () => {
         const omeroItem = state.omeroFileTreeData[index];
         return omeroItem ? [omeroItem.category, omeroItem.id] : null;
       })
-      .filter(Boolean); // Remove any null values
+      .filter(Boolean);
 
-    const uploadData = { selectedLocal, selectedOmero };
+    const uploadData = { 
+      selectedLocal, 
+      selectedOmero,
+      group: state.user.groups.find(g => g.id === state.user.active_group_id)?.name 
+    };
 
     try {
       await uploadSelectedData(uploadData);

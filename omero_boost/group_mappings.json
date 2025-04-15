@@ -1,1 +1,14 @@
-{}
+{
+  "0": {
+    "folder": "Project A",
+    "groupName": "system"
+  },
+  "3": {
+    "folder": "root",
+    "groupName": "demo"
+  },
+  "53": {
+    "folder": "Project A/Dataset",
+    "groupName": "torectest"
+  }
+}
