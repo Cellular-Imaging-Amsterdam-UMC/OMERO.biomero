@@ -71,7 +71,7 @@ const DatasetSelectWithPopover = ({
     >
       <TagInput
         placeholder="Add new dataset name or select..."
-        values={value || []} // Pass value as prop to handle the input state
+        values={value || []}
         onChange={handleManualInputChange}
         onKeyDown={handleKeyDown}
         intent={intent}
@@ -81,16 +81,21 @@ const DatasetSelectWithPopover = ({
             isOpen={isPopoverOpen}
             onInteraction={(state) => setPopoverOpen(state)}
             content={
-              <div className="p-4 flex flex-col space-y-4">
-                <OmeroDataBrowser
-                  onSelectCallback={(folder) => handleInputChange(folder)}
-                />
-                <Button
-                  className="self-end"
-                  icon="send-message"
-                  onClick={handleSelectFolder}
-                  intent="primary"
-                />
+              <div className="flex flex-col h-[60vh]">
+                <div className="flex-1 overflow-y-auto p-4">
+                  <OmeroDataBrowser
+                    onSelectCallback={(folder) => handleInputChange(folder)}
+                  />
+                </div>
+                <div className="p-4 border-t bg-white">
+                  <div className="flex justify-end">
+                    <Button
+                      icon="send-message"
+                      onClick={handleSelectFolder}
+                      intent="primary"
+                    />
+                  </div>
+                </div>
               </div>
             }
           >

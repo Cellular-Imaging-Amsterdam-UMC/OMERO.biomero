@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAppContext } from "../AppContext";
 import FileBrowser from "./components/FileBrowser";
 import OmeroDataBrowser from "../shared/components/OmeroDataBrowser";
-import GroupSelect from "./components/GroupSelect";
+import GroupSelect from "../shared/components/GroupSelect";
 import AdminPanel from "./components/AdminPanel";
 import {
   Tabs,

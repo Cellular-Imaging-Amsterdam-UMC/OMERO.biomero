@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAppContext } from "../AppContext";
 import TabContainer from "./components/TabContainer";
 import RunPanel from "./components/RunPanel";
+import GroupSelect from "../shared/components/GroupSelect"; // Add this import
 import { Tabs, Tab, H4, Tooltip, H6 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 import SettingsForm from "./components/SettingsForm";
@@ -174,6 +175,15 @@ const BiomeroApp = () => {
 
   return (
     <div>
+      <div className="p-4">
+        {state?.user?.groups && (
+          <div className="flex items-center">
+            <span className="text-base mr-4">Select group</span>
+            <GroupSelect />
+          </div>
+        )}
+      </div>
+
       {/* Tabs with Panels */}
       <div className="p-4 h-full overflow-hidden">
         <Tabs
