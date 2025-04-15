@@ -13,6 +13,8 @@ import {
   Callout,
   Divider,
   Icon,
+  Overlay2,
+  OverlaysProvider,
 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 
@@ -83,6 +85,7 @@ const UploaderApp = () => {
   });
   const [uploadList, setUploadList] = useState([]);
   const [areUploadItemsSelected, setAreUploadItemsSelected] = useState(false);
+  const [isNewItemOverlayOpen, setIsNewItemOverlayOpen] = useState(false);
 
   const handleFileTreeSelection = (nodeData, type) => {
     const nodeId = nodeData.id;
@@ -153,6 +156,19 @@ const UploaderApp = () => {
     setAreUploadItemsSelected(false);
   };
 
+  // Create a new dataset in OMERO
+  const createDataset = () => {
+    const selectedOmero = state.omeroFileTreeSelection
+      .map((index) => {
+        const omeroItem = state.omeroFileTreeData[index];
+        return omeroItem ? [omeroItem.category, omeroItem.id] : null;
+      })
+      .filter(Boolean); // Remove any null values
+    const selectedOmeroId = selectedOmero[0][1];
+    const selectedOmeroCategory = selectedOmero[0][0];
+    const selectedOmeroName = state.omeroFileTreeData[selectedOmeroId].name;
+  };
+
   const selectItem = (item) => {
     let areItemsSelected = false;
     const newUploadList = uploadList.map((uploadItem) => {
@@ -205,6 +221,59 @@ const UploaderApp = () => {
     loadGroups();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const toggleOverlay = () => {
+    setIsNewItemOverlayOpen(!isNewItemOverlayOpen);
+  };
+  const [datasetName, setDatasetName] = useState("");
+
+  const handleCreate = () => {
+    console.log("Dataset created with name:", datasetName);
+
+    setDatasetName(""); // Clear input
+    toggleOverlay(); // Close overlay
+  };
+
+  const handleCancel = () => {
+    setDatasetName(""); // Clear input
+    toggleOverlay(); // Close overlay
+  };
+  const NewItemOverlay = () => {
+    return (
+      <OverlaysProvider>
+        <div>
+          <Button text="Show overlay" onClick={toggleOverlay} />
+          <Overlay2
+            isOpen={isNewItemOverlayOpen}
+            onClose={toggleOverlay}
+            className="flex items-center justify-center"
+          >
+            <div className="w-full h-full flex items-center justify-center position-fixed top-0 left-0">
+              <div className="bg-white p-6 rounded shadow-lg w-96">
+                <h3 className="text-lg font-bold mb-4">Create New Dataset</h3>
+                <input
+                  type="text"
+                  placeholder="Enter dataset name"
+                  value={datasetName}
+                  onChange={(e) => setDatasetName(e.target.value)}
+                  className="bp5-input w-full mb-4"
+                />
+                <div className="flex justify-end space-x-4">
+                  <Button text="Cancel" onClick={handleCancel} />
+                  <Button
+                    text="Create"
+                    intent="primary"
+                    onClick={handleCreate}
+                    disabled={!datasetName.trim()}
+                  />
+                </div>
+              </div>
+            </div>
+          </Overlay2>
+        </div>
+      </OverlaysProvider>
+    );
+  };
 
   return (
     <div>
@@ -292,9 +361,22 @@ const UploaderApp = () => {
                       )}
                     </div>
                     <div className="w-1/3 overflow-auto">
-                      <h1 className="text-base font-bold p-0 m-0">
-                        Select destination in OMERO
-                      </h1>
+                      <div className="flex space-x-4 items-center">
+                        <h1 className="text-base font-bold p-0 m-0">
+                          Select destination in OMERO
+                        </h1>
+                        <Button
+                          onClick={() => {
+                            setIsNewItemOverlayOpen(true);
+                          }}
+                          disabled={false}
+                          rightIcon="plus"
+                          intent="success"
+                          loading={uploading}
+                        >
+                          Create dataset
+                        </Button>
+                      </div>
                       {state.omeroFileTreeData && (
                         <div className="mt-4">
                           <OmeroDataBrowser
@@ -358,6 +440,7 @@ const UploaderApp = () => {
           />
         </Tabs>
       </div>
+      <NewItemOverlay />
     </div>
   );
 };
