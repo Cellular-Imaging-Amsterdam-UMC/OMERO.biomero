@@ -14,6 +14,7 @@ const OmeroDataBrowser = ({ onSelectCallback }) => {
       children: [],
       childCount: dataset.childCount,
       data: dataset.name,
+      source: "omero",
     }));
 
     const updatedNode = {

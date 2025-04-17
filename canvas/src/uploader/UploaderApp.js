@@ -13,10 +13,10 @@ import {
   Callout,
   Divider,
   Icon,
-  Overlay2,
-  OverlaysProvider,
+  Tooltip,
 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
+import NewContainerOverlay from "./components/NewContainerOverlay";
 
 const MonitorPanel = ({
   iframeUrl,
@@ -74,43 +74,71 @@ const UploaderApp = () => {
     loadFolderData,
     loadGroups,
     uploadSelectedData,
+    createNewContainer,
+    toaster,
   } = useAppContext();
 
-  const [activeTab, setActiveTab] = useState("Upload");
+  const [activeTab, setActiveTab] = useState("UploadImages");
   const [metabaseError, setMetabaseError] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [loadedTabs, setLoadedTabs] = useState({
-    Upload: true,
+    UploadImages: true,
+    UploadScreens: false,
     Monitor: false,
   });
   const [uploadList, setUploadList] = useState([]);
   const [areUploadItemsSelected, setAreUploadItemsSelected] = useState(false);
-  const [isNewItemOverlayOpen, setIsNewItemOverlayOpen] = useState(false);
+
+  const [isNewContainerOverlayOpen, setIsNewContainerOverlayOpen] =
+    useState(false);
+  const [newContaineName, setNewContainerName] = useState("");
+  const [newContaineDescription, setContainerDescription] = useState("");
+  const [newContainerType, setNewContainerType] = useState("");
+  const [selectedOmeroTarget, setSelectedOmeroTarget] = useState(null);
+
+  const openCreateContainerOverlay = (isOpen, type) => {
+    setIsNewContainerOverlayOpen(isOpen);
+    setNewContainerType(type);
+  };
 
   const handleFileTreeSelection = (nodeData, type) => {
-    const nodeId = nodeData.id;
+    console.log("Selected node data:", nodeData);
+    const nodeIds = Array.isArray(nodeData) ? nodeData : [nodeData.id];
     const selectionKey =
       type === "local" ? "localFileTreeSelection" : "omeroFileTreeSelection";
-    let updatedSelection;
+    let updatedSelection = [...state[selectionKey]];
 
-    const itemData = state.localFileTreeData[nodeId];
-    if (itemData && itemData.isFolder) {
-      // Do not allow selection of folders
-      return;
-    }
+    nodeIds.forEach((nodeId) => {
+      const itemData =
+        type === "local"
+          ? state.localFileTreeData[nodeId]
+          : state.omeroFileTreeData[nodeId];
 
-    if (state[selectionKey].includes(nodeId)) {
-      // Remove the node if it was already selected
-      updatedSelection = state[selectionKey].filter((id) => id !== nodeId);
-    } else {
-      // Add the node, with single selection for OMERO
-      if (type === "omero") {
-        updatedSelection = [nodeId];
-      } else {
-        updatedSelection = [...state[selectionKey], nodeId];
+      if (itemData && itemData.isFolder) {
+        return; // Skip folders
       }
-    }
+
+      if (updatedSelection.includes(nodeId)) {
+        // Remove the node if it was already selected
+        updatedSelection = updatedSelection.filter((id) => id !== nodeId);
+      } else {
+        // Add the node, with single selection for OMERO
+        if (type === "omero") {
+          updatedSelection = [nodeId];
+        } else {
+          updatedSelection.push(nodeId);
+        }
+      }
+    });
+    console.log("Updated selection:", updatedSelection);
+
     updateState({ [selectionKey]: updatedSelection });
+
+    // Update the selected target for creating new containers
+    if (type === "omero" && updatedSelection.length === 1) {
+      const selectedItem = state.omeroFileTreeData[updatedSelection[0]];
+      setSelectedOmeroTarget(selectedItem);
+    }
   };
 
   const handleUpload = async () => {
@@ -136,6 +164,29 @@ const UploaderApp = () => {
 
   // We need to make sure only unique items are added to the upload list
   const addUploadItems = () => {
+    // Only allow selection of screens as target if active tab is UploadScreens
+    const nodeId = state.omeroFileTreeSelection[0];
+    const isScreen = nodeId.includes("screen-");
+    const isDataset = nodeId.includes("dataset-");
+    if (!isScreen && activeTab === "UploadScreens") {
+      // Show toast if the user tries to select something else
+      toaster.show({
+        message: "You can only select a screen as upload destination",
+        intent: "warning",
+      });
+      return;
+    } else if (!isDataset && activeTab === "UploadImages") {
+      // Only allow selection of datasets if active tab is UploadImages
+      if (!isDataset && activeTab === "UploadImages") {
+        // Show toast if the user tries to select something else
+        toaster.show({
+          message: "You can only select a dataset as upload destination",
+          intent: "warning",
+        });
+        return;
+      }
+    }
+
     const newUploadList = state.localFileTreeSelection
       .filter(
         (item) => !uploadList.some((uploadItem) => uploadItem.value === item)
@@ -154,19 +205,6 @@ const UploaderApp = () => {
   const removeAllUploadItems = () => {
     setUploadList([]);
     setAreUploadItemsSelected(false);
-  };
-
-  // Create a new dataset in OMERO
-  const createDataset = () => {
-    const selectedOmero = state.omeroFileTreeSelection
-      .map((index) => {
-        const omeroItem = state.omeroFileTreeData[index];
-        return omeroItem ? [omeroItem.category, omeroItem.id] : null;
-      })
-      .filter(Boolean); // Remove any null values
-    const selectedOmeroId = selectedOmero[0][1];
-    const selectedOmeroCategory = selectedOmero[0][0];
-    const selectedOmeroName = state.omeroFileTreeData[selectedOmeroId].name;
   };
 
   const selectItem = (item) => {
@@ -223,55 +261,212 @@ const UploaderApp = () => {
   }, []);
 
   const toggleOverlay = () => {
-    setIsNewItemOverlayOpen(!isNewItemOverlayOpen);
-  };
-  const [datasetName, setDatasetName] = useState("");
-
-  const handleCreate = () => {
-    console.log("Dataset created with name:", datasetName);
-
-    setDatasetName(""); // Clear input
-    toggleOverlay(); // Close overlay
+    setIsNewContainerOverlayOpen(!isNewContainerOverlayOpen);
   };
 
-  const handleCancel = () => {
-    setDatasetName(""); // Clear input
-    toggleOverlay(); // Close overlay
+  const handleCreateContainer = () => {
+    const selectedOmeroNode = state.omeroFileTreeSelection[0];
+
+    let targetContainerId = null;
+    let targetContainerType = "dataset";
+
+    if (selectedOmeroNode) {
+      targetContainerType = selectedOmeroNode.split("-")[0];
+      targetContainerId = selectedOmeroNode.split("-")[1];
+    }
+
+    if (
+      !(targetContainerType === "project" && newContainerType === "dataset")
+    ) {
+      targetContainerId = null;
+    }
+
+    createNewContainer(
+      newContainerType,
+      newContaineName,
+      newContaineDescription,
+      targetContainerId,
+      targetContainerType
+    )
+      .then(() => {
+        loadOmeroTreeData();
+        setNewContainerName("");
+        setContainerDescription("");
+      })
+      .catch((error) => {
+        console.error("Error creating new container:", error);
+      })
+      .finally(() => {
+        setIsNewContainerOverlayOpen(false);
+      });
   };
-  const NewItemOverlay = () => {
+
+  const renderUploadPanel = (mode) => {
+    const localFileTreeTitle = `Select ${mode}s to upload`;
+    const omeroFileTreeTitle = `Select destination ${
+      mode === "screen" ? "screen" : ""
+    }in OMERO`;
+
     return (
-      <OverlaysProvider>
-        <div>
-          <Button text="Show overlay" onClick={toggleOverlay} />
-          <Overlay2
-            isOpen={isNewItemOverlayOpen}
-            onClose={toggleOverlay}
-            className="flex items-center justify-center"
-          >
-            <div className="w-full h-full flex items-center justify-center position-fixed top-0 left-0">
-              <div className="bg-white p-6 rounded shadow-lg w-96">
-                <h3 className="text-lg font-bold mb-4">Create New Dataset</h3>
-                <input
-                  type="text"
-                  placeholder="Enter dataset name"
-                  value={datasetName}
-                  onChange={(e) => setDatasetName(e.target.value)}
-                  className="bp5-input w-full mb-4"
-                />
-                <div className="flex justify-end space-x-4">
-                  <Button text="Cancel" onClick={handleCancel} />
-                  <Button
-                    text="Create"
-                    intent="primary"
-                    onClick={handleCreate}
-                    disabled={!datasetName.trim()}
-                  />
-                </div>
-              </div>
+      <div className="h-full">
+        <div className="flex space-x-4">
+          <div className="w-1/3 overflow-auto pt-2">
+            <div className="flex space-x-4 items-center">
+              <h1 className="text-base font-bold p-0 m-0 inline-block">
+                {localFileTreeTitle}
+              </h1>
+              <Button
+                onClick={addUploadItems}
+                disabled={
+                  state.localFileTreeSelection.length === 0 ||
+                  state.omeroFileTreeSelection.length === 0
+                }
+                rightIcon="plus"
+                intent="success"
+                loading={uploading}
+              >
+                Add to upload list
+              </Button>
             </div>
-          </Overlay2>
+            {state.localFileTreeData && (
+              <div className="mt-4">
+                <FileBrowser
+                  onSelectCallback={(nodeData) =>
+                    handleFileTreeSelection(nodeData, "local")
+                  }
+                />
+              </div>
+            )}
+          </div>
+          <div className="w-1/3 overflow-auto pt-2">
+            <div className="flex space-x-4 items-center">
+              <h1 className="text-base font-bold p-0 m-0 inline-block">
+                Upload list
+              </h1>
+              <Button
+                onClick={removeUploadItems}
+                disabled={!areUploadItemsSelected}
+                rightIcon="minus"
+                intent="success"
+                loading={uploading}
+              >
+                Remove selected
+              </Button>
+              <Button
+                onClick={removeAllUploadItems}
+                disabled={!uploadList.length}
+                rightIcon="minus"
+                intent="success"
+                loading={uploading}
+              >
+                Remove all
+              </Button>
+            </div>
+            {uploadList.length ? (
+              <div className="mt-4">
+                <CardList bordered={false}>{renderCards()}</CardList>
+              </div>
+            ) : (
+              <div className="flex p-8">
+                <Callout intent="primary">No files selected</Callout>
+              </div>
+            )}
+          </div>
+          <div className="w-1/3 overflow-auto pt-2">
+            <div className="flex items-center">
+              <h1 className="text-base font-bold p-0 m-0">
+                {omeroFileTreeTitle}
+              </h1>
+              <Tooltip
+                content="Create new dataset"
+                placement="bottom"
+                usePortal={false}
+              >
+                <Icon
+                  icon="folder-new"
+                  onClick={() => {
+                    openCreateContainerOverlay(true, "dataset");
+                  }}
+                  disabled={false}
+                  tooltip="Create new dataset"
+                  color="#99b882"
+                  className="cursor-pointer ml-3"
+                  size={20}
+                />
+              </Tooltip>
+              <Tooltip
+                content="Create new project"
+                placement="bottom"
+                usePortal={false}
+                className="text-sm"
+              >
+                <Icon
+                  icon="folder-new"
+                  onClick={() => {
+                    openCreateContainerOverlay(true, "project");
+                  }}
+                  disabled={false}
+                  color="#76899e"
+                  className="cursor-pointer ml-3"
+                  size={20}
+                />
+              </Tooltip>
+              <Tooltip
+                content="Create new screen"
+                placement="bottom"
+                usePortal={false}
+                className="text-sm"
+              >
+                <Icon
+                  icon="folder-new"
+                  onClick={() => {
+                    openCreateContainerOverlay(true, "screen");
+                  }}
+                  disabled={false}
+                  color="#393939"
+                  className="cursor-pointer ml-3"
+                  size={20}
+                />
+              </Tooltip>
+            </div>
+            {state.omeroFileTreeData && (
+              <div className="mt-4">
+                <OmeroDataBrowser
+                  onSelectCallback={(nodeData) =>
+                    handleFileTreeSelection(nodeData, "omero")
+                  }
+                />
+              </div>
+            )}
+          </div>
         </div>
-      </OverlaysProvider>
+        <Divider className="my-10" />
+        <div className="flex items-center place-content-between">
+          <Card className="ml-12">
+            <span className="text-base">{`${uploadList.length} file${
+              uploadList.length > 1 || uploadList.length === 0 ? "s" : ""
+            } selected for upload`}</span>
+          </Card>
+          <Icon icon="circle-arrow-right" size={24} color="grey" />
+          <Card>
+            <span className="text-base">{`Upload destination: ${state.omeroFileTreeSelection[0]}`}</span>
+          </Card>
+          <Icon icon="circle-arrow-right" size={24} color="grey" />
+          <Button
+            onClick={handleUpload}
+            disabled={
+              !uploadList.length || !state.omeroFileTreeSelection.length
+            }
+            rightIcon="cloud-upload"
+            intent="success"
+            loading={uploading}
+            large={true}
+            className="mr-12"
+          >
+            Add to upload queue
+          </Button>
+        </div>
+      </div>
     );
   };
 
@@ -294,131 +489,17 @@ const UploaderApp = () => {
           onChange={handleTabChange}
         >
           <Tab
-            id="Upload"
-            title="Upload"
+            id="UploadImages"
+            title="Upload images"
+            icon="upload"
+            panel={loadedTabs.UploadImages ? renderUploadPanel("image") : null}
+          />
+          <Tab
+            id="UploadScreens"
+            title="Upload screens"
             icon="upload"
             panel={
-              loadedTabs.Upload ? (
-                <div className="h-full">
-                  <div className="flex space-x-4">
-                    <div className="w-1/3 overflow-auto">
-                      <div className="flex space-x-4 items-center">
-                        <h1 className="text-base font-bold p-0 m-0 inline-block">
-                          Select files to upload
-                        </h1>
-                        <Button
-                          onClick={addUploadItems}
-                          disabled={state.localFileTreeSelection.length === 0}
-                          rightIcon="plus"
-                          intent="success"
-                          loading={uploading}
-                        >
-                          Add to upload list
-                        </Button>
-                      </div>
-                      {state.localFileTreeData && (
-                        <div className="mt-4">
-                          <FileBrowser
-                            onSelectCallback={(nodeData) =>
-                              handleFileTreeSelection(nodeData, "local")
-                            }
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <div className="w-1/3 overflow-auto">
-                      <div className="flex space-x-4 items-center">
-                        <h1 className="text-base font-bold p-0 m-0 inline-block">
-                          Upload list
-                        </h1>
-                        <Button
-                          onClick={removeUploadItems}
-                          disabled={!areUploadItemsSelected}
-                          rightIcon="minus"
-                          intent="success"
-                          loading={uploading}
-                        >
-                          Remove selected
-                        </Button>
-                        <Button
-                          onClick={removeAllUploadItems}
-                          disabled={!uploadList.length}
-                          rightIcon="minus"
-                          intent="success"
-                          loading={uploading}
-                        >
-                          Remove all
-                        </Button>
-                      </div>
-                      {uploadList.length ? (
-                        <div className="mt-4">
-                          <CardList bordered={false}>{renderCards()}</CardList>
-                        </div>
-                      ) : (
-                        <div className="flex p-8">
-                          <Callout intent="primary">No files selected</Callout>
-                        </div>
-                      )}
-                    </div>
-                    <div className="w-1/3 overflow-auto">
-                      <div className="flex space-x-4 items-center">
-                        <h1 className="text-base font-bold p-0 m-0">
-                          Select destination in OMERO
-                        </h1>
-                        <Button
-                          onClick={() => {
-                            setIsNewItemOverlayOpen(true);
-                          }}
-                          disabled={false}
-                          rightIcon="plus"
-                          intent="success"
-                          loading={uploading}
-                        >
-                          Create dataset
-                        </Button>
-                      </div>
-                      {state.omeroFileTreeData && (
-                        <div className="mt-4">
-                          <OmeroDataBrowser
-                            onSelectCallback={(nodeData) =>
-                              handleFileTreeSelection(nodeData, "omero")
-                            }
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <Divider className="my-10" />
-                  <div className="flex items-center place-content-between">
-                    <Card className="ml-12">
-                      <span className="text-base">{`${uploadList.length} file${
-                        uploadList.length > 1 || uploadList.length === 0
-                          ? "s"
-                          : ""
-                      } selected for upload`}</span>
-                    </Card>
-                    <Icon icon="circle-arrow-right" size={24} color="grey" />
-                    <Card>
-                      <span className="text-base">{`Upload destination: ${state.omeroFileTreeSelection[0]}`}</span>
-                    </Card>
-                    <Icon icon="circle-arrow-right" size={24} color="grey" />
-                    <Button
-                      onClick={handleUpload}
-                      disabled={
-                        !uploadList.length ||
-                        !state.omeroFileTreeSelection.length
-                      }
-                      rightIcon="cloud-upload"
-                      intent="success"
-                      loading={uploading}
-                      large={true}
-                      className="mr-12"
-                    >
-                      Add to upload queue
-                    </Button>
-                  </div>
-                </div>
-              ) : null
+              loadedTabs.UploadScreens ? renderUploadPanel("screen") : null
             }
           />
 
@@ -440,7 +521,17 @@ const UploaderApp = () => {
           />
         </Tabs>
       </div>
-      <NewItemOverlay />
+      <NewContainerOverlay
+        isNewContainerOverlayOpen={isNewContainerOverlayOpen}
+        toggleOverlay={toggleOverlay}
+        newContaineName={newContaineName}
+        setNewContainerName={setNewContainerName}
+        newContaineDescription={newContaineDescription}
+        setContainerDescription={setContainerDescription}
+        handleCreate={handleCreateContainer}
+        newContainerType={newContainerType}
+        selectedOmeroTarget={selectedOmeroTarget}
+      />
     </div>
   );
 };

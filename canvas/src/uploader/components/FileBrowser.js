@@ -10,7 +10,6 @@ const FileBrowser = ({ onSelectCallback }) => {
     const response = await fetchFolderData(node.index, node.isFolder);
     const contents = response.contents || [];
 
-    console.log("Folder data fetched:", node, contents);
     const newNodes = contents.reduce((acc, item) => {
       acc[item.id] = {
         index: item.id,
@@ -18,6 +17,7 @@ const FileBrowser = ({ onSelectCallback }) => {
         children: [],
         data: item.name,
         metadata: item.metadata,
+        source: item.source,
       };
       return acc;
     }, {});

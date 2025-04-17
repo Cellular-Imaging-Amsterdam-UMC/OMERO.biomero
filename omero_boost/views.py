@@ -24,7 +24,7 @@ import datetime
 import uuid
 from collections import defaultdict
 from omero_adi.utils.ingest_tracker import initialize_ingest_tracker
-from .constants import BROWSABLE_FILE_EXTENSIONS
+from .constants import BROWSABLE_FILE_EXTENSIONS, SUPPORTED_FILE_EXTENSIONS
 from .file_browser.ReadLeicaFile import read_leica_file
 
 
@@ -841,8 +841,20 @@ def get_folder_contents(request, conn=None, **kwargs):
                         "is_folder": item_type == "Folder",
                         "id": item_path + "#" + item["uuid"],
                         "metadata": item,
+                        "source": "filesystem",
                     }
                 )
+        elif ext in SUPPORTED_FILE_EXTENSIONS:
+            # Handle other supported file types
+            contents.append(
+                {
+                    "name": os.path.basename(target_path),
+                    "is_folder": False,
+                    "id": item_path,
+                    "metadata": None,
+                    "source": "filesystem",
+                }
+            )
         else:
             return HttpResponseBadRequest("Invalid folder ID or path does not exist.")
     else:
@@ -864,6 +876,7 @@ def get_folder_contents(request, conn=None, **kwargs):
                     "id": os.path.relpath(item_path, base_dir),
                     "info": info,
                     "metadata": metadata,
+                    "source": "filesystem",
                 }
             )
 
