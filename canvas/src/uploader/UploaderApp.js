@@ -95,15 +95,26 @@ const UploaderApp = () => {
   const [newContaineDescription, setContainerDescription] = useState("");
   const [newContainerType, setNewContainerType] = useState("");
   const [selectedOmeroTarget, setSelectedOmeroTarget] = useState(null);
+  const [
+    lastSelectedLocalFileTreeNodeMeta,
+    setLastSelectedLocalFileTreeNodeMeta,
+  ] = useState(null);
 
   const openCreateContainerOverlay = (isOpen, type) => {
     setIsNewContainerOverlayOpen(isOpen);
     setNewContainerType(type);
   };
 
-  const handleFileTreeSelection = (nodeData, type) => {
-    console.log("Selected node data:", nodeData);
+  const handleFileTreeSelection = (
+    nodeData,
+    coords,
+    e,
+    type,
+    deselect = false
+  ) => {
+    // console.log("handleFileTreeSelection", nodeData, coords, e, type, deselect);
     const nodeIds = Array.isArray(nodeData) ? nodeData : [nodeData.id];
+
     const selectionKey =
       type === "local" ? "localFileTreeSelection" : "omeroFileTreeSelection";
     let updatedSelection = [...state[selectionKey]];
@@ -114,23 +125,39 @@ const UploaderApp = () => {
           ? state.localFileTreeData[nodeId]
           : state.omeroFileTreeData[nodeId];
 
-      if (itemData && itemData.isFolder) {
+      if (type === "local" && itemData && itemData.isFolder) {
         return; // Skip folders
       }
 
-      if (updatedSelection.includes(nodeId)) {
-        // Remove the node if it was already selected
+      if (deselect === true) {
+        // Explicitly remove from selection
         updatedSelection = updatedSelection.filter((id) => id !== nodeId);
-      } else {
-        // Add the node, with single selection for OMERO
-        if (type === "omero") {
-          updatedSelection = [nodeId];
+      } else if (type === "local") {
+        // Remove from selection if already selected
+        if (updatedSelection.includes(nodeId)) {
+          updatedSelection = updatedSelection.filter((id) => id !== nodeId);
         } else {
+          // Add to selection
           updatedSelection.push(nodeId);
+        }
+      } else {
+        // Explicitly add to selection
+        if (!updatedSelection.includes(nodeId)) {
+          if (type === "omero") {
+            updatedSelection = [nodeId];
+          } else {
+            updatedSelection.push(nodeId);
+          }
         }
       }
     });
-    console.log("Updated selection:", updatedSelection);
+
+    // Update the state with the new selection
+    if (deselect) {
+      setLastSelectedLocalFileTreeNodeMeta(null);
+    } else if (type === "local" && coords) {
+      setLastSelectedLocalFileTreeNodeMeta({ coords, nodeId: nodeIds[0] });
+    }
 
     updateState({ [selectionKey]: updatedSelection });
 
@@ -138,6 +165,54 @@ const UploaderApp = () => {
     if (type === "omero" && updatedSelection.length === 1) {
       const selectedItem = state.omeroFileTreeData[updatedSelection[0]];
       setSelectedOmeroTarget(selectedItem);
+    }
+
+    // Handle shift key selection for local file tree
+    const isShiftKeyPressed = e.shiftKey;
+    if (isShiftKeyPressed && type === "local" && coords) {
+      // Check if last selected node is of the same parent (coords array has same length, and all but last element are equal)
+      const isSameParent =
+        lastSelectedLocalFileTreeNodeMeta &&
+        lastSelectedLocalFileTreeNodeMeta.coords.length === coords.length &&
+        lastSelectedLocalFileTreeNodeMeta.coords
+          .slice(0, -1)
+          .every((coord, index) => coord === coords[index]);
+
+      if (isSameParent) {
+        // Find item that has last-selected id under children
+        const selectedNodeId = nodeIds[0];
+        const lastSelectedNodeId = lastSelectedLocalFileTreeNodeMeta.nodeId;
+
+        const selectedParentNode = Object.values(state.localFileTreeData).find(
+          (node) => node.children.includes(selectedNodeId)
+        );
+        const siblingNodeIds = selectedParentNode.children || [];
+
+        const selectedNodeIdIndex = siblingNodeIds.indexOf(selectedNodeId);
+        const lastSelectedNodeIdIndex =
+          siblingNodeIds.indexOf(lastSelectedNodeId);
+        // Get all nodes between the first and last selected node
+        const start = Math.min(selectedNodeIdIndex, lastSelectedNodeIdIndex);
+        const end = Math.max(selectedNodeIdIndex, lastSelectedNodeIdIndex);
+        const nodesBetween = siblingNodeIds.slice(start + 1, end + 1);
+        // Exclude already selected nodes
+        const alreadySelectedNodes = updatedSelection.filter((id) =>
+          nodesBetween.includes(id)
+        );
+        const nodesToSelect = nodesBetween.filter(
+          (id) => !alreadySelectedNodes.includes(id)
+        );
+        // Re-add the last selected node
+        nodesToSelect.push(selectedNodeId);
+
+        handleFileTreeSelection(
+          nodesToSelect,
+          null,
+          { shiftKey: false },
+          "local",
+          false
+        );
+      }
     }
   };
 
@@ -331,8 +406,14 @@ const UploaderApp = () => {
             {state.localFileTreeData && (
               <div className="mt-4">
                 <FileBrowser
-                  onSelectCallback={(nodeData) =>
-                    handleFileTreeSelection(nodeData, "local")
+                  onSelectCallback={(nodeData, coords, e, deselect = false) =>
+                    handleFileTreeSelection(
+                      nodeData,
+                      coords,
+                      e,
+                      "local",
+                      deselect
+                    )
                   }
                 />
               </div>
@@ -432,8 +513,14 @@ const UploaderApp = () => {
             {state.omeroFileTreeData && (
               <div className="mt-4">
                 <OmeroDataBrowser
-                  onSelectCallback={(nodeData) =>
-                    handleFileTreeSelection(nodeData, "omero")
+                  onSelectCallback={(nodeData, coords, e, deselect = false) =>
+                    handleFileTreeSelection(
+                      nodeData,
+                      coords,
+                      e,
+                      "omero",
+                      deselect
+                    )
                   }
                 />
               </div>

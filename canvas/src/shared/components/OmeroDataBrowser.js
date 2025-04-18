@@ -42,9 +42,6 @@ const OmeroDataBrowser = ({ onSelectCallback }) => {
       fetchData={handleProjectDataFetch}
       initialDataKey="root"
       dataStructure={state.omeroFileTreeData}
-      onExpandCallback={(node, newData) => {
-        console.log("Project expanded:", node, newData);
-      }}
       onSelectCallback={onSelectCallback}
       selectedItems={state.omeroFileTreeSelection}
     />

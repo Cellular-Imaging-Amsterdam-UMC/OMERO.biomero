@@ -845,7 +845,6 @@ def get_folder_contents(request, conn=None, **kwargs):
                     }
                 )
         elif ext in SUPPORTED_FILE_EXTENSIONS:
-            # Handle other supported file types
             contents.append(
                 {
                     "name": os.path.basename(target_path),
@@ -858,7 +857,8 @@ def get_folder_contents(request, conn=None, **kwargs):
         else:
             return HttpResponseBadRequest("Invalid folder ID or path does not exist.")
     else:
-        for item in os.listdir(target_path):
+        items = os.listdir(target_path)
+        for item in items:
             item_path = os.path.join(target_path, item)
             # Get extension, if any
             ext = os.path.splitext(item)[1]
@@ -868,6 +868,7 @@ def get_folder_contents(request, conn=None, **kwargs):
             if ext in BROWSABLE_FILE_EXTENSIONS:
                 # Read metadata for Leica files
                 metadata = read_leica_file(item_path)
+
             contents.append(
                 {
                     "name": item,
@@ -879,5 +880,8 @@ def get_folder_contents(request, conn=None, **kwargs):
                     "source": "filesystem",
                 }
             )
+
+    # Sort the contents by name, folders first
+    contents.sort(key=lambda x: (not x["is_folder"], x["name"].lower()))
 
     return {"contents": contents, "item_id": item_id, "metadata": clicked_item_metadata}

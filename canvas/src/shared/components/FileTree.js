@@ -62,7 +62,7 @@ const FileTree = ({
 
     const iconMetaData = iconMeta[category] || {};
 
-    const contextMaenuDisabled =
+    const contextMenuDisabled =
       !item.isFolder || !expandedItems.includes(item.index);
 
     const itemLabel = isOmeroItem ? (
@@ -71,25 +71,40 @@ const FileTree = ({
       <div className="relative">
         <ContextMenu
           id={item.index}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
           content={
             <Menu>
               <MenuItem
-                disabled={contextMaenuDisabled}
+                disabled={contextMenuDisabled}
                 className="text-sm"
                 text="Select all children"
-                onClick={() => {
+                onClick={(e) => {
                   const allChildren = item.children || [];
-                  console.log(item);
-                  onSelectCallback(allChildren, "local");
+                  onSelectCallback(allChildren, null, e, false);
+                  e.stopPropagation();
                 }}
               />
               <MenuItem
-                disabled={contextMaenuDisabled}
+                disabled={contextMenuDisabled}
                 className="text-sm"
                 text="Deselect all children"
-                onClick={() => {
+                onClick={(e) => {
                   const allChildren = item.children || [];
-                  onSelectCallback(allChildren, "local");
+                  onSelectCallback(allChildren, null, e, true);
+                  e.stopPropagation();
+                }}
+              />
+              <MenuItem
+                disabled={false}
+                className="text-sm"
+                text="Deselect all"
+                onClick={(e) => {
+                  const allItems = Object.keys(dataStructure);
+                  onSelectCallback(allItems, null, e, true);
+                  e.stopPropagation();
                 }}
               />
             </Menu>
@@ -133,7 +148,9 @@ const FileTree = ({
           contents={treeNodes}
           onNodeExpand={handleNodeExpand}
           onNodeCollapse={handleNodeCollapse}
-          onNodeClick={onSelectCallback}
+          onNodeClick={(nodeData, coords, e) => {
+            onSelectCallback(nodeData, coords, e);
+          }}
         />
       ) : (
         <div>Loading...</div>

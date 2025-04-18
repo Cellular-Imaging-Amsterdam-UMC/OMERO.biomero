@@ -492,7 +492,6 @@ export const AppProvider = ({ children }) => {
         intent: "success",
         icon: "tick-circle",
         message: `${message}`,
-        timeout: 0,
       });
     } catch (err) {
       toaster.show({

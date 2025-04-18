@@ -43,9 +43,6 @@ const FileBrowser = ({ onSelectCallback }) => {
       fetchData={handleFolderDataFetch}
       initialDataKey="root"
       dataStructure={state.localFileTreeData}
-      onExpandCallback={(node, newData, e) => {
-        console.log("Folder expanded:", node, newData, e);
-      }}
       onSelectCallback={onSelectCallback}
       selectedItems={state.localFileTreeSelection}
     />
