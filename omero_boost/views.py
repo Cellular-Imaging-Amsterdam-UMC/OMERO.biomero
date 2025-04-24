@@ -844,6 +844,7 @@ def get_folder_contents(request, conn=None, **kwargs):
                         "source": "filesystem",
                     }
                 )
+
         elif ext in SUPPORTED_FILE_EXTENSIONS:
             contents.append(
                 {
@@ -857,29 +858,73 @@ def get_folder_contents(request, conn=None, **kwargs):
         else:
             return HttpResponseBadRequest("Invalid folder ID or path does not exist.")
     else:
-        items = os.listdir(target_path)
-        for item in items:
-            item_path = os.path.join(target_path, item)
-            # Get extension, if any
-            ext = os.path.splitext(item)[1]
-            info = f"Item: {item}, Path: {item_path}, Extension: {ext}"
-            is_folder = os.path.isdir(item_path) or ext in BROWSABLE_FILE_EXTENSIONS
-            metadata = None
-            if ext in BROWSABLE_FILE_EXTENSIONS:
-                # Read metadata for Leica files
-                metadata = read_leica_file(item_path)
-
+        # If filename is .zarr, treat as a file
+        if os.path.basename(target_path).endswith(".zarr"):
             contents.append(
                 {
-                    "name": item,
-                    "is_folder": is_folder,
-                    # Use relative path as ID
-                    "id": os.path.relpath(item_path, base_dir),
-                    "info": info,
-                    "metadata": metadata,
+                    "name": os.path.basename(target_path),
+                    "is_folder": False,
+                    "id": item_path,
+                    "metadata": None,
                     "source": "filesystem",
                 }
             )
+        else:
+            items = os.listdir(target_path)
+            # If there is a .xlef or experiment.db file in the folder, only show that
+            xlef_files = [item for item in items if item.endswith(".xlef")]
+            experiment_db_files = [
+                item for item in items if item.endswith("experiment.db")
+            ]
+
+            if xlef_files or experiment_db_files:
+                if xlef_files:
+                    selected_items = xlef_files
+                elif experiment_db_files:
+                    selected_items = experiment_db_files
+
+                for item in selected_items:
+                    contents.append(
+                        {
+                            "name": item,
+                            "is_folder": False,
+                            "id": os.path.relpath(item, base_dir),
+                            "metadata": None,
+                            "source": "filesystem",
+                        }
+                    )
+
+            else:
+                for item in items:
+                    item_path = os.path.join(target_path, item)
+                    # Get extension, if any
+                    ext = os.path.splitext(item)[1]
+                    info = f"Item: {item}, Path: {item_path}, Extension: {ext}"
+                    is_folder = (
+                        os.path.isdir(item_path) or ext in BROWSABLE_FILE_EXTENSIONS
+                    )
+                    metadata = None
+                    if ext in BROWSABLE_FILE_EXTENSIONS:
+                        # Read metadata for Leica files
+                        metadata = read_leica_file(item_path)
+
+                    # .zarr folders should be treated as files
+                    is_folder = (
+                        False
+                        if os.path.basename(item_path).endswith(".zarr")
+                        else is_folder
+                    )
+
+                    contents.append(
+                        {
+                            "name": item,
+                            "is_folder": is_folder,
+                            "id": os.path.relpath(item_path, base_dir),
+                            "info": info,
+                            "metadata": metadata,
+                            "source": "filesystem",
+                        }
+                    )
 
     # Sort the contents by name, folders first
     contents.sort(key=lambda x: (not x["is_folder"], x["name"].lower()))

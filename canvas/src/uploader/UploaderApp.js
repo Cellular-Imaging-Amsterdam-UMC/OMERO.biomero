@@ -11,12 +11,12 @@ import {
   CardList,
   Card,
   Callout,
-  Divider,
   Icon,
   Tooltip,
 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 import NewContainerOverlay from "./components/NewContainerOverlay";
+import MetadataForms from "./components/MetadataForms";
 
 const MonitorPanel = ({
   iframeUrl,
@@ -99,6 +99,7 @@ const UploaderApp = () => {
     lastSelectedLocalFileTreeNodeMeta,
     setLastSelectedLocalFileTreeNodeMeta,
   ] = useState(null);
+  const [lastSelectedIndex, setLastSelectedIndex] = useState(null);
 
   const openCreateContainerOverlay = (isOpen, type) => {
     setIsNewContainerOverlayOpen(isOpen);
@@ -241,6 +242,9 @@ const UploaderApp = () => {
   const addUploadItems = () => {
     // Only allow selection of screens as target if active tab is UploadScreens
     const nodeId = state.omeroFileTreeSelection[0];
+    console.log("nodeId", state.omeroFileTreeData);
+    const omeroPath = findPathToTreeLeaf(nodeId, state.omeroFileTreeData);
+    const pathString = omeroPath.join("/");
     const isScreen = nodeId.includes("screen-");
     const isDataset = nodeId.includes("dataset-");
     if (!isScreen && activeTab === "UploadScreens") {
@@ -261,12 +265,20 @@ const UploaderApp = () => {
         return;
       }
     }
-
     const newUploadList = state.localFileTreeSelection
       .filter(
         (item) => !uploadList.some((uploadItem) => uploadItem.value === item)
       )
-      .map((item) => ({ value: item, isSelected: false }));
+      .map((item) => {
+        const itemData = state.localFileTreeData[item];
+        return {
+          value: item,
+          isSelected: false,
+          filename: itemData.data,
+          omeroPath: pathString,
+          ...itemData,
+        };
+      });
     setUploadList([...uploadList, ...newUploadList]);
     updateState({ localFileTreeSelection: [] });
   };
@@ -282,33 +294,94 @@ const UploaderApp = () => {
     setAreUploadItemsSelected(false);
   };
 
-  const selectItem = (item) => {
-    let areItemsSelected = false;
-    const newUploadList = uploadList.map((uploadItem) => {
-      if (uploadItem.value === item.value) {
-        if (!uploadItem.isSelected) {
-          areItemsSelected = true;
-        }
-        return { ...uploadItem, isSelected: !uploadItem.isSelected };
+  const selectItem = (item, e) => {
+    const clickedIndex = uploadList.findIndex(
+      (uploadItem) => uploadItem.value === item.value
+    );
+    let newUploadList = [...uploadList];
+
+    if (e.shiftKey && lastSelectedIndex !== null) {
+      const [start, end] = [lastSelectedIndex, clickedIndex].sort(
+        (a, b) => a - b
+      );
+      for (let i = start; i <= end; i++) {
+        newUploadList[i] = { ...newUploadList[i], isSelected: true };
       }
-      return uploadItem;
-    });
+    } else {
+      newUploadList = uploadList.map((uploadItem) =>
+        uploadItem.value === item.value
+          ? { ...uploadItem, isSelected: !uploadItem.isSelected }
+          : uploadItem
+      );
+      setLastSelectedIndex(clickedIndex);
+    }
+
+    const areItemsSelected = newUploadList.some((item) => item.isSelected);
     setUploadList(newUploadList);
     setAreUploadItemsSelected(areItemsSelected);
   };
 
+  const findPathToTreeLeaf = (nodeId, tree) => {
+    const dfs = (currentNode, path) => {
+      if (currentNode === nodeId) return path.concat(tree[currentNode]?.data);
+      const children = tree[currentNode]?.children || [];
+      for (const child of children) {
+        const result = dfs(child, path.concat(tree[currentNode]?.data));
+        if (result) return result;
+      }
+      return null;
+    };
+    return dfs("root", []);
+  };
+
+  const selectedOmeroPath =
+    state.omeroFileTreeSelection.length > 0
+      ? findPathToTreeLeaf(
+          state.omeroFileTreeSelection[0],
+          state.omeroFileTreeData
+        ).join("/")
+      : "";
+
   const renderCards = () => {
-    return uploadList.map((item) => (
-      <Card
-        key={item.value}
-        interactive={true}
-        className="text-sm m-1 pl-3"
-        selected={item.isSelected}
-        onClick={() => selectItem(item)}
-      >
-        {item.value.replace(/\//g, " / ")}{" "}
-      </Card>
-    ));
+    // TODO
+    return uploadList.map((item) => {
+      const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData);
+      console.log("itemPath", itemPath);
+      const itemPathString = itemPath.join("/");
+      return (
+        <Card
+          key={item.value}
+          interactive={true}
+          className="text-sm m-1 pl-3 flex flex-col"
+          selected={item.isSelected}
+          onClick={(e) => selectItem(item, e)}
+        >
+          <div className="flex items-center place-content-between w-full">
+            <div className="select-none">{item.filename}</div>
+            <div>
+              {/* deselect button*/}
+              <Icon
+                icon="cross"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setUploadList((prevList) =>
+                    prevList.filter(
+                      (uploadItem) => uploadItem.value !== item.value
+                    )
+                  );
+                }}
+                color="red"
+                className="cursor-pointer ml-3"
+                size={16}
+              />
+            </div>
+          </div>
+          <div className="text-xs text-gray-500 text-align-left w-full select-none">
+            {"Source path: " + itemPathString}
+          </div>
+        </Card>
+      );
+    });
   };
 
   const handleTabChange = (newTabId) => {
@@ -385,7 +458,7 @@ const UploaderApp = () => {
     return (
       <div className="h-full">
         <div className="flex space-x-4">
-          <div className="w-1/3 overflow-auto pt-2">
+          <div className="w-1/4 overflow-auto pt-2">
             <div className="flex space-x-4 items-center">
               <h1 className="text-base font-bold p-0 m-0 inline-block">
                 {localFileTreeTitle}
@@ -404,7 +477,7 @@ const UploaderApp = () => {
               </Button>
             </div>
             {state.localFileTreeData && (
-              <div className="mt-4">
+              <div className="mt-4 max-h-[calc(100vh-450px)] overflow-auto">
                 <FileBrowser
                   onSelectCallback={(nodeData, coords, e, deselect = false) =>
                     handleFileTreeSelection(
@@ -419,7 +492,7 @@ const UploaderApp = () => {
               </div>
             )}
           </div>
-          <div className="w-1/3 overflow-auto pt-2">
+          <div className="w-1/4 overflow-auto pt-2">
             <div className="flex space-x-4 items-center">
               <h1 className="text-base font-bold p-0 m-0 inline-block">
                 Upload list
@@ -444,7 +517,7 @@ const UploaderApp = () => {
               </Button>
             </div>
             {uploadList.length ? (
-              <div className="mt-4">
+              <div className="mt-4 max-h-[calc(100vh-450px)] overflow-auto">
                 <CardList bordered={false}>{renderCards()}</CardList>
               </div>
             ) : (
@@ -453,7 +526,7 @@ const UploaderApp = () => {
               </div>
             )}
           </div>
-          <div className="w-1/3 overflow-auto pt-2">
+          <div className="w-1/4 overflow-auto pt-2">
             <div className="flex items-center">
               <h1 className="text-base font-bold p-0 m-0">
                 {omeroFileTreeTitle}
@@ -511,7 +584,7 @@ const UploaderApp = () => {
               </Tooltip>
             </div>
             {state.omeroFileTreeData && (
-              <div className="mt-4">
+              <div className="mt-4 max-h-[calc(100vh-450px)] overflow-auto">
                 <OmeroDataBrowser
                   onSelectCallback={(nodeData, coords, e, deselect = false) =>
                     handleFileTreeSelection(
@@ -526,9 +599,17 @@ const UploaderApp = () => {
               </div>
             )}
           </div>
+          <div className="w-1/4 overflow-auto pt-2">
+            <div className="flex items-center">
+              <h1 className="text-base font-bold p-0 m-0 inline-block">
+                Add metadata
+              </h1>
+            </div>
+            {<MetadataForms />}
+          </div>
         </div>
-        <Divider className="my-10" />
-        <div className="flex items-center place-content-between">
+
+        <div className="absolute flex items-center place-content-between bg-slate-300 w-full p-8 mt-12 bottom-0 left-0">
           <Card className="ml-12">
             <span className="text-base">{`${uploadList.length} file${
               uploadList.length > 1 || uploadList.length === 0 ? "s" : ""
@@ -536,7 +617,9 @@ const UploaderApp = () => {
           </Card>
           <Icon icon="circle-arrow-right" size={24} color="grey" />
           <Card>
-            <span className="text-base">{`Upload destination: ${state.omeroFileTreeSelection[0]}`}</span>
+            <span className="text-base">{`Upload destination: ${
+              selectedOmeroPath || "None"
+            }`}</span>
           </Card>
           <Icon icon="circle-arrow-right" size={24} color="grey" />
           <Button
@@ -568,10 +651,9 @@ const UploaderApp = () => {
         )}
       </div>
 
-      <div className="p-4 h-full overflow-hidden">
+      <div className="p-4 overflow-hidden">
         <Tabs
           id="app-tabs"
-          className="h-full"
           selectedTabId={activeTab}
           onChange={handleTabChange}
         >

@@ -98,7 +98,7 @@ const FileTree = ({
                 }}
               />
               <MenuItem
-                disabled={false}
+                disabled={selectedItems.length === 0}
                 className="text-sm"
                 text="Deselect all"
                 onClick={(e) => {
