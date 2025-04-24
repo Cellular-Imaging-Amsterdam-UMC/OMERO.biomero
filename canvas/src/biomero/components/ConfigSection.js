@@ -5,6 +5,7 @@ const ConfigSection = ({
   items,
   onItemChange,
   onAddItem,
+  onAddParam,
   onDeleteItem,
   onResetItem,
   CardComponent, // Allow custom card component
@@ -62,6 +63,7 @@ const ConfigSection = ({
                 item={item}
                 index={index}
                 onChange={onItemChange}
+                onAddParam={onAddParam}
                 onDelete={onDeleteItem}
                 onReset={onResetItem}
                 editable={editableIndex === index}
