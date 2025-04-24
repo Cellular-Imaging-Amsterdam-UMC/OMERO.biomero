@@ -472,8 +472,8 @@ export const AppProvider = ({ children }) => {
 
   const createNewContainer = async (
     newContainerType,
-    newContaineName,
-    newContaineDescription,
+    newContainerName,
+    newContainerDescription,
     targetContainerId,
     targetContainerType
   ) => {
@@ -482,8 +482,8 @@ export const AppProvider = ({ children }) => {
     try {
       const response = await createContainer(
         newContainerType,
-        newContaineName,
-        newContaineDescription,
+        newContainerName,
+        newContainerDescription,
         targetContainerId,
         targetContainerType
       );
@@ -500,7 +500,7 @@ export const AppProvider = ({ children }) => {
         message: `Dataset creation error: ${err.message}: ${
           err.response?.data?.error
         } (Params: ${JSON.stringify(
-          { newContaineName, newContaineDescription },
+          { newContainerName, newContainerDescription },
           null,
           2
         )})`,

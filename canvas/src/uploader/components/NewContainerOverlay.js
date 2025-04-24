@@ -4,9 +4,9 @@ import { Button, Overlay2, OverlaysProvider } from "@blueprintjs/core";
 const NewContainerOverlay = ({
   isNewContainerOverlayOpen,
   toggleOverlay,
-  newContaineName,
+  newContainerName,
   setNewContainerName,
-  newContaineDescription,
+  newContainerDescription,
   setContainerDescription,
   handleCreate,
   newContainerType,
@@ -58,7 +58,7 @@ const NewContainerOverlay = ({
               <input
                 type="text"
                 placeholder={placeholderName}
-                value={newContaineName}
+                value={newContainerName}
                 onChange={(e) => setNewContainerName(e.target.value)}
                 className="bp5-input w-full mb-4"
               />
@@ -66,7 +66,7 @@ const NewContainerOverlay = ({
                 placeholder={placeholderDescription}
                 className="bp5-input w-full mb-4"
                 rows={4}
-                value={newContaineDescription}
+                value={newContainerDescription}
                 onChange={(e) => setContainerDescription(e.target.value)}
               />
               <div className="flex justify-end space-x-4">
@@ -75,7 +75,7 @@ const NewContainerOverlay = ({
                   text="Create"
                   intent="primary"
                   onClick={handleCreate}
-                  disabled={!newContaineName.trim()}
+                  disabled={!newContainerName.trim()}
                 />
               </div>
             </div>

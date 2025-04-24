@@ -91,8 +91,8 @@ const UploaderApp = () => {
 
   const [isNewContainerOverlayOpen, setIsNewContainerOverlayOpen] =
     useState(false);
-  const [newContaineName, setNewContainerName] = useState("");
-  const [newContaineDescription, setContainerDescription] = useState("");
+  const [newContainerName, setNewContainerName] = useState("");
+  const [newContainerDescription, setContainerDescription] = useState("");
   const [newContainerType, setNewContainerType] = useState("");
   const [selectedOmeroTarget, setSelectedOmeroTarget] = useState(null);
   const [
@@ -431,8 +431,8 @@ const UploaderApp = () => {
 
     createNewContainer(
       newContainerType,
-      newContaineName,
-      newContaineDescription,
+      newContainerName,
+      newContainerDescription,
       targetContainerId,
       targetContainerType
     )
@@ -693,9 +693,9 @@ const UploaderApp = () => {
       <NewContainerOverlay
         isNewContainerOverlayOpen={isNewContainerOverlayOpen}
         toggleOverlay={toggleOverlay}
-        newContaineName={newContaineName}
+        newContainerName={newContainerName}
         setNewContainerName={setNewContainerName}
-        newContaineDescription={newContaineDescription}
+        newContainerDescription={newContainerDescription}
         setContainerDescription={setContainerDescription}
         handleCreate={handleCreateContainer}
         newContainerType={newContainerType}
