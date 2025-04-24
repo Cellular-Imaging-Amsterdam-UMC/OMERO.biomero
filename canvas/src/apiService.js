@@ -47,15 +47,16 @@ export const fetchProjectData = async (item) => {
   return apiRequest(urls.api_datasets, "GET", null, { params });
 };
 
-export const fetchFolderData = async (folderId = null) => {
+export const fetchFolderData = async (itemId = null, isFolder = true) => {
   const { urls, user } = getDjangoConstants();
   const params = {
-    folder_id: folderId,
+    item_id: itemId,
     page: 0,
     group: user.active_group_id,
+    is_folder: isFolder,
     _: new Date().getTime(),
   };
-  return apiRequest(urls.api_local_file_browser, "GET", null, { params });
+  return apiRequest(urls.api_get_folder_contents, "GET", null, { params });
 };
 
 export const fetchGroups = async () => {
@@ -241,6 +242,44 @@ export const postUpload = async (upload) => {
     return response; // Return the API response
   } catch (error) {
     console.error("Error saving config:", error);
+    throw error;
+  }
+};
+
+export const createContainer = async (
+  type,
+  name,
+  description,
+  targetContainerId,
+  targetContainerType
+) => {
+  const { urls } = getDjangoConstants(); // Base URL for the API from Django constants
+
+  try {
+    // Use the global csrftoken directly from window object
+    const csrfToken = window.csrftoken;
+
+    // Prepare the form data payload
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("description", description);
+    formData.append("folder_type", type);
+    formData.append("owner", "");
+
+    const url = targetContainerId
+      ? `${urls.api_addnewcontainer}${targetContainerType}/${targetContainerId}/`
+      : urls.api_addnewcontainer;
+
+    const response = await apiRequest(url, "POST", formData, {
+      headers: {
+        "X-CSRFToken": csrfToken,
+        // Let browser set Content-Type for FormData
+      },
+    });
+
+    return response; // Return the API response
+  } catch (error) {
+    console.error("Error creating container:", error);
     throw error;
   }
 };

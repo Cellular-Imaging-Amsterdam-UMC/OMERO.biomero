@@ -34,7 +34,7 @@ export const getDjangoConstants = () => {
     initially_open: WEBCLIENT.initially_open,
     tree_top_level: WEBCLIENT.URLS.tree_top_level,
     api_experimenter: WEBCLIENT.URLS.api_experimenter,
-    api_local_file_browser: "/omero_boost/local_file_browser/",
+    api_get_folder_contents: "/omero_boost/get_folder_contents/",
     api_get_groups: "/webclient/group_user_content/",
     scripts: "/webclient/list_scripts/",
     get_script_menu: "/omero_boost/get_script_menu/",
@@ -43,8 +43,32 @@ export const getDjangoConstants = () => {
     api_save_config: "/omero_boost/api/biomero/admin/config/save/",
     api_import_selected: "/omero_boost/api/import_selected/",
     api_run_workflow: "/omero_boost/api/biomero/workflows/run/",
-    api_thumbnails: "/webclient/get_thumbnails/"
+    api_thumbnails: "/webclient/get_thumbnails/",
+    api_addnewcontainer: "/webclient/action/addnewcontainer/",
   };
-  
+
   return { user, urls };
+};
+
+export const iconMeta = {
+  dataset: {
+    icon: "folder-close",
+    tooltip: "Dataset",
+    color: "#99b882",
+  },
+  project: {
+    icon: "folder-close",
+    tooltip: "Project",
+    color: "#76899e",
+  },
+  screen: {
+    icon: "folder-close",
+    tooltip: "Screen",
+    color: "#393939",
+  },
+  image: {
+    icon: "image",
+    tooltip: "Image",
+    color: "#393939",
+  },
 };
