@@ -602,10 +602,10 @@ const UploaderApp = () => {
           <div className="w-1/4 overflow-auto pt-2">
             <div className="flex items-center">
               <h1 className="text-base font-bold p-0 m-0 inline-block">
-                Add metadata
+                Metadata Forms
               </h1>
             </div>
-            {<MetadataForms />}
+            <MetadataForms />
           </div>
         </div>
 
