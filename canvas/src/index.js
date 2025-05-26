@@ -62,12 +62,10 @@ window.onload = function () {
   const rootElement = document.getElementById("root");
   const root = ReactDOM.createRoot(rootElement);
   root.render(
-    <React.StrictMode>
-      <BrowserRouter>
-        <Routes>
-          <Route path="*" element={<AppRouter />} />
-        </Routes>
-      </BrowserRouter>
-    </React.StrictMode>
+    <BrowserRouter>
+      <Routes>
+        <Route path="*" element={<AppRouter />} />
+      </Routes>
+    </BrowserRouter>
   );
 };

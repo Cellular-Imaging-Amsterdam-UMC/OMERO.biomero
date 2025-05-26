@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
-import { Tree, Icon } from "@blueprintjs/core";
+import { Tree, Icon, ContextMenu, Menu, MenuItem } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
+import { iconMeta } from "../../constants";
 
 const FileTree = ({
   fetchData,
@@ -37,11 +38,82 @@ const FileTree = ({
     const item = dataStructure[itemIndex];
     const isExpanded = expandedItems.includes(item.index);
     const isSelected = selectedItems.includes(item.index);
+
+    const isOmeroItem = "source" in item && item.source === "omero";
+    if (isOmeroItem) {
+      item.category = item.category || "dataset";
+    }
+
+    const initialIconName =
+      iconMeta[item.category]?.icon || isOmeroItem ? "folder-close" : "media";
+
     const iconName = item.isFolder
       ? isExpanded
         ? "folder-open"
         : "folder-close"
-      : "document";
+      : initialIconName;
+
+    // Remove final 's' from category name for iconMeta lookup
+    const category = item.category
+      ? item.category.replace(/s$/, "")
+      : isOmeroItem
+      ? "image"
+      : "folder";
+
+    const iconMetaData = iconMeta[category] || {};
+
+    const contextMenuDisabled =
+      !item.isFolder || !expandedItems.includes(item.index);
+
+    const itemLabel = isOmeroItem ? (
+      <span className="text-sm relative top-[2px]">{item.data}</span>
+    ) : (
+      <div className="relative">
+        <ContextMenu
+          id={item.index}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          content={
+            <Menu>
+              <MenuItem
+                disabled={contextMenuDisabled}
+                className="text-sm"
+                text="Select all children"
+                onClick={(e) => {
+                  const allChildren = item.children || [];
+                  onSelectCallback(allChildren, null, e, false);
+                  e.stopPropagation();
+                }}
+              />
+              <MenuItem
+                disabled={contextMenuDisabled}
+                className="text-sm"
+                text="Deselect all children"
+                onClick={(e) => {
+                  const allChildren = item.children || [];
+                  onSelectCallback(allChildren, null, e, true);
+                  e.stopPropagation();
+                }}
+              />
+              <MenuItem
+                disabled={selectedItems.length === 0}
+                className="text-sm"
+                text="Deselect all"
+                onClick={(e) => {
+                  const allItems = Object.keys(dataStructure);
+                  onSelectCallback(allItems, null, e, true);
+                  e.stopPropagation();
+                }}
+              />
+            </Menu>
+          }
+        >
+          <span className="text-sm relative top-[2px]">{item.data}</span>
+        </ContextMenu>
+      </div>
+    );
 
     // Avoid recursive loops by ensuring children exist and don't point to the same node
     const childNodes =
@@ -54,12 +126,12 @@ const FileTree = ({
 
     return {
       id: item.index,
-      label: item.data,
+      label: itemLabel,
       hasCaret: item.isFolder,
       isExpanded,
       isSelected,
       childNodes,
-      icon: <Icon icon={iconName} size={18} />,
+      icon: <Icon icon={iconName} size={18} color={iconMetaData.color} />,
     };
   };
 
@@ -76,7 +148,9 @@ const FileTree = ({
           contents={treeNodes}
           onNodeExpand={handleNodeExpand}
           onNodeCollapse={handleNodeCollapse}
-          onNodeClick={onSelectCallback}
+          onNodeClick={(nodeData, coords, e) => {
+            onSelectCallback(nodeData, coords, e);
+          }}
         />
       ) : (
         <div>Loading...</div>

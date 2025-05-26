@@ -45,7 +45,7 @@ setup(
         "web importer",
     ],
     install_requires=[
-        "omero-web>=5.6.0", 
+        "omero-web>=5.6.0",
         "pyjwt",
         "biomero>=2.0.0-alpha.4",
         "configupdater>=3.2",

@@ -14,6 +14,7 @@ import {
   postUpload,
   fetchThumbnails,
   fetchImages,
+  createContainer,
   fetchGroupMappings,
   postGroupMappings,
 } from "./apiService";
@@ -55,6 +56,7 @@ export const AppProvider = ({ children }) => {
     async function initializeToaster() {
       const toaster = await OverlayToaster.createAsync({
         position: Position.TOP,
+        className: "text-base",
       });
       setToaster(toaster);
     }
@@ -116,8 +118,14 @@ export const AppProvider = ({ children }) => {
             group
           );
 
+          // Add source key to each image
+          const imagesWithSource = images.map((image) => ({
+            ...image,
+            source: "omero",
+          }));
+
           if (images.length > 0) {
-            allImages = [...allImages, ...images];
+            allImages = [...allImages, ...imagesWithSource];
 
             // Check if we have fetched enough images
             if (allImages.length >= childCount) {
@@ -326,7 +334,13 @@ export const AppProvider = ({ children }) => {
     setError(null);
     try {
       const omeroFileTreeData = await fetchomeroFileTreeData();
-      updateState({ omeroFileTreeData: transformStructure(omeroFileTreeData) });
+      const transformedData = transformStructure(omeroFileTreeData);
+      // Add source key to each item
+      Object.keys(transformedData).forEach((key) => {
+        transformedData[key].source = "omero";
+      });
+
+      updateState({ omeroFileTreeData: transformedData });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -348,6 +362,7 @@ export const AppProvider = ({ children }) => {
           children: [],
           data: content.name,
           childCount: 0,
+          source: content.source,
         };
         return acc;
       }, {});
@@ -458,6 +473,48 @@ export const AppProvider = ({ children }) => {
     OME.openPopup(WEBCLIENT.URLS.script_upload);
   };
 
+  const createNewContainer = async (
+    newContainerType,
+    newContainerName,
+    newContainerDescription,
+    targetContainerId,
+    targetContainerType
+  ) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await createContainer(
+        newContainerType,
+        newContainerName,
+        newContainerDescription,
+        targetContainerId,
+        targetContainerType
+      );
+      const message = response?.message || "Dataset created successfully.";
+      toaster.show({
+        intent: "success",
+        icon: "tick-circle",
+        message: `${message}`,
+      });
+    } catch (err) {
+      toaster.show({
+        intent: "danger",
+        icon: "error",
+        message: `Dataset creation error: ${err.message}: ${
+          err.response?.data?.error
+        } (Params: ${JSON.stringify(
+          { newContainerName, newContainerDescription },
+          null,
+          2
+        )})`,
+        timeout: 0,
+      });
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadGroupMappings = async () => {
     setLoading(true);
     setError(null);
@@ -524,6 +581,7 @@ export const AppProvider = ({ children }) => {
         apiLoading,
         apiError,
         toaster,
+        createNewContainer,
       }}
     >
       {children}

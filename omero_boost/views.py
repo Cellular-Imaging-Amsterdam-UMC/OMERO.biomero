@@ -24,6 +24,8 @@ import datetime
 import uuid
 from collections import defaultdict
 from omero_adi.utils.ingest_tracker import initialize_ingest_tracker
+from .constants import BROWSABLE_FILE_EXTENSIONS, SUPPORTED_FILE_EXTENSIONS
+from .file_browser.ReadLeicaFile import read_leica_file
 
 logger = logging.getLogger(__name__)
 
@@ -48,12 +50,17 @@ def get_biomero_config(request, conn=None, **kwargs):
         # Load the configuration file
         configs = configparser.ConfigParser(allow_no_value=True)
         # Loads from default locations and given location, missing files are ok
-        configs.read([os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_1),
-                     os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_2),
-                     os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_3)])
+        configs.read(
+            [
+                os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_1),
+                os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_2),
+                os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_3),
+            ]
+        )
         # Convert configparser object to JSON-like dict
-        config_dict = {section: dict(configs.items(section))
-                       for section in configs.sections()}
+        config_dict = {
+            section: dict(configs.items(section)) for section in configs.sections()
+        }
 
         return JsonResponse({"config": config_dict})
     except Exception as e:
@@ -89,9 +96,9 @@ def save_biomero_config(request, conn=None, **kwargs):
         config_data = data.get("config", {})
 
         def generate_model_comment(key):
-            if key.endswith('_job'):
+            if key.endswith("_job"):
                 c = "# The jobscript in the 'slurm_script_repo'"
-            elif key.endswith('_repo'):
+            elif key.endswith("_repo"):
                 c = "# The (e.g. github) repository with the descriptor.json file"
             else:
                 c = "# Adding or overriding job value for this workflow"
@@ -100,8 +107,7 @@ def save_biomero_config(request, conn=None, **kwargs):
         # Update the config with new values
         for section, settingsd in config_data.items():
             if not isinstance(settingsd, dict):
-                raise ValueError(
-                    f"Section '{section}' must contain key-value pairs.")
+                raise ValueError(f"Section '{section}' must contain key-value pairs.")
 
             # If the section doesn't exist, add it
             if section not in config:
@@ -113,7 +119,7 @@ def save_biomero_config(request, conn=None, **kwargs):
                 for key, value in settingsd.items():
                     # Split the key on the known suffixes
                     model_prefix = key
-                    for suffix in ['repo', 'job']:
+                    for suffix in ["repo", "job"]:
                         if f"_{suffix}" in key:
                             model_prefix = key.split(f"_{suffix}")[0]
                             break
@@ -128,35 +134,44 @@ def save_biomero_config(request, conn=None, **kwargs):
                             config.set(section, key, value)
                         else:
                             if key == model_prefix:
-                                comment = f'''
+                                comment = f"""
 # -------------------------------------
 # {model_prefix.capitalize()} (added via web UI)
 # -------------------------------------
-# The path to store the container on the slurm_images_path'''
+# The path to store the container on the slurm_images_path"""
                                 config.set(section, key, value)
-                                (config[section][model_prefix].add_before
-                                 .comment(comment))
+                                (
+                                    config[section][model_prefix].add_before.comment(
+                                        comment
+                                    )
+                                )
                             else:
                                 # For new keys, add the key and a comment before it
                                 model_comment = generate_model_comment(key)
 
                                 if "job_" in key:
-                                    (config[section][model_prefix+"_job"].add_after
-                                     .comment(model_comment)
-                                     .option(key, value))
+                                    (
+                                        config[section][model_prefix + "_job"]
+                                        .add_after.comment(model_comment)
+                                        .option(key, value)
+                                    )
                                 elif "_job" in key:
-                                    (config[section][model_prefix+"_repo"].add_after
-                                     .comment(model_comment)
-                                     .option(key, value))
+                                    (
+                                        config[section][model_prefix + "_repo"]
+                                        .add_after.comment(model_comment)
+                                        .option(key, value)
+                                    )
                                 else:
-                                    (config[section][model_prefix].add_after
-                                     .comment(model_comment)
-                                     .option(key, value))
+                                    (
+                                        config[section][model_prefix]
+                                        .add_after.comment(model_comment)
+                                        .option(key, value)
+                                    )
 
                 # Check for removing top-level keys and related keys
                 for key in list(config[section].keys()):
                     model_prefix = key
-                    for suffix in ['repo', 'job']:
+                    for suffix in ["repo", "job"]:
                         if f"_{suffix}" in key:
                             model_prefix = key.split(f"_{suffix}")[0]
                             break
@@ -182,7 +197,7 @@ def save_biomero_config(request, conn=None, **kwargs):
                     config.set(section, key, value)
 
         # Prepare the update timestamp comment
-        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         change_comment = f"Config automatically updated by {username} ({user_id}) via the web UI on {timestamp}"
         # Check if the changelog section exists, and create it if not
         if "changelog" not in config:
@@ -199,22 +214,31 @@ def save_biomero_config(request, conn=None, **kwargs):
             config.write(config_file)
 
         logger.info(f"Configuration saved successfully to {config_path}")
-        return JsonResponse({"message": "Configuration saved successfully", "path": config_path}, status=200)
+        return JsonResponse(
+            {"message": "Configuration saved successfully", "path": config_path},
+            status=200,
+        )
 
     except json.JSONDecodeError:
         logger.error("Invalid JSON data in the request")
         return JsonResponse({"error": "Invalid JSON data"}, status=400)
     except ValueError as e:
         logger.error(f"Invalid configuration format: {str(e)}")
-        return JsonResponse({"error": f"Invalid configuration format: {str(e)}"}, status=400)
+        return JsonResponse(
+            {"error": f"Invalid configuration format: {str(e)}"}, status=400
+        )
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
-        return JsonResponse({"error": f"Failed to save configuration: {str(e)}"}, status=500)
+        return JsonResponse(
+            {"error": f"Failed to save configuration: {str(e)}"}, status=500
+        )
 
 
 @login_required()
 @require_http_methods(["POST"])
-def run_workflow_script(request, conn=None, script_name="SLURM_Run_Workflow.py", **kwargs):
+def run_workflow_script(
+    request, conn=None, script_name="SLURM_Run_Workflow.py", **kwargs
+):
     """
     Trigger a specific OMERO script to run based on the provided script name and parameters.
     """
@@ -238,7 +262,9 @@ def run_workflow_script(request, conn=None, script_name="SLURM_Run_Workflow.py",
                 break
 
         if not script:
-            return JsonResponse({"error": f"Script {script_name} not found on server"}, status=404)
+            return JsonResponse(
+                {"error": f"Script {script_name} not found on server"}, status=404
+            )
 
         # Run the script with parameters
         script_id = int(unwrap(script.id))
@@ -253,27 +279,48 @@ def run_workflow_script(request, conn=None, script_name="SLURM_Run_Workflow.py",
         version = params.get("version")
 
         # Convert provided params to OMERO rtypes using wrap
-        known_params = ["Data_Type", "IDs", "receiveEmail", "importAsZip",
-                        "uploadCsv", "attachToOriginalImages",
-                        "selectedDatasets", "renamePattern", "workflow_name",
-                        "cytomine_host", "cytomine_id_project", "cytomine_id_software",
-                        "cytomine_private_key", "cytomine_public_key", "version"]
-        inputs = {f"{workflow_name}_|_{key}": wrap(
-            value) for key, value in params.items() if key not in known_params}
-        inputs.update({
-            workflow_name: rbool(True),
-            f"{workflow_name}_Version": wrap(version),
-            "IDs": wrap([rlong(i) for i in input_ids]),
-            "Data_Type": wrap(data_type),
-            "E-mail": rbool(out_email),
-            "Select how to import your results (one or more)": rbool(True),
-            "1) Zip attachment to parent": rbool(import_zp),
-            "2) Attach to original images": rbool(attach_og),
-            "3a) Import into NEW Dataset": wrap(output_ds[0]) if output_ds else wrap("--NO THANK YOU--"),
-            "3b) Allow duplicate dataset (name)?": rbool(False),
-            "3c) Rename the imported images": wrap(rename_pt) if rename_pt else wrap("--NO THANK YOU--"),
-            "4) Upload result CSVs as OMERO tables": rbool(uploadcsv)
-        })
+        known_params = [
+            "Data_Type",
+            "IDs",
+            "receiveEmail",
+            "importAsZip",
+            "uploadCsv",
+            "attachToOriginalImages",
+            "selectedDatasets",
+            "renamePattern",
+            "workflow_name",
+            "cytomine_host",
+            "cytomine_id_project",
+            "cytomine_id_software",
+            "cytomine_private_key",
+            "cytomine_public_key",
+            "version",
+        ]
+        inputs = {
+            f"{workflow_name}_|_{key}": wrap(value)
+            for key, value in params.items()
+            if key not in known_params
+        }
+        inputs.update(
+            {
+                workflow_name: rbool(True),
+                f"{workflow_name}_Version": wrap(version),
+                "IDs": wrap([rlong(i) for i in input_ids]),
+                "Data_Type": wrap(data_type),
+                "E-mail": rbool(out_email),
+                "Select how to import your results (one or more)": rbool(True),
+                "1) Zip attachment to parent": rbool(import_zp),
+                "2) Attach to original images": rbool(attach_og),
+                "3a) Import into NEW Dataset": (
+                    wrap(output_ds[0]) if output_ds else wrap("--NO THANK YOU--")
+                ),
+                "3b) Allow duplicate dataset (name)?": rbool(False),
+                "3c) Rename the imported images": (
+                    wrap(rename_pt) if rename_pt else wrap("--NO THANK YOU--")
+                ),
+                "4) Upload result CSVs as OMERO tables": rbool(uploadcsv),
+            }
+        )
         logger.debug(inputs)
 
         try:
@@ -282,19 +329,35 @@ def run_workflow_script(request, conn=None, script_name="SLURM_Run_Workflow.py",
             omero_job_id = proc.getJob()._id
             msg = f"Started script {script_id} at {datetime.datetime.now()} with OMERO Job ID {unwrap(omero_job_id)}"
             logger.info(msg)
-            return JsonResponse({"status": "success", "message": f"Script {script_name} for {workflow_name} started successfully: {msg}"})
+            return JsonResponse(
+                {
+                    "status": "success",
+                    "message": f"Script {script_name} for {workflow_name} started successfully: {msg}",
+                }
+            )
 
         except Exception as e:
             logger.error(
-                f"Error executing script {script_name} for {workflow_name}: {str(e)}")
-            return JsonResponse({"error": f"Failed to execute script {script_name} for {workflow_name}: {str(e)} -- inputs: {inputs}"}, status=500)
+                f"Error executing script {script_name} for {workflow_name}: {str(e)}"
+            )
+            return JsonResponse(
+                {
+                    "error": f"Failed to execute script {script_name} for {workflow_name}: {str(e)} -- inputs: {inputs}"
+                },
+                status=500,
+            )
 
     except json.JSONDecodeError:
         logger.error("Invalid JSON data")
         return JsonResponse({"error": "Invalid JSON data"}, status=400)
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
-        return JsonResponse({"error": f"Failed to execute workflow for {workflow_name} {inputs}: {str(e)}"}, status=500)
+        return JsonResponse(
+            {
+                "error": f"Failed to execute workflow for {workflow_name} {inputs}: {str(e)}"
+            },
+            status=500,
+        )
 
 
 @login_required()
@@ -331,8 +394,7 @@ def get_workflow_metadata(request, conn=None, **kwargs):
             metadata = sc.pull_descriptor_from_github(workflow_name)
         return JsonResponse(metadata)
     except Exception as e:
-        logger.error(
-            f"Error fetching metadata for workflow {workflow_name}: {str(e)}")
+        logger.error(f"Error fetching metadata for workflow {workflow_name}: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
 
 
@@ -355,17 +417,9 @@ def get_workflow_github(request, conn=None, **kwargs):
         return JsonResponse({"url": github})
     except Exception as e:
         logger.error(
-            f"Error fetching descriptor for workflow {workflow_name}: {str(e)}")
+            f"Error fetching descriptor for workflow {workflow_name}: {str(e)}"
+        )
         return JsonResponse({"error": str(e)}, status=500)
-
-
-@login_required()
-@render_response()
-def webclient_templates(request, base_template, **kwargs):
-    """Simply return the named template. Similar functionality to
-    django.views.generic.simple.direct_to_template"""
-    template_name = "scriptmenu/webgateway/%s.html" % base_template
-    return {"template": template_name}
 
 
 @login_required()
@@ -406,8 +460,7 @@ def get_script_menu(request, conn=None, **kwargs):
                     "description": unwrap(params.description)
                     or "No description available",
                     "authors": (
-                        ", ".join(
-                            params.authors) if params.authors else "Unknown"
+                        ", ".join(params.authors) if params.authors else "Unknown"
                     ),
                     "version": params.version or "Unknown",
                 }
@@ -444,12 +497,12 @@ def ready():
     """
     Called when the app is ready. We initialize the IngestTracker using an environment variable.
     """
-    db_url = os.getenv('INGEST_TRACKING_DB_URL')
+    db_url = os.getenv("INGEST_TRACKING_DB_URL")
     if not db_url:
         logger.error("Environment variable 'INGEST_TRACKING_DB_URL' not set")
         return
 
-    config = {'ingest_tracking_db': db_url}
+    config = {"ingest_tracking_db": db_url}
 
     try:
         if initialize_ingest_tracker(config):
@@ -458,7 +511,8 @@ def ready():
             logger.error("Failed to initialize IngestTracker")
     except Exception as e:
         logger.error(
-            f"Unexpected error during IngestTracker initialization: {e}", exc__info=True)
+            f"Unexpected error during IngestTracker initialization: {e}", exc__info=True
+        )
 
 
 logger.info("Setting up IngestTracker for imports")
@@ -491,9 +545,7 @@ def omero_boost_upload(request, conn=None, **kwargs):
     """Render the server-side browser page."""
     metabase_site_url = os.environ.get("METABASE_SITE_URL")
     metabase_secret_key = os.environ.get("METABASE_SECRET_KEY")
-    metabase_dashboard_id = os.environ.get(
-        "METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID"
-    )
+    metabase_dashboard_id = os.environ.get("METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID")
 
     current_user = conn.getUser()
     username = current_user.getName()
@@ -546,8 +598,7 @@ def list_directory(request, conn=None, **kwargs):
         return JsonResponse({"error": message}, status=403)
 
     if not abs_current_path.startswith(BASE_DIR):
-        logger.warning(
-            f"Access denied - path {abs_current_path} not within {BASE_DIR}")
+        logger.warning(f"Access denied - path {abs_current_path} not within {BASE_DIR}")
         return JsonResponse(
             {"error": "Access denied - path outside of allowed directory"}, status=403
         )
@@ -572,23 +623,6 @@ def list_directory(request, conn=None, **kwargs):
         )
     except OSError as e:
         logger.error(f"Failed to list directory {abs_current_path}: {str(e)}")
-        return JsonResponse({"error": str(e)}, status=500)
-
-
-@login_required()
-@require_http_methods(["GET"])
-def file_info(request, conn=None, **kwargs):
-    file_path = request.GET.get("path", "")
-    abs_file_path = os.path.abspath(os.path.join(BASE_DIR, file_path))
-
-    if not abs_file_path.startswith(BASE_DIR):
-        return JsonResponse({"error": "Access denied"}, status=403)
-
-    try:
-        size = os.path.getsize(abs_file_path)
-        modified_time = time.ctime(os.path.getmtime(abs_file_path))
-        return JsonResponse({"size": f"{size} bytes", "modified": modified_time})
-    except OSError as e:
         return JsonResponse({"error": str(e)}, status=500)
 
 
@@ -644,8 +678,7 @@ def process_files(selected_items, selected_destinations, group, username):
     """
     Process the selected files and destinations to create upload orders with appropriate preprocessing.
     """
-    files_by_preprocessing = defaultdict(
-        list)  # Group files by preprocessing config
+    files_by_preprocessing = defaultdict(list)  # Group files by preprocessing config
     # Path to root folder from settings
     base_dir = os.getenv("IMPORT_MOUNT_PATH", "/L-Drive")
     for item in selected_items:
@@ -653,7 +686,7 @@ def process_files(selected_items, selected_destinations, group, username):
 
         logger.info(f"Importing: {abs_path} to {selected_destinations}")
 
-        for (sample_parent_type, sample_parent_id) in selected_destinations:
+        for sample_parent_type, sample_parent_id in selected_destinations:
             if sample_parent_type in ("screens", "Screen"):
                 sample_parent_type = "Screen"
                 if item.endswith(".db"):
@@ -670,26 +703,34 @@ def process_files(selected_items, selected_destinations, group, username):
                     preprocessing_key = "dataset_no_preprocessing"
             else:
                 raise ValueError(
-                    f"Unknown type {sample_parent_type} for id {sample_parent_id}")
+                    f"Unknown type {sample_parent_type} for id {sample_parent_id}"
+                )
 
             # Group files by preprocessing key
-            files_by_preprocessing[(
-                sample_parent_type, sample_parent_id, preprocessing_key)].append(abs_path)
+            files_by_preprocessing[
+                (sample_parent_type, sample_parent_id, preprocessing_key)
+            ].append(abs_path)
 
     # Now create orders for each group
-    for (sample_parent_type, sample_parent_id, preprocessing_key), files in files_by_preprocessing.items():
+    for (
+        sample_parent_type,
+        sample_parent_id,
+        preprocessing_key,
+    ), files in files_by_preprocessing.items():
         order_info = {
             "Group": group,
             "Username": username,
             "DestinationID": sample_parent_id,
             "DestinationType": sample_parent_type,
             "UUID": str(uuid.uuid4()),
-            "Files": files
+            "Files": files,
         }
 
         # Apply preprocessing based on key
         if preprocessing_key == "screen_db":
-            order_info["preprocessing_container"] = "cellularimagingcf/cimagexpresstoometiff:v0.7"
+            order_info["preprocessing_container"] = (
+                "cellularimagingcf/cimagexpresstoometiff:v0.7"
+            )
             order_info["preprocessing_inputfile"] = "{Files}"
             order_info["preprocessing_outputfolder"] = "/data"
             order_info["preprocessing_altoutputfolder"] = "/out"
@@ -737,9 +778,7 @@ def canvas(request, conn=None, **kwargs):
         "params": {"user_name": [username]},
         "exp": round(time.time()) + (60 * 30),
     }
-    token_imports = jwt.encode(
-        payload_imports, metabase_secret_key, algorithm="HS256"
-    )
+    token_imports = jwt.encode(payload_imports, metabase_secret_key, algorithm="HS256")
 
     context = {
         "metabase_site_url": metabase_site_url,
@@ -759,58 +798,151 @@ def canvas(request, conn=None, **kwargs):
 
 @login_required()
 @render_response()
-def imports_webclient_templates(request, base_template, **kwargs):
-    """Simply return the named template for imports database."""
-    template_name = f"omeroboost/webgateway/{base_template}.html"
-    return {"template": template_name}
-
-
-@login_required()
-@render_response()
-def workflows_webclient_templates(request, base_template, **kwargs):
-    """Simply return the named template for workflows database."""
-    template_name = f"omeroboost/webgateway/{base_template}.html"
-    return {"template": template_name}
-
-
-@login_required()
-@render_response()
 @require_http_methods(["GET"])
 def get_folder_contents(request, conn=None, **kwargs):
     """
     Handles the GET request to retrieve folder contents.
     """
-    base_dir = os.getenv("IMPORT_MOUNT_PATH",
-                         "/L-Drive")  # Path to root folder from settings
+    base_dir = os.getenv(
+        "IMPORT_MOUNT_PATH", "/L-Drive"
+    )  # Path to root folder from settings
 
     # Extract the folder ID from the request
-    folder_id = request.GET.get("folder_id", None)
+    item_id = request.GET.get("item_id", None)
+    is_folder = request.GET.get("is_folder", False)
+
+    # Split the item ID to get the folder ID and item UUID
+    item_uuid = None
+    if item_id and "#" in item_id:
+        item_path, item_uuid = item_id.split("#") if item_id else (None, None)
+    else:
+        item_path = item_id
+
     logger.info(f"Connection: {conn.getUser().getName()}")
 
-    # Determine the target directory based on folder_id or default to the root folder
-    target_dir = base_dir if folder_id is None else os.path.join(
-        base_dir, folder_id)
-    logger.info(f"Target folder: {target_dir}")
+    # Determine the target path based on item_path or default to the root folder
+    target_path = base_dir if item_path is None else os.path.join(base_dir, item_path)
+    logger.info(f"Target folder: {target_path}")
 
-    # Validate if the directory exists
-    if not os.path.exists(target_dir) or not os.path.isdir(target_dir):
+    # Validate if the path exists
+    if not os.path.exists(target_path):
         return HttpResponseBadRequest("Invalid folder ID or path does not exist.")
 
-    # TODO: if xlef etc file, then "get the contents of that folder"
-    # Get the contents of the folder
+    # Get the contents of the folder/file
     contents = []
-    for item in os.listdir(target_dir):
-        item_path = os.path.join(target_dir, item)
-        contents.append(
-            {
-                "name": item,
-                "is_folder": os.path.isdir(item_path),
-                # Use relative path as ID
-                "id": os.path.relpath(item_path, base_dir),
-            }
-        )
+    clicked_item_metadata = None
 
-    return {"contents": contents, "folder_id": folder_id}
+    # Check if path is a file or folder
+    if os.path.isfile(target_path):
+        ext = os.path.splitext(target_path)[1]
+        if ext in BROWSABLE_FILE_EXTENSIONS:
+
+            if is_folder:
+                metadata = read_leica_file(target_path, folder_uuid=item_uuid)
+            elif item_uuid:
+                metadata = read_leica_file(target_path, image_uuid=item_uuid)
+            else:
+                metadata = read_leica_file(target_path)
+
+            clicked_item_metadata = json.loads(metadata)
+
+            for item in clicked_item_metadata["children"]:
+                item_type = item.get("type", None)
+                contents.append(
+                    {
+                        "name": item["name"],
+                        "is_folder": item_type == "Folder",
+                        "id": item_path + "#" + item["uuid"],
+                        "metadata": item,
+                        "source": "filesystem",
+                    }
+                )
+
+        elif ext in SUPPORTED_FILE_EXTENSIONS:
+            contents.append(
+                {
+                    "name": os.path.basename(target_path),
+                    "is_folder": False,
+                    "id": item_path,
+                    "metadata": None,
+                    "source": "filesystem",
+                }
+            )
+        else:
+            return HttpResponseBadRequest("Invalid folder ID or path does not exist.")
+    else:
+        # If filename is .zarr, treat as a file
+        if os.path.basename(target_path).endswith(".zarr"):
+            contents.append(
+                {
+                    "name": os.path.basename(target_path),
+                    "is_folder": False,
+                    "id": item_path,
+                    "metadata": None,
+                    "source": "filesystem",
+                }
+            )
+        else:
+            items = os.listdir(target_path)
+            # If there is a .xlef or experiment.db file in the folder, only show that
+            xlef_files = [item for item in items if item.endswith(".xlef")]
+            experiment_db_files = [
+                item for item in items if item.endswith("experiment.db")
+            ]
+
+            if xlef_files or experiment_db_files:
+                if xlef_files:
+                    selected_items = xlef_files
+                elif experiment_db_files:
+                    selected_items = experiment_db_files
+
+                for item in selected_items:
+                    contents.append(
+                        {
+                            "name": item,
+                            "is_folder": False,
+                            "id": os.path.relpath(item, base_dir),
+                            "metadata": None,
+                            "source": "filesystem",
+                        }
+                    )
+
+            else:
+                for item in items:
+                    item_path = os.path.join(target_path, item)
+                    # Get extension, if any
+                    ext = os.path.splitext(item)[1]
+                    info = f"Item: {item}, Path: {item_path}, Extension: {ext}"
+                    is_folder = (
+                        os.path.isdir(item_path) or ext in BROWSABLE_FILE_EXTENSIONS
+                    )
+                    metadata = None
+                    if ext in BROWSABLE_FILE_EXTENSIONS:
+                        # Read metadata for Leica files
+                        metadata = read_leica_file(item_path)
+
+                    # .zarr folders should be treated as files
+                    is_folder = (
+                        False
+                        if os.path.basename(item_path).endswith(".zarr")
+                        else is_folder
+                    )
+
+                    contents.append(
+                        {
+                            "name": item,
+                            "is_folder": is_folder,
+                            "id": os.path.relpath(item_path, base_dir),
+                            "info": info,
+                            "metadata": metadata,
+                            "source": "filesystem",
+                        }
+                    )
+
+    # Sort the contents by name, folders first
+    contents.sort(key=lambda x: (not x["is_folder"], x["name"].lower()))
+
+    return {"contents": contents, "item_id": item_id, "metadata": clicked_item_metadata}
 
 
 @login_required()

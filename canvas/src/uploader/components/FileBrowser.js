@@ -48,7 +48,7 @@ const FileBrowser = ({ onSelectCallback, rootFolder = null }) => {
   const treeData = getFilteredTreeData();
 
   const handleFolderDataFetch = async (node) => {
-    const response = await fetchFolderData(node.index);
+    const response = await fetchFolderData(node.index, node.isFolder);
     const contents = response.contents || [];
 
     const newNodes = contents.reduce((acc, item) => {
@@ -57,6 +57,8 @@ const FileBrowser = ({ onSelectCallback, rootFolder = null }) => {
         isFolder: item.is_folder,
         children: [],
         data: item.name,
+        metadata: item.metadata,
+        source: item.source,
       };
       return acc;
     }, {});
@@ -82,9 +84,6 @@ const FileBrowser = ({ onSelectCallback, rootFolder = null }) => {
       fetchData={handleFolderDataFetch}
       initialDataKey={rootFolder || "root"}
       dataStructure={treeData}
-      onExpandCallback={(node, newData) => {
-        console.log("Folder expanded:", node, newData);
-      }}
       onSelectCallback={onSelectCallback}
       selectedItems={state.localFileTreeSelection}
     />

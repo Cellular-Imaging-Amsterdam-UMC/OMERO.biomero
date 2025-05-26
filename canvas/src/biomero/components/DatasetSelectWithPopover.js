@@ -41,7 +41,7 @@ const DatasetSelectWithPopover = ({
         updatedSelection = [...state.omeroFileTreeSelection, nodeId];
       }
     }
-    updateState({ ["omeroFileTreeSelection"]: updatedSelection }); // update selector
+    updateState({ omeroFileTreeSelection: updatedSelection }); // update selector
   };
 
   const handleManualInputChange = (updatedValues) => {
