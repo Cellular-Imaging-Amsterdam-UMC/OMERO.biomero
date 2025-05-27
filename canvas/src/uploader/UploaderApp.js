@@ -229,7 +229,12 @@ const UploaderApp = () => {
   const handleUpload = async () => {
     setUploading(true);
 
-    const selectedLocal = uploadList.map((item) => item.value);
+    // Use the same path construction as used in renderCards
+    const selectedLocal = uploadList.map((item) => {
+      const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData);
+      return itemPath.slice(1).join("/");  // skip Root node for upload
+    });
+
     const selectedOmero = state.omeroFileTreeSelection
       .map((index) => {
         const omeroItem = state.omeroFileTreeData[index];
