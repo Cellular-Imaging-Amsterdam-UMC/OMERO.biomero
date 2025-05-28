@@ -46,6 +46,7 @@ export const getDjangoConstants = () => {
     api_group_mappings: "/omero_boost/api/group_mappings/",
     api_thumbnails: "/webclient/get_thumbnails/",
     api_addnewcontainer: "/webclient/action/addnewcontainer/",
+    api_wells: "/api/v0/m/wells/",
     forms_viewer: "/omero_forms/",
   };
 

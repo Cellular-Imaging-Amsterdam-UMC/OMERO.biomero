@@ -304,3 +304,54 @@ export const postGroupMappings = async (mappings) => {
     throw error;
   }
 };
+
+export const fetchPlatesData = async (item) => {
+  const screenId = item.id;
+  const { urls, user } = getDjangoConstants();
+  const params = {
+    id: screenId,
+    page: 0,
+    group: user.active_group_id,
+    _: new Date().getTime(),
+  };
+  return apiRequest(urls.api_plates, "GET", null, { params });
+};
+
+export const fetchPlateImages = async (plateId) => {
+  const { urls } = getDjangoConstants();
+  
+  let allImages = [];
+  let keepFetching = true;
+  let offset = 0;
+  const limit = 200;  // Default API limit
+
+  while (keepFetching) {
+    // Get paginated wells
+    const response = await apiRequest(
+      `${urls.api_wells}?plate=${plateId}&offset=${offset}&limit=${limit}`,
+      "GET"
+    );
+
+    // Extract images from wells
+    const images = response.data
+      .flatMap(well => well.WellSamples || [])
+      .map(sample => ({
+        id: sample.Image["@id"],
+        name: sample.Image.Name,
+        index: `image-${sample.Image["@id"]}`,
+        source: "omero"
+      }))
+      .filter(img => img.id != null);
+
+    allImages.push(...images);
+
+    // Check if we need to fetch more
+    if (offset + limit >= response.meta.totalCount) {
+      keepFetching = false;
+    } else {
+      offset += limit;
+    }
+  }
+
+  return allImages;
+};

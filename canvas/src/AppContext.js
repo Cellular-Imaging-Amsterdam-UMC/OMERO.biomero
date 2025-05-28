@@ -14,6 +14,7 @@ import {
   postUpload,
   fetchThumbnails,
   fetchImages,
+  fetchPlateImages,
   createContainer,
   fetchGroupMappings,
   postGroupMappings,
@@ -149,8 +150,34 @@ export const AppProvider = ({ children }) => {
           },
           images: [...(state.images || []), ...allImages],
         });
+      } else if (type === "plate") {
+        const plateId = parseInt(id, 10);
+        // Use our existing API service functions
+        const images = await fetchPlateImages(plateId);
+
+        // Format images the same way as dataset images
+        const imagesWithSource = images.map((image) => ({
+          ...image,
+          source: "omero",
+        }));
+
+        // Store images in state the same way as datasets
+        updateState({
+          omeroFileTreeData: {
+            ...state.omeroFileTreeData,
+            [index]: {
+              ...dataset,
+              children: imagesWithSource,
+            },
+          },
+          images: [...(state.images || []), ...imagesWithSource],
+        });
+
+        // Load thumbnails for these images
+        const imageIds = imagesWithSource.map((img) => img.id);
+        loadThumbnails(imageIds);
       } else {
-        console.log(`Skipping non-dataset index: ${index}:`, dataset);
+        console.log(`Skipping non-dataset/plate index: ${index}:`, dataset);
       }
     } catch (err) {
       setError(err.message);

@@ -1,31 +1,50 @@
 import React from "react";
 import { useAppContext } from "../../AppContext";
 import FileTree from "./FileTree";
-import { fetchProjectData } from "../../apiService";
+import { fetchProjectData, fetchPlatesData } from "../../apiService";
 
 const OmeroDataBrowser = ({ onSelectCallback }) => {
   const { state, updateState } = useAppContext();
 
   const handleProjectDataFetch = async (node) => {
-    const response = await fetchProjectData(node);
-    const datasets = (response.datasets || []).map((dataset) => ({
-      id: dataset.id,
-      category: "datasets",
-      index: `dataset-${dataset.id}`,
-      isFolder: false,
-      children: [],
-      childCount: dataset.childCount,
-      data: dataset.name,
-      source: "omero",
-    }));
+    // Determine if this is a project or screen node
+    const [nodeType] = node.index.split('-');
+    let response;
+    let children;
+
+    if (nodeType === 'screen') {
+      response = await fetchPlatesData(node);
+      children = (response.plates || []).map((plate) => ({
+        id: plate.id,
+        category: "plates",
+        index: `plate-${plate.id}`,
+        isFolder: false,
+        children: [],
+        childCount: plate.childCount || 0,
+        data: plate.name,
+        source: "omero",
+      }));
+    } else {
+      response = await fetchProjectData(node);
+      children = (response.datasets || []).map((dataset) => ({
+        id: dataset.id,
+        category: "datasets",
+        index: `dataset-${dataset.id}`,
+        isFolder: false,
+        children: [],
+        childCount: dataset.childCount,
+        data: dataset.name,
+        source: "omero",
+      }));
+    }
 
     const updatedNode = {
       ...state.omeroFileTreeData[node.index],
-      children: datasets.map((dataset) => dataset.index),
+      children: children.map((child) => child.index),
     };
 
-    const newNodes = datasets.reduce((acc, dataset) => {
-      acc[dataset.index] = dataset;
+    const newNodes = children.reduce((acc, child) => {
+      acc[child.index] = child;
       return acc;
     }, {});
 
