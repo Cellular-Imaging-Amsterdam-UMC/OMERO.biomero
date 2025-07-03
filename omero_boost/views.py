@@ -17,7 +17,7 @@ from omeroweb.webclient.decorators import login_required, render_response
 from omero.gateway import BlitzGateway
 from omero.rtypes import unwrap, rbool, wrap, rlong
 from biomero import SlurmClient
-from .utils import create_upload_order, get_react_build_file
+from .utils import create_upload_order, get_react_build_file, prepare_workflow_parameters
 import configparser
 from configupdater import ConfigUpdater, Comment
 import datetime
@@ -249,6 +249,9 @@ def run_workflow_script(
         if not workflow_name:
             return JsonResponse({"error": "workflow_name is required"}, status=400)
         params = data.get("params", {})
+
+        # Apply BIOMERO's type conversion logic
+        params = prepare_workflow_parameters(workflow_name, params)
 
         # Connect to OMERO Script Service
         svc = conn.getScriptService()
@@ -681,24 +684,35 @@ def process_files(selected_items, selected_destinations, group, username):
     files_by_preprocessing = defaultdict(list)  # Group files by preprocessing config
     # Path to root folder from settings
     base_dir = os.getenv("IMPORT_MOUNT_PATH", "/L-Drive")
+    
     for item in selected_items:
-        abs_path = os.path.abspath(os.path.join(base_dir, item))
+        # Handle both old string format and new object format for backward compatibility
+        if isinstance(item, dict):
+            # New format with localPath and uuid
+            local_path = item.get("localPath")
+            subfile_uuid = item.get("uuid")
+        else:
+            # Old format - just a string path
+            local_path = item
+            subfile_uuid = None
+            
+        abs_path = os.path.abspath(os.path.join(base_dir, local_path))
 
-        logger.info(f"Importing: {abs_path} to {selected_destinations}")
+        logger.info(f"Importing: {abs_path} to {selected_destinations} (UUID: {subfile_uuid})")
 
         for sample_parent_type, sample_parent_id in selected_destinations:
             if sample_parent_type in ("screens", "Screen"):
                 sample_parent_type = "Screen"
-                if item.endswith(".db"):
+                if local_path.endswith(".db"):
                     preprocessing_key = "screen_db"
                 else:
                     preprocessing_key = "screen_no_preprocessing"
             elif sample_parent_type in ("datasets", "Dataset"):
                 sample_parent_type = "Dataset"
-                # Placeholder for custom criteria
-                # if some_other_criteria(item):
-                if item.endswith(".xlef"):
-                    preprocessing_key = "dataset_custom_preprocessing"
+                
+                # Check if this is a Leica file with UUID (sub-image selection)
+                if subfile_uuid and any(ext in local_path.lower() for ext in ['.lif', '.xlef', '.lof']):
+                    preprocessing_key = "dataset_leica_uuid"
                 else:
                     preprocessing_key = "dataset_no_preprocessing"
             else:
@@ -706,17 +720,26 @@ def process_files(selected_items, selected_destinations, group, username):
                     f"Unknown type {sample_parent_type} for id {sample_parent_id}"
                 )
 
-            # Group files by preprocessing key
+            # Group files by preprocessing key, including UUID info
+            file_info = {
+                "path": abs_path,
+                "uuid": subfile_uuid,
+                "original_item": item
+            }
             files_by_preprocessing[
                 (sample_parent_type, sample_parent_id, preprocessing_key)
-            ].append(abs_path)
+            ].append(file_info)
 
     # Now create orders for each group
     for (
         sample_parent_type,
         sample_parent_id,
         preprocessing_key,
-    ), files in files_by_preprocessing.items():
+    ), file_infos in files_by_preprocessing.items():
+        
+        # Extract just the file paths for the Files field
+        files = [file_info["path"] for file_info in file_infos]
+        
         order_info = {
             "Group": group,
             "Username": username,
@@ -736,12 +759,50 @@ def process_files(selected_items, selected_destinations, group, username):
             order_info["preprocessing_altoutputfolder"] = "/out"
             order_info["extra_params"] = {"saveoption": "single"}
 
-        elif preprocessing_key == "dataset_custom_preprocessing":
-            order_info["preprocessing_container"] = "some-other-container"
+        elif preprocessing_key == "dataset_leica_uuid":
+            # New Leica UUID preprocessing
+            order_info["preprocessing_container"] = (
+                "cellularimagingcf/convertleica-docker:v1.2.0"
+            )
             order_info["preprocessing_inputfile"] = "{Files}"
-            order_info["preprocessing_outputfolder"] = "/custom-output-folder"
-            order_info["preprocessing_altoutputfolder"] = "/custom-alt-output"
-            order_info["extra_params"] = {"custom_param": "value"}
+            order_info["preprocessing_outputfolder"] = "/data"
+            order_info["preprocessing_altoutputfolder"] = "/out"
+            
+            # Handle multiple files with UUIDs
+            if len(file_infos) == 1 and file_infos[0]["uuid"]:
+                # Single file with UUID
+                order_info["extra_params"] = {
+                    "image_uuid": file_infos[0]["uuid"]
+                }
+            else:
+                # Multiple files or mixed UUID/non-UUID files
+                # Create separate orders for each UUID file
+                uuid_files = [f for f in file_infos if f["uuid"]]
+                if uuid_files:
+                    # Process UUID files separately
+                    for file_info in uuid_files:
+                        single_order_info = order_info.copy()
+                        single_order_info["Files"] = [file_info["path"]]
+                        single_order_info["UUID"] = str(uuid.uuid4())
+                        single_order_info["extra_params"] = {
+                            "image_uuid": file_info["uuid"]
+                        }
+                        create_upload_order(single_order_info)
+                    
+                    # Process non-UUID files together (if any)
+                    non_uuid_files = [f["path"] for f in file_infos if not f["uuid"]]
+                    if non_uuid_files:
+                        order_info["Files"] = non_uuid_files
+                        # order_info["extra_params"] = {"saveoption": ""}
+                        create_upload_order(order_info)
+                    return  # Skip the normal create_upload_order call below
+
+        # elif preprocessing_key == "dataset_custom_preprocessing":
+        #     order_info["preprocessing_container"] = "some-other-container"
+        #     order_info["preprocessing_inputfile"] = "{Files}"
+        #     order_info["preprocessing_outputfolder"] = "/custom-output-folder"
+        #     order_info["preprocessing_altoutputfolder"] = "/custom-alt-output"
+        #     order_info["extra_params"] = {"custom_param": "value"}
 
         # No preprocessing for other cases
         create_upload_order(order_info)

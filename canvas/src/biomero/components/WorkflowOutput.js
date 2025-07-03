@@ -32,6 +32,23 @@ const WorkflowOutput = ({ onSelectionChange }) => {
     onSelectionChange(hasOutputSelection);
   }, [hasOutputSelection]);
 
+  useEffect(() => {
+    // Auto-populate output datasets with input datasets when they change
+    if (
+      state.inputDatasets?.length > 0 &&
+      (!state.formData.selectedDatasets ||
+        state.formData.selectedDatasets.length === 0)
+    ) {
+      // Extract dataset names from input datasets
+      const inputDatasetNames = state.inputDatasets.map(
+        (dataset) => dataset.data
+      );
+
+      // Set them as the default output datasets
+      handleInputChange("selectedDatasets", inputDatasetNames);
+    }
+  }, [state.inputDatasets]); // Trigger when input datasets change
+
   const handleInputChange = (key, value) => {
     // Compute new state immediately
     const updatedFormData = {

@@ -75,9 +75,42 @@ const WorkflowForm = () => {
               >
                 <NumericInput
                   id={id}
-                  value={state.formData[id] || defaultValue || 0}
-                  onValueChange={(value) => handleInputChange(id, value)}
+                  value={
+                    state.formData[id] !== undefined
+                      ? state.formData[id]
+                      : defaultValue !== undefined
+                      ? defaultValue
+                      : 0
+                  }
+                  onValueChange={(valueAsNumber, valueAsString) => {
+                    // Use string value if it contains a decimal point at the end (partial input)
+                    // or if it's invalid (like "1e")
+                    if (
+                      valueAsString.endsWith(".") ||
+                      valueAsString.includes("e") ||
+                      isNaN(valueAsNumber) ||
+                      valueAsNumber === null
+                    ) {
+                      handleInputChange(id, valueAsString);
+                    } else {
+                      // Use the number value for complete valid numbers
+                      handleInputChange(id, valueAsNumber);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // Convert to final number on blur, fallback to 0 if invalid
+                    const finalValue = parseFloat(e.target.value);
+                    handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
+                  }}
+                  onKeyDown={(e) => {
+                    // Also handle Enter key like the example
+                    if (e.key === "Enter") {
+                      const finalValue = parseFloat(e.currentTarget.value);
+                      handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
+                    }
+                  }}
                   placeholder={optional ? `Optional ${name}` : name}
+                  allowNumericCharactersOnly={false}
                 />
               </FormGroup>
             );

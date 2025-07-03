@@ -24,7 +24,7 @@ const WorkflowInput = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredImages, setFilteredImages] = useState([]);
   const [selectedImageIds, setSelectedImageIds] = useState([]);
-  const [activeTab, setActiveTab] = useState("list"); // Tabs: "list" or "grid"
+  const [activeTab, setActiveTab] = useState("grid"); // Tabs: "list" or "grid"
   const [zoom, setZoom] = useState(7); // Starting size 65px, like OMERO
 
   // Load images when datasets change

@@ -229,10 +229,36 @@ const UploaderApp = () => {
   const handleUpload = async () => {
     setUploading(true);
 
-    // Use the same path construction as used in renderCards
+    // Enhanced path construction to handle UUID-based items
     const selectedLocal = uploadList.map((item) => {
       const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData);
-      return itemPath.slice(1).join("/");  // skip Root node for upload
+      const pathString = itemPath.slice(1).join("/"); // skip Root node
+
+      // Check if this is a UUID-based item (has # in the value)
+      if (item.value.includes("#")) {
+        const [filePath, uuid] = item.value.split("#");
+
+        // For UUID items, we want the file path up to the .lif/.xlef/.lof file
+        const fileExtensions = [".lif", ".xlef", ".lof"];
+        const hasKnownExtension = fileExtensions.some((ext) =>
+          filePath.toLowerCase().includes(ext)
+        );
+
+        if (hasKnownExtension) {
+          // Use the filePath directly - this already contains the correct path to the .lif file
+          // e.g., "Project A/LIF/Test-subs_copies.lif"
+          return {
+            localPath: filePath,
+            uuid: uuid
+          };
+        }
+      }
+
+      // Backward compatible: return simple path string for regular files
+      return {
+        localPath: pathString,
+        uuid: null
+      };
     });
 
     const selectedOmero = state.omeroFileTreeSelection
@@ -242,10 +268,11 @@ const UploaderApp = () => {
       })
       .filter(Boolean);
 
-    const uploadData = { 
-      selectedLocal, 
+    const uploadData = {
+      selectedLocal,
       selectedOmero,
-      group: state.user.groups.find(g => g.id === state.user.active_group_id)?.name 
+      group: state.user.groups.find((g) => g.id === state.user.active_group_id)
+        ?.name,
     };
 
     try {
