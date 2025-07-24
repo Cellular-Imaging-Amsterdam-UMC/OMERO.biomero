@@ -26,6 +26,7 @@ from collections import defaultdict
 from omero_adi.utils.ingest_tracker import initialize_ingest_tracker
 from .constants import BROWSABLE_FILE_EXTENSIONS, SUPPORTED_FILE_EXTENSIONS
 from .file_browser.ReadLeicaFile import read_leica_file
+from .utils import parse_bool_env
 
 logger = logging.getLogger(__name__)
 
@@ -819,6 +820,9 @@ def canvas(request, conn=None, **kwargs):
     metabase_dashboard_id_imports = os.environ.get(
         "METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID"
     )
+    
+    # Gracefully parse ADI_ENABLED with multiple format support
+    adi_enabled = parse_bool_env(os.environ.get("ADI_ENABLED"), default=True)
 
     current_user = conn.getUser()
     username = current_user.getName()
@@ -853,6 +857,7 @@ def canvas(request, conn=None, **kwargs):
         "main_css": get_react_build_file("main.css"),
         "title": "CANVAS ft. BIOMERO",
         "app_name": "biomero",  # BiomeroApp
+        "adi_enabled": adi_enabled,
     }
     return context
 

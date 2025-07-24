@@ -11,6 +11,37 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def parse_bool_env(env_var, default=True):
+    """
+    Parse environment variable as boolean with graceful handling of multiple formats.
+    
+    Accepts: 'true', 'True', 'TRUE', '1', 'yes', 'on', 'enabled'
+    Rejects: 'false', 'False', 'FALSE', '0', 'no', 'off', 'disabled', None, ''
+    """
+    if env_var is None:
+        return default
+    
+    if isinstance(env_var, bool):
+        return env_var
+    
+    # Convert to string and normalize
+    str_val = str(env_var).lower().strip()
+    
+    # Truthy values
+    truthy = {'true', '1', 'yes', 'on', 'enabled', 'enable'}
+    # Falsy values  
+    falsy = {'false', '0', 'no', 'off', 'disabled', 'disable', ''}
+    
+    if str_val in truthy:
+        return True
+    elif str_val in falsy:
+        return False
+    else:
+        # Log warning for unrecognized values
+        logger.warning(f"Unrecognized boolean value '{env_var}' for environment variable, defaulting to {default}")
+        return default
+
+
 def get_react_build_file(logical_name):
     """
     Returns the hashed filename for a React build file.

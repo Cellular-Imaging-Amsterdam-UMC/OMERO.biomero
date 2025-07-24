@@ -2,4 +2,4 @@
 
 # Left Header Links
 config append -- omero.web.apps '"omero_boost"'
-config append -- omero.web.ui.top_links '["Canvas", "canvas", {"title": "Omero Canvas"}]'
+config append -- omero.web.ui.top_links '["Canvas", "canvas", {"title": "OMERO Canvas"}]'
