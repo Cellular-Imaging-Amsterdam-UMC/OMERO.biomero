@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppContext } from "../AppContext";
 import FileBrowser from "./components/FileBrowser";
 import OmeroDataBrowser from "../shared/components/OmeroDataBrowser";
@@ -496,31 +496,111 @@ const UploaderApp = () => {
   };
 
   const renderUploadPanel = (mode) => {
-    const localFileTreeTitle = `Select ${mode}s to upload`;
-    const omeroFileTreeTitle = `Select destination ${
-      mode === "screen" ? "screen" : ""
+    const omeroFileTreeTitle = `1. Select destination ${
+      mode === "screen" ? "screen " : "dataset "
     }in OMERO`;
+    const localFileTreeTitle = `2. Select ${mode}s to upload`;
+
+    const disableAddFilesButton = state.localFileTreeSelection.length === 0 || state.omeroFileTreeSelection.length === 0
 
     return (
       <div className="h-full">
         <div className="flex space-x-4">
           <div className="w-1/4 overflow-auto pt-2">
+            <div className="flex items-center">
+              <h1 className="text-base font-bold p-0 m-0">
+                {omeroFileTreeTitle}
+              </h1>
+              <Tooltip
+                content="Create new dataset"
+                placement="bottom"
+                usePortal={false}
+                className="text-md"
+              >
+                <Icon
+                  icon="folder-new"
+                  onClick={() => {
+                    openCreateContainerOverlay(true, "dataset");
+                  }}
+                  disabled={false}
+                  tooltip="Create new dataset"
+                  color="#99b882"
+                  className="cursor-pointer ml-3"
+                  size={20}
+                />
+              </Tooltip>
+              <Tooltip
+                content="Create new project"
+                placement="bottom"
+                usePortal={false}
+                className="text-md"
+              >
+                <Icon
+                  icon="folder-new"
+                  onClick={() => {
+                    openCreateContainerOverlay(true, "project");
+                  }}
+                  disabled={false}
+                  color="#76899e"
+                  className="cursor-pointer ml-3"
+                  size={20}
+                />
+              </Tooltip>
+              <Tooltip
+                content="Create new screen"
+                placement="bottom"
+                usePortal={false}
+                className="text-md"
+              >
+                <Icon
+                  icon="folder-new"
+                  onClick={() => {
+                    openCreateContainerOverlay(true, "screen");
+                  }}
+                  disabled={false}
+                  color="#393939"
+                  className="cursor-pointer ml-3"
+                  size={20}
+                />
+              </Tooltip>
+            </div>
+            {state.omeroFileTreeData && (
+              <div className="mt-4 max-h-[calc(100vh-450px)] overflow-auto">
+                <OmeroDataBrowser
+                  onSelectCallback={(nodeData, coords, e, deselect = false) =>
+                    handleFileTreeSelection(
+                      nodeData,
+                      coords,
+                      e,
+                      "omero",
+                      deselect
+                    )
+                  }
+                />
+              </div>
+            )}
+          </div>
+          <div className="w-1/4 overflow-auto pt-2">
             <div className="flex space-x-4 items-center">
               <h1 className="text-base font-bold p-0 m-0 inline-block">
                 {localFileTreeTitle}
               </h1>
-              <Button
-                onClick={addUploadItems}
-                disabled={
-                  state.localFileTreeSelection.length === 0 ||
-                  state.omeroFileTreeSelection.length === 0
-                }
-                rightIcon="plus"
-                intent="success"
-                loading={uploading}
+              <Tooltip
+                content={disableAddFilesButton ? "Select destination in omero and files first" : "Add selected files to upload list"}
+                placement="bottom"
+                usePortal={false}
+                className="text-md"
               >
-                Add to upload list
-              </Button>
+                <Button
+                  onClick={addUploadItems}
+                  disabled={disableAddFilesButton}
+                  rightIcon="plus"
+                  intent="success"
+                  loading={uploading}
+                >
+                  Add to upload list
+                </Button>
+              </Tooltip>
             </div>
             {state.localFileTreeData && (
               <div className="mt-4 max-h-[calc(100vh-450px)] overflow-auto">
@@ -573,83 +653,11 @@ const UploaderApp = () => {
               </div>
             )}
           </div>
-          <div className="w-1/4 overflow-auto pt-2">
-            <div className="flex items-center">
-              <h1 className="text-base font-bold p-0 m-0">
-                {omeroFileTreeTitle}
-              </h1>
-              <Tooltip
-                content="Create new dataset"
-                placement="bottom"
-                usePortal={false}
-              >
-                <Icon
-                  icon="folder-new"
-                  onClick={() => {
-                    openCreateContainerOverlay(true, "dataset");
-                  }}
-                  disabled={false}
-                  tooltip="Create new dataset"
-                  color="#99b882"
-                  className="cursor-pointer ml-3"
-                  size={20}
-                />
-              </Tooltip>
-              <Tooltip
-                content="Create new project"
-                placement="bottom"
-                usePortal={false}
-                className="text-sm"
-              >
-                <Icon
-                  icon="folder-new"
-                  onClick={() => {
-                    openCreateContainerOverlay(true, "project");
-                  }}
-                  disabled={false}
-                  color="#76899e"
-                  className="cursor-pointer ml-3"
-                  size={20}
-                />
-              </Tooltip>
-              <Tooltip
-                content="Create new screen"
-                placement="bottom"
-                usePortal={false}
-                className="text-sm"
-              >
-                <Icon
-                  icon="folder-new"
-                  onClick={() => {
-                    openCreateContainerOverlay(true, "screen");
-                  }}
-                  disabled={false}
-                  color="#393939"
-                  className="cursor-pointer ml-3"
-                  size={20}
-                />
-              </Tooltip>
-            </div>
-            {state.omeroFileTreeData && (
-              <div className="mt-4 max-h-[calc(100vh-450px)] overflow-auto">
-                <OmeroDataBrowser
-                  onSelectCallback={(nodeData, coords, e, deselect = false) =>
-                    handleFileTreeSelection(
-                      nodeData,
-                      coords,
-                      e,
-                      "omero",
-                      deselect
-                    )
-                  }
-                />
-              </div>
-            )}
-          </div>
+          
           <div className="w-1/4 overflow-auto pt-2">
             <div className="flex items-center">
               <h1 className="text-base font-bold p-0 m-0 inline-block">
-                Metadata Forms
+                Attach metadata
               </h1>
             </div>
             <MetadataForms />
