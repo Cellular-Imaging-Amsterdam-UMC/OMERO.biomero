@@ -32,10 +32,10 @@ from omero_adi.utils.ingest_tracker import initialize_ingest_tracker
 logger = logging.getLogger(__name__)
 
 
-class OmeroBoostAppConfig(AppConfig):
-    name = "omero_boost"
-    label = "boost"
-    
+class OmeroBiomeroAppConfig(AppConfig):
+    name = "omero_biomero"
+    label = "OMERO.biomero"
+
     # TODO: Doesn't seem to be called here
     # def ready(self):
     #     """

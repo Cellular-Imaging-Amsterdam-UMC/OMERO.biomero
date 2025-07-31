@@ -48,7 +48,7 @@ def get_react_build_file(logical_name):
     """
     current_dir = os.path.dirname(__file__)
     manifest_path = os.path.join(
-        current_dir, "static/omero_boost/assets/asset-manifest.json"
+        current_dir, "static/omero_biomero/assets/asset-manifest.json"
     )
     manifest_path = os.path.normpath(manifest_path)
 

@@ -3,4 +3,4 @@ requires = ["setuptools>=61.0", "wheel", "setuptools_scm[toml]>=8.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-write_to = "omero_boost/_version.py"
+write_to = "omero_biomero/_version.py"

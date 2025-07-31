@@ -1,6 +1,6 @@
 {
   "name": "canvas",
-  "homepage": "omero_boost/assets",
+  "homepage": "omero_biomero/assets",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -27,7 +27,7 @@
     "web-vitals": "^2.1.0"
   },
   "scripts": {
-    "clear-assets": "rimraf ../omero_boost/static/omero_boost/assets",
+    "clear-assets": "rimraf ../omero_biomero/static/omero_biomero/assets",
     "watch": "yarn clear-assets && webpack --mode=development --color --progress -w",
     "start": "react-scripts start",
     "build": "yarn clear-assets && webpack --mode=production --color --progress",

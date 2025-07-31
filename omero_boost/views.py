@@ -545,7 +545,7 @@ def check_directory_access(path):
 
 @login_required()
 @render_response()
-def omero_boost_upload(request, conn=None, **kwargs):
+def omero_biomero_upload(request, conn=None, **kwargs):
     """Render the server-side browser page."""
     metabase_site_url = os.environ.get("METABASE_SITE_URL")
     metabase_secret_key = os.environ.get("METABASE_SECRET_KEY")
@@ -564,7 +564,7 @@ def omero_boost_upload(request, conn=None, **kwargs):
     token = jwt.encode(payload, metabase_secret_key, algorithm="HS256")
 
     context = {
-        "template": "omeroboost/webclient_plugins/react_app.html",  # Unified template
+        "template": "omero_biomero/webclient_plugins/react_app.html",  # Unified template
         "user_name": username,
         "user_id": user_id,
         "is_admin": is_admin,
@@ -849,7 +849,7 @@ def canvas(request, conn=None, **kwargs):
         "metabase_site_url": metabase_site_url,
         "metabase_token_monitor_workflows": token_monitor_workflows,
         "metabase_token_imports": token_imports,
-        "template": "omeroboost/webclient_plugins/react_app.html",
+        "template": "omero_biomero/webclient_plugins/react_app.html",
         "user_name": username,
         "user_id": user_id,
         "is_admin": is_admin,

@@ -1,5 +1,5 @@
-# OMERO BOOST configurations for OMERO web
+# OMERO.biomero configurations for OMERO web
 
 # Left Header Links
-config append -- omero.web.apps '"omero_boost"'
+config append -- omero.web.apps '"omero_biomero"'
 config append -- omero.web.ui.top_links '["Canvas", "canvas", {"title": "OMERO Canvas"}]'
