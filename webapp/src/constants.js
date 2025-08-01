@@ -50,7 +50,12 @@ export const getDjangoConstants = () => {
     forms_viewer: "/omero_forms/",
   };
 
-  return { user, urls };
+  const ui = {
+    adi_enabled: WEBCLIENT.UI.ADI_ENABLED,
+    analyze_enabled: WEBCLIENT.UI.ANALYZE_ENABLED,
+  };
+
+  return { user, urls, ui };
 };
 
 export const iconMeta = {

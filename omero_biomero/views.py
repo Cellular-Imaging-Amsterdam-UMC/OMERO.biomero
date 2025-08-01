@@ -823,6 +823,7 @@ def biomero(request, conn=None, **kwargs):
     
     # Gracefully parse ADI_ENABLED with multiple format support
     adi_enabled = parse_bool_env(os.environ.get("ADI_ENABLED"), default=True)
+    analyze_enabled = parse_bool_env(os.environ.get("ANALYZE_ENABLED"), default=True)
 
     current_user = conn.getUser()
     username = current_user.getName()
@@ -858,6 +859,7 @@ def biomero(request, conn=None, **kwargs):
         "title": "Biomero",
         "app_name": "biomero",
         "adi_enabled": adi_enabled,
+        "analyze_enabled": analyze_enabled,
     }
     return context
 

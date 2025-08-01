@@ -27,10 +27,11 @@ import { OverlayToaster, Position } from "@blueprintjs/core";
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
-  const { user, urls } = getDjangoConstants();
+  const { user, urls, ui } = getDjangoConstants();
   const [state, setState] = useState({
     user,
     urls,
+    ui,
     scripts: [],
     workflows: null,
     workflowMetadata: null,
