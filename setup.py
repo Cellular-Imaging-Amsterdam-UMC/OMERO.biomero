@@ -11,7 +11,7 @@ def read(fname):
 
 
 setup(
-    name="omero-boost",
+    name="omero-biomero",
     version="0.1.0",
     packages=find_packages(exclude=["ez_setup"]),
     description="A Python plugin for OMERO.web combining database pages, script menu, and web importer functionality",
@@ -33,8 +33,8 @@ setup(
     author="Cellular Imaging Amsterdam UMC",
     author_email="cellularimaging@amsterdamumc.nl",
     license="AGPL-3.0",
-    url="https://github.com/Cellular-Imaging-Amsterdam-UMC/omero-boost",
-    download_url="https://github.com/Cellular-Imaging-Amsterdam-UMC/omero-boost/archive/refs/heads/main.zip",
+    url="https://github.com/Cellular-Imaging-Amsterdam-UMC/OMERO.biomero",
+    download_url="https://github.com/Cellular-Imaging-Amsterdam-UMC/OMERO.biomero/archive/refs/heads/main.zip",
     keywords=[
         "OMERO.web",
         "plugin",
@@ -55,20 +55,20 @@ setup(
     include_package_data=True,
     zip_safe=False,
     package_data={
-        "omero_boost": [
+        "omero_biomero": [
             # Static files
             "static/css/*.css",
             "static/img/*.svg",
             "static/js/*.js",
             # Template files
-            "templates/omeroboost/webclientplugins/*.html",
+            "templates/omero_biomero/webclientplugins/*.html",
             # Configuration files
             "*.omero",
         ],
     },
     entry_points={
         "console_scripts": [
-            "omero-boost-setup=omero_boost.setup_integration:main",
+            "omero-biomero-setup=omero_biomero.setup_integration:main",
         ],
     },
 )
