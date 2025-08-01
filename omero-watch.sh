@@ -15,7 +15,7 @@ COMMAND4="/opt/omero/web/OMERO.biomero/startup.sh"
 
 # Monitor for changes
 inotifywait -m -r -e close_write --format '%w%f' \
-  --exclude './canvas(/.*)?' "$WATCHED_DIR" |
+  --exclude './webapp(/.*)?' "$WATCHED_DIR" |
 while read FILE; do
   echo "File changed: $FILE"
 

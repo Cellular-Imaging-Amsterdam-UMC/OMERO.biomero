@@ -34,9 +34,9 @@ urlpatterns = [
          views.get_folder_contents,
          name="get_folder_contents",
          ),
-    path("canvas/",
-         views.canvas,
-         name="canvas",
+    path("biomero/",
+         views.biomero,
+         name="biomero",
          ),
     # Webclient templates and script menu
     re_path(r"^get_script_menu/$",

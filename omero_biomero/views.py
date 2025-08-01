@@ -811,7 +811,7 @@ def process_files(selected_items, selected_destinations, group, username):
 
 @login_required()
 @render_response()
-def canvas(request, conn=None, **kwargs):
+def biomero(request, conn=None, **kwargs):
     metabase_site_url = os.environ.get("METABASE_SITE_URL")
     metabase_secret_key = os.environ.get("METABASE_SECRET_KEY")
     metabase_dashboard_id_monitor_workflows = os.environ.get(
@@ -855,8 +855,8 @@ def canvas(request, conn=None, **kwargs):
         "is_admin": is_admin,
         "main_js": get_react_build_file("main.js"),
         "main_css": get_react_build_file("main.css"),
-        "title": "CANVAS ft. BIOMERO",
-        "app_name": "biomero",  # BiomeroApp
+        "title": "Biomero",
+        "app_name": "biomero",
         "adi_enabled": adi_enabled,
     }
     return context

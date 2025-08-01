@@ -1,4 +1,3 @@
-import React from "react";
 import ReactDOM from "react-dom/client";
 import {
   BrowserRouter,
@@ -32,7 +31,7 @@ function AppRouter() {
         <Navbar className="z-[1] top-[35px]" fixedToTop>
           <NavbarGroup>
             <Icon icon="style" className="mr-[7px]" />
-            <NavbarHeading>CANVAS</NavbarHeading>
+            <NavbarHeading>Biomero</NavbarHeading>
             <NavbarDivider />
             <Button
               className="bp5-minimal focus:ring-0 focus:ring-offset-0"
