@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from "react";
+import { createRoot } from "react-dom/client";
 import {
   fetchomeroFileTreeData,
   fetchFolderData,
@@ -56,10 +57,16 @@ export const AppProvider = ({ children }) => {
   // Initialize toaster asynchronously
   React.useEffect(() => {
     async function initializeToaster() {
-      const toaster = await OverlayToaster.createAsync({
-        position: Position.TOP,
-        className: "text-base",
-      });
+      const toaster = await OverlayToaster.createAsync(
+        {
+          position: Position.TOP,
+          className: "text-base",
+        },
+        {
+          domRenderer: (toaster, containerElement) =>
+            createRoot(containerElement).render(toaster),
+        }
+      );
       setToaster(toaster);
     }
     initializeToaster();
