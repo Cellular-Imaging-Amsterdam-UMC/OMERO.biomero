@@ -20,7 +20,8 @@ import {
   Icon,
   Button,
 } from "@blueprintjs/core";
-function AppRouter() {
+
+const AppRouter = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const appName = searchParams.get("tab") || "upload"; // Default to "biomero"
@@ -34,14 +35,22 @@ function AppRouter() {
             <NavbarHeading>Biomero</NavbarHeading>
             <NavbarDivider />
             <Button
-              className="bp5-minimal focus:ring-0 focus:ring-offset-0"
+              className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
+                appName === "upload"
+                  ? "bp5-intent-primary font-bold shadow-md"
+                  : ""
+              }`}
               icon="cloud-upload"
               text="Import"
               onClick={() => navigate("?tab=upload")}
               outlined={appName === "upload"}
             />
             <Button
-              className="bp5-minimal focus:ring-0 focus:ring-offset-0"
+              className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
+                appName === "biomero"
+                  ? "bp5-intent-primary font-bold shadow-md"
+                  : ""
+              }`}
               icon="data-sync"
               text="Analyze"
               onClick={() => navigate("?tab=biomero")}

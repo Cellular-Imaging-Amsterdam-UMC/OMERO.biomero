@@ -23,7 +23,7 @@ const GroupSelect = () => {
   }, [state.user.active_group_id, state.user.groups]);
 
   const onSelect = (item) => {
-    console.log("Selected item:", item);
+    return;
   };
 
   const renderOption = (item, { handleClick, handleFocus, modifiers }) => {

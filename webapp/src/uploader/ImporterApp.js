@@ -122,7 +122,6 @@ const ImporterApp = () => {
     type,
     deselect = false
   ) => {
-    // console.log("handleFileTreeSelection", nodeData, coords, e, type, deselect);
     const nodeIds = Array.isArray(nodeData) ? nodeData : [nodeData.id];
 
     const selectionKey =
@@ -287,7 +286,6 @@ const ImporterApp = () => {
   const addUploadItems = () => {
     // Only allow selection of screens as target if active tab is ImportScreens
     const nodeId = state.omeroFileTreeSelection[0];
-    console.log("nodeId", state.omeroFileTreeData);
     const omeroPath = findPathToTreeLeaf(nodeId, state.omeroFileTreeData);
     const pathString = omeroPath.join("/");
     const isScreen = nodeId.includes("screen-");
@@ -391,7 +389,6 @@ const ImporterApp = () => {
     // TODO
     return uploadList.map((item) => {
       const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData);
-      console.log("itemPath", itemPath);
       const itemPathString = itemPath.join("/");
       return (
         <Card
@@ -495,11 +492,11 @@ const ImporterApp = () => {
       });
   };
 
-  const renderUploadPanel = (mode) => {
+  const renderImportPanel = (mode) => {
     const omeroFileTreeTitle = `1. Select destination ${
       mode === "screen" ? "screen " : "dataset "
     }in OMERO`;
-    const localFileTreeTitle = `2. Select ${mode}s to upload`;
+    const localFileTreeTitle = `2. Select ${mode}s to import`;
 
     const disableAddFilesButton = state.localFileTreeSelection.length === 0 || state.omeroFileTreeSelection.length === 0
 
@@ -622,7 +619,7 @@ const ImporterApp = () => {
           <div className="w-1/4 overflow-auto pt-2">
             <div className="flex space-x-4 items-center">
               <h1 className="text-base font-bold p-0 m-0 inline-block">
-                Upload list
+                3. Upload list
               </h1>
               <Button
                 onClick={removeUploadItems}
@@ -657,7 +654,7 @@ const ImporterApp = () => {
           <div className="w-1/4 overflow-auto pt-2">
             <div className="flex items-center">
               <h1 className="text-base font-bold p-0 m-0 inline-block">
-                Attach metadata
+                4. Attach metadata (optional)
               </h1>
             </div>
             <MetadataForms />
@@ -717,7 +714,7 @@ const ImporterApp = () => {
             id="ImportImages"
             title="Import images"
             icon="upload"
-            panel={loadedTabs.ImportImages ? renderUploadPanel("image") : null}
+            panel={loadedTabs.ImportImages ? renderImportPanel("image") : null}
             className="focus:outline-none focus:ring-0"
           />
           <Tab
@@ -725,7 +722,7 @@ const ImporterApp = () => {
             title="Import screens"
             icon="upload"
             panel={
-              loadedTabs.ImportScreens ? renderUploadPanel("screen") : null
+              loadedTabs.ImportScreens ? renderImportPanel("screen") : null
             }
             className="focus:outline-none focus:ring-0"
           />

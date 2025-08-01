@@ -10,15 +10,11 @@ const MetadataForms = () => {
   if (!state.omeroFileTreeSelection || state.omeroFileTreeSelection.length === 0) {
     return (
       <div className="text-sm">
-        <p>Here you can find the metadata forms for the uploader.</p>
         <p>
-          These forms are used to collect metadata from the user before uploading
-          files.
+          If your administrator has configured OMERO.forms, you can use them to
+          add metadata to datasets, projects and screens.
         </p>
-        <p>
-          They are designed to be flexible and extensible, allowing for different
-          types of metadata to be collected.
-        </p>
+        <p>Select OMERO dataset, project or screen to get started!</p>
       </div>
     );
   }

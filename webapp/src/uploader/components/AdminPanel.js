@@ -93,7 +93,7 @@ const AdminPanel = () => {
     <div className="h-full overflow-y-auto p-4">
       <H4>Admin Settings</H4>
       
-      <Card elevation={Elevation.TWO} className="mt-4">
+      <Card elevation={Elevation.TWO} className="mt-4 max-w-[800px]">
         <h3 className="text-lg font-semibold mb-4">Group Folder Mappings</h3>
         
         <div className="mb-4">

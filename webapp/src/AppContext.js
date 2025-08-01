@@ -398,7 +398,7 @@ export const AppProvider = ({ children }) => {
         index: parentId,
         isFolder: true,
         children: contents.map((content) => content.id),
-        data: parentId === "root" ? "Root" : "Folder",
+        data: parentId === "root" ? "Home" : "Folder",
         childCount: contents.length,
       };
 

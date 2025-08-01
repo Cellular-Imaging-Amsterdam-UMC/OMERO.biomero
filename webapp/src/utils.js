@@ -23,7 +23,7 @@ export const transformStructure = (data) => {
         ...(data.plates || []).map((plate) => `plate-${plate.id}`),
         "orphaned", // Include the orphaned folder
       ],
-      data: "Root",
+      data: "Home",
       childCount:
         (data.projects?.length || 0) +
         (data.datasets?.length || 0) +
