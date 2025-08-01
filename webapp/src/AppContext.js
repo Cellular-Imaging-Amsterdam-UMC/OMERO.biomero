@@ -488,7 +488,7 @@ export const AppProvider = ({ children }) => {
     OME.openScriptWindow(event, SCRIPT_WINDOW_WIDTH, SCRIPT_WINDOW_HEIGHT);
   };
 
-  const openUploadScriptWindow = (scriptUrl) => {
+  const openImportScriptWindow = (scriptUrl) => {
     // eslint-disable-next-line no-unused-vars
     const SCRIPT_WINDOW_WIDTH = 800;
     // eslint-disable-next-line no-unused-vars
@@ -594,7 +594,7 @@ export const AppProvider = ({ children }) => {
         loadScripts,
         fetchScriptDetails,
         openScriptWindow,
-        openUploadScriptWindow,
+        openImportScriptWindow,
         loadWorkflows,
         loadWorkflowMetadata,
         loadBiomeroConfig,

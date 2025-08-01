@@ -3,9 +3,9 @@ import { useAppContext } from "../../AppContext";
 import { Button } from "@blueprintjs/core";
 
 const UploadButton = () => {
-  const { openUploadScriptWindow } = useAppContext();
+  const { openImportScriptWindow } = useAppContext();
   const handleUploadClick = () => {
-    openUploadScriptWindow();
+    openImportScriptWindow();
   };
 
   return (

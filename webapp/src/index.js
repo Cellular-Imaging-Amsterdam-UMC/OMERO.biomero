@@ -11,7 +11,7 @@ import "./index.css";
 import "./tailwind.css";
 import { AppProvider } from "./AppContext";
 import BiomeroApp from "./biomero/BiomeroApp";
-import UploaderApp from "./uploader/UploaderApp";
+import ImporterApp from "./uploader/ImporterApp";
 import {
   Navbar,
   NavbarGroup,
@@ -36,7 +36,7 @@ function AppRouter() {
             <Button
               className="bp5-minimal focus:ring-0 focus:ring-offset-0"
               icon="cloud-upload"
-              text="Upload"
+              text="Import"
               onClick={() => navigate("?tab=upload")}
               outlined={appName === "upload"}
             />
@@ -50,7 +50,7 @@ function AppRouter() {
           </NavbarGroup>
         </Navbar>
         <div className="pt-[50px]">
-          {appName === "biomero" ? <BiomeroApp /> : <UploaderApp />}
+          {appName === "biomero" ? <BiomeroApp /> : <ImporterApp />}
         </div>
       </div>
     </AppProvider>
