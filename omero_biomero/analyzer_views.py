@@ -134,7 +134,8 @@ def run_workflow_script(request, conn=None, **kwargs):
         import_zp = params.get("importAsZip")
         uploadcsv = params.get("uploadCsv")
         output_ds = params.get("selectedDatasets", [])
-        rename_pt = params.get("renamePattern")
+        rename_enabled = params.get("enableRename", False)
+        rename_pt = params.get("renamePattern", "")
         version = params.get("version")
         # EXPERIMENTAL: ZARR format support
         use_zarr = params.get("useZarrFormat", False)
@@ -153,6 +154,7 @@ def run_workflow_script(request, conn=None, **kwargs):
             "attachToOriginalImages",
             "selectedDatasets",
             "renamePattern",
+            "enableRename",
             "workflow_name",
             "cytomine_host",
             "cytomine_id_project",
@@ -187,7 +189,7 @@ def run_workflow_script(request, conn=None, **kwargs):
                 ),
                 workflow.OUTPUT_DUPLICATES: rbool(False),
                 workflow.OUTPUT_RENAME: (
-                    wrap(rename_pt) if rename_pt else wrap(workflow.NO)
+                    wrap(rename_pt) if (rename_enabled and rename_pt) else wrap(workflow.NO)
                 ),
                 workflow.OUTPUT_CSV_TABLE: rbool(uploadcsv),
             }
