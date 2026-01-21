@@ -165,6 +165,7 @@ const BiomeroApp = () => {
     loadFolderData,
     loadGroups,
     loadWorkflows,
+    loadBiomeroConfig,
   } = useAppContext();
   const [metabaseError, setMetabaseError] = useState(false);
   const [activeTab, setActiveTab] = useState("Run");
@@ -193,6 +194,7 @@ const BiomeroApp = () => {
     loadFolderData();
     loadGroups();
     loadWorkflows();
+    loadBiomeroConfig();
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // called only once
