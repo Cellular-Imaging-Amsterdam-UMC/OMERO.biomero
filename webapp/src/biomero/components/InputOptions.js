@@ -7,6 +7,11 @@ const InputOptions = () => {
   const [batchEnabled, setBatchEnabled] = useState(false);
   const [unlockDangerousJobs, setUnlockDangerousJobs] = useState(false);
   
+  // Get the configured maximum batch jobs limit from UI settings, default to 100
+  const maxBatchJobs = parseInt(state.config?.UI?.max_batch_jobs || "100", 10);
+  // Get whether dangerous jobs (>10) are allowed, default to true  
+  const allowDangerousJobs = state.config?.UI?.allow_dangerous_jobs !== "false";
+  
   // Calculate batch size from job count
   const calculateBatchSizeFromJobCount = (totalImages, jobCount) => {
     if (jobCount <= 1) return totalImages;
@@ -150,7 +155,7 @@ const InputOptions = () => {
                   {selectedJobCount} parallel jobs ({batchSize} images each)
                 </span>
                 
-                {totalImages > 10 && (
+                {totalImages > 10 && allowDangerousJobs && (
                   <Switch
                     checked={unlockDangerousJobs}
                     onChange={(e) => {
@@ -169,22 +174,31 @@ const InputOptions = () => {
                     intent={Intent.DANGER}
                   />
                 )}
+                
+                {totalImages > 10 && !allowDangerousJobs && (
+                  <span className="text-sm text-gray-600">
+                    Admin has limited batch jobs to safe range (2-10)
+                  </span>
+                )}
               </div>
               
-              <div className={unlockDangerousJobs ? 'p-2 bg-red-50 border border-red-400 rounded' : ''}>
+              <div className={(unlockDangerousJobs && allowDangerousJobs) ? 'p-2 bg-red-50 border border-red-400 rounded' : ''}>
                 <Slider
                   min={2}
-                  max={unlockDangerousJobs ? Math.min(100, totalImages) : Math.min(10, totalImages)}
+                  max={(unlockDangerousJobs && allowDangerousJobs) 
+                    ? Math.min(maxBatchJobs, totalImages) 
+                    : Math.min(Math.min(maxBatchJobs, 10), totalImages)
+                  }
                   stepSize={1}
                   value={selectedJobCount}
                   onChange={handleJobCountChange}
                   showTrackFill={true}
-                  labelStepSize={unlockDangerousJobs ? Math.max(10, Math.floor(totalImages / 8)) : 1}
+                  labelStepSize={(unlockDangerousJobs && allowDangerousJobs) ? Math.max(10, Math.floor(totalImages / 8)) : 1}
                   labelRenderer={(value) => {
                     const imagesPerJob = calculateBatchSizeFromJobCount(totalImages, value);
                     return `${value}`;
                   }}
-                  intent={unlockDangerousJobs && selectedJobCount > 10 ? Intent.DANGER : Intent.PRIMARY}
+                  intent={(unlockDangerousJobs && allowDangerousJobs) && selectedJobCount > 10 ? Intent.DANGER : Intent.PRIMARY}
                 />
               </div>
             </FormGroup>

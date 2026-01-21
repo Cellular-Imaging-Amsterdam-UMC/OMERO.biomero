@@ -36,6 +36,24 @@ const SettingsForm = () => {
 
   const [converters, setConverters] = useState([]);
   const [errors, setErrors] = useState({});
+  
+  // Validation for UI settings
+  const validateMaxBatchJobs = (value) => {
+    if (!value || value === "") return null;
+    const numValue = parseInt(value, 10);
+    if (isNaN(numValue)) return "Must be a number";
+    if (numValue < 10) return "Minimum 10 jobs (for dangerous jobs mode)";
+    if (numValue > 1000) return "Maximum 1000 jobs";
+    return null;
+  };
+  
+  const getMaxBatchJobsError = () => {
+    return validateMaxBatchJobs(settingsForm?.UI?.max_batch_jobs);
+  };
+  
+  const hasValidationErrors = () => {
+    return getMaxBatchJobsError() !== null || Object.keys(errors).length > 0;
+  };
 
   useEffect(() => {
     if (JSON.stringify(settingsForm) !== JSON.stringify(initialFormData)) {
@@ -265,6 +283,11 @@ const SettingsForm = () => {
   };
 
   const submitConfig = async () => {
+    // Check for validation errors before saving
+    if (hasValidationErrors()) {
+      return; // Don't save if there are validation errors
+    }
+    
     setLoading(true);
     try {
       // Prepare the config with current converters for saving
@@ -282,6 +305,8 @@ const SettingsForm = () => {
       }
       
       await saveConfigData(transformSettingsFormToPayload(configToSave));
+      // Reload config to make changes immediately available in other components
+      await loadBiomeroConfig();
       setShowSaveTooltip(false); // Hide "Don't forget to save"
       setShowResetTooltip(true); // Show "Reload to apply changes"
     } finally {
@@ -513,6 +538,80 @@ const SettingsForm = () => {
           "The Git repository to pull the Slurm scripts from. Recommended to leave this empty (default) to work with generated job scripts.",
           "danger"
         )}
+      </CollapsibleSection>
+      <CollapsibleSection title="UI Settings">
+        <div className="bp5-form-group">
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              Settings that control the user interface behavior and limits.
+            </div>
+          </div>
+        </div>
+        <H6>Batch Processing Limits</H6>
+        <div className="bp5-form-group">
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              Configure the maximum number of parallel batch jobs users can create when processing large datasets.
+              Lower values reduce server load but may limit processing capability for very large datasets.
+            </div>
+            <div className="bp5-form-helper-text">
+              <strong>Note:</strong> Users can still choose fewer jobs than this maximum. This only sets the upper limit.
+            </div>
+          </div>
+        </div>
+        <H6>Dangerous Jobs Control</H6>
+        <div className="bp5-form-group">
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              Control whether users can enable processing with more than 10 jobs. When disabled, users will be limited to the safe range (2-10 jobs).
+            </div>
+            <div className="bp5-form-helper-text font-bold text-red-500">
+              <strong>Caution:</strong> Enabling dangerous jobs allows users to create many parallel jobs, which can overwhelm the SLURM cluster and affect other users. It also increases the chance of errors in (BI)OMERO scripts, possibly causing job failures.
+            </div>
+            <div className="bp5-form-helper-text">
+              <strong>Recommendation:</strong> Keep this enabled for power users who understand the implications, disable for safer general usage.
+            </div>
+          </div>
+        </div>
+        <Switch
+          checked={settingsForm.UI?.allow_dangerous_jobs !== "false"}
+          label="Allow users to enable dangerous jobs (>10)"
+          onChange={(e) =>
+            handleInputChange("UI.allow_dangerous_jobs", e.target.checked ? "true" : "false")
+          }
+        />
+        <H6>Maximum Batch Jobs Limit</H6>
+        <div className="bp5-form-group">
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              Set the absolute maximum number of parallel batch jobs when dangerous jobs are enabled above. This setting applies regardless of dataset size.
+            </div>
+            <div className="bp5-form-helper-text font-bold text-orange-500">
+              <strong>Note:</strong> This limit is only relevant when "Allow dangerous jobs" is enabled. When disabled, users are limited to 2-10 jobs regardless of this setting.
+            </div>
+            <div className="bp5-form-helper-text">
+              Lower values reduce server load but may limit processing capability for very large datasets.
+            </div>
+          </div>
+        </div>
+        <FormGroup
+          label="Max Batch Jobs (when dangerous jobs enabled)"
+          helperText="Maximum number of parallel batch jobs allowed (10-1000). Default: 100. Only applies when dangerous jobs are enabled."
+          intent={getMaxBatchJobsError() ? "danger" : "primary"}
+        >
+          <InputGroup
+            id="UI.max_batch_jobs"
+            placeholder="100"
+            value={settingsForm.UI?.max_batch_jobs || ""}
+            onChange={(e) => handleInputChange("UI.max_batch_jobs", e.target.value)}
+            intent={getMaxBatchJobsError() ? "danger" : "none"}
+          />
+          {getMaxBatchJobsError() && (
+            <div className="text-red-500 text-sm mt-1">
+              {getMaxBatchJobsError()}
+            </div>
+          )}
+        </FormGroup>
       </CollapsibleSection>
       <CollapsibleSection title="Analytics Settings">
         <div className="bp5-form-group">
@@ -773,18 +872,22 @@ const SettingsForm = () => {
       </div>
       <ButtonGroup>
         <Tooltip
-          content="Please save your changes"
-          intent="none"
-          isOpen={hasChanges && showSaveTooltip}
+          content={hasValidationErrors() ? "Please fix validation errors before saving" : "Please save your changes"}
+          intent={hasValidationErrors() ? "danger" : "none"}
+          isOpen={(hasChanges && showSaveTooltip) || hasValidationErrors()}
           compact={true}
           placement="bottom"
         >
           <Button
             icon={loading ? <Spinner size={16} /> : "floppy-disk"}
-            intent={hasChanges && showSaveTooltip ? "primary" : "none"}
+            intent={hasValidationErrors() ? "danger" : (hasChanges && showSaveTooltip ? "primary" : "none")}
+            disabled={hasValidationErrors()}
             onClick={() => {
-              submitConfig();
+              if (!hasValidationErrors()) {
+                submitConfig();
+              }
             }}
+            style={hasValidationErrors() ? { cursor: 'not-allowed' } : {}}
           >
             Save Settings
           </Button>
