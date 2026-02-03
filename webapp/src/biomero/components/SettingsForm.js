@@ -33,6 +33,7 @@ const SettingsForm = () => {
   const [showSaveTooltip, setShowSaveTooltip] = useState(true);
   const [showResetTooltip, setShowResetTooltip] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false); // Track if form has been initialized
 
   const [converters, setConverters] = useState([]);
   const [errors, setErrors] = useState({});
@@ -70,7 +71,7 @@ const SettingsForm = () => {
     }
   }, [settingsForm, initialFormData, converters]);
 
-  const fetchInitialFormState = async () => {
+  const initializeFormState = () => {
     if (state.config) {
       const mappedModels = Object.entries(state.config.MODELS || {})
         .filter(([key]) => key.endsWith("_repo")) // Filter for relevant keys
@@ -117,11 +118,15 @@ const SettingsForm = () => {
 
   useEffect(() => {
     loadBiomeroConfig();
-  }, []); // called only once
+  }, []); // Load config once on mount
 
   useEffect(() => {
-    fetchInitialFormState();
-  }, [state.config]); // setup our form
+    // Initialize form state once when config is available and form hasn't been initialized
+    if (state.config && !isInitialized) {
+      initializeFormState();
+      setIsInitialized(true);
+    }
+  }, [state.config, isInitialized]); // Only run when config loads and form isn't initialized
 
   const toggleEdit = (field) => {
     setEditMode((prev) => ({ ...prev, [field]: !prev[field] }));
@@ -259,8 +264,10 @@ const SettingsForm = () => {
   };
 
   const resetForm = () => {
-    fetchInitialFormState();
-    setShowSaveTooltip(true);
+    if (state.config) {
+      initializeFormState(); // Re-initialize from current config
+      setShowSaveTooltip(true);
+    }
   };
 
   const handleInputChange = (field, value) => {
@@ -296,7 +303,7 @@ const SettingsForm = () => {
         CONVERTERS: converters, // Use current converters state
       };
       
-      // Update the form state for UI consistency (async)
+      // Update the form state for UI consistency
       if (Object.keys(errors).length === 0) {
         setSettingsForm((prev) => ({
           ...prev,
@@ -305,8 +312,17 @@ const SettingsForm = () => {
       }
       
       await saveConfigData(transformSettingsFormToPayload(configToSave));
-      // Reload config to make changes immediately available in other components
-      await loadBiomeroConfig();
+      
+      // Update the baseline for "hasChanges" detection - form state is now the "initial" state
+      const currentFormState = {
+        ...settingsForm,
+        CONVERTERS: converters,
+      };
+      setInitialFormData(currentFormState);
+      
+      // Reload config in background for other components (doesn't affect our form state)
+      loadBiomeroConfig(); // Note: not awaited - we don't want it to interfere with our form
+      
       setShowSaveTooltip(false); // Hide "Don't forget to save"
       setShowResetTooltip(true); // Show "Reload to apply changes"
     } finally {
