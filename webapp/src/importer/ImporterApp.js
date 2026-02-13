@@ -121,13 +121,12 @@ const ImporterApp = () => {
     loadBiomeroConfig,
   } = useAppContext();
 
-  const [activeTab, setActiveTab] = useState("ImportImages");
+  const [activeTab, setActiveTab] = useState("Import");
   const [metabaseError, setMetabaseError] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [loadedTabs, setLoadedTabs] = useState({
-    ImportImages: true,
-    ImportScreens: false,
-    UploadImages: false,
+    Import: true,
+    Upload: false,
     Monitor: false,
     Admin: false,
   });
@@ -332,29 +331,48 @@ const ImporterApp = () => {
   // We need to make sure only unique items are added to the upload list
   const addUploadItems = () => {
     // Only allow selection of screens as target if active tab is ImportScreens
+    // Only allow selection of dataset or screen as target
     const nodeId = state.omeroFileTreeSelection[0];
-    const omeroPath = findPathToTreeLeaf(nodeId, state.omeroFileTreeData);
-    const pathString = omeroPath.join("/");
-    const isScreen = nodeId.includes("screen-");
-    const isDataset = nodeId.includes("dataset-");
-    if (!isScreen && activeTab === "ImportScreens") {
-      // Show toast if the user tries to select something else
+    const isScreenDest = nodeId.includes("screen-");
+    const isDatasetDest = nodeId.includes("dataset-");
+    
+    if (!isScreenDest && !isDatasetDest && activeTab === "Import") {
       toaster.show({
-        message: "You can only select a screen as import destination",
+        message: "Please select a Dataset or Screen as import destination",
         intent: "warning",
       });
       return;
-    } else if (!isDataset && activeTab === "ImportImages") {
-      // Only allow selection of datasets if active tab is ImportImages
-      if (!isDataset && activeTab === "ImportImages") {
-        // Show toast if the user tries to select something else
+    }
+
+    // Helper to identify screen files (currently .db files)
+    const isScreenFile = (filename) => filename.toLowerCase().endsWith(".db");
+    
+    // Validate selection against destination type
+    const selectedItems = state.localFileTreeSelection.map(id => state.localFileTreeData[id]);
+    
+    if (isDatasetDest) {
+      const hasScreenFiles = selectedItems.some(item => isScreenFile(item.data));
+      if (hasScreenFiles) {
         toaster.show({
-          message: "You can only select a dataset as import destination",
-          intent: "warning",
+          message: "Cannot import Screen data (.db files) into a Dataset. Please select a Screen destination.",
+          intent: "danger",
+        });
+        return;
+      }
+    } else if (isScreenDest) {
+      const hasNonScreenFiles = selectedItems.some(item => !isScreenFile(item.data));
+      if (hasNonScreenFiles) {
+         toaster.show({
+          message: "Cannot import standard files into a Screen. Only .db files are supported for Screen import.",
+          intent: "danger",
         });
         return;
       }
     }
+    
+    const omeroPath = findPathToTreeLeaf(nodeId, state.omeroFileTreeData);
+    const pathString = omeroPath.join("/");
+
     const newUploadList = state.localFileTreeSelection
       .filter(
         (item) => !uploadList.some((uploadItem) => uploadItem.value === item)
@@ -656,11 +674,9 @@ const ImporterApp = () => {
     );
   };
 
-  const renderImportPanel = (mode) => {
-    const omeroFileTreeTitle = `1. Select destination ${
-      mode === "screen" ? "screen " : "dataset "
-    }in OMERO`;
-    const localFileTreeTitle = `2. Select ${mode}s to import`;
+  const renderImportPanel = () => {
+    const omeroFileTreeTitle = "1. Select destination (Dataset/Screen)";
+    const localFileTreeTitle = "2. Select files/folders to import";
 
     const disableAddFilesButton =
       state.localFileTreeSelection.length === 0 ||
@@ -670,7 +686,7 @@ const ImporterApp = () => {
       <div className="h-full">
         <div className="mb-4">
           <Callout intent="primary" icon="info-sign">
-            Import {mode}s from your group&apos;s predefined network location.
+            Import images or screens from your group&apos;s predefined network location.
           </Callout>
         </div>
         <div className="flex space-x-4">
@@ -882,28 +898,19 @@ const ImporterApp = () => {
           className="focus:outline-none focus:ring-0"
         >
           <Tab
-            id="ImportImages"
-            title="Import images"
+            id="Import"
+            title="Import"
             icon="upload"
-            panel={loadedTabs.ImportImages ? renderImportPanel("image") : null}
-            className="focus:outline-none focus:ring-0"
-          />
-          <Tab
-            id="ImportScreens"
-            title="Import screens"
-            icon="upload"
-            panel={
-              loadedTabs.ImportScreens ? renderImportPanel("screen") : null
-            }
+            panel={loadedTabs.Import ? renderImportPanel() : null}
             className="focus:outline-none focus:ring-0"
           />
 
           {useUploader && (
             <Tab
-              id="UploadImages"
-              title="Upload images"
+              id="Upload"
+              title="Upload"
               icon="cloud-upload"
-              panel={loadedTabs.UploadImages ? renderUploadPanel() : null}
+              panel={loadedTabs.Upload ? renderUploadPanel() : null}
               className="focus:outline-none focus:ring-0"
             />
           )}

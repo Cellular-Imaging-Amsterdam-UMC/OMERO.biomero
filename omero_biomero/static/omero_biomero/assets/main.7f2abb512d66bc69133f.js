@@ -28485,13 +28485,12 @@ const ImporterApp = () => {
     toaster,
     loadBiomeroConfig
   } = (0,_AppContext__WEBPACK_IMPORTED_MODULE_1__.useAppContext)();
-  const [activeTab, setActiveTab] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)("ImportImages");
+  const [activeTab, setActiveTab] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)("Import");
   const [metabaseError, setMetabaseError] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
   const [uploading, setUploading] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
   const [loadedTabs, setLoadedTabs] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
-    ImportImages: true,
-    ImportScreens: false,
-    UploadImages: false,
+    Import: true,
+    Upload: false,
     Monitor: false,
     Admin: false
   });
@@ -28647,29 +28646,44 @@ const ImporterApp = () => {
   // We need to make sure only unique items are added to the upload list
   const addUploadItems = () => {
     // Only allow selection of screens as target if active tab is ImportScreens
+    // Only allow selection of dataset or screen as target
     const nodeId = state.omeroFileTreeSelection[0];
-    const omeroPath = findPathToTreeLeaf(nodeId, state.omeroFileTreeData);
-    const pathString = omeroPath.join("/");
-    const isScreen = nodeId.includes("screen-");
-    const isDataset = nodeId.includes("dataset-");
-    if (!isScreen && activeTab === "ImportScreens") {
-      // Show toast if the user tries to select something else
+    const isScreenDest = nodeId.includes("screen-");
+    const isDatasetDest = nodeId.includes("dataset-");
+    if (!isScreenDest && !isDatasetDest && activeTab === "Import") {
       toaster.show({
-        message: "You can only select a screen as import destination",
+        message: "Please select a Dataset or Screen as import destination",
         intent: "warning"
       });
       return;
-    } else if (!isDataset && activeTab === "ImportImages") {
-      // Only allow selection of datasets if active tab is ImportImages
-      if (!isDataset && activeTab === "ImportImages") {
-        // Show toast if the user tries to select something else
+    }
+
+    // Helper to identify screen files (currently .db files)
+    const isScreenFile = filename => filename.toLowerCase().endsWith(".db");
+
+    // Validate selection against destination type
+    const selectedItems = state.localFileTreeSelection.map(id => state.localFileTreeData[id]);
+    if (isDatasetDest) {
+      const hasScreenFiles = selectedItems.some(item => isScreenFile(item.data));
+      if (hasScreenFiles) {
         toaster.show({
-          message: "You can only select a dataset as import destination",
-          intent: "warning"
+          message: "Cannot import Screen data (.db files) into a Dataset. Please select a Screen destination.",
+          intent: "danger"
+        });
+        return;
+      }
+    } else if (isScreenDest) {
+      const hasNonScreenFiles = selectedItems.some(item => !isScreenFile(item.data));
+      if (hasNonScreenFiles) {
+        toaster.show({
+          message: "Cannot import standard files into a Screen. Only .db files are supported for Screen import.",
+          intent: "danger"
         });
         return;
       }
     }
+    const omeroPath = findPathToTreeLeaf(nodeId, state.omeroFileTreeData);
+    const pathString = omeroPath.join("/");
     const newUploadList = state.localFileTreeSelection.filter(item => !uploadList.some(uploadItem => uploadItem.value === item)).map(item => {
       const itemData = state.localFileTreeData[item];
       return {
@@ -28911,18 +28925,18 @@ const ImporterApp = () => {
       })]
     });
   };
-  const renderImportPanel = mode => {
-    const omeroFileTreeTitle = `1. Select destination ${mode === "screen" ? "screen " : "dataset "}in OMERO`;
-    const localFileTreeTitle = `2. Select ${mode}s to import`;
+  const renderImportPanel = () => {
+    const omeroFileTreeTitle = "1. Select destination (Dataset/Screen)";
+    const localFileTreeTitle = "2. Select files/folders to import";
     const disableAddFilesButton = state.localFileTreeSelection.length === 0 || state.omeroFileTreeSelection.length === 0;
     return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsxs)("div", {
       className: "h-full",
       children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)("div", {
         className: "mb-4",
-        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_14__.Callout, {
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_14__.Callout, {
           intent: "primary",
           icon: "info-sign",
-          children: ["Import ", mode, "s from your group's predefined network location."]
+          children: "Import images or screens from your group's predefined network location."
         })
       }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsxs)("div", {
         className: "flex space-x-4",
@@ -29118,22 +29132,16 @@ const ImporterApp = () => {
         onChange: handleTabChange,
         className: "focus:outline-none focus:ring-0",
         children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_19__.Tab, {
-          id: "ImportImages",
-          title: "Import images",
+          id: "Import",
+          title: "Import",
           icon: "upload",
-          panel: loadedTabs.ImportImages ? renderImportPanel("image") : null,
-          className: "focus:outline-none focus:ring-0"
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_19__.Tab, {
-          id: "ImportScreens",
-          title: "Import screens",
-          icon: "upload",
-          panel: loadedTabs.ImportScreens ? renderImportPanel("screen") : null,
+          panel: loadedTabs.Import ? renderImportPanel() : null,
           className: "focus:outline-none focus:ring-0"
         }), useUploader && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_19__.Tab, {
-          id: "UploadImages",
-          title: "Upload images",
+          id: "Upload",
+          title: "Upload",
           icon: "cloud-upload",
-          panel: loadedTabs.UploadImages ? renderUploadPanel() : null,
+          panel: loadedTabs.Upload ? renderUploadPanel() : null,
           className: "focus:outline-none focus:ring-0"
         }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_19__.Tab, {
           id: "Monitor",
@@ -29831,6 +29839,12 @@ const ResumableUploader = _ref => {
     return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__.Callout, {
       intent: _blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Intent.WARNING,
       children: "Please select a dataset to upload to."
+    });
+  }
+  if (datasetType !== "Dataset") {
+    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__.Callout, {
+      intent: _blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Intent.WARNING,
+      children: "Web uploads are only supported for Datasets. Please select a Dataset."
     });
   }
   return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)("div", {
@@ -46190,11 +46204,11 @@ video {
 .mt-12 {
   margin-top: 3rem !important;
 }
-.mt-4 {
-  margin-top: 1rem !important;
-}
 .mt-2 {
   margin-top: 0.5rem !important;
+}
+.mt-4 {
+  margin-top: 1rem !important;
 }
 .block {
   display: block !important;
@@ -136671,4 +136685,4 @@ window.onload = function () {
 
 /******/ })()
 ;
-//# sourceMappingURL=main.873eb64e893482668eb6.js.map
+//# sourceMappingURL=main.7f2abb512d66bc69133f.js.map

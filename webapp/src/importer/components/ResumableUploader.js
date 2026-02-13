@@ -93,6 +93,14 @@ const ResumableUploader = ({ datasetId, datasetType, group }) => {
     );
   }
 
+  if (datasetType !== "Dataset") {
+    return (
+      <Callout intent={Intent.WARNING}>
+        Web uploads are only supported for Datasets. Please select a Dataset.
+      </Callout>
+    );
+  }
+
   return (
     <div className="resumable-uploader p-4">
       <div ref={dashboardRef} style={{ minHeight: "500px" }} />
