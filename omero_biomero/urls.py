@@ -1,5 +1,5 @@
 from django.urls import path
-from . import biomero_views, importer_views, admin_views, analyzer_views
+from . import biomero_views, importer_views, admin_views, analyzer_views, stardist_views
 
 urlpatterns = [
     # Importer URLs
@@ -49,6 +49,22 @@ urlpatterns = [
         "api/analyzer/slurm/status/",
         analyzer_views.get_slurm_status,  # GET: SLURM cluster status
         name="analyzer_slurm_status",
+    ),
+    # Stardist URLs
+    path(
+        "api/stardist/models/",
+        stardist_views.list_models,
+        name="stardist_list_models",
+    ),
+    path(
+        "api/stardist/save_annotations/",
+        stardist_views.save_annotations,
+        name="stardist_save_annotations",
+    ),
+    path(
+        "api/stardist/train/",
+        stardist_views.run_training,
+        name="stardist_run_training",
     ),
     # Main Biomero URL
     path(

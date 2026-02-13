@@ -25098,6 +25098,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   postConfig: () => (/* binding */ postConfig),
 /* harmony export */   postGroupMappings: () => (/* binding */ postGroupMappings),
 /* harmony export */   postUpload: () => (/* binding */ postUpload),
+/* harmony export */   runStardistTraining: () => (/* binding */ runStardistTraining),
 /* harmony export */   runWorkflow: () => (/* binding */ runWorkflow)
 /* harmony export */ });
 /* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! axios */ "./node_modules/axios/lib/axios.js");
@@ -25371,6 +25372,25 @@ const postUpload = async upload => {
     return response; // Return the API response
   } catch (error) {
     console.error("Error saving config:", error);
+    throw error;
+  }
+};
+const runStardistTraining = async params => {
+  const {
+    urls
+  } = (0,_constants__WEBPACK_IMPORTED_MODULE_0__.getDjangoConstants)();
+  try {
+    const csrfToken = window.csrftoken;
+    // We assume urls.stardist_train is defined or we hardcode path for now
+    const endpoint = "/omero_biomero/api/stardist/train/";
+    const response = await apiRequest(endpoint, "POST", params, {
+      headers: {
+        "X-CSRFToken": csrfToken
+      }
+    });
+    return response;
+  } catch (error) {
+    console.error("Error running stardist training:", error);
     throw error;
   }
 };
@@ -29430,6 +29450,995 @@ const WorkflowOutput = _ref => {
   });
 };
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (WorkflowOutput);
+
+/***/ }),
+
+/***/ "./src/biomero/stardist/StardistApp.js":
+/*!*********************************************!*\
+  !*** ./src/biomero/stardist/StardistApp.js ***!
+  \*********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/tabs/tabs.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/tabs/tab.js");
+/* harmony import */ var _components_PreviewTab__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./components/PreviewTab */ "./src/biomero/stardist/components/PreviewTab.js");
+/* harmony import */ var _components_AnnotationTab__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./components/AnnotationTab */ "./src/biomero/stardist/components/AnnotationTab.js");
+/* harmony import */ var _components_TrainingTab__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./components/TrainingTab */ "./src/biomero/stardist/components/TrainingTab.js");
+/* harmony import */ var _AppContext__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../AppContext */ "./src/AppContext.js");
+/* harmony import */ var _shared_components_GroupSelect__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../shared/components/GroupSelect */ "./src/shared/components/GroupSelect.js");
+/* harmony import */ var _shared_components_SlurmStatusIndicator__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../../shared/components/SlurmStatusIndicator */ "./src/shared/components/SlurmStatusIndicator.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+
+
+
+
+
+
+const StardistApp = () => {
+  const {
+    state,
+    updateState,
+    loadOmeroTreeData,
+    loadFolderData,
+    loadGroups,
+    loadWorkflows,
+    loadBiomeroConfig
+  } = (0,_AppContext__WEBPACK_IMPORTED_MODULE_4__.useAppContext)();
+  const [activeTab, setActiveTab] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)("preview");
+  const [loadingOmero, setLoadingOmero] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const [workflowError, setWorkflowError] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    if (!loadingOmero) {
+      setLoadingOmero(true);
+      loadOmeroTreeData().then(() => {
+        setLoadingOmero(false);
+      }).catch(() => {
+        setLoadingOmero(false);
+      });
+    }
+    loadFolderData();
+    loadGroups();
+    loadWorkflows();
+    loadBiomeroConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const handleTabChange = newTabId => {
+    setActiveTab(newTabId);
+  };
+  const handleWorkflowError = () => {
+    setWorkflowError(prev => !prev);
+  };
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("div", {
+      className: "p-4",
+      children: state?.user?.groups && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
+        className: "flex items-center justify-between",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
+          className: "flex items-center",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("span", {
+            className: "text-base mr-4",
+            children: "Select group"
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_shared_components_GroupSelect__WEBPACK_IMPORTED_MODULE_5__["default"], {})]
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_shared_components_SlurmStatusIndicator__WEBPACK_IMPORTED_MODULE_6__["default"], {
+          onTabChange: activeTab,
+          onWorkflowError: workflowError
+        })]
+      })
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("div", {
+      className: "p-4 h-full overflow-hidden",
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__.Tabs, {
+        id: "stardist-tabs",
+        className: "h-full",
+        animate: true,
+        renderActiveTabPanelOnly: false,
+        large: true,
+        selectedTabId: activeTab,
+        onChange: handleTabChange,
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Tab, {
+          id: "preview",
+          title: "Preview",
+          icon: "eye-open",
+          panel: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_components_PreviewTab__WEBPACK_IMPORTED_MODULE_1__["default"], {})
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Tab, {
+          id: "annotation",
+          title: "Annotation",
+          icon: "edit",
+          panel: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_components_AnnotationTab__WEBPACK_IMPORTED_MODULE_2__["default"], {})
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Tab, {
+          id: "training",
+          title: "Training",
+          icon: "learning",
+          panel: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_components_TrainingTab__WEBPACK_IMPORTED_MODULE_3__["default"], {})
+        })]
+      })
+    })]
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (StardistApp);
+
+/***/ }),
+
+/***/ "./src/biomero/stardist/components/AnnotationTab.js":
+/*!**********************************************************!*\
+  !*** ./src/biomero/stardist/components/AnnotationTab.js ***!
+  \**********************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/html/html.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/card/card.js");
+/* harmony import */ var _components_DatasetSelectWithPopover__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../components/DatasetSelectWithPopover */ "./src/biomero/components/DatasetSelectWithPopover.js");
+/* harmony import */ var _ImageSelector__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./ImageSelector */ "./src/biomero/stardist/components/ImageSelector.js");
+/* harmony import */ var _AnnotationViewer__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./AnnotationViewer */ "./src/biomero/stardist/components/AnnotationViewer.js");
+/* harmony import */ var _AppContext__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../../AppContext */ "./src/AppContext.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+
+
+ // Correct context path
+
+const AnnotationTab = () => {
+  const [selectedDatasets, setSelectedDatasets] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
+  const [selectedImage, setSelectedImage] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
+
+  // Need toaster for notifications
+  const {
+    toaster
+  } = (0,_AppContext__WEBPACK_IMPORTED_MODULE_4__.useAppContext)();
+  const getDatasetId = selection => {
+    if (!selection || selection.length === 0) return null;
+    const str = selection[0];
+    if (str.startsWith("dataset-")) {
+      return str.split("-")[1];
+    }
+    return null;
+  };
+  const datasetId = getDatasetId(selectedDatasets);
+  const handleDatasetChange = newSelection => {
+    setSelectedDatasets(newSelection);
+    setSelectedImage(null);
+  };
+  const handleSaveAnnotations = async (imageId, polygons) => {
+    // Mock save for now
+    console.log("Saving annotations for image", imageId, polygons);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    toaster.show({
+      message: `Saved ${polygons.length} annotations!`,
+      intent: "success"
+    });
+  };
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+    className: "p-4 flex flex-col gap-4 h-full overflow-y-auto",
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.H4, {
+      children: "Annotate Training Data"
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+      className: "flex gap-4",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+        className: "w-1/3 flex flex-col gap-4",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_components_DatasetSelectWithPopover__WEBPACK_IMPORTED_MODULE_1__["default"], {
+            label: "Select Dataset",
+            value: selectedDatasets,
+            onChange: handleDatasetChange,
+            multiSelect: false,
+            allowedCategories: ["datasets"],
+            buttonText: selectedDatasets.length ? `${selectedDatasets.length} selected` : "Select Dataset"
+          })
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
+          className: "flex-1 min-h-[200px] flex flex-col",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("h5", {
+            className: "bp5-heading mb-2",
+            children: "Select Image"
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_ImageSelector__WEBPACK_IMPORTED_MODULE_2__["default"], {
+            datasetId: datasetId,
+            selectedImageId: selectedImage?.id,
+            onSelect: setSelectedImage
+          })]
+        })]
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("div", {
+        className: "w-2/3",
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
+          className: "h-full",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("h5", {
+            className: "bp5-heading mb-4",
+            children: "Annotate"
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_AnnotationViewer__WEBPACK_IMPORTED_MODULE_3__["default"], {
+            image: selectedImage,
+            onSaveAnnotations: handleSaveAnnotations
+          })]
+        })
+      })]
+    })]
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (AnnotationTab);
+
+/***/ }),
+
+/***/ "./src/biomero/stardist/components/AnnotationViewer.js":
+/*!*************************************************************!*\
+  !*** ./src/biomero/stardist/components/AnnotationViewer.js ***!
+  \*************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+const AnnotationViewer = _ref => {
+  let {
+    image,
+    onSaveAnnotations
+  } = _ref;
+  const canvasRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
+  const [polygons, setPolygons] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
+  const [currentPolygon, setCurrentPolygon] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
+  const [saving, setSaving] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const Z = 0;
+  const T = 0;
+  const imageUrl = image ? `/webgateway/render_image/${image.id}/${Z}/${T}/` : null;
+  const draw = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw completed polygons
+    ctx.strokeStyle = "#00ff00"; // Green
+    ctx.lineWidth = 2;
+    ctx.fillStyle = "rgba(0, 255, 0, 0.2)";
+    polygons.forEach(poly => {
+      if (poly.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(poly[0][0], poly[0][1]);
+      for (let i = 1; i < poly.length; i++) {
+        ctx.lineTo(poly[i][0], poly[i][1]);
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+    });
+
+    // Draw current polygon
+    if (currentPolygon.length > 0) {
+      ctx.strokeStyle = "#ff0000"; // Red
+      ctx.fillStyle = "rgba(255, 0, 0, 0.2)";
+      ctx.beginPath();
+      ctx.moveTo(currentPolygon[0][0], currentPolygon[0][1]);
+      for (let i = 1; i < currentPolygon.length; i++) {
+        ctx.lineTo(currentPolygon[i][0], currentPolygon[i][1]);
+      }
+      ctx.stroke();
+
+      // Draw points
+      ctx.fillStyle = "red";
+      currentPolygon.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], 3, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+    }
+  };
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    draw();
+  }, [polygons, currentPolygon]);
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    // Reset when image changes
+    setPolygons([]);
+    setCurrentPolygon([]);
+  }, [image]);
+  const handleCanvasClick = e => {
+    if (!image) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Check if clicking near start point to close
+    if (currentPolygon.length > 2) {
+      const start = currentPolygon[0];
+      const dist = Math.sqrt(Math.pow(x - start[0], 2) + Math.pow(y - start[1], 2));
+      if (dist < 10) {
+        // Close polygon
+        setPolygons([...polygons, currentPolygon]);
+        setCurrentPolygon([]);
+        return;
+      }
+    }
+    setCurrentPolygon([...currentPolygon, [x, y]]);
+  };
+  const handleSave = async () => {
+    if (polygons.length === 0) return;
+    setSaving(true);
+    try {
+      await onSaveAnnotations(image.id, polygons);
+      // Clear after save? Or keep them? Keep them for now.
+    } catch (e) {
+      console.error("Failed to save annotations", e);
+    } finally {
+      setSaving(false);
+    }
+  };
+  if (!image) {
+    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("div", {
+      className: "flex items-center justify-center h-64 bg-gray-100 text-gray-400 border rounded",
+      children: "Select an image to annotate"
+    });
+  }
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
+    className: "flex flex-col gap-2",
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
+      className: "relative border inline-block self-start",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("img", {
+        src: imageUrl,
+        alt: "Annotation",
+        className: "max-w-full max-h-[500px] display-block select-none",
+        draggable: false,
+        onLoad: e => {
+          if (canvasRef.current) {
+            canvasRef.current.width = e.target.width;
+            canvasRef.current.height = e.target.height;
+            draw();
+          }
+        }
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("canvas", {
+        ref: canvasRef,
+        className: "absolute top-0 left-0 cursor-crosshair",
+        onClick: handleCanvasClick
+      })]
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
+      className: "flex gap-2",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.Button, {
+        intent: "success",
+        onClick: handleSave,
+        loading: saving,
+        icon: "floppy-disk",
+        disabled: polygons.length === 0,
+        children: "Save Annotations"
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.Button, {
+        intent: "danger",
+        onClick: () => {
+          setPolygons([]);
+          setCurrentPolygon([]);
+        },
+        icon: "trash",
+        children: "Clear All"
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.Button, {
+        intent: "warning",
+        onClick: () => setCurrentPolygon([]),
+        icon: "undo",
+        disabled: currentPolygon.length === 0,
+        children: "Cancel Current Shape"
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("span", {
+        className: "text-gray-500 text-sm flex items-center ml-2",
+        children: "Click points to draw. Click start point (red dot) to close shape."
+      })]
+    })]
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (AnnotationViewer);
+
+/***/ }),
+
+/***/ "./src/biomero/stardist/components/ImageSelector.js":
+/*!**********************************************************!*\
+  !*** ./src/biomero/stardist/components/ImageSelector.js ***!
+  \**********************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _apiService__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../apiService */ "./src/apiService.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/spinner/spinner.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/card/card.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/common/elevation.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+
+const ImageSelector = _ref => {
+  let {
+    datasetId,
+    onSelect,
+    selectedImageId
+  } = _ref;
+  const [images, setImages] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
+  const [loading, setLoading] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const [error, setError] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    if (!datasetId) {
+      setImages([]);
+      return;
+    }
+    const loadImages = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // Fetch images (default page 1, maybe need pagination later)
+        const imgs = await (0,_apiService__WEBPACK_IMPORTED_MODULE_1__.fetchImages)(datasetId);
+        setImages(imgs);
+      } catch (err) {
+        console.error("Error loading images:", err);
+        setError("Failed to load images.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadImages();
+  }, [datasetId]);
+  if (!datasetId) {
+    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+      className: "text-gray-500 italic",
+      children: "Select a dataset to view images."
+    });
+  }
+  if (loading) {
+    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.Spinner, {
+      size: 20
+    });
+  }
+  if (error) {
+    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+      className: "text-red-500",
+      children: error
+    });
+  }
+  if (images.length === 0) {
+    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+      className: "text-gray-500",
+      children: "No images found in this dataset."
+    });
+  }
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+    className: "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[300px] overflow-y-auto p-2 border rounded",
+    children: images.map(img => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Card, {
+      interactive: true,
+      elevation: selectedImageId === img.id ? _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Elevation.TWO : _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Elevation.ZERO,
+      className: `p-2 cursor-pointer ${selectedImageId === img.id ? "bg-blue-100 border-blue-500 border" : ""}`,
+      onClick: () => onSelect(img),
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+        className: "flex flex-col items-center",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+          className: "w-full h-24 bg-gray-200 flex items-center justify-center mb-2 text-xs text-gray-400",
+          children: img.thumb_url ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("img", {
+            src: img.thumb_url,
+            alt: img.name,
+            className: "max-h-full max-w-full"
+          }) : "No Thumb"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+          className: "text-xs truncate w-full text-center",
+          title: img.name,
+          children: img.name
+        })]
+      })
+    }, img.id))
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (ImageSelector);
+
+/***/ }),
+
+/***/ "./src/biomero/stardist/components/ModelSelector.js":
+/*!**********************************************************!*\
+  !*** ./src/biomero/stardist/components/ModelSelector.js ***!
+  \**********************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/formGroup.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/html-select/htmlSelect.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+const MODELS = [{
+  label: "2D_versatile_fluo",
+  value: "2D_versatile_fluo"
+}, {
+  label: "2D_versatile_he",
+  value: "2D_versatile_he"
+}, {
+  label: "2D_demo",
+  value: "2D_demo"
+}];
+const ModelSelector = _ref => {
+  let {
+    selectedModel,
+    onSelect
+  } = _ref;
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.FormGroup, {
+    label: "Select Model",
+    labelFor: "model-select",
+    children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.HTMLSelect, {
+      id: "model-select",
+      options: MODELS,
+      value: selectedModel,
+      onChange: e => onSelect(e.target.value),
+      fill: true
+    })
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (ModelSelector);
+
+/***/ }),
+
+/***/ "./src/biomero/stardist/components/PreviewTab.js":
+/*!*******************************************************!*\
+  !*** ./src/biomero/stardist/components/PreviewTab.js ***!
+  \*******************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/html/html.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/card/card.js");
+/* harmony import */ var _components_DatasetSelectWithPopover__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../components/DatasetSelectWithPopover */ "./src/biomero/components/DatasetSelectWithPopover.js");
+/* harmony import */ var _ImageSelector__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./ImageSelector */ "./src/biomero/stardist/components/ImageSelector.js");
+/* harmony import */ var _ModelSelector__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./ModelSelector */ "./src/biomero/stardist/components/ModelSelector.js");
+/* harmony import */ var _PreviewViewer__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./PreviewViewer */ "./src/biomero/stardist/components/PreviewViewer.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+
+
+
+
+const PreviewTab = () => {
+  const [selectedDatasets, setSelectedDatasets] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
+  const [selectedImage, setSelectedImage] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
+  const [selectedModel, setSelectedModel] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)("2D_versatile_fluo");
+
+  // Helper to extract ID from string like "dataset-123"
+  const getDatasetId = selection => {
+    if (!selection || selection.length === 0) return null;
+    const str = selection[0]; // Assume single selection for now
+    if (str.startsWith("dataset-")) {
+      return str.split("-")[1];
+    }
+    return null;
+  };
+  const datasetId = getDatasetId(selectedDatasets);
+  const handleDatasetChange = newSelection => {
+    setSelectedDatasets(newSelection);
+    setSelectedImage(null); // Reset image when dataset changes
+  };
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+    className: "p-4 flex flex-col gap-4 h-full overflow-y-auto",
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.H4, {
+      children: "Preview Stardist Models"
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+      className: "flex gap-4",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+        className: "w-1/3 flex flex-col gap-4",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_components_DatasetSelectWithPopover__WEBPACK_IMPORTED_MODULE_1__["default"], {
+            label: "Select Dataset",
+            value: selectedDatasets,
+            onChange: handleDatasetChange,
+            multiSelect: false,
+            allowedCategories: ["datasets"],
+            buttonText: selectedDatasets.length ? `${selectedDatasets.length} selected` : "Select Dataset"
+          })
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_ModelSelector__WEBPACK_IMPORTED_MODULE_3__["default"], {
+            selectedModel: selectedModel,
+            onSelect: setSelectedModel
+          })
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
+          className: "flex-1 min-h-[200px] flex flex-col",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("h5", {
+            className: "bp5-heading mb-2",
+            children: "Select Image"
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_ImageSelector__WEBPACK_IMPORTED_MODULE_2__["default"], {
+            datasetId: datasetId,
+            selectedImageId: selectedImage?.id,
+            onSelect: setSelectedImage
+          })]
+        })]
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("div", {
+        className: "w-2/3",
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
+          className: "h-full",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("h5", {
+            className: "bp5-heading mb-4",
+            children: "Preview"
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_PreviewViewer__WEBPACK_IMPORTED_MODULE_4__["default"], {
+            image: selectedImage,
+            model: selectedModel
+          })]
+        })
+      })]
+    })]
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (PreviewTab);
+
+/***/ }),
+
+/***/ "./src/biomero/stardist/components/PreviewViewer.js":
+/*!**********************************************************!*\
+  !*** ./src/biomero/stardist/components/PreviewViewer.js ***!
+  \**********************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+const PreviewViewer = _ref => {
+  let {
+    image,
+    model,
+    onRunPreview
+  } = _ref;
+  const canvasRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
+  const [loading, setLoading] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const [overlays, setOverlays] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
+
+  // Constants (could be passed as props or fetched)
+  const Z = 0;
+  const T = 0;
+  const imageUrl = image ? `/webgateway/render_image/${image.id}/${Z}/${T}/` : null;
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    // Clear overlays when image changes
+    setOverlays(null);
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d");
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+  }, [image]);
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    if (overlays && canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d");
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
+      // Draw overlays (simple polygons)
+      ctx.strokeStyle = "yellow";
+      ctx.lineWidth = 2;
+      overlays.forEach(polygon => {
+        ctx.beginPath();
+        if (polygon.length > 0) {
+          ctx.moveTo(polygon[0][1], polygon[0][0]); // y, x -> x, y ? Check stardist output format
+          for (let i = 1; i < polygon.length; i++) {
+            ctx.lineTo(polygon[i][1], polygon[i][0]);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
+      });
+    }
+  }, [overlays]);
+  const handleRun = async () => {
+    if (!image || !model) return;
+    setLoading(true);
+    try {
+      // Mock result for now, or call onRunPreview if it handles the API call
+      // const result = await onRunPreview(image.id, model);
+
+      // Simulating API delay and result
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Mock Stardist-like output (list of polygons in [y, x] format)
+      // Just a simple square in the middle
+      const mockResult = [[[50, 50], [50, 150], [150, 150], [150, 50]]];
+      setOverlays(mockResult);
+    } catch (e) {
+      console.error("Preview failed", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+  if (!image) {
+    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("div", {
+      className: "flex items-center justify-center h-64 bg-gray-100 text-gray-400 border rounded",
+      children: "Select an image to view"
+    });
+  }
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
+    className: "flex flex-col gap-2",
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
+      className: "relative border inline-block self-start",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("img", {
+        src: imageUrl,
+        alt: "Preview",
+        className: "max-w-full max-h-[500px] display-block"
+        // Ensure canvas matches image size. 
+        // Real implementation needs to handle loading state to get natural dimensions
+        ,
+        onLoad: e => {
+          if (canvasRef.current) {
+            canvasRef.current.width = e.target.width;
+            canvasRef.current.height = e.target.height;
+          }
+        }
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("canvas", {
+        ref: canvasRef,
+        className: "absolute top-0 left-0 pointer-events-none"
+      })]
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("div", {
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.Button, {
+        intent: "primary",
+        onClick: handleRun,
+        loading: loading,
+        icon: "play",
+        children: "Run Preview"
+      })
+    })]
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (PreviewViewer);
+
+/***/ }),
+
+/***/ "./src/biomero/stardist/components/TrainingForm.js":
+/*!*********************************************************!*\
+  !*** ./src/biomero/stardist/components/TrainingForm.js ***!
+  \*********************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/formGroup.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/inputGroup.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/numericInput.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+const TrainingForm = _ref => {
+  let {
+    onTrain,
+    loading
+  } = _ref;
+  const [config, setConfig] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
+    epochs: 100,
+    batchSize: 4,
+    valSplit: 0.15,
+    patchSize: 256,
+    name: "my_stardist_model"
+  });
+  const handleChange = (key, value) => {
+    setConfig({
+      ...config,
+      [key]: value
+    });
+  };
+  const handleSubmit = () => {
+    onTrain(config);
+  };
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
+    className: "flex flex-col gap-4 max-w-md",
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.FormGroup, {
+      label: "Model Name",
+      labelFor: "model-name",
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.InputGroup, {
+        id: "model-name",
+        value: config.name,
+        onChange: e => handleChange("name", e.target.value)
+      })
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.FormGroup, {
+      label: "Epochs",
+      labelFor: "epochs",
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.NumericInput, {
+        id: "epochs",
+        value: config.epochs,
+        onValueChange: v => handleChange("epochs", v),
+        min: 1,
+        max: 1000
+      })
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.FormGroup, {
+      label: "Batch Size",
+      labelFor: "batch-size",
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.NumericInput, {
+        id: "batch-size",
+        value: config.batchSize,
+        onValueChange: v => handleChange("batchSize", v),
+        min: 1,
+        max: 32
+      })
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.FormGroup, {
+      label: "Validation Split (0.0 - 1.0)",
+      labelFor: "val-split",
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.NumericInput, {
+        id: "val-split",
+        value: config.valSplit,
+        onValueChange: v => handleChange("valSplit", v),
+        min: 0.05,
+        max: 0.5,
+        stepSize: 0.05
+      })
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.FormGroup, {
+      label: "Patch Size (px)",
+      labelFor: "patch-size",
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.NumericInput, {
+        id: "patch-size",
+        value: config.patchSize,
+        onValueChange: v => handleChange("patchSize", v),
+        min: 64,
+        max: 1024,
+        stepSize: 32
+      })
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
+      intent: "primary",
+      onClick: handleSubmit,
+      loading: loading,
+      icon: "learning",
+      large: true,
+      children: "Start Training"
+    })]
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (TrainingForm);
+
+/***/ }),
+
+/***/ "./src/biomero/stardist/components/TrainingTab.js":
+/*!********************************************************!*\
+  !*** ./src/biomero/stardist/components/TrainingTab.js ***!
+  \********************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/html/html.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/card/card.js");
+/* harmony import */ var _components_DatasetSelectWithPopover__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../components/DatasetSelectWithPopover */ "./src/biomero/components/DatasetSelectWithPopover.js");
+/* harmony import */ var _TrainingForm__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./TrainingForm */ "./src/biomero/stardist/components/TrainingForm.js");
+/* harmony import */ var _AppContext__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../../AppContext */ "./src/AppContext.js");
+/* harmony import */ var _apiService__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../../apiService */ "./src/apiService.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+
+
+
+
+const TrainingTab = () => {
+  const [selectedDatasets, setSelectedDatasets] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
+  const [loading, setLoading] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const {
+    toaster
+  } = (0,_AppContext__WEBPACK_IMPORTED_MODULE_3__.useAppContext)();
+  const getDatasetId = selection => {
+    if (!selection || selection.length === 0) return null;
+    const str = selection[0];
+    if (str.startsWith("dataset-")) {
+      return str.split("-")[1];
+    }
+    return null;
+  };
+  const handleTrain = async config => {
+    const datasetId = getDatasetId(selectedDatasets);
+    if (!datasetId) {
+      toaster.show({
+        message: "Please select a training dataset.",
+        intent: "danger"
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      // Prepare parameters for Slurm script
+      const params = {
+        dataset_id: datasetId,
+        epochs: config.epochs,
+        batch_size: config.batchSize,
+        val_split: config.valSplit,
+        patch_size: config.patchSize,
+        model_name: config.name
+      };
+
+      // Call backend to start workflow
+      // Workflow name 'stardist_train' must exist in backend/Slurm
+      await (0,_apiService__WEBPACK_IMPORTED_MODULE_4__.runStardistTraining)(params);
+      toaster.show({
+        message: "Training job submitted successfully! Check Status tab.",
+        intent: "success"
+      });
+    } catch (error) {
+      console.error("Training failed", error);
+      toaster.show({
+        message: "Failed to submit training job.",
+        intent: "danger"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+    className: "p-4 flex flex-col gap-4 h-full overflow-y-auto",
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.H4, {
+      children: "Train New Model"
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+      className: "flex gap-4",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("div", {
+        className: "w-1/3",
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_components_DatasetSelectWithPopover__WEBPACK_IMPORTED_MODULE_1__["default"], {
+            label: "Select Training Dataset",
+            value: selectedDatasets,
+            onChange: setSelectedDatasets,
+            multiSelect: false,
+            allowedCategories: ["datasets"],
+            buttonText: selectedDatasets.length ? `${selectedDatasets.length} selected` : "Select Dataset"
+          })
+        })
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("div", {
+        className: "w-2/3",
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_TrainingForm__WEBPACK_IMPORTED_MODULE_2__["default"], {
+            onTrain: handleTrain,
+            loading: loading
+          })
+        })
+      })]
+    })]
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (TrainingTab);
 
 /***/ }),
 
@@ -47203,6 +48212,9 @@ video {
 .ml-12 {
   margin-left: 3rem !important;
 }
+.ml-2 {
+  margin-left: 0.5rem !important;
+}
 .ml-3 {
   margin-left: 0.75rem !important;
 }
@@ -47257,8 +48269,14 @@ video {
 .contents {
   display: contents !important;
 }
+.h-24 {
+  height: 6rem !important;
+}
 .h-6 {
   height: 1.5rem !important;
+}
+.h-64 {
+  height: 16rem !important;
 }
 .h-\\[100px\\] {
   height: 100px !important;
@@ -47275,8 +48293,14 @@ video {
 .h-full {
   height: 100% !important;
 }
+.max-h-\\[300px\\] {
+  max-height: 300px !important;
+}
 .max-h-\\[45vh\\] {
   max-height: 45vh !important;
+}
+.max-h-\\[500px\\] {
+  max-height: 500px !important;
 }
 .max-h-\\[calc\\(100vh-225px\\)\\] {
   max-height: calc(100vh - 225px) !important;
@@ -47287,6 +48311,12 @@ video {
 .max-h-\\[calc\\(100vh-450px\\)\\] {
   max-height: calc(100vh - 450px) !important;
 }
+.max-h-full {
+  max-height: 100% !important;
+}
+.min-h-\\[200px\\] {
+  min-height: 200px !important;
+}
 .min-h-\\[75vh\\] {
   min-height: 75vh !important;
 }
@@ -47296,11 +48326,17 @@ video {
 .w-1\\/2 {
   width: 50% !important;
 }
+.w-1\\/3 {
+  width: 33.333333% !important;
+}
 .w-1\\/4 {
   width: 25% !important;
 }
 .w-16 {
   width: 4rem !important;
+}
+.w-2\\/3 {
+  width: 66.666667% !important;
 }
 .w-6 {
   width: 1.5rem !important;
@@ -47323,6 +48359,12 @@ video {
 .max-w-\\[800px\\] {
   max-width: 800px !important;
 }
+.max-w-full {
+  max-width: 100% !important;
+}
+.max-w-md {
+  max-width: 28rem !important;
+}
 .flex-1 {
   flex: 1 1 0% !important;
 }
@@ -47334,6 +48376,9 @@ video {
 }
 .transform {
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y)) !important;
+}
+.cursor-crosshair {
+  cursor: crosshair !important;
 }
 .cursor-not-allowed {
   cursor: not-allowed !important;
@@ -47431,6 +48476,9 @@ video {
   margin-top: calc(1rem * calc(1 - var(--tw-space-y-reverse))) !important;
   margin-bottom: calc(1rem * var(--tw-space-y-reverse)) !important;
 }
+.self-start {
+  align-self: flex-start !important;
+}
 .overflow-auto {
   overflow: auto !important;
 }
@@ -47439,6 +48487,11 @@ video {
 }
 .overflow-y-auto {
   overflow-y: auto !important;
+}
+.truncate {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 .rounded {
   border-radius: 0.25rem !important;
@@ -47459,6 +48512,10 @@ video {
   --tw-border-opacity: 1 !important;
   border-color: rgb(191 219 254 / var(--tw-border-opacity, 1)) !important;
 }
+.border-blue-500 {
+  --tw-border-opacity: 1 !important;
+  border-color: rgb(59 130 246 / var(--tw-border-opacity, 1)) !important;
+}
 .border-orange-200 {
   --tw-border-opacity: 1 !important;
   border-color: rgb(254 215 170 / var(--tw-border-opacity, 1)) !important;
@@ -47475,6 +48532,10 @@ video {
   --tw-bg-opacity: 1 !important;
   background-color: rgb(240 241 245 / var(--tw-bg-opacity, 1)) !important;
 }
+.bg-blue-100 {
+  --tw-bg-opacity: 1 !important;
+  background-color: rgb(219 234 254 / var(--tw-bg-opacity, 1)) !important;
+}
 .bg-blue-50 {
   --tw-bg-opacity: 1 !important;
   background-color: rgb(239 246 255 / var(--tw-bg-opacity, 1)) !important;
@@ -47482,6 +48543,10 @@ video {
 .bg-blue-500 {
   --tw-bg-opacity: 1 !important;
   background-color: rgb(59 130 246 / var(--tw-bg-opacity, 1)) !important;
+}
+.bg-gray-100 {
+  --tw-bg-opacity: 1 !important;
+  background-color: rgb(243 244 246 / var(--tw-bg-opacity, 1)) !important;
 }
 .bg-gray-200 {
   --tw-bg-opacity: 1 !important;
@@ -47614,9 +48679,16 @@ video {
 .capitalize {
   text-transform: capitalize !important;
 }
+.italic {
+  font-style: italic !important;
+}
 .text-blue-600 {
   --tw-text-opacity: 1 !important;
   color: rgb(37 99 235 / var(--tw-text-opacity, 1)) !important;
+}
+.text-gray-400 {
+  --tw-text-opacity: 1 !important;
+  color: rgb(156 163 175 / var(--tw-text-opacity, 1)) !important;
 }
 .text-gray-500 {
   --tw-text-opacity: 1 !important;
@@ -47723,6 +48795,10 @@ video {
   .md\\:grid-cols-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
+
+  .md\\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -47730,8 +48806,12 @@ video {
   .lg\\:grid-cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
+
+  .lg\\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
 }
-`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"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AA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA,oCAAmB;UAAnB;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB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","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n"],"sourceRoot":""}]);
+`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"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AA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA,oCAAmB;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","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
@@ -119737,18 +120817,19 @@ var __webpack_exports__ = {};
   \**********************/
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var react_dom_client__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react-dom/client */ "./node_modules/react-dom/client.js");
-/* harmony import */ var react_router_dom__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! react-router-dom */ "./node_modules/react-router/dist/development/chunk-IR6S3I6Y.mjs");
+/* harmony import */ var react_router_dom__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! react-router-dom */ "./node_modules/react-router/dist/development/chunk-IR6S3I6Y.mjs");
 /* harmony import */ var _index_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./index.css */ "./src/index.css");
 /* harmony import */ var _tailwind_css__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./tailwind.css */ "./src/tailwind.css");
 /* harmony import */ var _AppContext__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./AppContext */ "./src/AppContext.js");
 /* harmony import */ var _biomero_BiomeroApp__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./biomero/BiomeroApp */ "./src/biomero/BiomeroApp.js");
 /* harmony import */ var _importer_ImporterApp__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./importer/ImporterApp */ "./src/importer/ImporterApp.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/navbar/navbar.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/navbar/navbarGroup.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/navbar/navbarHeading.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/navbar/navbarDivider.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var _biomero_stardist_StardistApp__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./biomero/stardist/StardistApp */ "./src/biomero/stardist/StardistApp.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/navbar/navbar.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/navbar/navbarGroup.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/navbar/navbarHeading.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/navbar/navbarDivider.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
 
 
 
@@ -119758,57 +120839,66 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-const BiomeroIcon = () => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)("div", {
+
+const BiomeroIcon = () => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("div", {
   className: "mr-2 w-[20px]",
-  children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)("svg", {
+  children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("svg", {
     viewBox: "0 0 300 388",
     xmlns: "http://www.w3.org/2000/svg",
     role: "img",
     "aria-label": "OMERO.biomero leaf\u2013circuit icon",
-    children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)("g", {
+    children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("g", {
       transform: "translate(0 388) scale(0.1 -0.1)",
       fill: "currentColor",
-      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)("path", {
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("path", {
         d: "M1399 3578 c-155 -144 -445 -451 -555 -589 -248 -310 -407 -620 -458\n-887 -49 -258 -16 -555 84 -769 107 -228 274 -394 578 -574 176 -104 249 -156\n305 -219 53 -58 74 -114 83 -219 5 -52 13 -80 26 -93 41 -41 108 -7 108 55 0\n29 37 69 427 454 291 287 433 420 443 416 73 -27 158 -2 202 59 33 47 33 159\n0 206 -45 63 -134 88 -205 58 -71 -29 -123 -129 -102 -196 6 -20 -25 -55 -231\n-261 -132 -132 -242 -239 -246 -239 -5 0 -8 109 -8 242 l0 242 277 278 278\n278 46 0 c33 0 51 -6 64 -20 30 -33 98 -53 152 -45 86 13 155 112 139 198 -8\n41 -41 93 -77 120 -34 24 -106 33 -152 18 -43 -15 -96 -71 -104 -112 -5 -28\n-8 -29 -57 -29 l-51 0 -307 -307 c-168 -170 -312 -319 -319 -333 -11 -19 -15\n-99 -17 -340 l-4 -315 -66 -70 c-37 -38 -70 -71 -74 -73 -5 -2 -8 227 -8 510\nl0 513 424 424 c415 415 425 424 451 413 62 -28 154 0 199 61 32 43 30 159 -3\n206 -27 37 -90 70 -135 71 -46 0 -115 -38 -142 -80 -20 -30 -25 -51 -25 -97\nl0 -58 -377 -377 c-207 -208 -380 -378 -384 -378 -5 0 -8 99 -8 221 0 189 3\n226 17 257 10 21 119 140 243 267 231 235 257 269 280 367 25 109 -2 228 -74\n326 -44 59 -475 495 -508 513 -14 8 -39 -10 -129 -93z m358 -321 c204 -208\n228 -244 228 -342 0 -49 -6 -82 -20 -110 -11 -22 -102 -124 -207 -230 l-187\n-190 -1 523 c0 287 4 522 9 522 4 0 85 -78 178 -173z m-317 -315 c0 -258 -3\n-523 -6 -589 l-7 -121 -59 64 c-73 78 -215 187 -323 249 -79 45 -105 54 -105\n36 0 -6 97 -111 215 -235 139 -146 224 -244 242 -278 28 -52 28 -56 31 -262\nl3 -210 -39 50 c-89 111 -257 257 -424 367 -138 91 -192 110 -156 55 9 -13\n114 -124 233 -248 259 -268 316 -334 358 -420 l32 -65 3 -345 3 -345 -38 36\nc-64 60 -112 93 -271 188 -375 222 -525 400 -604 719 -18 72 -22 117 -22 257\n-1 182 5 225 56 385 74 235 206 461 421 720 76 91 436 460 449 460 4 0 8 -211\n8 -468z m1104 -371 c26 -29 17 -73 -16 -85 -41 -15 -78 6 -78 43 0 56 58 82\n94 42z m126 -599 c25 -20 30 -63 10 -87 -15 -18 -71 -20 -88 -3 -21 21 -15 75\n10 92 29 20 41 20 68 -2z m-128 -619 c35 -32 10 -93 -39 -93 -25 0 -63 32 -63\n53 0 48 65 74 102 40z"
       })
     })
   })
 });
 const AppRouter = () => {
-  const [searchParams] = (0,react_router_dom__WEBPACK_IMPORTED_MODULE_7__.useSearchParams)();
+  const [searchParams] = (0,react_router_dom__WEBPACK_IMPORTED_MODULE_8__.useSearchParams)();
   const WEBCLIENT = window.WEBCLIENT;
   const {
     IMPORTER_ENABLED,
     ANALYZER_ENABLED
   } = WEBCLIENT.UI;
-  const navigate = (0,react_router_dom__WEBPACK_IMPORTED_MODULE_7__.useNavigate)();
+  const navigate = (0,react_router_dom__WEBPACK_IMPORTED_MODULE_8__.useNavigate)();
   const appName = searchParams.get("tab") || (IMPORTER_ENABLED ? "import" : "biomero");
-  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_AppContext__WEBPACK_IMPORTED_MODULE_3__.AppProvider, {
-    children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsxs)("div", {
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_AppContext__WEBPACK_IMPORTED_MODULE_3__.AppProvider, {
+    children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
       className: "bg-[#f0f1f5] w-full h-full relative top-0",
-      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__.Navbar, {
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Navbar, {
         className: "z-[1] top-[35px]",
         fixedToTop: true,
-        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.NavbarGroup, {
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(BiomeroIcon, {}), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__.NavbarHeading, {
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__.NavbarGroup, {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(BiomeroIcon, {}), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_11__.NavbarHeading, {
             children: "BIOMERO"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_11__.NavbarDivider, {}), IMPORTER_ENABLED && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_12__.Button, {
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_12__.NavbarDivider, {}), IMPORTER_ENABLED && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_13__.Button, {
             className: `bp5-minimal focus:ring-0 focus:ring-offset-0 ${appName === "import" ? "bp5-intent-primary font-bold shadow-md" : ""}`,
             icon: "cloud-upload",
             text: "Import",
             onClick: () => navigate("?tab=import"),
             outlined: appName === "import"
-          }), ANALYZER_ENABLED && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_12__.Button, {
-            className: `bp5-minimal focus:ring-0 focus:ring-offset-0 ${appName === "biomero" ? "bp5-intent-primary font-bold shadow-md" : ""}`,
-            icon: "data-sync",
-            text: "Analyze",
-            onClick: () => navigate("?tab=biomero"),
-            outlined: appName === "biomero"
+          }), ANALYZER_ENABLED && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.Fragment, {
+            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_13__.Button, {
+              className: `bp5-minimal focus:ring-0 focus:ring-offset-0 ${appName === "biomero" ? "bp5-intent-primary font-bold shadow-md" : ""}`,
+              icon: "data-sync",
+              text: "Analyze",
+              onClick: () => navigate("?tab=biomero"),
+              outlined: appName === "biomero"
+            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_13__.Button, {
+              className: `bp5-minimal focus:ring-0 focus:ring-offset-0 ${appName === "stardist" ? "bp5-intent-primary font-bold shadow-md" : ""}`,
+              icon: "learning",
+              text: "Train",
+              onClick: () => navigate("?tab=stardist"),
+              outlined: appName === "stardist"
+            })]
           })]
         })
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)("div", {
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("div", {
         className: "pt-[50px]",
-        children: appName === "biomero" ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_biomero_BiomeroApp__WEBPACK_IMPORTED_MODULE_4__["default"], {}) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_importer_ImporterApp__WEBPACK_IMPORTED_MODULE_5__["default"], {})
+        children: appName === "biomero" ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_biomero_BiomeroApp__WEBPACK_IMPORTED_MODULE_4__["default"], {}) : appName === "stardist" ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_biomero_stardist_StardistApp__WEBPACK_IMPORTED_MODULE_6__["default"], {}) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_importer_ImporterApp__WEBPACK_IMPORTED_MODULE_5__["default"], {})
       })]
     })
   });
@@ -119816,11 +120906,11 @@ const AppRouter = () => {
 window.onload = function () {
   const rootElement = document.getElementById("root");
   const root = react_dom_client__WEBPACK_IMPORTED_MODULE_0__.createRoot(rootElement);
-  root.render(/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(react_router_dom__WEBPACK_IMPORTED_MODULE_7__.BrowserRouter, {
-    children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(react_router_dom__WEBPACK_IMPORTED_MODULE_7__.Routes, {
-      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(react_router_dom__WEBPACK_IMPORTED_MODULE_7__.Route, {
+  root.render(/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(react_router_dom__WEBPACK_IMPORTED_MODULE_8__.BrowserRouter, {
+    children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(react_router_dom__WEBPACK_IMPORTED_MODULE_8__.Routes, {
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(react_router_dom__WEBPACK_IMPORTED_MODULE_8__.Route, {
         path: "*",
-        element: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(AppRouter, {})
+        element: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(AppRouter, {})
       })
     })
   }));
@@ -119829,4 +120919,4 @@ window.onload = function () {
 
 /******/ })()
 ;
-//# sourceMappingURL=main.dca9c0c8de123159929e.js.map
+//# sourceMappingURL=main.0f834c84818b371ef52a.js.map
