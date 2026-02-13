@@ -257,6 +257,30 @@ export const postUpload = async (upload) => {
   }
 };
 
+export const runStardistTraining = async (params) => {
+  const { urls } = getDjangoConstants();
+  try {
+    const csrfToken = window.csrftoken;
+    // We assume urls.stardist_train is defined or we hardcode path for now
+    const endpoint = "/omero_biomero/api/stardist/train/"; 
+    
+    const response = await apiRequest(
+      endpoint,
+      "POST",
+      params,
+      {
+        headers: {
+          "X-CSRFToken": csrfToken,
+        },
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error running stardist training:", error);
+    throw error;
+  }
+};
+
 export const createContainer = async (
   type,
   name,

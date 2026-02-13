@@ -12,6 +12,7 @@ import "./tailwind.css";
 import { AppProvider } from "./AppContext";
 import BiomeroApp from "./biomero/BiomeroApp";
 import ImporterApp from "./importer/ImporterApp";
+import StardistApp from "./biomero/stardist/StardistApp";
 import {
   Navbar,
   NavbarGroup,
@@ -94,22 +95,41 @@ const AppRouter = () => {
               />
             )}
             {ANALYZER_ENABLED && (
-              <Button
-                className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
-                  appName === "biomero"
-                    ? "bp5-intent-primary font-bold shadow-md"
-                    : ""
-                }`}
-                icon="data-sync"
-                text="Analyze"
-                onClick={() => navigate("?tab=biomero")}
-                outlined={appName === "biomero"}
-              />
+              <>
+                <Button
+                  className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
+                    appName === "biomero"
+                      ? "bp5-intent-primary font-bold shadow-md"
+                      : ""
+                  }`}
+                  icon="data-sync"
+                  text="Analyze"
+                  onClick={() => navigate("?tab=biomero")}
+                  outlined={appName === "biomero"}
+                />
+                <Button
+                  className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
+                    appName === "stardist"
+                      ? "bp5-intent-primary font-bold shadow-md"
+                      : ""
+                  }`}
+                  icon="learning"
+                  text="Train"
+                  onClick={() => navigate("?tab=stardist")}
+                  outlined={appName === "stardist"}
+                />
+              </>
             )}
           </NavbarGroup>
         </Navbar>
         <div className="pt-[50px]">
-          {appName === "biomero" ? <BiomeroApp /> : <ImporterApp />}
+          {appName === "biomero" ? (
+            <BiomeroApp />
+          ) : appName === "stardist" ? (
+            <StardistApp />
+          ) : (
+            <ImporterApp />
+          )}
         </div>
       </div>
     </AppProvider>
