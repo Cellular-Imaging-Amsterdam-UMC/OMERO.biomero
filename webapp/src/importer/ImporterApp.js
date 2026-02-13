@@ -117,6 +117,7 @@ const ImporterApp = () => {
     uploadSelectedData,
     createNewContainer,
     toaster,
+    apiLoading,
   } = useAppContext();
 
   const [activeTab, setActiveTab] = useState("ImportImages");
@@ -148,6 +149,12 @@ const ImporterApp = () => {
     setLastSelectedLocalFileTreeNodeMeta,
   ] = useState(null);
   const [lastSelectedIndex, setLastSelectedIndex] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRefresh = async () => {
+    await loadOmeroTreeData();
+    setRefreshKey((prev) => prev + 1);
+  };
 
   const openCreateContainerOverlay = (isOpen, type) => {
     setIsNewContainerOverlayOpen(isOpen);
@@ -599,10 +606,26 @@ const ImporterApp = () => {
                   size={20}
                 />
               </Tooltip>
+              <Tooltip
+                content="Refresh file tree"
+                placement="bottom"
+                usePortal={false}
+                className="text-md"
+              >
+                <Icon
+                  icon="refresh"
+                  onClick={handleRefresh}
+                  disabled={apiLoading}
+                  color="#5c7080"
+                  className={`cursor-pointer ml-3 ${apiLoading ? "opacity-50" : ""}`}
+                  size={20}
+                />
+              </Tooltip>
             </div>
             {state.omeroFileTreeData && (
               <div className="mt-4 max-h-[calc(100vh-450px)] overflow-auto">
                 <OmeroDataBrowser
+                  key={refreshKey}
                   onSelectCallback={(nodeData, coords, e, deselect = false) =>
                     handleFileTreeSelection(
                       nodeData,

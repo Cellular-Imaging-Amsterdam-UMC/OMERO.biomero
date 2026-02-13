@@ -22,7 +22,7 @@ const DatasetSelectWithPopover = ({
   intent = "",
   allowedCategories = ["datasets", "plates", "screens"], // default: allow most except projects
 }) => {
-  const { state, updateState, toaster } = useAppContext();
+  const { state, updateState, toaster, loadOmeroTreeData, apiLoading } = useAppContext();
   const [isPopoverOpen, setPopoverOpen] = useState(false);
   const [values, setValues] = useState([]);
   const getCategoryFromId = (id) => {
@@ -142,6 +142,13 @@ const DatasetSelectWithPopover = ({
     (id) => !isDisallowed(id, state.omeroFileTreeData?.[id])
   );
 
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRefresh = async () => {
+    await loadOmeroTreeData();
+    setRefreshKey((prev) => prev + 1);
+  };
+
   return (
     <FormGroup
       label={label}
@@ -165,11 +172,19 @@ const DatasetSelectWithPopover = ({
               <div className="flex flex-col h-[60vh]">
                 <div className="flex-1 overflow-y-auto p-4">
                   <OmeroDataBrowser
+                    key={refreshKey}
                     onSelectCallback={(folder) => handleInputChange(folder)}
                   />
                 </div>
                 <div className="p-4 border-t bg-white">
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    <Tooltip content="Refresh file tree">
+                      <Button
+                        icon="refresh"
+                        onClick={handleRefresh}
+                        loading={apiLoading}
+                      />
+                    </Tooltip>
                     <Tooltip
                       content={
                         !hasValidItems
