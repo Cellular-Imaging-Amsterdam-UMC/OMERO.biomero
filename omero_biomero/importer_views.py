@@ -21,7 +21,9 @@ from .settings import (
     FOLDER_EXTENSIONS_NON_BROWSABLE,
     BASE_DIR,
     PREPROCESSING_CONFIG,
+    PREPROCESSING_CONFIG,
     CONFIG_FILE_PATH,
+    GROUP_MAPPINGS_FILE_PATH,
     TUS_DESTINATION_DIR,
 )
 from .utils import build_extra_params
@@ -325,18 +327,17 @@ def group_mappings(request, conn=None, **kwargs):
     try:
         if request.method == "GET":
             mappings = {}
-            if os.path.exists(CONFIG_FILE_PATH):
+            if os.path.exists(GROUP_MAPPINGS_FILE_PATH):
                 try:
-                    with open(CONFIG_FILE_PATH, "r") as f:
+                    with open(GROUP_MAPPINGS_FILE_PATH, "r") as f:
                         data = json.load(f) or {}
                     if isinstance(data, dict):
-                        gm = data.get("group_mappings")
-                        if isinstance(gm, dict):
-                            mappings = gm
+                        # With the new file, the data IS the mappings
+                        mappings = data
                 except Exception:
                     logger.warning(
                         "Failed reading group mappings from %s",
-                        CONFIG_FILE_PATH,
+                        GROUP_MAPPINGS_FILE_PATH,
                         exc_info=True,
                     )
             return JsonResponse({"mappings": mappings})
@@ -361,19 +362,21 @@ def group_mappings(request, conn=None, **kwargs):
             return JsonResponse({"error": "'mappings' must be an object"}, status=400)
 
         existing = {}
-        if os.path.exists(CONFIG_FILE_PATH):
+        if os.path.exists(GROUP_MAPPINGS_FILE_PATH):
             try:
-                with open(CONFIG_FILE_PATH, "r") as f:
+                with open(GROUP_MAPPINGS_FILE_PATH, "r") as f:
                     existing = json.load(f) or {}
                 if not isinstance(existing, dict):
                     existing = {}
             except Exception:
                 existing = {}
 
-        existing["group_mappings"] = mappings
+        # The whole file is just mappings now
+        existing = mappings
+        
         # Ensure parent directory exists (handle cases where path includes
         # ~ which we expanded earlier).
-        config_dir = os.path.dirname(CONFIG_FILE_PATH)
+        config_dir = os.path.dirname(GROUP_MAPPINGS_FILE_PATH)
         if config_dir and not os.path.exists(config_dir):
             try:
                 os.makedirs(config_dir, exist_ok=True)
@@ -388,7 +391,7 @@ def group_mappings(request, conn=None, **kwargs):
                     status=500,
                 )
         try:
-            with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+            with open(GROUP_MAPPINGS_FILE_PATH, "w", encoding="utf-8") as f:
                 json.dump(existing, f, indent=2)
         except Exception as e:
             logger.error("Failed writing group mappings: %s", e)
