@@ -25085,6 +25085,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   fetchGroupMappings: () => (/* binding */ fetchGroupMappings),
 /* harmony export */   fetchGroups: () => (/* binding */ fetchGroups),
 /* harmony export */   fetchImages: () => (/* binding */ fetchImages),
+/* harmony export */   fetchMapAnnotations: () => (/* binding */ fetchMapAnnotations),
 /* harmony export */   fetchPlateImages: () => (/* binding */ fetchPlateImages),
 /* harmony export */   fetchPlatesData: () => (/* binding */ fetchPlatesData),
 /* harmony export */   fetchProjectData: () => (/* binding */ fetchProjectData),
@@ -25099,7 +25100,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   postGroupMappings: () => (/* binding */ postGroupMappings),
 /* harmony export */   postUpload: () => (/* binding */ postUpload),
 /* harmony export */   runStardistTraining: () => (/* binding */ runStardistTraining),
-/* harmony export */   runWorkflow: () => (/* binding */ runWorkflow)
+/* harmony export */   runWorkflow: () => (/* binding */ runWorkflow),
+/* harmony export */   saveMapAnnotation: () => (/* binding */ saveMapAnnotation)
 /* harmony export */ });
 /* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! axios */ "./node_modules/axios/lib/axios.js");
 /* harmony import */ var _constants__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./constants */ "./src/constants.js");
@@ -25391,6 +25393,47 @@ const runStardistTraining = async params => {
     return response;
   } catch (error) {
     console.error("Error running stardist training:", error);
+    throw error;
+  }
+};
+const fetchMapAnnotations = async imageId => {
+  if (!imageId) return [];
+  // Use our custom endpoint that reads FileAnnotation
+  try {
+    const endpoint = `/omero_biomero/api/stardist/fetch_annotations/?image=${imageId}`;
+    const response = await apiRequest(endpoint, "GET");
+
+    // Response is just the data object { annotations: [], featureTypes: [] }
+    // We wrap it in a structure compatible with existing "fetch" return if needed?
+    // But let's just return the raw data and update AnnotationTab to handle it.
+    return response;
+  } catch (error) {
+    console.error("Error fetching annotations:", error);
+    return {
+      annotations: [],
+      featureTypes: []
+    };
+  }
+};
+const saveMapAnnotation = async function (imageId, annotationData) {
+  let annotationId = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
+  // New Implementation: Save as FileAnnotation via custom view
+  const endpoint = "/omero_biomero/api/stardist/save_annotations/";
+  const csrfToken = window.csrftoken;
+  try {
+    const payload = {
+      imageId: imageId,
+      data: annotationData
+    };
+    const response = await apiRequest(endpoint, "POST", payload, {
+      headers: {
+        "X-CSRFToken": csrfToken,
+        "Content-Type": "application/json"
+      }
+    });
+    return response;
+  } catch (error) {
+    console.error("Error saving annotations:", error);
     throw error;
   }
 };
@@ -25759,7 +25802,7 @@ const BiomeroApp = () => {
         })]
       })
     }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("div", {
-      className: "p-4 h-full overflow-hidden",
+      className: "px-4 pb-4 h-full overflow-hidden",
       children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__.Tabs, {
         id: "app-tabs",
         className: "h-full",
@@ -29581,23 +29624,39 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/html/html.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/card/card.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/html/html.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/card/card.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/spinner/spinner.js");
 /* harmony import */ var _components_DatasetSelectWithPopover__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../components/DatasetSelectWithPopover */ "./src/biomero/components/DatasetSelectWithPopover.js");
 /* harmony import */ var _ImageSelector__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./ImageSelector */ "./src/biomero/stardist/components/ImageSelector.js");
 /* harmony import */ var _AnnotationViewer__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./AnnotationViewer */ "./src/biomero/stardist/components/AnnotationViewer.js");
 /* harmony import */ var _AppContext__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../../AppContext */ "./src/AppContext.js");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var _apiService__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../../apiService */ "./src/apiService.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
 
 
 
 
 
- // Correct context path
+
+
 
 const AnnotationTab = () => {
   const [selectedDatasets, setSelectedDatasets] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
   const [selectedImage, setSelectedImage] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
+  const [annotations, setAnnotations] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
+  const [featureTypes, setFeatureTypes] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([{
+    id: "1",
+    name: "Cell",
+    color: "#00ff00"
+  }, {
+    id: "2",
+    name: "Nucleus",
+    color: "#0000ff"
+  }]);
+  const [loadingAnns, setLoadingAnns] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const [saving, setSaving] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
 
   // Need toaster for notifications
   const {
@@ -29616,25 +29675,88 @@ const AnnotationTab = () => {
     setSelectedDatasets(newSelection);
     setSelectedImage(null);
   };
-  const handleSaveAnnotations = async (imageId, polygons) => {
-    // Mock save for now
-    console.log("Saving annotations for image", imageId, polygons);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    toaster.show({
-      message: `Saved ${polygons.length} annotations!`,
-      intent: "success"
-    });
+
+  // Load annotations  // --- Data Loading ---
+
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    if (selectedImage) {
+      loadAnnotations(selectedImage.id);
+    } else {
+      setAnnotations([]);
+    }
+  }, [selectedImage]);
+  const loadAnnotations = async imageId => {
+    setLoadingAnns(true);
+    try {
+      const data = await (0,_apiService__WEBPACK_IMPORTED_MODULE_5__.fetchMapAnnotations)(imageId);
+      // data is now { annotations: [], featureTypes: [] }
+      if (data) {
+        setAnnotations(data.annotations || []);
+        if (data.featureTypes) {
+          setFeatureTypes(data.featureTypes);
+        }
+      }
+    } catch (e) {
+      console.error("Error loading annotations", e);
+      toaster.show({
+        message: "Failed to load annotations",
+        intent: "danger"
+      });
+    } finally {
+      setLoadingAnns(false);
+    }
   };
-  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+
+  // --- Actions ---
+
+  const handleSave = async () => {
+    if (!selectedImage) return;
+    setSaving(true);
+    try {
+      // Wrapped payload
+      const payload = {
+        version: "1.0",
+        annotations: annotations,
+        featureTypes: featureTypes
+      };
+      await (0,_apiService__WEBPACK_IMPORTED_MODULE_5__.saveMapAnnotation)(selectedImage.id, payload);
+      toaster.show({
+        message: "Annotations saved",
+        intent: "success"
+      });
+    } catch (e) {
+      console.error("Save failed", e);
+      toaster.show({
+        message: "Failed to save",
+        intent: "danger"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsxs)("div", {
     className: "p-4 flex flex-col gap-4 h-full overflow-y-auto",
-    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.H4, {
-      children: "Annotate Training Data"
-    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
-      className: "flex gap-4",
-      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
-        className: "w-1/3 flex flex-col gap-4",
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
-          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_components_DatasetSelectWithPopover__WEBPACK_IMPORTED_MODULE_1__["default"], {
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsxs)("div", {
+      className: "flex justify-between items-center",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.H4, {
+        children: "Annotate Training Data"
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)("div", {
+        className: "flex gap-2",
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__.Button, {
+          intent: "primary",
+          icon: "floppy-disk",
+          onClick: handleSave,
+          loading: saving,
+          disabled: !selectedImage || loadingAnns,
+          children: "Save to OMERO"
+        })
+      })]
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsxs)("div", {
+      className: "flex gap-4 h-full",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsxs)("div", {
+        className: "w-1/4 flex flex-col gap-4",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Card, {
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_components_DatasetSelectWithPopover__WEBPACK_IMPORTED_MODULE_1__["default"], {
             label: "Select Dataset",
             value: selectedDatasets,
             onChange: handleDatasetChange,
@@ -29642,28 +29764,31 @@ const AnnotationTab = () => {
             allowedCategories: ["datasets"],
             buttonText: selectedDatasets.length ? `${selectedDatasets.length} selected` : "Select Dataset"
           })
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
-          className: "flex-1 min-h-[200px] flex flex-col",
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("h5", {
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Card, {
+          className: "flex-1 min-h-[300px] flex flex-col",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)("h5", {
             className: "bp5-heading mb-2",
             children: "Select Image"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_ImageSelector__WEBPACK_IMPORTED_MODULE_2__["default"], {
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_ImageSelector__WEBPACK_IMPORTED_MODULE_2__["default"], {
             datasetId: datasetId,
             selectedImageId: selectedImage?.id,
             onSelect: setSelectedImage
           })]
         })]
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("div", {
-        className: "w-2/3",
-        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
-          className: "h-full",
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("h5", {
-            className: "bp5-heading mb-4",
-            children: "Annotate"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_AnnotationViewer__WEBPACK_IMPORTED_MODULE_3__["default"], {
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)("div", {
+        className: "w-3/4 flex flex-col h-[calc(100vh-300px)]",
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Card, {
+          className: "h-full flex flex-col p-0 overflow-hidden",
+          children: loadingAnns ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)("div", {
+            className: "flex justify-center items-center h-full",
+            children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__.Spinner, {})
+          }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_6__.jsx)(_AnnotationViewer__WEBPACK_IMPORTED_MODULE_3__["default"], {
             image: selectedImage,
-            onSaveAnnotations: handleSaveAnnotations
-          })]
+            annotations: annotations,
+            onAnnotationsChange: setAnnotations,
+            featureTypes: featureTypes,
+            onFeatureTypesChange: setFeatureTypes
+          })
         })
       })]
     })]
@@ -29686,157 +29811,537 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttonGroup.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/controls.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/slider/slider.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/icon/icon.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/inputGroup.js");
+/* harmony import */ var _utils_GeometryUtils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../utils/GeometryUtils */ "./src/biomero/stardist/utils/GeometryUtils.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
 
 
 
 const AnnotationViewer = _ref => {
   let {
     image,
-    onSaveAnnotations
+    annotations,
+    onAnnotationsChange,
+    featureTypes,
+    onFeatureTypesChange
   } = _ref;
   const canvasRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
-  const [polygons, setPolygons] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
-  const [currentPolygon, setCurrentPolygon] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
-  const [saving, setSaving] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const containerRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
+
+  // View State
+  const [zoom, setZoom] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(1);
+  const [pan, setPan] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
+    x: 0,
+    y: 0
+  });
+  const [isPanning, setIsPanning] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const [lastPanPoint, setLastPanPoint] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
+    x: 0,
+    y: 0
+  });
+
+  // Tool State
+  const [tool, setTool] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)("brush");
+  const [brushSize, setBrushSize] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(20);
+  const [collisionDetection, setCollisionDetection] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const [mode, setMode] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)("add"); // 'add' or 'subtract'
+
+  // Feature Types State
+  const [activeFeatureType, setActiveFeatureType] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(featureTypes[0]?.id || "1");
+  const [newFeatureName, setNewFeatureName] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)("");
+  const [newFeatureColor, setNewFeatureColor] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)("#ff0000");
+  const [editingFeatureId, setEditingFeatureId] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
+
+  // Interaction State
+  const [currentPoints, setCurrentPoints] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]); // For polygon tool
+  const [isDrawing, setIsDrawing] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false); // For brush
+
+  // Offscreen canvas for brush
+  const maskCanvas = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(() => document.createElement("canvas"), []);
+
+  // Constants
   const Z = 0;
   const T = 0;
   const imageUrl = image ? `/webgateway/render_image/${image.id}/${Z}/${T}/` : null;
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    // Sync active feature if list changes or empty
+    if (featureTypes.length > 0) {
+      if (!activeFeatureType || !featureTypes.find(ft => ft.id === activeFeatureType)) {
+        setActiveFeatureType(featureTypes[0].id);
+      }
+    } else {
+      setActiveFeatureType(null);
+    }
+  }, [featureTypes, activeFeatureType]);
+
+  // --- Drawing Helpers ---
+
+  const getCanvasPoint = e => {
+    if (!canvasRef.current) return {
+      x: 0,
+      y: 0
+    };
+    const rect = canvasRef.current.getBoundingClientRect();
+    const canvas = canvasRef.current;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    return {
+      x,
+      y
+    };
+  };
   const draw = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw completed polygons
-    ctx.strokeStyle = "#00ff00"; // Green
-    ctx.lineWidth = 2;
-    ctx.fillStyle = "rgba(0, 255, 0, 0.2)";
-    polygons.forEach(poly => {
-      if (poly.length < 2) return;
+    // 1. Draw existing annotations
+    annotations.forEach((ann, idx) => {
+      if (!ann.points || ann.points.length < 2) return;
+      const type = featureTypes.find(t => t.id === ann.typeId) || {
+        color: "yellow"
+      };
       ctx.beginPath();
-      ctx.moveTo(poly[0][0], poly[0][1]);
-      for (let i = 1; i < poly.length; i++) {
-        ctx.lineTo(poly[i][0], poly[i][1]);
+      ctx.moveTo(ann.points[0][0], ann.points[0][1]);
+      for (let i = 1; i < ann.points.length; i++) {
+        ctx.lineTo(ann.points[i][0], ann.points[i][1]);
       }
       ctx.closePath();
+      ctx.strokeStyle = type.color;
+      ctx.lineWidth = 2;
+      ctx.fillStyle = type.color + "33";
       ctx.stroke();
       ctx.fill();
     });
 
-    // Draw current polygon
-    if (currentPolygon.length > 0) {
-      ctx.strokeStyle = "#ff0000"; // Red
-      ctx.fillStyle = "rgba(255, 0, 0, 0.2)";
+    // 2. Draw current interaction
+    if (tool === "polygon" && currentPoints.length > 0) {
+      ctx.strokeStyle = mode === "subtract" ? "red" : "lime";
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(currentPolygon[0][0], currentPolygon[0][1]);
-      for (let i = 1; i < currentPolygon.length; i++) {
-        ctx.lineTo(currentPolygon[i][0], currentPolygon[i][1]);
+      ctx.moveTo(currentPoints[0][0], currentPoints[0][1]);
+      for (let i = 1; i < currentPoints.length; i++) {
+        ctx.lineTo(currentPoints[i][0], currentPoints[i][1]);
       }
       ctx.stroke();
 
       // Draw points
-      ctx.fillStyle = "red";
-      currentPolygon.forEach(p => {
+      ctx.fillStyle = mode === "subtract" ? "red" : "lime";
+      const ptSize = 3;
+      currentPoints.forEach(p => {
         ctx.beginPath();
-        ctx.arc(p[0], p[1], 3, 0, 2 * Math.PI);
+        ctx.arc(p[0], p[1], ptSize, 0, 2 * Math.PI);
         ctx.fill();
       });
     }
   };
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
-    draw();
-  }, [polygons, currentPolygon]);
-  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
-    // Reset when image changes
-    setPolygons([]);
-    setCurrentPolygon([]);
-  }, [image]);
-  const handleCanvasClick = e => {
-    if (!image) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    requestAnimationFrame(draw);
+  }, [annotations, currentPoints, zoom, pan, featureTypes, mode]);
 
-    // Check if clicking near start point to close
-    if (currentPolygon.length > 2) {
-      const start = currentPolygon[0];
-      const dist = Math.sqrt(Math.pow(x - start[0], 2) + Math.pow(y - start[1], 2));
-      if (dist < 10) {
-        // Close polygon
-        setPolygons([...polygons, currentPolygon]);
-        setCurrentPolygon([]);
-        return;
+  // --- Handlers ---
+
+  const handleMouseDown = e => {
+    if (!image) return;
+    if (tool === "pan") {
+      setIsPanning(true);
+      setLastPanPoint({
+        x: e.clientX,
+        y: e.clientY
+      });
+      return;
+    }
+
+    // Block adding if no features
+    if (mode === "add" && (!featureTypes.length || !activeFeatureType)) {
+      return;
+    }
+    const pt = getCanvasPoint(e);
+    if (tool === "polygon") {
+      if (currentPoints.length > 2) {
+        const start = currentPoints[0];
+        const dist = Math.hypot(pt.x - start[0], pt.y - start[1]);
+        if (dist < 10 / zoom) {
+          finishPolygon();
+          return;
+        }
+      }
+      setCurrentPoints([...currentPoints, [pt.x, pt.y]]);
+    } else if (tool === "brush") {
+      setIsDrawing(true);
+      if (maskCanvas.width !== canvasRef.current.width || maskCanvas.height !== canvasRef.current.height) {
+        maskCanvas.width = canvasRef.current.width;
+        maskCanvas.height = canvasRef.current.height;
+      }
+      const mCtx = maskCanvas.getContext("2d");
+      mCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+      mCtx.fillStyle = "white";
+      mCtx.beginPath();
+      mCtx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
+      mCtx.fill();
+    }
+  };
+  const handleMouseMove = e => {
+    if (tool === "pan" && isPanning) {
+      const dx = e.clientX - lastPanPoint.x;
+      const dy = e.clientY - lastPanPoint.y;
+      setPan(p => ({
+        x: p.x + dx,
+        y: p.y + dy
+      }));
+      setLastPanPoint({
+        x: e.clientX,
+        y: e.clientY
+      });
+      return;
+    }
+    if (tool === "brush" && isDrawing) {
+      const pt = getCanvasPoint(e);
+      const mCtx = maskCanvas.getContext("2d");
+      mCtx.beginPath();
+      mCtx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
+      mCtx.fill();
+      const ctx = canvasRef.current.getContext("2d");
+      const type = featureTypes.find(t => t.id === activeFeatureType);
+      const color = mode === "subtract" ? "#ff0000" : type?.color || "yellow";
+      ctx.fillStyle = color + "80";
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+  const handleMouseUp = () => {
+    if (tool === "pan") {
+      setIsPanning(false);
+      return;
+    }
+    if (tool === "brush" && isDrawing) {
+      setIsDrawing(false);
+      const ctx = maskCanvas.getContext("2d");
+      const imageData = ctx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+      const polys = (0,_utils_GeometryUtils__WEBPACK_IMPORTED_MODULE_1__.traceContours)(imageData);
+      processNewPolygons(polys);
+      draw();
+    }
+  };
+  const finishPolygon = () => {
+    if (currentPoints.length < 3) {
+      setCurrentPoints([]);
+      return;
+    }
+    processNewPolygons([currentPoints]);
+    setCurrentPoints([]);
+  };
+  const processNewPolygons = newPolys => {
+    const width = canvasRef.current.width;
+    const height = canvasRef.current.height;
+    if (mode === "subtract") {
+      let currentAnns = [...annotations];
+      newPolys.forEach(erasePoly => {
+        currentAnns = (0,_utils_GeometryUtils__WEBPACK_IMPORTED_MODULE_1__.eraseFromAnnotations)(erasePoly, currentAnns, width, height);
+      });
+      onAnnotationsChange(currentAnns);
+    } else {
+      const newAnns = newPolys.map(pts => ({
+        id: crypto.randomUUID(),
+        points: pts,
+        typeId: activeFeatureType,
+        generated: true
+      }));
+      if (collisionDetection) {
+        handleCollisionAndAdd(newAnns);
+      } else {
+        onAnnotationsChange([...annotations, ...newAnns]);
       }
     }
-    setCurrentPolygon([...currentPolygon, [x, y]]);
   };
-  const handleSave = async () => {
-    if (polygons.length === 0) return;
-    setSaving(true);
-    try {
-      await onSaveAnnotations(image.id, polygons);
-      // Clear after save? Or keep them? Keep them for now.
-    } catch (e) {
-      console.error("Failed to save annotations", e);
-    } finally {
-      setSaving(false);
+  const handleCollisionAndAdd = newPolys => {
+    const width = canvasRef.current.width;
+    const height = canvasRef.current.height;
+    let finalAnns = [...annotations];
+    newPolys.forEach(newPoly => {
+      const resultPolys = (0,_utils_GeometryUtils__WEBPACK_IMPORTED_MODULE_1__.subtractAnnotations)(newPoly.points, finalAnns, width, height);
+      resultPolys.forEach(pts => {
+        finalAnns.push({
+          id: crypto.randomUUID(),
+          points: pts,
+          typeId: newPoly.typeId,
+          generated: true
+        });
+      });
+    });
+    onAnnotationsChange(finalAnns);
+  };
+  const handleContextMenu = e => {
+    e.preventDefault();
+    if (tool === "polygon" && currentPoints.length > 2) {
+      finishPolygon();
+    } else {
+      setCurrentPoints([]);
     }
   };
-  if (!image) {
-    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("div", {
-      className: "flex items-center justify-center h-64 bg-gray-100 text-gray-400 border rounded",
-      children: "Select an image to annotate"
-    });
-  }
-  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
-    className: "flex flex-col gap-2",
-    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
-      className: "relative border inline-block self-start",
-      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("img", {
-        src: imageUrl,
-        alt: "Annotation",
-        className: "max-w-full max-h-[500px] display-block select-none",
-        draggable: false,
-        onLoad: e => {
-          if (canvasRef.current) {
-            canvasRef.current.width = e.target.width;
-            canvasRef.current.height = e.target.height;
-            draw();
-          }
-        }
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("canvas", {
-        ref: canvasRef,
-        className: "absolute top-0 left-0 cursor-crosshair",
-        onClick: handleCanvasClick
+  const handleWheel = e => {
+    if (e.ctrlKey || tool === "pan") {
+      const scaleAmount = -e.deltaY * 0.001;
+      const newZoom = Math.min(Math.max(0.1, zoom * (1 + scaleAmount)), 10);
+      setZoom(newZoom);
+    }
+  };
+  const deleteAnnotation = id => {
+    onAnnotationsChange(annotations.filter(a => a.id !== id));
+  };
+
+  // --- Feature Management ---
+  const addFeatureType = () => {
+    if (!newFeatureName) return;
+    const newType = {
+      id: crypto.randomUUID(),
+      name: newFeatureName,
+      color: newFeatureColor
+    };
+    onFeatureTypesChange([...featureTypes, newType]);
+    setNewFeatureName("");
+  };
+  const deleteFeatureType = id => {
+    const newTypes = featureTypes.filter(t => t.id !== id);
+    onFeatureTypesChange(newTypes);
+  };
+  const updateFeatureName = (id, newName) => {
+    const newTypes = featureTypes.map(ft => ft.id === id ? {
+      ...ft,
+      name: newName
+    } : ft);
+    onFeatureTypesChange(newTypes);
+  };
+  const handleImageLoad = e => {
+    if (canvasRef.current) {
+      canvasRef.current.width = e.target.naturalWidth;
+      canvasRef.current.height = e.target.naturalHeight;
+      draw();
+    }
+  };
+  if (!image) return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+    children: "Select an image"
+  });
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+    className: "flex h-full gap-4",
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+      className: "w-64 flex flex-col gap-4 p-2 border-r bg-gray-50 overflow-y-auto shrink-0",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+        className: "flex flex-col gap-2",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("h5", {
+          children: "Tools"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.ButtonGroup, {
+          fill: true,
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+            icon: "hand",
+            active: tool === "pan",
+            onClick: () => setTool("pan"),
+            title: "Pan/Zoom (Ctrl+Scroll)"
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+            icon: "polygon-filter",
+            active: tool === "polygon",
+            onClick: () => setTool("polygon"),
+            title: "Polygon (Right Click to Finish)",
+            disabled: mode === "add" && featureTypes.length === 0
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+            icon: "draw",
+            active: tool === "brush",
+            onClick: () => setTool("brush"),
+            title: "Brush",
+            disabled: mode === "add" && featureTypes.length === 0
+          })]
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+          className: "flex gap-2 items-center mt-2 px-1",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+            className: "text-xs font-bold w-12",
+            children: "Mode:"
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.ButtonGroup, {
+            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+              small: true,
+              active: mode === "add",
+              onClick: () => setMode("add"),
+              intent: mode === "add" ? "primary" : "none",
+              children: "Add"
+            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+              small: true,
+              active: mode === "subtract",
+              onClick: () => setMode("subtract"),
+              intent: mode === "subtract" ? "danger" : "none",
+              children: "Subtract"
+            })]
+          })]
+        }), mode === "add" && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+          className: "mt-2 px-1",
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Checkbox, {
+            checked: collisionDetection,
+            onChange: e => setCollisionDetection(e.target.checked),
+            label: "Avoid Overlap",
+            title: "When enabled, new annotations will be clipped by existing ones"
+          })
+        }), tool === "brush" && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+          className: "px-2 pt-2",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("label", {
+            children: ["Brush Size: ", brushSize, " px"]
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.Slider, {
+            min: 5,
+            max: 200,
+            value: brushSize,
+            onChange: setBrushSize,
+            labelStepSize: 50
+          })]
+        })]
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+        className: "border-t pt-2",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("h5", {
+          children: "Features"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+          className: "flex flex-col gap-2 mb-2",
+          children: featureTypes.map(ft => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+            className: `p-1 border rounded cursor-pointer flex items-center gap-2 ${activeFeatureType === ft.id ? 'ring-2 ring-blue-500 bg-blue-50' : 'bg-white'}`,
+            onClick: () => setActiveFeatureType(ft.id),
+            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+              className: "w-4 h-4 rounded-full border",
+              style: {
+                background: ft.color
+              }
+            }), editingFeatureId === ft.id ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("input", {
+              className: "flex-1 min-w-0 text-sm border rounded px-1",
+              value: ft.name,
+              autoFocus: true,
+              onClick: e => e.stopPropagation(),
+              onChange: e => updateFeatureName(ft.id, e.target.value),
+              onBlur: () => setEditingFeatureId(null),
+              onKeyDown: e => {
+                if (e.key === 'Enter') setEditingFeatureId(null);
+              }
+            }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+              className: "text-sm flex-1 truncate",
+              onClick: e => {
+                e.stopPropagation();
+                setActiveFeatureType(ft.id);
+                setEditingFeatureId(ft.id);
+              },
+              children: ft.name
+            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Icon, {
+              icon: "cross",
+              size: 12,
+              className: "text-gray-400 hover:text-red-500",
+              onClick: e => {
+                e.stopPropagation();
+                deleteFeatureType(ft.id);
+              }
+            })]
+          }, ft.id))
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+          className: "flex gap-1 flex-col mt-2 p-2 bg-white rounded border",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__.InputGroup, {
+            placeholder: "Name",
+            value: newFeatureName,
+            onChange: e => setNewFeatureName(e.target.value),
+            small: true
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+            className: "flex gap-1",
+            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("input", {
+              type: "color",
+              value: newFeatureColor,
+              onChange: e => setNewFeatureColor(e.target.value),
+              className: "h-6 w-8 p-0 border-0 cursor-pointer"
+            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+              icon: "add",
+              small: true,
+              onClick: addFeatureType,
+              disabled: !newFeatureName,
+              fill: true,
+              children: "Add"
+            })]
+          })]
+        })]
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+        className: "border-t pt-2 flex-1 overflow-auto min-h-[100px]",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("h5", {
+          children: ["Annotations (", annotations.length, ")"]
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+          className: "flex flex-col gap-1",
+          children: annotations.map((ann, i) => {
+            const ft = featureTypes.find(t => t.id === ann.typeId);
+            return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+              className: "flex justify-between items-center text-xs p-1 bg-white border hover:bg-gray-100",
+              children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+                className: "flex items-center gap-2",
+                children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+                  className: "w-2 h-2 rounded-full",
+                  style: {
+                    background: ft?.color || 'gray'
+                  }
+                }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
+                  children: [ft?.name || 'Unknown', " #", i + 1]
+                })]
+              }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+                icon: "trash",
+                minimal: true,
+                small: true,
+                onClick: () => deleteAnnotation(ann.id)
+              })]
+            }, ann.id);
+          })
+        })]
       })]
-    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
-      className: "flex gap-2",
-      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.Button, {
-        intent: "success",
-        onClick: handleSave,
-        loading: saving,
-        icon: "floppy-disk",
-        disabled: polygons.length === 0,
-        children: "Save Annotations"
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.Button, {
-        intent: "danger",
-        onClick: () => {
-          setPolygons([]);
-          setCurrentPolygon([]);
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+      className: "flex-1 relative overflow-hidden bg-gray-200 border rounded cursor-crosshair",
+      ref: containerRef,
+      onWheel: handleWheel,
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+        style: {
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transformOrigin: "0 0",
+          transition: isPanning ? "none" : "transform 0.1s"
         },
-        icon: "trash",
-        children: "Clear All"
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.Button, {
-        intent: "warning",
-        onClick: () => setCurrentPolygon([]),
-        icon: "undo",
-        disabled: currentPolygon.length === 0,
-        children: "Cancel Current Shape"
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("span", {
-        className: "text-gray-500 text-sm flex items-center ml-2",
-        children: "Click points to draw. Click start point (red dot) to close shape."
+        className: "inline-block origin-top-left relative",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("img", {
+          src: imageUrl,
+          alt: "work",
+          className: "block pointer-events-none select-none max-w-none",
+          onLoad: handleImageLoad
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("canvas", {
+          ref: canvasRef,
+          className: "absolute top-0 left-0 w-full h-full",
+          onMouseDown: handleMouseDown,
+          onMouseMove: handleMouseMove,
+          onMouseUp: handleMouseUp,
+          onMouseLeave: handleMouseUp,
+          onContextMenu: handleContextMenu
+        })]
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+        className: "absolute bottom-4 right-4 flex gap-2",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+          icon: "minus",
+          onClick: () => setZoom(z => Math.max(0.1, z * 0.8))
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+          text: `${Math.round(zoom * 100)}%`,
+          disabled: true
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+          icon: "plus",
+          onClick: () => setZoom(z => Math.min(10, z * 1.2))
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+          icon: "reset",
+          onClick: () => {
+            setZoom(1);
+            setPan({
+              x: 0,
+              y: 0
+            });
+          }
+        })]
       })]
     })]
   });
@@ -29874,20 +30379,42 @@ const ImageSelector = _ref => {
     selectedImageId
   } = _ref;
   const [images, setImages] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
+  const [thumbnails, setThumbnails] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({});
   const [loading, setLoading] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
   const [error, setError] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
     if (!datasetId) {
       setImages([]);
+      setThumbnails({});
       return;
     }
     const loadImages = async () => {
       setLoading(true);
       setError(null);
       try {
-        // Fetch images (default page 1, maybe need pagination later)
         const imgs = await (0,_apiService__WEBPACK_IMPORTED_MODULE_1__.fetchImages)(datasetId);
         setImages(imgs);
+
+        // Fetch thumbnails for the images
+        if (imgs.length > 0) {
+          const imageIds = imgs.map(img => img.id);
+          // Fetch in batches to be safe? The API handles multiple IDs.
+          // Let's just fetch all at once for now as per AppContext logic
+          try {
+            // We might want to batch this if there are many images
+            const batchSize = 50;
+            let allThumbs = {};
+            for (let i = 0; i < imageIds.length; i += batchSize) {
+              const chunk = imageIds.slice(i, i + batchSize);
+              const thumbs = await (0,_apiService__WEBPACK_IMPORTED_MODULE_1__.fetchThumbnails)(chunk);
+              Object.assign(allThumbs, thumbs);
+            }
+            setThumbnails(allThumbs);
+          } catch (thumbErr) {
+            console.error("Error loading thumbnails:", thumbErr);
+            // Don't fail the whole view if thumbs fail
+          }
+        }
       } catch (err) {
         console.error("Error loading images:", err);
         setError("Failed to load images.");
@@ -29903,7 +30430,7 @@ const ImageSelector = _ref => {
       children: "Select a dataset to view images."
     });
   }
-  if (loading) {
+  if (loading && images.length === 0) {
     return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.Spinner, {
       size: 20
     });
@@ -29921,27 +30448,29 @@ const ImageSelector = _ref => {
     });
   }
   return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
-    className: "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[300px] overflow-y-auto p-2 border rounded",
-    children: images.map(img => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Card, {
+    className: "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[400px] overflow-y-auto p-2 border rounded bg-white",
+    children: images.map(img => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Card, {
       interactive: true,
       elevation: selectedImageId === img.id ? _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Elevation.TWO : _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Elevation.ZERO,
-      className: `p-2 cursor-pointer ${selectedImageId === img.id ? "bg-blue-100 border-blue-500 border" : ""}`,
+      className: `p-2 cursor-pointer flex flex-col items-center gap-2 ${selectedImageId === img.id ? "bg-blue-100 border-blue-500 border" : "hover:bg-gray-50"}`,
       onClick: () => onSelect(img),
-      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
-        className: "flex flex-col items-center",
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
-          className: "w-full h-24 bg-gray-200 flex items-center justify-center mb-2 text-xs text-gray-400",
-          children: img.thumb_url ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("img", {
-            src: img.thumb_url,
-            alt: img.name,
-            className: "max-h-full max-w-full"
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+        className: "w-full h-24 bg-gray-100 flex items-center justify-center rounded overflow-hidden relative",
+        children: thumbnails[img.id] ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("img", {
+          src: thumbnails[img.id],
+          alt: img.name,
+          className: "max-h-full max-w-full object-contain"
+        }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+          className: "text-xs text-gray-400",
+          children: loading ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.Spinner, {
+            size: 16
           }) : "No Thumb"
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
-          className: "text-xs truncate w-full text-center",
-          title: img.name,
-          children: img.name
-        })]
-      })
+        })
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+        className: "text-xs truncate w-full text-center font-medium",
+        title: img.name,
+        children: img.name
+      })]
     }, img.id))
   });
 };
@@ -30255,6 +30784,7 @@ const TrainingForm = _ref => {
     name: "my_stardist_model"
   });
   const handleChange = (key, value) => {
+    // Basic type casting
     setConfig({
       ...config,
       [key]: value
@@ -30281,7 +30811,10 @@ const TrainingForm = _ref => {
         value: config.epochs,
         onValueChange: v => handleChange("epochs", v),
         min: 1,
-        max: 1000
+        max: 1000,
+        stepSize: 1,
+        minorStepSize: 1,
+        majorStepSize: 10
       })
     }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.FormGroup, {
       label: "Batch Size",
@@ -30291,7 +30824,10 @@ const TrainingForm = _ref => {
         value: config.batchSize,
         onValueChange: v => handleChange("batchSize", v),
         min: 1,
-        max: 32
+        max: 32,
+        stepSize: 1,
+        minorStepSize: 1,
+        majorStepSize: 4
       })
     }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.FormGroup, {
       label: "Validation Split (0.0 - 1.0)",
@@ -30302,7 +30838,9 @@ const TrainingForm = _ref => {
         onValueChange: v => handleChange("valSplit", v),
         min: 0.05,
         max: 0.5,
-        stepSize: 0.05
+        stepSize: 0.05,
+        minorStepSize: 0.01,
+        majorStepSize: 0.1
       })
     }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.FormGroup, {
       label: "Patch Size (px)",
@@ -30313,7 +30851,9 @@ const TrainingForm = _ref => {
         onValueChange: v => handleChange("patchSize", v),
         min: 64,
         max: 1024,
-        stepSize: 32
+        stepSize: 32,
+        minorStepSize: 8,
+        majorStepSize: 64
       })
     }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
       intent: "primary",
@@ -30442,6 +30982,456 @@ const TrainingTab = () => {
 
 /***/ }),
 
+/***/ "./src/biomero/stardist/utils/GeometryUtils.js":
+/*!*****************************************************!*\
+  !*** ./src/biomero/stardist/utils/GeometryUtils.js ***!
+  \*****************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   eraseFromAnnotations: () => (/* binding */ eraseFromAnnotations),
+/* harmony export */   subtractAnnotations: () => (/* binding */ subtractAnnotations),
+/* harmony export */   traceContours: () => (/* binding */ traceContours)
+/* harmony export */ });
+/**
+ * Simple implementation of Marching Squares for contour finding.
+ * Converts a binary image (Canvas ImageData) to a list of polygon points.
+ */
+
+// Lookup table for Marching Squares
+const MARCHING_SQUARES_LOOKUP = [[],
+// 0: No points
+[[0, 0.5], [0.5, 1]],
+// 1: Bottom-Left
+[[0.5, 1], [1, 0.5]],
+// 2: Bottom-Right
+[[0, 0.5], [1, 0.5]],
+// 3: Bottom-Left + Bottom-Right (horizontal)
+[[0.5, 0], [1, 0.5]],
+// 4: Top-Right
+[[0, 0.5], [0.5, 0], [0.5, 1], [1, 0.5]],
+// 5: Saddle (BL + TR) - ambiguity
+[[0.5, 0], [0.5, 1]],
+// 6: Top-Right + Bottom-Right (vertical)
+[[0, 0.5], [0.5, 0]],
+// 7: BL + BR + TR
+[[0, 0.5], [0.5, 0]],
+// 8: Top-Left
+[[0.5, 0], [0.5, 1]],
+// 9: TL + BL (vertical)
+[[0, 0.5], [0.5, 1], [0.5, 0], [1, 0.5]],
+// 10: Saddle (TL + BR)
+[[0.5, 0], [1, 0.5]],
+// 11: TL + BL + BR
+[[0, 0.5], [1, 0.5]],
+// 12: TL + TR (horizontal)
+[[0.5, 1], [1, 0.5]],
+// 13: TL + TR + BL
+[[0, 0.5], [0.5, 1]],
+// 14: TL + TR + BR
+[] // 15: All points
+];
+
+/**
+ * Perform Marching Squares on ImageData to get contours.
+ * @param {ImageData} imageData 
+ * @returns {Array<Array<[number, number]>>} List of polygons (each polygon is list of points)
+ */
+const traceContours = imageData => {
+  const width = imageData.width;
+  const height = imageData.height;
+  const data = imageData.data;
+  const polygons = [];
+  const threshold = 128; // Alpha threshold
+
+  // Boolean grid
+  const grid = new Uint8Array(width * height);
+  for (let i = 0; i < width * height; i++) {
+    // Check alpha channel (every 4th byte + 3)
+    grid[i] = data[i * 4 + 3] > threshold ? 1 : 0;
+  }
+  const segments = [];
+
+  // Iterate over squares
+  for (let y = 0; y < height - 1; y++) {
+    for (let x = 0; x < width - 1; x++) {
+      // Get values at corners
+      const val = grid[y * width + x] << 3 | grid[y * width + (x + 1)] << 2 | grid[(y + 1) * width + (x + 1)] << 1 | grid[(y + 1) * width + x];
+      if (val === 0 || val === 15) continue;
+
+      // Simplified lookup - just get edge midpoints
+      // 0,0 is top-left of square. Local coords 0..1
+
+      // Map lookup index to segments
+      // This is a simplified approach, real marching squares connects edges
+      // We just store segments [start, end] in pixel coords
+
+      // Standard MS Logic:
+      // Edges: 0:Top, 1:Right, 2:Bottom, 3:Left
+      // We map lookup to edge indices
+
+      // Cases based on standard MS tables
+      // 1: Left->Bottom
+      // 2: Bottom->Right
+      // ...
+
+      // For brevity, let's just use a direct segment generator based on case
+      const addSeg = (x1, y1, x2, y2) => {
+        segments.push([[x + x1, y + y1], [x + x2, y + y2]]);
+      };
+      switch (val) {
+        case 1:
+          addSeg(0, 0.5, 0.5, 1);
+          break;
+        case 2:
+          addSeg(0.5, 1, 1, 0.5);
+          break;
+        case 3:
+          addSeg(0, 0.5, 1, 0.5);
+          break;
+        case 4:
+          addSeg(0.5, 0, 1, 0.5);
+          break;
+        case 5:
+          addSeg(0, 0.5, 0.5, 0);
+          addSeg(0.5, 1, 1, 0.5);
+          break;
+        // Ambiguous
+        case 6:
+          addSeg(0.5, 0, 0.5, 1);
+          break;
+        case 7:
+          addSeg(0, 0.5, 0.5, 0);
+          break;
+        case 8:
+          addSeg(0, 0.5, 0.5, 0);
+          break;
+        case 9:
+          addSeg(0.5, 0, 0.5, 1);
+          break;
+        case 10:
+          addSeg(0.5, 0, 1, 0.5);
+          addSeg(0, 0.5, 0.5, 1);
+          break;
+        // Ambiguous
+        case 11:
+          addSeg(0.5, 0, 1, 0.5);
+          break;
+        case 12:
+          addSeg(0, 0.5, 1, 0.5);
+          break;
+        case 13:
+          addSeg(0.5, 1, 1, 0.5);
+          break;
+        case 14:
+          addSeg(0, 0.5, 0.5, 1);
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  // Connect segments into polygons
+  if (segments.length === 0) return [];
+  const resultPolys = stitchSegments(segments);
+
+  // Simplify polygons (Douglas-Peucker could be added here)
+  return resultPolys.map(poly => simplifyPolygon(poly, 2.0));
+};
+const stitchSegments = segments => {
+  // Naively connect segments
+  // A robust implementation uses a spatial hash or adjacency list
+  // Since this runs in browser on arguably small images (mask size),
+  // let's try a simple greedy connect.
+
+  // Convert to list of points? No, order matters.
+
+  // Create adjacency map
+  // Key: "x,y", Value: list of other ends
+  const adj = new Map();
+  const key = p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+  segments.forEach(seg => {
+    const start = seg[0];
+    const end = seg[1];
+    const k1 = key(start);
+    const k2 = key(end);
+    if (!adj.has(k1)) adj.set(k1, []);
+    if (!adj.has(k2)) adj.set(k2, []);
+    adj.get(k1).push(end);
+    adj.get(k2).push(start);
+  });
+  const polygons = [];
+  const visited = new Set();
+
+  // Traverse
+  for (const [startKey, neighbors] of adj) {
+    if (visited.has(startKey)) continue;
+    if (neighbors.length !== 2) continue; // Start tracing from node with degree 2 (loop) ? 
+    // Actually for closed loops all nodes degree 2.
+
+    const poly = [];
+    let curr = neighbors[0]; // Pick one
+    let prevKey = startKey;
+    visited.add(startKey);
+    // Recover original point from key? adj stores actual points
+    // Let's just store the point we started from
+    // Wait, Map iteration gives keys. Need to find point object.
+    // Let's assume neighbors store [x,y] arrays.
+    poly.push(neighbors[0]); // Actually push the start point? 
+    // We need the point corresponding to startKey. Since we don't have it easily:
+    // Let's refactor to store points in a lookup if needed.
+    // Easier:
+    // Just pick a seed segment.
+  }
+
+  // Alternative simpler stitching:
+  // 1. Pick a segment.
+  // 2. Find a segment that starts where this one ends.
+  // 3. Repeat until closed.
+
+  const pool = new Set(segments);
+  const loops = [];
+  while (pool.size > 0) {
+    const firstSeg = pool.values().next().value;
+    pool.delete(firstSeg);
+    const loop = [firstSeg[0], firstSeg[1]];
+    let currentHead = firstSeg[1];
+    let closed = false;
+    while (true) {
+      // Find next segment starting at currentHead
+      let nextSeg = null;
+      let reverse = false;
+
+      // Linear search - slow but works for small sets
+      for (const seg of pool) {
+        // Check dist
+        const dist1 = Math.hypot(seg[0][0] - currentHead[0], seg[0][1] - currentHead[1]);
+        const dist2 = Math.hypot(seg[1][0] - currentHead[0], seg[1][1] - currentHead[1]);
+        if (dist1 < 0.1) {
+          nextSeg = seg;
+          reverse = false;
+          break;
+        }
+        if (dist2 < 0.1) {
+          nextSeg = seg;
+          reverse = true;
+          break;
+        }
+      }
+      if (nextSeg) {
+        pool.delete(nextSeg);
+        const nextPoint = reverse ? nextSeg[0] : nextSeg[1];
+        loop.push(nextPoint);
+        currentHead = nextPoint;
+
+        // Check closure
+        const distClose = Math.hypot(currentHead[0] - loop[0][0], currentHead[1] - loop[0][1]);
+        if (distClose < 0.1) {
+          closed = true;
+          break;
+        }
+      } else {
+        // Cannot continue
+        break;
+      }
+    }
+    if (closed && loop.length > 2) {
+      loops.push(loop);
+    }
+  }
+  return loops;
+};
+
+/**
+ * Subtracts a list of existing polygons from a new polygon using rasterization.
+ * 
+ * @param {Array<[number, number]>} newPolyPoints List of points for the new polygon
+ * @param {Array<{points: Array<[number, number]>}>} existingAnnotations List of existing annotation objects
+ * @param {number} width Canvas width
+ * @param {number} height Canvas height
+ * @returns {Array<Array<[number, number]>>} List of resulting polygons (may be split)
+ */
+const subtractAnnotations = (newPolyPoints, existingAnnotations, width, height) => {
+  // 1. Create a mask for the new polygon
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  // Fill new polygon
+  ctx.fillStyle = 'white';
+  ctx.beginPath();
+  if (newPolyPoints.length > 0) {
+    ctx.moveTo(newPolyPoints[0][0], newPolyPoints[0][1]);
+    for (let i = 1; i < newPolyPoints.length; i++) {
+      ctx.lineTo(newPolyPoints[i][0], newPolyPoints[i][1]);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 2. Erase existing polygons
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = 'black'; // Color doesn't matter for destination-out, alpha 1 does
+
+  existingAnnotations.forEach(ann => {
+    if (!ann.points || ann.points.length < 3) return;
+    ctx.beginPath();
+    ctx.moveTo(ann.points[0][0], ann.points[0][1]);
+    for (let i = 1; i < ann.points.length; i++) {
+      ctx.lineTo(ann.points[i][0], ann.points[i][1]);
+    }
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // 3. Trace contours of the remaining result
+  const imageData = ctx.getImageData(0, 0, width, height);
+  return traceContours(imageData);
+};
+
+// Simple polygon simplification (Douglas-Peucker-ish)
+const simplifyPolygon = (points, epsilon) => {
+  if (points.length < 3) return points;
+  // For now returning as is, proper DP algorithm is recursive
+  // Implementing very basic distance filter
+  if (!epsilon) return points;
+  const result = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const last = result[result.length - 1];
+    const curr = points[i];
+    const dist = Math.hypot(curr[0] - last[0], curr[1] - last[1]);
+    if (dist > epsilon) {
+      result.push(curr);
+    }
+  }
+  // ensure closed
+  const first = result[0];
+  const last = result[result.length - 1];
+  if (Math.hypot(first[0] - last[0], first[1] - last[1]) > epsilon) {
+    result.push(first); // Close loop if not close enough
+  } else {
+    // already simplified close to start
+  }
+  return result;
+};
+
+/**
+ * Subtracts an eraser polygon from a list of existing annotations.
+ * Returns a NEW list of annotations (some might be removed, some modified/split).
+ * 
+ * @param {Array<[number, number]>} eraserPoints Points of the eraser polygon
+ * @param {Array<{id: string, points: Array<[number, number]>, typeId: string}>} existingAnnotations List of existing annotations
+ * @param {number} width Canvas width
+ * @param {number} height Canvas height
+ * @returns {Array<{id: string, points: Array<[number, number]>, typeId: string}>} New list of annotations
+ */
+const eraseFromAnnotations = (eraserPoints, existingAnnotations, width, height) => {
+  if (!eraserPoints || eraserPoints.length < 3) return existingAnnotations;
+
+  // Bounding box of eraser for quick overlap check
+  let minX = width,
+    minY = height,
+    maxX = 0,
+    maxY = 0;
+  eraserPoints.forEach(p => {
+    if (p[0] < minX) minX = p[0];
+    if (p[0] > maxX) maxX = p[0];
+    if (p[1] < minY) minY = p[1];
+    if (p[1] > maxY) maxY = p[1];
+  });
+
+  // Expand slightly
+  minX -= 2;
+  minY -= 2;
+  maxX += 2;
+  maxY += 2;
+  const resultAnnotations = [];
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d', {
+    willReadFrequently: true
+  });
+  existingAnnotations.forEach(ann => {
+    // Quick bbox check of annotation
+    let annMinX = width,
+      annMinY = height,
+      annMaxX = 0,
+      annMaxY = 0;
+    if (!ann.points || ann.points.length < 3) {
+      resultAnnotations.push(ann);
+      return;
+    }
+    ann.points.forEach(p => {
+      if (p[0] < annMinX) annMinX = p[0];
+      if (p[0] > annMaxX) annMaxX = p[0];
+      if (p[1] < annMinY) annMinY = p[1];
+      if (p[1] > annMaxY) annMaxY = p[1];
+    });
+
+    // Check intersection
+    if (maxX < annMinX || minX > annMaxX || maxY < annMinY || minY > annMaxY) {
+      // No overlap
+      resultAnnotations.push(ann);
+      return;
+    }
+
+    // Perform subtraction
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw Annotation (White)
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.moveTo(ann.points[0][0], ann.points[0][1]);
+    for (let i = 1; i < ann.points.length; i++) {
+      ctx.lineTo(ann.points[i][0], ann.points[i][1]);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw Eraser (Black, destination-out)
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'black';
+    ctx.beginPath();
+    ctx.moveTo(eraserPoints[0][0], eraserPoints[0][1]);
+    for (let i = 1; i < eraserPoints.length; i++) {
+      ctx.lineTo(eraserPoints[i][0], eraserPoints[i][1]);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Trace Result
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const newPolys = traceContours(imageData);
+    if (newPolys.length === 0) {
+      // Annotation completely erased
+    } else if (newPolys.length === 1) {
+      // Updated single polygon
+      resultAnnotations.push({
+        ...ann,
+        points: newPolys[0]
+      });
+    } else {
+      // Split into multiple
+      newPolys.forEach(poly => {
+        resultAnnotations.push({
+          ...ann,
+          id: crypto.randomUUID(),
+          points: poly
+        });
+      });
+    }
+  });
+  return resultAnnotations;
+};
+
+/***/ }),
+
 /***/ "./src/constants.js":
 /*!**************************!*\
   !*** ./src/constants.js ***!
@@ -30504,7 +31494,8 @@ const getDjangoConstants = () => {
     api_run_workflow: "/omero_biomero/api/analyzer/workflows/",
     // append <name>/jobs/
     get_workflows: "/omero_biomero/api/analyzer/scripts/",
-    api_slurm_status: "/omero_biomero/api/analyzer/slurm/status/"
+    api_slurm_status: "/omero_biomero/api/analyzer/slurm/status/",
+    webclient_api_annotations: "/webclient/api/annotations/"
   };
   const ui = {
     importer_enabled: WEBCLIENT.UI.IMPORTER_ENABLED,
@@ -48170,8 +49161,14 @@ video {
 .bottom-0 {
   bottom: 0px !important;
 }
+.bottom-4 {
+  bottom: 1rem !important;
+}
 .left-0 {
   left: 0px !important;
+}
+.right-4 {
+  right: 1rem !important;
 }
 .top-0 {
   top: 0px !important;
@@ -48211,9 +49208,6 @@ video {
 }
 .ml-12 {
   margin-left: 3rem !important;
-}
-.ml-2 {
-  margin-left: 0.5rem !important;
 }
 .ml-3 {
   margin-left: 0.75rem !important;
@@ -48263,14 +49257,23 @@ video {
 .flex {
   display: flex !important;
 }
+.table {
+  display: table !important;
+}
 .grid {
   display: grid !important;
 }
 .contents {
   display: contents !important;
 }
+.h-2 {
+  height: 0.5rem !important;
+}
 .h-24 {
   height: 6rem !important;
+}
+.h-4 {
+  height: 1rem !important;
 }
 .h-6 {
   height: 1.5rem !important;
@@ -48287,14 +49290,17 @@ video {
 .h-\\[800px\\] {
   height: 800px !important;
 }
+.h-\\[calc\\(100vh-300px\\)\\] {
+  height: calc(100vh - 300px) !important;
+}
 .h-\\[calc\\(100vh-450px\\)\\] {
   height: calc(100vh - 450px) !important;
 }
 .h-full {
   height: 100% !important;
 }
-.max-h-\\[300px\\] {
-  max-height: 300px !important;
+.max-h-\\[400px\\] {
+  max-height: 400px !important;
 }
 .max-h-\\[45vh\\] {
   max-height: 45vh !important;
@@ -48314,8 +49320,14 @@ video {
 .max-h-full {
   max-height: 100% !important;
 }
+.min-h-\\[100px\\] {
+  min-height: 100px !important;
+}
 .min-h-\\[200px\\] {
   min-height: 200px !important;
+}
+.min-h-\\[300px\\] {
+  min-height: 300px !important;
 }
 .min-h-\\[75vh\\] {
   min-height: 75vh !important;
@@ -48332,14 +49344,32 @@ video {
 .w-1\\/4 {
   width: 25% !important;
 }
+.w-12 {
+  width: 3rem !important;
+}
 .w-16 {
   width: 4rem !important;
+}
+.w-2 {
+  width: 0.5rem !important;
 }
 .w-2\\/3 {
   width: 66.666667% !important;
 }
+.w-3\\/4 {
+  width: 75% !important;
+}
+.w-4 {
+  width: 1rem !important;
+}
 .w-6 {
   width: 1.5rem !important;
+}
+.w-64 {
+  width: 16rem !important;
+}
+.w-8 {
+  width: 2rem !important;
 }
 .w-96 {
   width: 24rem !important;
@@ -48353,6 +49383,9 @@ video {
 .w-full {
   width: 100% !important;
 }
+.min-w-0 {
+  min-width: 0px !important;
+}
 .min-w-fit {
   min-width: fit-content !important;
 }
@@ -48365,14 +49398,23 @@ video {
 .max-w-md {
   max-width: 28rem !important;
 }
+.max-w-none {
+  max-width: none !important;
+}
 .flex-1 {
   flex: 1 1 0% !important;
 }
 .flex-shrink-0 {
   flex-shrink: 0 !important;
 }
+.shrink-0 {
+  flex-shrink: 0 !important;
+}
 .flex-grow {
   flex-grow: 1 !important;
+}
+.origin-top-left {
+  transform-origin: top left !important;
 }
 .transform {
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y)) !important;
@@ -48450,6 +49492,9 @@ video {
 .justify-between {
   justify-content: space-between !important;
 }
+.gap-1 {
+  gap: 0.25rem !important;
+}
 .gap-2 {
   gap: 0.5rem !important;
 }
@@ -48496,6 +49541,9 @@ video {
 .rounded {
   border-radius: 0.25rem !important;
 }
+.rounded-full {
+  border-radius: 9999px !important;
+}
 .rounded-md {
   border-radius: 0.375rem !important;
 }
@@ -48504,6 +49552,12 @@ video {
 }
 .border {
   border-width: 1px !important;
+}
+.border-0 {
+  border-width: 0px !important;
+}
+.border-r {
+  border-right-width: 1px !important;
 }
 .border-t {
   border-top-width: 1px !important;
@@ -48584,6 +49638,9 @@ video {
   --tw-bg-opacity: 1 !important;
   background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1)) !important;
 }
+.object-contain {
+  object-fit: contain !important;
+}
 .object-cover {
   object-fit: cover !important;
 }
@@ -48611,6 +49668,10 @@ video {
 .px-1 {
   padding-left: 0.25rem !important;
   padding-right: 0.25rem !important;
+}
+.px-2 {
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
 }
 .px-3 {
   padding-left: 0.75rem !important;
@@ -48641,6 +49702,9 @@ video {
 }
 .pt-\\[50px\\] {
   padding-top: 50px !important;
+}
+.pb-4 {
+  padding-bottom: 1rem !important;
 }
 .text-center {
   text-align: center !important;
@@ -48744,12 +49808,28 @@ video {
   --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color) !important;
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow) !important;
 }
+.ring-2 {
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color) !important;
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color) !important;
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000) !important;
+}
+.ring-blue-500 {
+  --tw-ring-opacity: 1 !important;
+  --tw-ring-color: rgb(59 130 246 / var(--tw-ring-opacity, 1)) !important;
+}
 .blur {
   --tw-blur: blur(8px) !important;
   filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow) !important;
 }
 .filter {
   filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow) !important;
+}
+.transition {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, -webkit-backdrop-filter !important;
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter !important;
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter, -webkit-backdrop-filter !important;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-duration: 150ms !important;
 }
 .transition-all {
   transition-property: all !important;
@@ -48770,9 +49850,24 @@ video {
   background-color: rgb(219 234 254 / var(--tw-bg-opacity, 1)) !important;
 }
 
+.hover\\:bg-gray-100:hover {
+  --tw-bg-opacity: 1 !important;
+  background-color: rgb(243 244 246 / var(--tw-bg-opacity, 1)) !important;
+}
+
+.hover\\:bg-gray-50:hover {
+  --tw-bg-opacity: 1 !important;
+  background-color: rgb(249 250 251 / var(--tw-bg-opacity, 1)) !important;
+}
+
 .hover\\:text-blue-800:hover {
   --tw-text-opacity: 1 !important;
   color: rgb(30 64 175 / var(--tw-text-opacity, 1)) !important;
+}
+
+.hover\\:text-red-500:hover {
+  --tw-text-opacity: 1 !important;
+  color: rgb(239 68 68 / var(--tw-text-opacity, 1)) !important;
 }
 
 .focus\\:outline-none:focus {
@@ -48811,7 +49906,7 @@ video {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 }
-`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"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AA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA,oCAAmB;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","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n"],"sourceRoot":""}]);
+`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"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AA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;A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","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
@@ -120919,4 +122014,4 @@ window.onload = function () {
 
 /******/ })()
 ;
-//# sourceMappingURL=main.0f834c84818b371ef52a.js.map
+//# sourceMappingURL=main.81b22a0e775b8b32c01e.js.map

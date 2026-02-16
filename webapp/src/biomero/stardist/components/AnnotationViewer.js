@@ -1,17 +1,69 @@
-import React, { useRef, useEffect, useState } from "react";
-import { Button, Spinner } from "@blueprintjs/core";
+import React, { useRef, useEffect, useState, useMemo } from "react";
+import { Button, Slider, ButtonGroup, Icon, Popover, Menu, MenuItem, InputGroup, Checkbox } from "@blueprintjs/core";
+import { traceContours, subtractAnnotations, eraseFromAnnotations } from "../utils/GeometryUtils";
 
-const AnnotationViewer = ({ image, onSaveAnnotations }) => {
+const AnnotationViewer = ({ image, annotations, onAnnotationsChange, featureTypes, onFeatureTypesChange }) => {
   const canvasRef = useRef(null);
-  const [polygons, setPolygons] = useState([]);
-  const [currentPolygon, setCurrentPolygon] = useState([]);
-  const [saving, setSaving] = useState(false);
+  const containerRef = useRef(null);
+  
+  // View State
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
 
+  // Tool State
+  const [tool, setTool] = useState("brush"); 
+  const [brushSize, setBrushSize] = useState(20);
+  const [collisionDetection, setCollisionDetection] = useState(false);
+  const [mode, setMode] = useState("add"); // 'add' or 'subtract'
+  
+  // Feature Types State
+  const [activeFeatureType, setActiveFeatureType] = useState(featureTypes[0]?.id || "1");
+  const [newFeatureName, setNewFeatureName] = useState("");
+  const [newFeatureColor, setNewFeatureColor] = useState("#ff0000");
+  const [editingFeatureId, setEditingFeatureId] = useState(null);
+
+  // Interaction State
+  const [currentPoints, setCurrentPoints] = useState([]); // For polygon tool
+  const [isDrawing, setIsDrawing] = useState(false); // For brush
+  
+  // Offscreen canvas for brush
+  const maskCanvas = useMemo(() => document.createElement("canvas"), []);
+  
+  // Constants
   const Z = 0;
   const T = 0;
   const imageUrl = image 
     ? `/webgateway/render_image/${image.id}/${Z}/${T}/`
     : null;
+
+  useEffect(() => {
+      // Sync active feature if list changes or empty
+      if (featureTypes.length > 0) {
+          if (!activeFeatureType || !featureTypes.find(ft => ft.id === activeFeatureType)) {
+              setActiveFeatureType(featureTypes[0].id);
+          }
+      } else {
+          setActiveFeatureType(null);
+      }
+  }, [featureTypes, activeFeatureType]);
+
+  // --- Drawing Helpers ---
+
+  const getCanvasPoint = (e) => {
+      if (!canvasRef.current) return { x: 0, y: 0 };
+      const rect = canvasRef.current.getBoundingClientRect();
+      const canvas = canvasRef.current;
+      
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+      
+      return { x, y };
+  };
 
   const draw = () => {
       const canvas = canvasRef.current;
@@ -19,153 +71,411 @@ const AnnotationViewer = ({ image, onSaveAnnotations }) => {
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw completed polygons
-      ctx.strokeStyle = "#00ff00"; // Green
-      ctx.lineWidth = 2;
-      ctx.fillStyle = "rgba(0, 255, 0, 0.2)";
-
-      polygons.forEach((poly) => {
-          if (poly.length < 2) return;
+      // 1. Draw existing annotations
+      annotations.forEach((ann, idx) => {
+          if (!ann.points || ann.points.length < 2) return;
+          const type = featureTypes.find(t => t.id === ann.typeId) || { color: "yellow" };
+          
           ctx.beginPath();
-          ctx.moveTo(poly[0][0], poly[0][1]);
-          for (let i = 1; i < poly.length; i++) {
-              ctx.lineTo(poly[i][0], poly[i][1]);
+          ctx.moveTo(ann.points[0][0], ann.points[0][1]);
+          for (let i = 1; i < ann.points.length; i++) {
+              ctx.lineTo(ann.points[i][0], ann.points[i][1]);
           }
           ctx.closePath();
+          
+          ctx.strokeStyle = type.color;
+          ctx.lineWidth = 2; 
+          ctx.fillStyle = type.color + "33"; 
           ctx.stroke();
           ctx.fill();
       });
 
-      // Draw current polygon
-      if (currentPolygon.length > 0) {
-          ctx.strokeStyle = "#ff0000"; // Red
-          ctx.fillStyle = "rgba(255, 0, 0, 0.2)";
+      // 2. Draw current interaction
+      if (tool === "polygon" && currentPoints.length > 0) {
+          ctx.strokeStyle = mode === "subtract" ? "red" : "lime";
+          ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.moveTo(currentPolygon[0][0], currentPolygon[0][1]);
-          for (let i = 1; i < currentPolygon.length; i++) {
-              ctx.lineTo(currentPolygon[i][0], currentPolygon[i][1]);
+          ctx.moveTo(currentPoints[0][0], currentPoints[0][1]);
+          for (let i = 1; i < currentPoints.length; i++) {
+              ctx.lineTo(currentPoints[i][0], currentPoints[i][1]);
           }
           ctx.stroke();
           
           // Draw points
-          ctx.fillStyle = "red";
-          currentPolygon.forEach(p => {
+          ctx.fillStyle = mode === "subtract" ? "red" : "lime";
+          const ptSize = 3; 
+          currentPoints.forEach(p => {
               ctx.beginPath();
-              ctx.arc(p[0], p[1], 3, 0, 2 * Math.PI);
+              ctx.arc(p[0], p[1], ptSize, 0, 2 * Math.PI);
               ctx.fill();
           });
       }
-  }
-
+  };
+  
   useEffect(() => {
-    draw();
-  }, [polygons, currentPolygon]);
+     requestAnimationFrame(draw);
+  }, [annotations, currentPoints, zoom, pan, featureTypes, mode]); 
 
-  useEffect(() => {
-    // Reset when image changes
-    setPolygons([]);
-    setCurrentPolygon([]);
-  }, [image]);
+  // --- Handlers ---
 
-  const handleCanvasClick = (e) => {
+  const handleMouseDown = (e) => {
       if (!image) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      if (tool === "pan") {
+          setIsPanning(true);
+          setLastPanPoint({ x: e.clientX, y: e.clientY });
+          return;
+      }
+      
+      // Block adding if no features
+      if (mode === "add" && (!featureTypes.length || !activeFeatureType)) {
+          return;
+      }
+      
+      const pt = getCanvasPoint(e);
+      
+      if (tool === "polygon") {
+          if (currentPoints.length > 2) {
+            const start = currentPoints[0];
+            const dist = Math.hypot(pt.x - start[0], pt.y - start[1]);
+            if (dist < 10 / zoom) {
+                finishPolygon();
+                return;
+            }
+          }
+          setCurrentPoints([...currentPoints, [pt.x, pt.y]]);
+      } else if (tool === "brush") {
+          setIsDrawing(true);
+          if (maskCanvas.width !== canvasRef.current.width || maskCanvas.height !== canvasRef.current.height) {
+              maskCanvas.width = canvasRef.current.width;
+              maskCanvas.height = canvasRef.current.height;
+          }
+          const mCtx = maskCanvas.getContext("2d");
+          mCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+          
+          mCtx.fillStyle = "white";
+          mCtx.beginPath();
+          mCtx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
+          mCtx.fill();
+      }
+  };
 
-      // Check if clicking near start point to close
-      if (currentPolygon.length > 2) {
-          const start = currentPolygon[0];
-          const dist = Math.sqrt(Math.pow(x - start[0], 2) + Math.pow(y - start[1], 2));
-          if (dist < 10) {
-              // Close polygon
-              setPolygons([...polygons, currentPolygon]);
-              setCurrentPolygon([]);
-              return;
+  const handleMouseMove = (e) => {
+      if (tool === "pan" && isPanning) {
+          const dx = e.clientX - lastPanPoint.x;
+          const dy = e.clientY - lastPanPoint.y;
+          setPan(p => ({ x: p.x + dx, y: p.y + dy }));
+          setLastPanPoint({ x: e.clientX, y: e.clientY });
+          return;
+      }
+      
+      if (tool === "brush" && isDrawing) {
+          const pt = getCanvasPoint(e);
+          const mCtx = maskCanvas.getContext("2d");
+          mCtx.beginPath();
+          mCtx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
+          mCtx.fill();
+          
+          const ctx = canvasRef.current.getContext("2d");
+          const type = featureTypes.find(t => t.id === activeFeatureType);
+          const color = mode === "subtract" ? "#ff0000" : (type?.color || "yellow");
+          ctx.fillStyle = color + "80"; 
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
+          ctx.fill();
+      }
+  };
+
+  const handleMouseUp = () => {
+      if (tool === "pan") {
+          setIsPanning(false);
+          return;
+      }
+      
+      if (tool === "brush" && isDrawing) {
+          setIsDrawing(false);
+          const ctx = maskCanvas.getContext("2d");
+          const imageData = ctx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+          const polys = traceContours(imageData);
+          processNewPolygons(polys);
+          draw();
+      }
+  };
+  
+  const finishPolygon = () => {
+      if (currentPoints.length < 3) {
+          setCurrentPoints([]);
+          return;
+      }
+      processNewPolygons([currentPoints]);
+      setCurrentPoints([]);
+  };
+
+  const processNewPolygons = (newPolys) => {
+      const width = canvasRef.current.width;
+      const height = canvasRef.current.height;
+      
+      if (mode === "subtract") {
+          let currentAnns = [...annotations];
+          newPolys.forEach(erasePoly => {
+               currentAnns = eraseFromAnnotations(erasePoly, currentAnns, width, height);
+          });
+          onAnnotationsChange(currentAnns);
+      } else {
+          const newAnns = newPolys.map(pts => ({
+              id: crypto.randomUUID(),
+              points: pts,
+              typeId: activeFeatureType,
+              generated: true
+          }));
+          
+          if (collisionDetection) {
+              handleCollisionAndAdd(newAnns);
+          } else {
+              onAnnotationsChange([...annotations, ...newAnns]);
           }
       }
+  };
+  
+  const handleCollisionAndAdd = (newPolys) => {
+      const width = canvasRef.current.width;
+      const height = canvasRef.current.height;
+      let finalAnns = [...annotations];
+      newPolys.forEach(newPoly => {
+           const resultPolys = subtractAnnotations(newPoly.points, finalAnns, width, height);
+           resultPolys.forEach(pts => {
+               finalAnns.push({
+                   id: crypto.randomUUID(),
+                   points: pts,
+                   typeId: newPoly.typeId,
+                   generated: true
+               });
+           });
+      });
+      onAnnotationsChange(finalAnns);
+  };
+  
+  const handleContextMenu = (e) => {
+      e.preventDefault();
+      if (tool === "polygon" && currentPoints.length > 2) {
+          finishPolygon();
+      } else {
+          setCurrentPoints([]);
+      }
+  };
+  
+  const handleWheel = (e) => {
+      if (e.ctrlKey || tool === "pan") {
+          const scaleAmount = -e.deltaY * 0.001;
+          const newZoom = Math.min(Math.max(0.1, zoom * (1 + scaleAmount)), 10);
+          setZoom(newZoom);
+      }
+  };
 
-      setCurrentPolygon([...currentPolygon, [x, y]]);
-  }
+  const deleteAnnotation = (id) => {
+      onAnnotationsChange(annotations.filter(a => a.id !== id));
+  };
+  
+  // --- Feature Management ---
+  const addFeatureType = () => {
+      if (!newFeatureName) return;
+      const newType = {
+          id: crypto.randomUUID(),
+          name: newFeatureName,
+          color: newFeatureColor
+      };
+      onFeatureTypesChange([...featureTypes, newType]);
+      setNewFeatureName("");
+  };
+  
+  const deleteFeatureType = (id) => {
+      const newTypes = featureTypes.filter(t => t.id !== id);
+      onFeatureTypesChange(newTypes);
+  };
+  
+  const updateFeatureName = (id, newName) => {
+      const newTypes = featureTypes.map(ft => 
+          ft.id === id ? { ...ft, name: newName } : ft
+      );
+      onFeatureTypesChange(newTypes);
+  };
+  
+  const handleImageLoad = (e) => {
+       if (canvasRef.current) {
+           canvasRef.current.width = e.target.naturalWidth;
+           canvasRef.current.height = e.target.naturalHeight;
+           draw();
+       }
+  };
 
-  const handleSave = async () => {
-    if (polygons.length === 0) return;
-    setSaving(true);
-    try {
-        await onSaveAnnotations(image.id, polygons);
-        // Clear after save? Or keep them? Keep them for now.
-    } catch (e) {
-        console.error("Failed to save annotations", e);
-    } finally {
-        setSaving(false);
-    }
-  }
-
-  if (!image) {
-    return (
-      <div className="flex items-center justify-center h-64 bg-gray-100 text-gray-400 border rounded">
-        Select an image to annotate
-      </div>
-    );
-  }
+  if (!image) return <div>Select an image</div>;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="relative border inline-block self-start">
-        <img 
-            src={imageUrl} 
-            alt="Annotation" 
-            className="max-w-full max-h-[500px] display-block select-none"
-            draggable={false}
-            onLoad={(e) => {
-                if (canvasRef.current) {
-                    canvasRef.current.width = e.target.width;
-                    canvasRef.current.height = e.target.height;
-                    draw();
-                }
-            }}
-        />
-        <canvas 
-            ref={canvasRef}
-            className="absolute top-0 left-0 cursor-crosshair"
-            onClick={handleCanvasClick}
-        />
-      </div>
-      
-      <div className="flex gap-2">
-        <Button 
-            intent="success" 
-            onClick={handleSave} 
-            loading={saving}
-            icon="floppy-disk"
-            disabled={polygons.length === 0}
-        >
-            Save Annotations
-        </Button>
-        <Button 
-            intent="danger" 
-            onClick={() => {
-                setPolygons([]);
-                setCurrentPolygon([]);
-            }} 
-            icon="trash"
-        >
-            Clear All
-        </Button>
-         <Button 
-            intent="warning" 
-            onClick={() => setCurrentPolygon([])} 
-            icon="undo"
-            disabled={currentPolygon.length === 0}
-        >
-            Cancel Current Shape
-        </Button>
-        <span className="text-gray-500 text-sm flex items-center ml-2">
-            Click points to draw. Click start point (red dot) to close shape.
-        </span>
-      </div>
+    <div className="flex h-full gap-4">
+       {/* Toolbar / Sidebar */}
+       <div className="w-64 flex flex-col gap-4 p-2 border-r bg-gray-50 overflow-y-auto shrink-0">
+           {/* Tools */}
+           <div className="flex flex-col gap-2">
+               <h5>Tools</h5>
+               <ButtonGroup fill>
+                   <Button icon="hand" active={tool === "pan"} onClick={() => setTool("pan")} title="Pan/Zoom (Ctrl+Scroll)" />
+                   <Button icon="polygon-filter" active={tool === "polygon"} onClick={() => setTool("polygon")} title="Polygon (Right Click to Finish)" disabled={mode === "add" && featureTypes.length === 0} />
+                   <Button icon="draw" active={tool === "brush"} onClick={() => setTool("brush")} title="Brush" disabled={mode === "add" && featureTypes.length === 0} />
+               </ButtonGroup>
+               
+               <div className="flex gap-2 items-center mt-2 px-1">
+                   <span className="text-xs font-bold w-12">Mode:</span>
+                   <ButtonGroup>
+                       <Button 
+                           small 
+                           active={mode === "add"} 
+                           onClick={() => setMode("add")} 
+                           intent={mode === "add" ? "primary" : "none"}
+                       >Add</Button>
+                       <Button 
+                           small 
+                           active={mode === "subtract"} 
+                           onClick={() => setMode("subtract")}
+                           intent={mode === "subtract" ? "danger" : "none"}
+                       >Subtract</Button>
+                   </ButtonGroup>
+               </div>
+               
+               {mode === "add" && (
+                   <div className="mt-2 px-1">
+                       <Checkbox 
+                            checked={collisionDetection} 
+                            onChange={(e) => setCollisionDetection(e.target.checked)}
+                            label="Avoid Overlap"
+                            title="When enabled, new annotations will be clipped by existing ones"
+                       />
+                   </div>
+               )}
+               
+               {tool === "brush" && (
+                   <div className="px-2 pt-2">
+                       <label>Brush Size: {brushSize} px</label>
+                       <Slider 
+                           min={5} max={200} 
+                           value={brushSize} 
+                           onChange={setBrushSize} 
+                           labelStepSize={50}
+                       />
+                   </div>
+               )}
+           </div>
+           
+           <div className="border-t pt-2">
+               <h5>Features</h5>
+               <div className="flex flex-col gap-2 mb-2">
+                   {featureTypes.map(ft => (
+                       <div 
+                           key={ft.id}
+                           className={`p-1 border rounded cursor-pointer flex items-center gap-2 ${activeFeatureType === ft.id ? 'ring-2 ring-blue-500 bg-blue-50' : 'bg-white'}`}
+                           onClick={() => setActiveFeatureType(ft.id)}
+                       >
+                           <div className="w-4 h-4 rounded-full border" style={{ background: ft.color }} />
+                           
+                           {editingFeatureId === ft.id ? (
+                               <input 
+                                   className="flex-1 min-w-0 text-sm border rounded px-1"
+                                   value={ft.name}
+                                   autoFocus
+                                   onClick={(e) => e.stopPropagation()}
+                                   onChange={(e) => updateFeatureName(ft.id, e.target.value)}
+                                   onBlur={() => setEditingFeatureId(null)}
+                                   onKeyDown={(e) => { if (e.key === 'Enter') setEditingFeatureId(null); }}
+                               />
+                           ) : (
+                               <span 
+                                   className="text-sm flex-1 truncate"
+                                   onClick={(e) => {
+                                       e.stopPropagation();
+                                       setActiveFeatureType(ft.id);
+                                       setEditingFeatureId(ft.id);
+                                   }}
+                               >{ft.name}</span>
+                           )}
+                           
+                           <Icon icon="cross" size={12} className="text-gray-400 hover:text-red-500" onClick={(e) => { e.stopPropagation(); deleteFeatureType(ft.id); }} />
+                       </div>
+                   ))}
+               </div>
+               
+               {/* Add New Feature */}
+               <div className="flex gap-1 flex-col mt-2 p-2 bg-white rounded border">
+                   <InputGroup 
+                       placeholder="Name" 
+                       value={newFeatureName} 
+                       onChange={e => setNewFeatureName(e.target.value)} 
+                       small 
+                   />
+                   <div className="flex gap-1">
+                       <input 
+                           type="color" 
+                           value={newFeatureColor} 
+                           onChange={e => setNewFeatureColor(e.target.value)}
+                           className="h-6 w-8 p-0 border-0 cursor-pointer"
+                       />
+                       <Button icon="add" small onClick={addFeatureType} disabled={!newFeatureName} fill>Add</Button>
+                   </div>
+               </div>
+           </div>
+           
+           <div className="border-t pt-2 flex-1 overflow-auto min-h-[100px]">
+               <h5>Annotations ({annotations.length})</h5>
+               <div className="flex flex-col gap-1">
+                   {annotations.map((ann, i) => {
+                       const ft = featureTypes.find(t => t.id === ann.typeId);
+                       return (
+                           <div key={ann.id} className="flex justify-between items-center text-xs p-1 bg-white border hover:bg-gray-100">
+                               <div className="flex items-center gap-2">
+                                   <div className="w-2 h-2 rounded-full" style={{ background: ft?.color || 'gray' }} />
+                                   <span>{ft?.name || 'Unknown'} #{i+1}</span>
+                               </div>
+                               <Button icon="trash" minimal small onClick={() => deleteAnnotation(ann.id)} />
+                           </div>
+                   )})}
+               </div>
+           </div>
+       </div>
+
+       {/* Canvas Area */}
+       <div className="flex-1 relative overflow-hidden bg-gray-200 border rounded cursor-crosshair" ref={containerRef} onWheel={handleWheel}>
+           <div 
+               style={{ 
+                   transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, 
+                   transformOrigin: "0 0",
+                   transition: isPanning ? "none" : "transform 0.1s"
+               }}
+               className="inline-block origin-top-left relative"
+           >
+               <img 
+                   src={imageUrl} 
+                   alt="work" 
+                   className="block pointer-events-none select-none max-w-none" 
+                   onLoad={handleImageLoad}
+               />
+               <canvas 
+                   ref={canvasRef}
+                   className="absolute top-0 left-0 w-full h-full" 
+                   onMouseDown={handleMouseDown}
+                   onMouseMove={handleMouseMove}
+                   onMouseUp={handleMouseUp}
+                   onMouseLeave={handleMouseUp}
+                   onContextMenu={handleContextMenu}
+               />
+           </div>
+           
+           {/* Zoom Controls Overlay */}
+           <div className="absolute bottom-4 right-4 flex gap-2">
+               <Button icon="minus" onClick={() => setZoom(z => Math.max(0.1, z * 0.8))} />
+               <Button text={`${Math.round(zoom * 100)}%`} disabled />
+               <Button icon="plus" onClick={() => setZoom(z => Math.min(10, z * 1.2))} />
+               <Button icon="reset" onClick={() => { setZoom(1); setPan({x:0,y:0}); }} />
+           </div>
+       </div>
     </div>
   );
 };
-
 export default AnnotationViewer;
+

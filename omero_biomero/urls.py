@@ -75,6 +75,11 @@ urlpatterns = [
         stardist_views.run_training,
         name="stardist_run_training",
     ),
+    path(
+        "api/stardist/fetch_annotations/",
+        stardist_views.fetch_annotations,
+        name="stardist_fetch_annotations",
+    ),
     # Main Biomero URL
     path(
         "biomero/",

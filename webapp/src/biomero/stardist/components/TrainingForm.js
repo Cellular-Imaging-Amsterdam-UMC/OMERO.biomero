@@ -11,6 +11,7 @@ const TrainingForm = ({ onTrain, loading }) => {
   });
 
   const handleChange = (key, value) => {
+      // Basic type casting
       setConfig({ ...config, [key]: value });
   };
 
@@ -35,6 +36,9 @@ const TrainingForm = ({ onTrain, loading }) => {
               onValueChange={(v) => handleChange("epochs", v)} 
               min={1} 
               max={1000}
+              stepSize={1}
+              minorStepSize={1}
+              majorStepSize={10}
           />
        </FormGroup>
 
@@ -45,6 +49,9 @@ const TrainingForm = ({ onTrain, loading }) => {
               onValueChange={(v) => handleChange("batchSize", v)} 
               min={1} 
               max={32}
+              stepSize={1}
+              minorStepSize={1}
+              majorStepSize={4}
           />
        </FormGroup>
 
@@ -56,6 +63,8 @@ const TrainingForm = ({ onTrain, loading }) => {
               min={0.05} 
               max={0.5}
               stepSize={0.05}
+              minorStepSize={0.01}
+              majorStepSize={0.1}
           />
        </FormGroup>
        
@@ -67,6 +76,8 @@ const TrainingForm = ({ onTrain, loading }) => {
               min={64} 
               max={1024}
               stepSize={32}
+              minorStepSize={8}
+              majorStepSize={64}
           />
        </FormGroup>
 
