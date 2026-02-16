@@ -264,9 +264,27 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, featureType
   };
   
   const handleWheel = (e) => {
-      if (e.ctrlKey || tool === "pan") {
-          const scaleAmount = -e.deltaY * 0.001;
-          const newZoom = Math.min(Math.max(0.1, zoom * (1 + scaleAmount)), 10);
+      e.preventDefault();
+      
+      const container = containerRef.current;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // Define zoom speed and limits
+      const zoomSpeed = 0.001;
+      const scaleAmount = -e.deltaY * zoomSpeed;
+      const newZoom = Math.min(Math.max(0.1, zoom * (1 + scaleAmount)), 20);
+
+      if (newZoom !== zoom) {
+          // Adjust pan to zoom relative to mouse position
+          const zoomRatio = newZoom / zoom;
+          setPan(p => ({
+              x: mouseX - (mouseX - p.x) * zoomRatio,
+              y: mouseY - (mouseY - p.y) * zoomRatio
+          }));
           setZoom(newZoom);
       }
   };
