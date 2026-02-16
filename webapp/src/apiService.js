@@ -270,6 +270,47 @@ export const runStardistTraining = async (params) => {
   }
 };
 
+export const fetchMapAnnotations = async (imageId) => {
+  if (!imageId) return [];
+  // Use our custom endpoint that reads FileAnnotation
+  try {
+      const endpoint = `/omero_biomero/api/stardist/fetch_annotations/?image=${imageId}`;
+      const response = await apiRequest(endpoint, "GET");
+      
+      // Response is just the data object { annotations: [], featureTypes: [] }
+      // We wrap it in a structure compatible with existing "fetch" return if needed?
+      // But let's just return the raw data and update AnnotationTab to handle it.
+      return response; 
+  } catch (error) {
+      console.error("Error fetching annotations:", error);
+      return { annotations: [], featureTypes: [] };
+  }
+};
+
+export const saveMapAnnotation = async (imageId, annotationData, annotationId = null) => {
+    // New Implementation: Save as FileAnnotation via custom view
+    const endpoint = "/omero_biomero/api/stardist/save_annotations/";
+    const csrfToken = window.csrftoken;
+    
+    try {
+        const payload = {
+            imageId: imageId,
+            data: annotationData
+        };
+        
+        const response = await apiRequest(endpoint, "POST", payload, {
+             headers: {
+                "X-CSRFToken": csrfToken,
+                "Content-Type": "application/json"
+             },
+        });
+        return response;
+    } catch (error) {
+        console.error("Error saving annotations:", error);
+        throw error;
+    }
+};
+
 export const createContainer = async (
   type,
   name,

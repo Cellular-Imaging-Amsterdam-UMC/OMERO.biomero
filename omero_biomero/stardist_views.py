@@ -24,47 +24,123 @@ def list_models(request, conn=None, **kwargs):
     return JsonResponse({"models": models})
 
 @login_required()
+@require_GET
+def fetch_annotations(request, conn=None, **kwargs):
+    """
+    Fetch annotations from the FileAnnotation attached to the image.
+    Expects ?image=ID
+    """
+    try:
+        image_id = request.GET.get("image")
+        if not image_id:
+            return JsonResponse({"error": "Missing image ID"}, status=400)
+            
+        image = conn.getObject("Image", image_id)
+        if not image:
+            return JsonResponse({"error": "Image not found"}, status=404)
+            
+        FILENAME = "stardist_data.json"
+        
+        # Find the annotation
+        for ann in image.listAnnotations():
+            if isinstance(ann, omero.gateway.FileAnnotationWrapper):
+                if ann.getFile().getName() == FILENAME:
+                    # Download file content
+                    # getFileInChunks is a generator
+                    content = b""
+                    for chunk in ann.getFileInChunks():
+                        content += chunk
+                    
+                    # Parse JSON
+                    data = json.loads(content)
+                    return JsonResponse(data)
+                    
+        # If not found
+        return JsonResponse({"annotations": [], "featureTypes": []})
+        
+    except Exception as e:
+        logger.error("Error fetching annotations", exc_info=True)
+        return JsonResponse({"error": str(e)}, status=500)
+
+@login_required()
 @require_POST
 def save_annotations(request, conn=None, **kwargs):
     """
-    Save polygons as OMERO ROIs.
-    Expects JSON body: { "imageId": 123, "polygons": [[ [x,y], ... ], ...] }
+    Save annotations as a FileAnnotation attached to the Image.
+    This bypasses the size limit of MapAnnotation values.
+    Expects form-data: imageId, data (JSON string)
     """
     try:
-        data = json.loads(request.body)
-        image_id = data.get("imageId")
-        polygons = data.get("polygons")
+        # We handle multipart/form-data or JSON body?
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+            image_id = data.get("imageId")
+            annotation_data = data.get("data") # The JSON object
+        else:
+            image_id = request.POST.get("imageId")
+            annotation_data = request.POST.get("data")
+            if isinstance(annotation_data, str):
+                annotation_data = json.loads(annotation_data)
 
-        if not image_id or not polygons:
-            return JsonResponse({"error": "Missing imageId or polygons"}, status=400)
+        if not image_id or not annotation_data:
+            return JsonResponse({"error": "Missing imageId or data"}, status=400)
 
         image = conn.getObject("Image", image_id)
         if not image:
             return JsonResponse({"error": "Image not found"}, status=404)
 
-        # Create ROI
-        roi = omero.model.RoiI()
-        roi.setImage(omero.model.ImageI(image_id, False))
-        
-        # Add polygons
-        for poly_points in polygons:
-            # Stardist might return [y,x] or [x,y]. 
-            # Our frontend sends [x,y].
-            # OMERO Polygon expects string "x1,y1, x2,y2 ..."
-            points_str = ", ".join([f"{p[0]},{p[1]}" for p in poly_points])
-            
-            shape = omero.model.PolygonI()
-            shape.setPoints(omero.rtypes.rstring(points_str))
-            shape.setTheZ(omero.rtypes.rint(0)) # Default Z
-            shape.setTheT(omero.rtypes.rint(0)) # Default T
-            shape.setTextValue(omero.rtypes.rstring("Stardist Annotation"))
-            
-            roi.addShape(shape)
+        # Ensure we are in the correct group context
+        group_id = image.getDetails().getGroup().getId()
+        conn.SERVICE_OPTS.setOmeroGroup(group_id)
 
-        # Save ROI
-        conn.getUpdateService().saveObject(roi)
+        # 1. Check for existing FileAnnotation named "stardist_data.json"
+        FILENAME = "stardist_data.json"
+        existing_file_ann = None
         
-        return JsonResponse({"success": True, "count": len(polygons)})
+        for ann in image.listAnnotations():
+            if isinstance(ann, omero.gateway.FileAnnotationWrapper):
+                if ann.getFile().getName() == FILENAME:
+                    existing_file_ann = ann
+                    break
+        
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix=".json") as tmp:
+            json.dump(annotation_data, tmp)
+            tmp_path = tmp.name
+            
+        try:
+            if existing_file_ann:
+                try:
+                    conn.deleteObjects("Annotation", [existing_file_ann.getId()])
+                except Exception:
+                     pass # Maybe already deleted or permission issue?
+            
+            namespace = "biomero.stardist.annotations"
+            
+            # Create annotation (this handles upload and linking usually? No, createOriginalFileFromFileObj just creates file)
+            # createFileAnnfromLocalFile creates FileAnnotation and OriginalFile
+            file_ann = conn.createFileAnnfromLocalFile(
+                tmp_path, 
+                mimetype="application/json", 
+                ns=namespace, 
+                desc="Stardist Training Annotations"
+            )
+            
+            # Rename the file
+            original_file = file_ann.getFile()
+            original_file.setName(FILENAME) 
+            original_file.save() # Uses current context
+            
+            # Attach to Image
+            image.linkAnnotation(file_ann)
+
+            return JsonResponse({"success": True, "fileId": original_file.getId()})
+            
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
     except Exception as e:
         logger.error("Error saving annotations", exc_info=True)

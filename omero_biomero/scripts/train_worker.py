@@ -46,42 +46,65 @@ def main():
 
         images = []
         
+        import json
+        from skimage.draw import polygon
+        import omero
+        
         # 2. Download Data
         print("Downloading images and annotations...")
         for image in dataset.listChildren():
-            # Check for ROIs
-            roi_service = conn.getRoiService()
-            result = roi_service.findByImage(image.getId(), None)
             
-            if not result.rois:
-                print(f"Skipping image {image.getId()} (no ROIs)")
+            # Fetch annotations from FileAnnotation
+            found_polys = []
+            FILENAME = "stardist_data.json"
+            
+            annotation_file = None
+            for ann in image.listAnnotations():
+                if isinstance(ann, omero.gateway.FileAnnotationWrapper):
+                    if ann.getFile().getName() == FILENAME:
+                        annotation_file = ann
+                        break
+            
+            if annotation_file:
+                try:
+                    content = b""
+                    for chunk in annotation_file.getFileInChunks():
+                        content += chunk
+                    payload = json.loads(content)
+                    if "annotations" in payload:
+                        found_polys = payload["annotations"]
+                except Exception as e:
+                    print(f"Failed to load JSON file for image {image.getId()}: {e}")
+
+            if not found_polys:
+                print(f"Skipping image {image.getId()} (no annotations in {FILENAME})")
                 continue
                 
             # Download Image
             pixels = image.getPrimaryPixels()
-            # Simple assumption: 2D image, create from plane 0,0
-            # For real usage, iterate Z/T or handle 3D
             # We fetch plane (z=0, t=0)
             plane = pixels.getPlane(0, 0) # numpy array
             
             img_path = f"{base_dir}/images/{image.getId()}.tif"
             imwrite(img_path, plane)
             
-            # Create Mask from ROIs
-            # We assume ROIs are polygons
-            # We need a mask of same shape as plane
+            # Create Mask from Polygons
             mask = np.zeros(plane.shape, dtype=np.uint16)
             
-            # TODO: Rasterize polygons to mask
-            # This requires converting OMERO shapes to mask
-            # For simplicity, we skip complex rasterization here
-            # and just create a dummy mask for proof of concept
-            # OR we try to implement simple polygon fill if possible
-            # But normally we use 'microbeSEG' logic or similar libraries
-            
-            # Mock mask generation (central square)
-            h, w = mask.shape
-            mask[h//4:3*h//4, w//4:3*w//4] = 1 
+            for idx, poly in enumerate(found_polys):
+                points = poly.get("points")
+                if not points or len(points) < 3: continue
+                
+                # points is [[x,y], ..]
+                # skimage polygon expects rows(y), cols(x)
+                rr = [p[1] for p in points]
+                cc = [p[0] for p in points]
+                
+                try:
+                    r_idx, c_idx = polygon(rr, cc, shape=mask.shape)
+                    mask[r_idx, c_idx] = idx + 1 # Instance labels 1..N
+                except Exception as e:
+                    print(f"Error rasterizing polygon {idx} on image {image.getId()}: {e}")
             
             mask_path = f"{base_dir}/masks/{image.getId()}.tif"
             imwrite(mask_path, mask)

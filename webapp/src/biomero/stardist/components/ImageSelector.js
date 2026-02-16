@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { fetchImages } from "../../../apiService";
-import { Button, Card, Elevation, Spinner } from "@blueprintjs/core";
+import { fetchImages, fetchThumbnails } from "../../../apiService";
+import { Card, Elevation, Spinner } from "@blueprintjs/core";
 
 const ImageSelector = ({ datasetId, onSelect, selectedImageId }) => {
   const [images, setImages] = useState([]);
+  const [thumbnails, setThumbnails] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!datasetId) {
       setImages([]);
+      setThumbnails({});
       return;
     }
 
@@ -17,9 +19,29 @@ const ImageSelector = ({ datasetId, onSelect, selectedImageId }) => {
       setLoading(true);
       setError(null);
       try {
-        // Fetch images (default page 1, maybe need pagination later)
         const imgs = await fetchImages(datasetId);
         setImages(imgs);
+        
+        // Fetch thumbnails for the images
+        if (imgs.length > 0) {
+            const imageIds = imgs.map(img => img.id);
+            // Fetch in batches to be safe? The API handles multiple IDs.
+            // Let's just fetch all at once for now as per AppContext logic
+            try {
+                // We might want to batch this if there are many images
+                const batchSize = 50;
+                let allThumbs = {};
+                for (let i = 0; i < imageIds.length; i += batchSize) {
+                    const chunk = imageIds.slice(i, i + batchSize);
+                    const thumbs = await fetchThumbnails(chunk);
+                    Object.assign(allThumbs, thumbs);
+                }
+                setThumbnails(allThumbs);
+            } catch (thumbErr) {
+                console.error("Error loading thumbnails:", thumbErr);
+                // Don't fail the whole view if thumbs fail
+            }
+        }
       } catch (err) {
         console.error("Error loading images:", err);
         setError("Failed to load images.");
@@ -35,7 +57,7 @@ const ImageSelector = ({ datasetId, onSelect, selectedImageId }) => {
     return <div className="text-gray-500 italic">Select a dataset to view images.</div>;
   }
 
-  if (loading) {
+  if (loading && images.length === 0) {
     return <Spinner size={20} />;
   }
 
@@ -48,26 +70,31 @@ const ImageSelector = ({ datasetId, onSelect, selectedImageId }) => {
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[300px] overflow-y-auto p-2 border rounded">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[400px] overflow-y-auto p-2 border rounded bg-white">
       {images.map((img) => (
         <Card
           key={img.id}
           interactive={true}
           elevation={selectedImageId === img.id ? Elevation.TWO : Elevation.ZERO}
-          className={`p-2 cursor-pointer ${
-            selectedImageId === img.id ? "bg-blue-100 border-blue-500 border" : ""
+          className={`p-2 cursor-pointer flex flex-col items-center gap-2 ${
+            selectedImageId === img.id ? "bg-blue-100 border-blue-500 border" : "hover:bg-gray-50"
           }`}
           onClick={() => onSelect(img)}
         >
-          <div className="flex flex-col items-center">
-             {/* Thumbnail placeholder or actual thumbnail if available via another API */}
-             <div className="w-full h-24 bg-gray-200 flex items-center justify-center mb-2 text-xs text-gray-400">
-               {img.thumb_url ? <img src={img.thumb_url} alt={img.name} className="max-h-full max-w-full" /> : "No Thumb"}
-             </div>
-            <div className="text-xs truncate w-full text-center" title={img.name}>
+           {/* Thumbnail */}
+           <div className="w-full h-24 bg-gray-100 flex items-center justify-center rounded overflow-hidden relative">
+             {thumbnails[img.id] ? (
+                 <img src={thumbnails[img.id]} alt={img.name} className="max-h-full max-w-full object-contain" />
+             ) : (
+                 <div className="text-xs text-gray-400">
+                     {loading ? <Spinner size={16} /> : "No Thumb"}
+                 </div>
+             )}
+           </div>
+           
+           <div className="text-xs truncate w-full text-center font-medium" title={img.name}>
               {img.name}
-            </div>
-          </div>
+           </div>
         </Card>
       ))}
     </div>

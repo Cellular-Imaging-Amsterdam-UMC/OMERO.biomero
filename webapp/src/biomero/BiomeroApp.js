@@ -238,7 +238,7 @@ const BiomeroApp = () => {
       </div>
 
       {/* Tabs with Panels */}
-      <div className="p-4 h-full overflow-hidden">
+      <div className="px-4 pb-4 h-full overflow-hidden">
         <Tabs
           id="app-tabs"
           className="h-full"
