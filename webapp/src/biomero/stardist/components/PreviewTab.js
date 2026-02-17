@@ -1,19 +1,24 @@
-import React, { useState } from "react";
-import { H4, Card, Divider } from "@blueprintjs/core";
+import React, { useState, useEffect } from "react";
+import { H4, Card } from "@blueprintjs/core";
 import DatasetSelectWithPopover from "../../components/DatasetSelectWithPopover";
 import ImageSelector from "./ImageSelector";
 import ModelSelector from "./ModelSelector";
+import ChannelSelector from "./ChannelSelector";
 import PreviewViewer from "./PreviewViewer";
+import { fetchImageChannels } from "../../../apiService";
 
 const PreviewTab = () => {
   const [selectedDatasets, setSelectedDatasets] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedModel, setSelectedModel] = useState("2D_versatile_fluo");
+  const [channels, setChannels] = useState([]);
+  const [selectedChannel, setSelectedChannel] = useState(0);
+  const [loadingChannels, setLoadingChannels] = useState(false);
 
   // Helper to extract ID from string like "dataset-123"
   const getDatasetId = (selection) => {
       if (!selection || selection.length === 0) return null;
-      const str = selection[0]; // Assume single selection for now
+      const str = selection[0];
       if (str.startsWith("dataset-")) {
           return str.split("-")[1];
       }
@@ -24,8 +29,42 @@ const PreviewTab = () => {
 
   const handleDatasetChange = (newSelection) => {
       setSelectedDatasets(newSelection);
-      setSelectedImage(null); // Reset image when dataset changes
+      setSelectedImage(null);
+      setChannels([]);
+      setSelectedChannel(0);
   };
+
+  const handleImageSelect = (img) => {
+      setSelectedImage(img);
+      setSelectedChannel(0);
+  };
+
+  // Fetch channels when image changes
+  useEffect(() => {
+      if (!selectedImage) {
+          setChannels([]);
+          setSelectedChannel(0);
+          return;
+      }
+
+      const loadChannels = async () => {
+          setLoadingChannels(true);
+          try {
+              const data = await fetchImageChannels(selectedImage.id);
+              setChannels(data.channels || []);
+              // Default to first active channel, or channel 0
+              const firstActive = (data.channels || []).find(ch => ch.active);
+              setSelectedChannel(firstActive ? firstActive.index : 0);
+          } catch (e) {
+              console.error("Failed to load channels:", e);
+              setChannels([]);
+          } finally {
+              setLoadingChannels(false);
+          }
+      };
+
+      loadChannels();
+  }, [selectedImage]);
 
   return (
     <div className="p-4 flex flex-col gap-4 h-full overflow-y-auto">
@@ -51,12 +90,23 @@ const PreviewTab = () => {
                  />
              </Card>
 
+             {channels.length > 1 && (
+                 <Card>
+                     <ChannelSelector 
+                        channels={channels}
+                        selectedChannel={selectedChannel}
+                        onSelect={setSelectedChannel}
+                        loading={loadingChannels}
+                     />
+                 </Card>
+             )}
+
              <Card className="flex-1 min-h-[200px] flex flex-col">
                  <h5 className="bp5-heading mb-2">Select Image</h5>
                  <ImageSelector 
                     datasetId={datasetId}
                     selectedImageId={selectedImage?.id}
-                    onSelect={setSelectedImage}
+                    onSelect={handleImageSelect}
                  />
              </Card>
         </div>
@@ -67,6 +117,8 @@ const PreviewTab = () => {
                  <PreviewViewer 
                     image={selectedImage}
                     model={selectedModel}
+                    channel={selectedChannel}
+                    channels={channels}
                  />
              </Card>
         </div>

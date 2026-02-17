@@ -40,21 +40,62 @@ def list_models(request, conn=None, **kwargs):
 
 
 @login_required()
+@require_GET
+def get_image_channels(request, conn=None, **kwargs):
+    """
+    Return channel information for an OMERO image.
+    Expects ?image=ID
+    Returns: { channels: [ {index, name, color, active} ] }
+    """
+    try:
+        image_id = request.GET.get("image")
+        if not image_id:
+            return JsonResponse({"error": "Missing image ID"}, status=400)
+
+        image = conn.getObject("Image", image_id)
+        if not image:
+            return JsonResponse({"error": "Image not found"}, status=404)
+
+        channels = []
+        for idx, ch in enumerate(image.getChannels()):
+            # getColor() returns an RGBA color object
+            color = ch.getColor()
+            channels.append({
+                "index": idx,
+                "name": ch.getLabel(),
+                "color": color.getHtml() if color else "#ffffff",
+                "active": ch.isActive(),
+            })
+
+        return JsonResponse({
+            "channels": channels,
+            "sizeC": image.getSizeC(),
+            "sizeZ": image.getSizeZ(),
+            "sizeT": image.getSizeT(),
+        })
+
+    except Exception as e:
+        logger.error("Error fetching image channels", exc_info=True)
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@login_required()
 @require_POST
 def run_prediction(request, conn=None, **kwargs):
     """
     Run StarDist prediction on an OMERO image.
     
     Expects JSON body:
-      { "image_id": int, "model": str }
+      { "image_id": int, "model": str, "channel": int (optional, default 0) }
     
-    Fetches the image from OMERO, sends it to the stardist container,
-    and returns the detected polygons.
+    Fetches the specified channel plane from OMERO, sends it to the stardist
+    container, and returns the detected polygons.
     """
     try:
         data = json.loads(request.body)
         image_id = data.get("image_id")
         model_name = data.get("model", "2D_versatile_fluo")
+        channel = data.get("channel", 0)
 
         if not image_id:
             return JsonResponse({"error": "Missing image_id"}, status=400)
@@ -63,10 +104,14 @@ def run_prediction(request, conn=None, **kwargs):
         if not image:
             return JsonResponse({"error": "Image not found"}, status=404)
 
-        # Render image as PNG bytes via OMERO's rendering engine
-        # We use the first z-plane and first timepoint
+        # Validate channel index
+        size_c = image.getSizeC()
+        if channel < 0 or channel >= size_c:
+            return JsonResponse({"error": f"Channel {channel} out of range (0-{size_c-1})"}, status=400)
+
+        # Fetch the specified channel plane (z=0, t=0)
         pixels = image.getPrimaryPixels()
-        plane = pixels.getPlane(0, 0, 0)  # z=0, c=0, t=0
+        plane = pixels.getPlane(0, channel, 0)  # z=0, c=channel, t=0
 
         # Convert numpy array to PNG bytes
         from PIL import Image as PILImage
