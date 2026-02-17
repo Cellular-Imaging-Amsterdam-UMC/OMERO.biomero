@@ -247,10 +247,8 @@ export const postUpload = async (upload) => {
 };
 
 export const runStardistTraining = async (params) => {
-  const { urls } = getDjangoConstants();
   try {
     const csrfToken = window.csrftoken;
-    // We assume urls.stardist_train is defined or we hardcode path for now
     const endpoint = "/omero_biomero/api/stardist/train/"; 
     
     const response = await apiRequest(
@@ -266,6 +264,44 @@ export const runStardistTraining = async (params) => {
     return response;
   } catch (error) {
     console.error("Error running stardist training:", error);
+    throw error;
+  }
+};
+
+export const fetchStardistModels = async () => {
+  try {
+    const endpoint = "/omero_biomero/api/stardist/models/";
+    const response = await apiRequest(endpoint, "GET");
+    return response.models || [];
+  } catch (error) {
+    console.error("Error fetching stardist models:", error);
+    // Return built-in defaults as fallback
+    return [
+      { value: "2D_versatile_fluo", label: "2D_versatile_fluo (Built-in)", type: "builtin" },
+      { value: "2D_versatile_he", label: "2D_versatile_he (Built-in)", type: "builtin" },
+      { value: "2D_demo", label: "2D_demo (Built-in)", type: "builtin" },
+    ];
+  }
+};
+
+export const runStardistPrediction = async (imageId, modelName) => {
+  try {
+    const csrfToken = window.csrftoken;
+    const endpoint = "/omero_biomero/api/stardist/predict/";
+    
+    const response = await apiRequest(
+      endpoint,
+      "POST",
+      { image_id: imageId, model: modelName },
+      {
+        headers: {
+          "X-CSRFToken": csrfToken,
+        },
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error running stardist prediction:", error);
     throw error;
   }
 };
