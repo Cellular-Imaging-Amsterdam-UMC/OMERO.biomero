@@ -57,6 +57,11 @@ urlpatterns = [
         name="stardist_list_models",
     ),
     path(
+        "api/stardist/channels/",
+        stardist_views.get_image_channels,
+        name="stardist_image_channels",
+    ),
+    path(
         "api/stardist/save_annotations/",
         stardist_views.save_annotations,
         name="stardist_save_annotations",

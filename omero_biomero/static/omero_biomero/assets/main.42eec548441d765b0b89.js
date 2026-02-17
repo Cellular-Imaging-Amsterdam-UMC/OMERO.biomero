@@ -25084,6 +25084,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   fetchFolderData: () => (/* binding */ fetchFolderData),
 /* harmony export */   fetchGroupMappings: () => (/* binding */ fetchGroupMappings),
 /* harmony export */   fetchGroups: () => (/* binding */ fetchGroups),
+/* harmony export */   fetchImageChannels: () => (/* binding */ fetchImageChannels),
 /* harmony export */   fetchImages: () => (/* binding */ fetchImages),
 /* harmony export */   fetchMapAnnotations: () => (/* binding */ fetchMapAnnotations),
 /* harmony export */   fetchPlateImages: () => (/* binding */ fetchPlateImages),
@@ -25092,6 +25093,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   fetchScriptData: () => (/* binding */ fetchScriptData),
 /* harmony export */   fetchScripts: () => (/* binding */ fetchScripts),
 /* harmony export */   fetchSlurmStatus: () => (/* binding */ fetchSlurmStatus),
+/* harmony export */   fetchStardistModels: () => (/* binding */ fetchStardistModels),
 /* harmony export */   fetchThumbnails: () => (/* binding */ fetchThumbnails),
 /* harmony export */   fetchWorkflowMetadata: () => (/* binding */ fetchWorkflowMetadata),
 /* harmony export */   fetchWorkflows: () => (/* binding */ fetchWorkflows),
@@ -25099,6 +25101,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   postConfig: () => (/* binding */ postConfig),
 /* harmony export */   postGroupMappings: () => (/* binding */ postGroupMappings),
 /* harmony export */   postUpload: () => (/* binding */ postUpload),
+/* harmony export */   runStardistPrediction: () => (/* binding */ runStardistPrediction),
 /* harmony export */   runStardistTraining: () => (/* binding */ runStardistTraining),
 /* harmony export */   runWorkflow: () => (/* binding */ runWorkflow),
 /* harmony export */   saveMapAnnotation: () => (/* binding */ saveMapAnnotation)
@@ -25378,12 +25381,8 @@ const postUpload = async upload => {
   }
 };
 const runStardistTraining = async params => {
-  const {
-    urls
-  } = (0,_constants__WEBPACK_IMPORTED_MODULE_0__.getDjangoConstants)();
   try {
     const csrfToken = window.csrftoken;
-    // We assume urls.stardist_train is defined or we hardcode path for now
     const endpoint = "/omero_biomero/api/stardist/train/";
     const response = await apiRequest(endpoint, "POST", params, {
       headers: {
@@ -25393,6 +25392,66 @@ const runStardistTraining = async params => {
     return response;
   } catch (error) {
     console.error("Error running stardist training:", error);
+    throw error;
+  }
+};
+const fetchStardistModels = async () => {
+  try {
+    const endpoint = "/omero_biomero/api/stardist/models/";
+    const response = await apiRequest(endpoint, "GET");
+    return response.models || [];
+  } catch (error) {
+    console.error("Error fetching stardist models:", error);
+    // Return built-in defaults as fallback
+    return [{
+      value: "2D_versatile_fluo",
+      label: "2D_versatile_fluo (Built-in)",
+      type: "builtin"
+    }, {
+      value: "2D_versatile_he",
+      label: "2D_versatile_he (Built-in)",
+      type: "builtin"
+    }, {
+      value: "2D_demo",
+      label: "2D_demo (Built-in)",
+      type: "builtin"
+    }];
+  }
+};
+const fetchImageChannels = async imageId => {
+  if (!imageId) return {
+    channels: [],
+    sizeC: 0
+  };
+  try {
+    const endpoint = `/omero_biomero/api/stardist/channels/?image=${imageId}`;
+    const response = await apiRequest(endpoint, "GET");
+    return response;
+  } catch (error) {
+    console.error("Error fetching image channels:", error);
+    return {
+      channels: [],
+      sizeC: 0
+    };
+  }
+};
+const runStardistPrediction = async function (imageId, modelName) {
+  let channel = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
+  try {
+    const csrfToken = window.csrftoken;
+    const endpoint = "/omero_biomero/api/stardist/predict/";
+    const response = await apiRequest(endpoint, "POST", {
+      image_id: imageId,
+      model: modelName,
+      channel: channel
+    }, {
+      headers: {
+        "X-CSRFToken": csrfToken
+      }
+    });
+    return response;
+  } catch (error) {
+    console.error("Error running stardist prediction:", error);
     throw error;
   }
 };
@@ -30365,6 +30424,83 @@ const AnnotationViewer = _ref => {
 
 /***/ }),
 
+/***/ "./src/biomero/stardist/components/ChannelSelector.js":
+/*!************************************************************!*\
+  !*** ./src/biomero/stardist/components/ChannelSelector.js ***!
+  \************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/formGroup.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/tag/tag.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+const ChannelSelector = _ref => {
+  let {
+    channels,
+    selectedChannel,
+    onSelect,
+    loading
+  } = _ref;
+  if (!channels || channels.length === 0) {
+    return null;
+  }
+
+  // Single channel — no need to show selector
+  if (channels.length === 1) {
+    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.FormGroup, {
+      label: "Channel",
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.Tag, {
+        minimal: true,
+        children: channels[0].name || "Channel 0"
+      })
+    });
+  }
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.FormGroup, {
+    label: "Select Channel",
+    helperText: "Choose which channel to run prediction on",
+    children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("div", {
+      className: "flex flex-col gap-1",
+      children: channels.map(ch => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+        active: selectedChannel === ch.index,
+        intent: selectedChannel === ch.index ? "primary" : "none",
+        onClick: () => onSelect(ch.index),
+        alignText: "left",
+        small: true,
+        fill: true,
+        disabled: loading,
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
+          className: "flex items-center gap-2 w-full",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("div", {
+            className: "w-3 h-3 rounded-full border border-gray-300 shrink-0",
+            style: {
+              backgroundColor: ch.color || "#ccc"
+            }
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("span", {
+            className: "truncate",
+            children: ch.name || `Channel ${ch.index}`
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("span", {
+            className: "text-xs opacity-60 ml-auto",
+            children: ["#", ch.index]
+          })]
+        })
+      }, ch.index))
+    })
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (ChannelSelector);
+
+/***/ }),
+
 /***/ "./src/biomero/stardist/components/ImageSelector.js":
 /*!**********************************************************!*\
   !*** ./src/biomero/stardist/components/ImageSelector.js ***!
@@ -30506,37 +30642,101 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/formGroup.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/html-select/htmlSelect.js");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/formGroup.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/spinner/spinner.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/html-select/htmlSelect.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/tag/tag.js");
+/* harmony import */ var _apiService__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../apiService */ "./src/apiService.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
 
 
 
-const MODELS = [{
-  label: "2D_versatile_fluo",
-  value: "2D_versatile_fluo"
-}, {
-  label: "2D_versatile_he",
-  value: "2D_versatile_he"
-}, {
-  label: "2D_demo",
-  value: "2D_demo"
-}];
+
 const ModelSelector = _ref => {
   let {
     selectedModel,
     onSelect
   } = _ref;
-  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.FormGroup, {
+  const [models, setModels] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
+  const [loading, setLoading] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(true);
+  const [error, setError] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
+  const loadModels = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const fetched = await (0,_apiService__WEBPACK_IMPORTED_MODULE_1__.fetchStardistModels)();
+      setModels(fetched);
+
+      // If current selection is not in the list, select the first one
+      if (fetched.length > 0 && !fetched.find(m => m.value === selectedModel)) {
+        onSelect(fetched[0].value);
+      }
+    } catch (e) {
+      console.error("Failed to load models:", e);
+      setError("Failed to load models");
+    } finally {
+      setLoading(false);
+    }
+  };
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    loadModels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (loading) {
+    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.FormGroup, {
+      label: "Select Model",
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Spinner, {
+        size: 20
+      })
+    });
+  }
+  if (error) {
+    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.FormGroup, {
+      label: "Select Model",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+        className: "text-red-500 text-sm mb-2",
+        children: error
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
+        icon: "refresh",
+        small: true,
+        onClick: loadModels,
+        children: "Retry"
+      })]
+    });
+  }
+  const options = models.map(m => ({
+    label: m.label,
+    value: m.value
+  }));
+  const selectedMeta = models.find(m => m.value === selectedModel);
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.FormGroup, {
     label: "Select Model",
     labelFor: "model-select",
-    children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.HTMLSelect, {
-      id: "model-select",
-      options: MODELS,
-      value: selectedModel,
-      onChange: e => onSelect(e.target.value),
-      fill: true
-    })
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+      className: "flex items-center gap-2",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.HTMLSelect, {
+        id: "model-select",
+        options: options,
+        value: selectedModel,
+        onChange: e => onSelect(e.target.value),
+        fill: true
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
+        icon: "refresh",
+        minimal: true,
+        small: true,
+        onClick: loadModels,
+        title: "Refresh model list"
+      })]
+    }), selectedMeta && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+      className: "mt-1",
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Tag, {
+        minimal: true,
+        intent: selectedMeta.type === "custom" ? "success" : "primary",
+        round: true,
+        children: selectedMeta.type === "custom" ? "Custom" : "Built-in"
+      })
+    })]
   });
 };
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (ModelSelector);
@@ -30556,13 +30756,17 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/html/html.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/card/card.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/html/html.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/card/card.js");
 /* harmony import */ var _components_DatasetSelectWithPopover__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../components/DatasetSelectWithPopover */ "./src/biomero/components/DatasetSelectWithPopover.js");
 /* harmony import */ var _ImageSelector__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./ImageSelector */ "./src/biomero/stardist/components/ImageSelector.js");
 /* harmony import */ var _ModelSelector__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./ModelSelector */ "./src/biomero/stardist/components/ModelSelector.js");
-/* harmony import */ var _PreviewViewer__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./PreviewViewer */ "./src/biomero/stardist/components/PreviewViewer.js");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var _ChannelSelector__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./ChannelSelector */ "./src/biomero/stardist/components/ChannelSelector.js");
+/* harmony import */ var _PreviewViewer__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./PreviewViewer */ "./src/biomero/stardist/components/PreviewViewer.js");
+/* harmony import */ var _apiService__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../../../apiService */ "./src/apiService.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
 
 
 
@@ -30574,11 +30778,14 @@ const PreviewTab = () => {
   const [selectedDatasets, setSelectedDatasets] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
   const [selectedImage, setSelectedImage] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
   const [selectedModel, setSelectedModel] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)("2D_versatile_fluo");
+  const [channels, setChannels] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
+  const [selectedChannel, setSelectedChannel] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(0);
+  const [loadingChannels, setLoadingChannels] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
 
   // Helper to extract ID from string like "dataset-123"
   const getDatasetId = selection => {
     if (!selection || selection.length === 0) return null;
-    const str = selection[0]; // Assume single selection for now
+    const str = selection[0];
     if (str.startsWith("dataset-")) {
       return str.split("-")[1];
     }
@@ -30587,18 +30794,49 @@ const PreviewTab = () => {
   const datasetId = getDatasetId(selectedDatasets);
   const handleDatasetChange = newSelection => {
     setSelectedDatasets(newSelection);
-    setSelectedImage(null); // Reset image when dataset changes
+    setSelectedImage(null);
+    setChannels([]);
+    setSelectedChannel(0);
   };
-  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+  const handleImageSelect = img => {
+    setSelectedImage(img);
+    setSelectedChannel(0);
+  };
+
+  // Fetch channels when image changes
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    if (!selectedImage) {
+      setChannels([]);
+      setSelectedChannel(0);
+      return;
+    }
+    const loadChannels = async () => {
+      setLoadingChannels(true);
+      try {
+        const data = await (0,_apiService__WEBPACK_IMPORTED_MODULE_6__.fetchImageChannels)(selectedImage.id);
+        setChannels(data.channels || []);
+        // Default to first active channel, or channel 0
+        const firstActive = (data.channels || []).find(ch => ch.active);
+        setSelectedChannel(firstActive ? firstActive.index : 0);
+      } catch (e) {
+        console.error("Failed to load channels:", e);
+        setChannels([]);
+      } finally {
+        setLoadingChannels(false);
+      }
+    };
+    loadChannels();
+  }, [selectedImage]);
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
     className: "p-4 flex flex-col gap-4 h-full overflow-y-auto",
-    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.H4, {
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__.H4, {
       children: "Preview Stardist Models"
-    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
       className: "flex gap-4",
-      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
         className: "w-1/3 flex flex-col gap-4",
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
-          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_components_DatasetSelectWithPopover__WEBPACK_IMPORTED_MODULE_1__["default"], {
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Card, {
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_components_DatasetSelectWithPopover__WEBPACK_IMPORTED_MODULE_1__["default"], {
             label: "Select Dataset",
             value: selectedDatasets,
             onChange: handleDatasetChange,
@@ -30606,32 +30844,41 @@ const PreviewTab = () => {
             allowedCategories: ["datasets"],
             buttonText: selectedDatasets.length ? `${selectedDatasets.length} selected` : "Select Dataset"
           })
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
-          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_ModelSelector__WEBPACK_IMPORTED_MODULE_3__["default"], {
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Card, {
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_ModelSelector__WEBPACK_IMPORTED_MODULE_3__["default"], {
             selectedModel: selectedModel,
             onSelect: setSelectedModel
           })
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
+        }), channels.length > 1 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Card, {
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_ChannelSelector__WEBPACK_IMPORTED_MODULE_4__["default"], {
+            channels: channels,
+            selectedChannel: selectedChannel,
+            onSelect: setSelectedChannel,
+            loading: loadingChannels
+          })
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Card, {
           className: "flex-1 min-h-[200px] flex flex-col",
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("h5", {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("h5", {
             className: "bp5-heading mb-2",
             children: "Select Image"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_ImageSelector__WEBPACK_IMPORTED_MODULE_2__["default"], {
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_ImageSelector__WEBPACK_IMPORTED_MODULE_2__["default"], {
             datasetId: datasetId,
             selectedImageId: selectedImage?.id,
-            onSelect: setSelectedImage
+            onSelect: handleImageSelect
           })]
         })]
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("div", {
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("div", {
         className: "w-2/3",
-        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Card, {
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Card, {
           className: "h-full",
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("h5", {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("h5", {
             className: "bp5-heading mb-4",
             children: "Preview"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_PreviewViewer__WEBPACK_IMPORTED_MODULE_4__["default"], {
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_PreviewViewer__WEBPACK_IMPORTED_MODULE_5__["default"], {
             image: selectedImage,
-            model: selectedModel
+            model: selectedModel,
+            channel: selectedChannel,
+            channels: channels
           })]
         })
       })]
@@ -30655,109 +30902,434 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/callout/callout.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/spinner/spinner.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/controls.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/divider/divider.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/tag/tag.js");
+/* harmony import */ var _apiService__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../apiService */ "./src/apiService.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
 
 
 
+
+/**
+ * Assign a stable hue to each channel index so overlays look distinct.
+ * We use well-spaced hues rather than the golden angle to keep things readable.
+ */
+
+const CHANNEL_HUES = [200, 30, 130, 310, 60, 270, 0, 170];
+const getChannelHue = idx => CHANNEL_HUES[idx % CHANNEL_HUES.length];
 const PreviewViewer = _ref => {
   let {
     image,
     model,
-    onRunPreview
+    channel = 0,
+    channels = []
   } = _ref;
   const canvasRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
-  const [loading, setLoading] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
-  const [overlays, setOverlays] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
+  const imgRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
+  const containerRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
 
-  // Constants (could be passed as props or fetched)
+  // Zoom & Pan state
+  const [zoom, setZoom] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(1);
+  const [pan, setPan] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
+    x: 0,
+    y: 0
+  });
+  const [isPanning, setIsPanning] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const [lastPanPoint, setLastPanPoint] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
+    x: 0,
+    y: 0
+  });
+  const [loading, setLoading] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const [error, setError] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
+
+  // Accumulated predictions keyed by channel index
+  // { [channelIdx]: { polygons: [...], count: int, visible: bool } }
+  const [predictions, setPredictions] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({});
+
+  // Image channel visibility — which OMERO channels to render
+  // { [channelIdx]: bool }
+  const [channelVisibility, setChannelVisibility] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({});
+
+  // Constants
   const Z = 0;
   const T = 0;
-  const imageUrl = image ? `/webgateway/render_image/${image.id}/${Z}/${T}/` : null;
+
+  // Build the OMERO render_image URL with channel visibility
+  // Format: ?c=1,-2,3 (1-indexed, negative = hidden)
+  const imageUrl = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(() => {
+    if (!image) return null;
+    const base = `/webgateway/render_image/${image.id}/${Z}/${T}/`;
+    if (channels.length <= 1) return base;
+
+    // Build channel string
+    const channelParam = channels.map(ch => {
+      const chNum = ch.index + 1; // OMERO uses 1-indexed
+      const visible = channelVisibility[ch.index] !== false; // default true
+      return visible ? `${chNum}` : `-${chNum}`;
+    }).join(",");
+    return `${base}?c=${channelParam}`;
+  }, [image, channels, channelVisibility]);
+
+  // Initialize channel visibility when channels change
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
-    // Clear overlays when image changes
-    setOverlays(null);
+    if (channels.length > 0) {
+      const vis = {};
+      channels.forEach(ch => {
+        vis[ch.index] = ch.active !== false; // default to OMERO's active state
+      });
+      setChannelVisibility(vis);
+    }
+  }, [channels]);
+
+  // Clear all predictions and reset view when image or model changes
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    setPredictions({});
+    setError(null);
+    setZoom(1);
+    setPan({
+      x: 0,
+      y: 0
+    });
     if (canvasRef.current) {
       const ctx = canvasRef.current.getContext("2d");
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
-  }, [image]);
-  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
-    if (overlays && canvasRef.current) {
-      const ctx = canvasRef.current.getContext("2d");
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+  }, [image, model]);
 
-      // Draw overlays (simple polygons)
-      ctx.strokeStyle = "yellow";
-      ctx.lineWidth = 2;
-      overlays.forEach(polygon => {
-        ctx.beginPath();
-        if (polygon.length > 0) {
-          ctx.moveTo(polygon[0][1], polygon[0][0]); // y, x -> x, y ? Check stardist output format
-          for (let i = 1; i < polygon.length; i++) {
-            ctx.lineTo(polygon[i][1], polygon[i][0]);
-          }
-          ctx.closePath();
-          ctx.stroke();
-        }
+  // --- Zoom & Pan handlers ---
+  const handleWheel = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(e => {
+    e.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const zoomSpeed = 0.001;
+    const scaleAmount = -e.deltaY * zoomSpeed;
+    const newZoom = Math.min(Math.max(0.1, zoom * (1 + scaleAmount)), 20);
+    if (newZoom !== zoom) {
+      const zoomRatio = newZoom / zoom;
+      setPan(p => ({
+        x: mouseX - (mouseX - p.x) * zoomRatio,
+        y: mouseY - (mouseY - p.y) * zoomRatio
+      }));
+      setZoom(newZoom);
+    }
+  }, [zoom]);
+  const handleMouseDown = e => {
+    // Any mouse button can pan (preview is read-only, no drawing tools)
+    e.preventDefault();
+    setIsPanning(true);
+    setLastPanPoint({
+      x: e.clientX,
+      y: e.clientY
+    });
+  };
+  const handleMouseMove = e => {
+    if (isPanning) {
+      setPan(p => ({
+        x: p.x + (e.clientX - lastPanPoint.x),
+        y: p.y + (e.clientY - lastPanPoint.y)
+      }));
+      setLastPanPoint({
+        x: e.clientX,
+        y: e.clientY
       });
     }
-  }, [overlays]);
+  };
+  const handleMouseUp = () => {
+    setIsPanning(false);
+  };
+  const resetView = () => {
+    setZoom(1);
+    setPan({
+      x: 0,
+      y: 0
+    });
+  };
+
+  // Redraw canvas whenever predictions change
+  const drawOverlays = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(() => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    Object.entries(predictions).forEach(_ref2 => {
+      let [chIdx, data] = _ref2;
+      if (!data.visible || !data.polygons) return;
+      const hue = getChannelHue(parseInt(chIdx));
+      data.polygons.forEach((polygon, pIdx) => {
+        const pts = polygon.points;
+        if (!pts || pts.length === 0) return;
+        const strokeColor = `hsl(${hue}, 85%, 55%)`;
+        const fillColor = `hsla(${hue}, 85%, 55%, 0.12)`;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2;
+        ctx.fillStyle = fillColor;
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i][0], pts[i][1]);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fill();
+      });
+    });
+  }, [predictions]);
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    drawOverlays();
+  }, [drawOverlays]);
   const handleRun = async () => {
     if (!image || !model) return;
     setLoading(true);
+    setError(null);
     try {
-      // Mock result for now, or call onRunPreview if it handles the API call
-      // const result = await onRunPreview(image.id, model);
-
-      // Simulating API delay and result
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Mock Stardist-like output (list of polygons in [y, x] format)
-      // Just a simple square in the middle
-      const mockResult = [[[50, 50], [50, 150], [150, 150], [150, 50]]];
-      setOverlays(mockResult);
+      const result = await (0,_apiService__WEBPACK_IMPORTED_MODULE_1__.runStardistPrediction)(image.id, model, channel);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        // Accumulate: store predictions under the current channel key
+        setPredictions(prev => ({
+          ...prev,
+          [channel]: {
+            polygons: result.polygons || [],
+            count: result.count || 0,
+            visible: true
+          }
+        }));
+      }
     } catch (e) {
       console.error("Preview failed", e);
+      const msg = e.response?.data?.error || e.message || "Prediction failed";
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
+  const togglePredictionVisibility = chIdx => {
+    setPredictions(prev => ({
+      ...prev,
+      [chIdx]: {
+        ...prev[chIdx],
+        visible: !prev[chIdx].visible
+      }
+    }));
+  };
+  const clearPrediction = chIdx => {
+    setPredictions(prev => {
+      const next = {
+        ...prev
+      };
+      delete next[chIdx];
+      return next;
+    });
+  };
+  const toggleChannelVisibility = chIdx => {
+    setChannelVisibility(prev => ({
+      ...prev,
+      [chIdx]: !prev[chIdx]
+    }));
+  };
+
+  // Total detected objects across all channels
+  const totalCount = Object.values(predictions).reduce((sum, d) => sum + (d.count || 0), 0);
+  const channelsWithPredictions = Object.keys(predictions).map(Number);
   if (!image) {
-    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("div", {
+    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
       className: "flex items-center justify-center h-64 bg-gray-100 text-gray-400 border rounded",
       children: "Select an image to view"
     });
   }
-  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
-    className: "flex flex-col gap-2",
-    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
-      className: "relative border inline-block self-start",
-      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("img", {
-        src: imageUrl,
-        alt: "Preview",
-        className: "max-w-full max-h-[500px] display-block"
-        // Ensure canvas matches image size. 
-        // Real implementation needs to handle loading state to get natural dimensions
-        ,
-        onLoad: e => {
-          if (canvasRef.current) {
-            canvasRef.current.width = e.target.width;
-            canvasRef.current.height = e.target.height;
-          }
-        }
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("canvas", {
-        ref: canvasRef,
-        className: "absolute top-0 left-0 pointer-events-none"
-      })]
-    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("div", {
-      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.Button, {
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+    className: "flex flex-col gap-3",
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+      className: "flex items-center gap-3",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.Button, {
         intent: "primary",
         onClick: handleRun,
         loading: loading,
         icon: "play",
+        disabled: !model,
         children: "Run Preview"
-      })
+      }), channels.length > 1 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
+        className: "text-xs px-2 py-1 rounded flex items-center gap-1",
+        style: {
+          background: 'rgba(0,0,0,0.06)'
+        },
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+          className: "inline-block w-2 h-2 rounded-full",
+          style: {
+            backgroundColor: channels[channel]?.color || '#ccc'
+          }
+        }), channels[channel]?.name || `Ch ${channel}`]
+      }), totalCount > 0 && !loading && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
+        className: "text-sm text-gray-600",
+        children: ["Total: ", /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("strong", {
+          children: totalCount
+        }), " object", totalCount !== 1 ? "s" : "", " across ", channelsWithPredictions.length, " channel", channelsWithPredictions.length !== 1 ? "s" : ""]
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+        className: "ml-auto"
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
+        className: "text-xs text-gray-500",
+        children: [Math.round(zoom * 100), "%"]
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.Button, {
+        icon: "zoom-to-fit",
+        minimal: true,
+        small: true,
+        onClick: resetView,
+        title: "Reset zoom"
+      })]
+    }), error && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Callout, {
+      intent: "danger",
+      icon: "error",
+      className: "mb-1",
+      children: error
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+      className: "flex gap-3 items-start",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+        ref: containerRef,
+        className: "relative overflow-hidden border rounded bg-gray-200",
+        style: {
+          flex: '1 1 0',
+          minHeight: '400px',
+          maxHeight: '600px',
+          cursor: isPanning ? 'grabbing' : 'grab'
+        },
+        onWheel: handleWheel,
+        onMouseDown: handleMouseDown,
+        onMouseMove: handleMouseMove,
+        onMouseUp: handleMouseUp,
+        onMouseLeave: handleMouseUp,
+        onContextMenu: e => e.preventDefault(),
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+          style: {
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: '0 0',
+            transition: isPanning ? 'none' : 'transform 0.1s'
+          },
+          className: "inline-block relative",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("img", {
+            ref: imgRef,
+            src: imageUrl,
+            alt: "Preview",
+            style: {
+              display: 'block',
+              maxWidth: 'none'
+            },
+            onLoad: e => {
+              if (canvasRef.current) {
+                canvasRef.current.width = e.target.naturalWidth;
+                canvasRef.current.height = e.target.naturalHeight;
+                canvasRef.current.style.width = e.target.naturalWidth + 'px';
+                canvasRef.current.style.height = e.target.naturalHeight + 'px';
+                drawOverlays();
+              }
+            }
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("canvas", {
+            ref: canvasRef,
+            className: "absolute top-0 left-0 pointer-events-none"
+          })]
+        }), loading && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+          className: "absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center rounded",
+          style: {
+            zIndex: 10
+          },
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+            className: "bg-white rounded-lg p-4 flex items-center gap-3 shadow-lg",
+            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Spinner, {
+              size: 24
+            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
+              className: "text-sm font-medium",
+              children: ["Running StarDist on Ch ", channel, "..."]
+            })]
+          })
+        })]
+      }), (channels.length > 1 || channelsWithPredictions.length > 0) && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+        className: "w-52 flex flex-col gap-3 shrink-0",
+        children: [channels.length > 1 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+            className: "text-xs font-bold uppercase text-gray-500 mb-2",
+            children: "Image Channels"
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+            className: "flex flex-col gap-1",
+            children: channels.map(ch => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.Checkbox, {
+              checked: channelVisibility[ch.index] !== false,
+              onChange: () => toggleChannelVisibility(ch.index),
+              className: "mb-0 flex items-center",
+              children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
+                style: {
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                },
+                children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+                  className: "inline-block w-3 h-3 rounded-full border border-gray-300 shrink-0",
+                  style: {
+                    backgroundColor: ch.color || '#ccc'
+                  }
+                }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+                  className: "text-sm",
+                  children: ch.name || `Channel ${ch.index}`
+                })]
+              })
+            }, ch.index))
+          })]
+        }), channelsWithPredictions.length > 0 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Divider, {
+            className: "mb-2"
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+            className: "text-xs font-bold uppercase text-gray-500 mb-2",
+            children: "Predictions"
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+            className: "flex flex-col gap-1",
+            children: channelsWithPredictions.map(chIdx => {
+              const pred = predictions[chIdx];
+              const chMeta = channels.find(c => c.index === chIdx);
+              const hue = getChannelHue(chIdx);
+              return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+                className: "flex items-center gap-2",
+                children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.Checkbox, {
+                  checked: pred.visible,
+                  onChange: () => togglePredictionVisibility(chIdx),
+                  className: "mb-0 flex items-center",
+                  children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
+                    style: {
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    },
+                    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+                      className: "inline-block w-3 h-3 rounded shrink-0",
+                      style: {
+                        backgroundColor: `hsl(${hue}, 85%, 55%)`,
+                        border: `1px solid hsl(${hue}, 85%, 40%)`
+                      }
+                    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+                      className: "text-sm",
+                      children: chMeta?.name || `Ch ${chIdx}`
+                    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__.Tag, {
+                      minimal: true,
+                      round: true,
+                      small: true,
+                      children: pred.count
+                    })]
+                  })
+                }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.Button, {
+                  icon: "cross",
+                  minimal: true,
+                  small: true,
+                  onClick: () => clearPrediction(chIdx),
+                  title: "Remove prediction"
+                })]
+              }, chIdx);
+            })
+          })]
+        })]
+      })]
     })]
   });
 };
@@ -49122,60 +49694,60 @@ video {
 [hidden]:where(:not([hidden="until-found"])) {
   display: none;
 }
-.container {
-  width: 100%;
-}
 .\\!container {
   width: 100% !important;
 }
+.container {
+  width: 100%;
+}
 @media (min-width: 640px) {
-
-  .container {
-    max-width: 640px;
-  }
 
   .\\!container {
     max-width: 640px !important;
   }
-}
-@media (min-width: 768px) {
 
   .container {
-    max-width: 768px;
+    max-width: 640px;
   }
+}
+@media (min-width: 768px) {
 
   .\\!container {
     max-width: 768px !important;
   }
-}
-@media (min-width: 1024px) {
 
   .container {
-    max-width: 1024px;
+    max-width: 768px;
   }
+}
+@media (min-width: 1024px) {
 
   .\\!container {
     max-width: 1024px !important;
   }
-}
-@media (min-width: 1280px) {
 
   .container {
-    max-width: 1280px;
+    max-width: 1024px;
   }
+}
+@media (min-width: 1280px) {
 
   .\\!container {
     max-width: 1280px !important;
   }
+
+  .container {
+    max-width: 1280px;
+  }
 }
 @media (min-width: 1536px) {
 
-  .container {
-    max-width: 1536px;
-  }
-
   .\\!container {
     max-width: 1536px !important;
+  }
+
+  .container {
+    max-width: 1536px;
   }
 }
 .pointer-events-none {
@@ -49195,6 +49767,9 @@ video {
 }
 .sticky {
   position: sticky !important;
+}
+.inset-0 {
+  inset: 0px !important;
 }
 .bottom-0 {
   bottom: 0px !important;
@@ -49235,6 +49810,9 @@ video {
 .mb-0 {
   margin-bottom: 0px !important;
 }
+.mb-1 {
+  margin-bottom: 0.25rem !important;
+}
 .mb-2 {
   margin-bottom: 0.5rem !important;
 }
@@ -49255,6 +49833,9 @@ video {
 }
 .ml-6 {
   margin-left: 1.5rem !important;
+}
+.ml-auto {
+  margin-left: auto !important;
 }
 .mr-12 {
   margin-right: 3rem !important;
@@ -49295,6 +49876,9 @@ video {
 .flex {
   display: flex !important;
 }
+.inline-flex {
+  display: inline-flex !important;
+}
 .table {
   display: table !important;
 }
@@ -49304,11 +49888,17 @@ video {
 .contents {
   display: contents !important;
 }
+.hidden {
+  display: none !important;
+}
 .h-2 {
   height: 0.5rem !important;
 }
 .h-24 {
   height: 6rem !important;
+}
+.h-3 {
+  height: 0.75rem !important;
 }
 .h-4 {
   height: 1rem !important;
@@ -49342,9 +49932,6 @@ video {
 }
 .max-h-\\[45vh\\] {
   max-height: 45vh !important;
-}
-.max-h-\\[500px\\] {
-  max-height: 500px !important;
 }
 .max-h-\\[calc\\(100vh-225px\\)\\] {
   max-height: calc(100vh - 225px) !important;
@@ -49394,11 +49981,17 @@ video {
 .w-2\\/3 {
   width: 66.666667% !important;
 }
+.w-3 {
+  width: 0.75rem !important;
+}
 .w-3\\/4 {
   width: 75% !important;
 }
 .w-4 {
   width: 1rem !important;
+}
+.w-52 {
+  width: 13rem !important;
 }
 .w-6 {
   width: 1.5rem !important;
@@ -49444,6 +50037,9 @@ video {
 }
 .flex-shrink-0 {
   flex-shrink: 0 !important;
+}
+.shrink {
+  flex-shrink: 1 !important;
 }
 .shrink-0 {
   flex-shrink: 0 !important;
@@ -49515,8 +50111,14 @@ video {
 .flex-col {
   flex-direction: column !important;
 }
+.place-content-start {
+  place-content: start !important;
+}
 .place-content-between {
   place-content: space-between !important;
+}
+.items-start {
+  align-items: flex-start !important;
 }
 .items-center {
   align-items: center !important;
@@ -49535,6 +50137,9 @@ video {
 }
 .gap-2 {
   gap: 0.5rem !important;
+}
+.gap-3 {
+  gap: 0.75rem !important;
 }
 .gap-4 {
   gap: 1rem !important;
@@ -49559,9 +50164,6 @@ video {
   margin-top: calc(1rem * calc(1 - var(--tw-space-y-reverse))) !important;
   margin-bottom: calc(1rem * var(--tw-space-y-reverse)) !important;
 }
-.self-start {
-  align-self: flex-start !important;
-}
 .overflow-auto {
   overflow: auto !important;
 }
@@ -49581,6 +50183,9 @@ video {
 }
 .rounded-full {
   border-radius: 9999px !important;
+}
+.rounded-lg {
+  border-radius: 0.5rem !important;
 }
 .rounded-md {
   border-radius: 0.375rem !important;
@@ -49608,6 +50213,10 @@ video {
   --tw-border-opacity: 1 !important;
   border-color: rgb(59 130 246 / var(--tw-border-opacity, 1)) !important;
 }
+.border-gray-300 {
+  --tw-border-opacity: 1 !important;
+  border-color: rgb(209 213 219 / var(--tw-border-opacity, 1)) !important;
+}
 .border-orange-200 {
   --tw-border-opacity: 1 !important;
   border-color: rgb(254 215 170 / var(--tw-border-opacity, 1)) !important;
@@ -49623,6 +50232,10 @@ video {
 .bg-\\[\\#f0f1f5\\] {
   --tw-bg-opacity: 1 !important;
   background-color: rgb(240 241 245 / var(--tw-bg-opacity, 1)) !important;
+}
+.bg-black {
+  --tw-bg-opacity: 1 !important;
+  background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1)) !important;
 }
 .bg-blue-100 {
   --tw-bg-opacity: 1 !important;
@@ -49676,6 +50289,9 @@ video {
   --tw-bg-opacity: 1 !important;
   background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1)) !important;
 }
+.bg-opacity-30 {
+  --tw-bg-opacity: 0.3 !important;
+}
 .object-contain {
   object-fit: contain !important;
 }
@@ -49726,6 +50342,9 @@ video {
 .pb-2 {
   padding-bottom: 0.5rem !important;
 }
+.pb-4 {
+  padding-bottom: 1rem !important;
+}
 .pl-1 {
   padding-left: 0.25rem !important;
 }
@@ -49740,9 +50359,6 @@ video {
 }
 .pt-\\[50px\\] {
   padding-top: 50px !important;
-}
-.pb-4 {
-  padding-bottom: 1rem !important;
 }
 .text-center {
   text-align: center !important;
@@ -49774,6 +50390,9 @@ video {
 }
 .font-semibold {
   font-weight: 600 !important;
+}
+.uppercase {
+  text-transform: uppercase !important;
 }
 .lowercase {
   text-transform: lowercase !important;
@@ -49822,6 +50441,9 @@ video {
 }
 .opacity-50 {
   opacity: 0.5 !important;
+}
+.opacity-60 {
+  opacity: 0.6 !important;
 }
 .opacity-75 {
   opacity: 0.75 !important;
@@ -49944,7 +50566,7 @@ video {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 }
-`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"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nB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AA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","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n"],"sourceRoot":""}]);
+`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"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nB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AA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","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
@@ -122052,4 +122674,4 @@ window.onload = function () {
 
 /******/ })()
 ;
-//# sourceMappingURL=main.b407774961bfdc300228.js.map
+//# sourceMappingURL=main.42eec548441d765b0b89.js.map

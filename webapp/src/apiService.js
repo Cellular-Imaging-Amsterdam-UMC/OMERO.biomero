@@ -284,7 +284,19 @@ export const fetchStardistModels = async () => {
   }
 };
 
-export const runStardistPrediction = async (imageId, modelName) => {
+export const fetchImageChannels = async (imageId) => {
+  if (!imageId) return { channels: [], sizeC: 0 };
+  try {
+    const endpoint = `/omero_biomero/api/stardist/channels/?image=${imageId}`;
+    const response = await apiRequest(endpoint, "GET");
+    return response;
+  } catch (error) {
+    console.error("Error fetching image channels:", error);
+    return { channels: [], sizeC: 0 };
+  }
+};
+
+export const runStardistPrediction = async (imageId, modelName, channel = 0) => {
   try {
     const csrfToken = window.csrftoken;
     const endpoint = "/omero_biomero/api/stardist/predict/";
@@ -292,7 +304,7 @@ export const runStardistPrediction = async (imageId, modelName) => {
     const response = await apiRequest(
       endpoint,
       "POST",
-      { image_id: imageId, model: modelName },
+      { image_id: imageId, model: modelName, channel: channel },
       {
         headers: {
           "X-CSRFToken": csrfToken,
