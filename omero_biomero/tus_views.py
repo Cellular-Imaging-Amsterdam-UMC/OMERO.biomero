@@ -14,20 +14,20 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
-from .settings import TUS_UPLOAD_DIR, TUS_DESTINATION_DIR
+from .settings import UPLOADER_CHUNKS_DIR, UPLOADER_DESTINATION_DIR
 
 logger = logging.getLogger(__name__)
 
 
 def ensure_directories():
     """Ensure TUS directories exist."""
-    Path(TUS_UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
-    Path(TUS_DESTINATION_DIR).mkdir(parents=True, exist_ok=True)
+    Path(UPLOADER_CHUNKS_DIR).mkdir(parents=True, exist_ok=True)
+    Path(UPLOADER_DESTINATION_DIR).mkdir(parents=True, exist_ok=True)
 
 
 def get_metadata_path(resource_id):
     """Get the path to the metadata file for a given resource."""
-    return os.path.join(TUS_UPLOAD_DIR, f"{resource_id}.meta")
+    return os.path.join(UPLOADER_CHUNKS_DIR, f"{resource_id}.meta")
 
 
 def load_metadata(resource_id):
@@ -177,7 +177,7 @@ class TusUploadView(View):
         resource_id = str(uuid.uuid4())
 
         # Create empty file for chunks
-        chunk_path = os.path.join(TUS_UPLOAD_DIR, resource_id)
+        chunk_path = os.path.join(UPLOADER_CHUNKS_DIR, resource_id)
         with open(chunk_path, "wb") as f:
             pass  # Create empty file
 
@@ -360,7 +360,7 @@ class TusUploadView(View):
         user_id = meta.get("user_id", "unknown")
 
         # Create per-user subdirectory to avoid filename conflicts between users
-        user_dest_dir = os.path.join(TUS_DESTINATION_DIR, f"user_{user_id}")
+        user_dest_dir = os.path.join(UPLOADER_DESTINATION_DIR, f"user_{user_id}")
         Path(user_dest_dir).mkdir(parents=True, exist_ok=True)
 
         # Ensure unique filename in destination (handle duplicates from same user)

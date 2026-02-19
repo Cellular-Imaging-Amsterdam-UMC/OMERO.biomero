@@ -469,7 +469,7 @@ class ImportUploadedFileTests(TestCase):
         self.mod = _import_module()
 
         # Patch TUS destination directory
-        setattr(self.mod, "TUS_DESTINATION_DIR", self.tus_dest)
+        setattr(self.mod, "UPLOADER_DESTINATION_DIR", self.tus_dest)
         setattr(self.mod, "BASE_DIR", self.tmp)
 
         # Mock process_files to avoid actual import

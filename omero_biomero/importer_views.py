@@ -24,7 +24,7 @@ from .settings import (
     PREPROCESSING_CONFIG,
     CONFIG_FILE_PATH,
     GROUP_MAPPINGS_FILE_PATH,
-    TUS_DESTINATION_DIR,
+    UPLOADER_DESTINATION_DIR,
 )
 from .utils import build_extra_params
 
@@ -549,8 +549,8 @@ def import_uploaded_file(request, conn=None, **kwargs):
     """
     Trigger import for a file uploaded via TUS.
 
-    Files are stored in per-user subdirectories under TUS_DESTINATION_DIR:
-    TUS_DESTINATION_DIR/user_{user_id}/{filename}
+    Files are stored in per-user subdirectories under UPLOADER_DESTINATION_DIR:
+    UPLOADER_DESTINATION_DIR/user_{user_id}/{filename}
     """
     initialize_biomero_importer()
 
@@ -572,12 +572,12 @@ def import_uploaded_file(request, conn=None, **kwargs):
         username = current_user.getName()
 
         # Construct full path to the uploaded file (in user-specific subdirectory)
-        user_dest_dir = os.path.join(TUS_DESTINATION_DIR, f"user_{user_id}")
+        user_dest_dir = os.path.join(UPLOADER_DESTINATION_DIR, f"user_{user_id}")
         file_path = os.path.join(user_dest_dir, filename)
 
         if not os.path.exists(file_path):
             # Try legacy path (without user subdirectory) for backwards compatibility
-            legacy_path = os.path.join(TUS_DESTINATION_DIR, filename)
+            legacy_path = os.path.join(UPLOADER_DESTINATION_DIR, filename)
             if os.path.exists(legacy_path):
                 file_path = legacy_path
                 logger.warning(

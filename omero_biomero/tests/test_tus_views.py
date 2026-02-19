@@ -78,10 +78,10 @@ class TusViewsTestCase(TestCase):
         self.mod = _import_module()
 
         # Patch the directories
-        self._orig_upload_dir = self.mod.TUS_UPLOAD_DIR
-        self._orig_dest_dir = self.mod.TUS_DESTINATION_DIR
-        self.mod.TUS_UPLOAD_DIR = self.tmp_upload_dir
-        self.mod.TUS_DESTINATION_DIR = self.tmp_dest_dir
+        self._orig_upload_dir = self.mod.UPLOADER_CHUNKS_DIR
+        self._orig_dest_dir = self.mod.UPLOADER_DESTINATION_DIR
+        self.mod.UPLOADER_CHUNKS_DIR = self.tmp_upload_dir
+        self.mod.UPLOADER_DESTINATION_DIR = self.tmp_dest_dir
 
     def tearDown(self):
         """Clean up temporary directories."""
@@ -89,8 +89,8 @@ class TusViewsTestCase(TestCase):
         shutil.rmtree(self.tmp_dest_dir, ignore_errors=True)
 
         # Restore original directories
-        self.mod.TUS_UPLOAD_DIR = self._orig_upload_dir
-        self.mod.TUS_DESTINATION_DIR = self._orig_dest_dir
+        self.mod.UPLOADER_CHUNKS_DIR = self._orig_upload_dir
+        self.mod.UPLOADER_DESTINATION_DIR = self._orig_dest_dir
 
     def _make_request(
         self,
