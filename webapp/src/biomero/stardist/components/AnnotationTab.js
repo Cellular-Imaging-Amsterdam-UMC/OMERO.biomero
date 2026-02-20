@@ -4,7 +4,7 @@ import DatasetSelectWithPopover from "../../components/DatasetSelectWithPopover"
 import ImageSelector from "./ImageSelector";
 import AnnotationViewer from "./AnnotationViewer";
 import { useAppContext } from "../../../AppContext"; 
-import { fetchMapAnnotations, saveMapAnnotation } from "../../../apiService";
+import { fetchMapAnnotations, saveMapAnnotation, fetchImageChannels } from "../../../apiService";
 
 const AnnotationTab = () => {
   const [selectedDatasets, setSelectedDatasets] = useState([]);
@@ -15,6 +15,8 @@ const AnnotationTab = () => {
       { id: "2", name: "Nucleus", color: "#0000ff" }
   ]);
   const [loadingAnns, setLoadingAnns] = useState(false);
+  const [channels, setChannels] = useState([]);
+  const [imageMeta, setImageMeta] = useState({ sizeZ: 1, sizeT: 1 });
   const [saving, setSaving] = useState(false);
   
   // Need toaster for notifications
@@ -41,10 +43,24 @@ const AnnotationTab = () => {
   useEffect(() => {
      if (selectedImage) {
          loadAnnotations(selectedImage.id);
+         loadChannels(selectedImage.id);
      } else {
          setAnnotations([]);
+         setChannels([]);
+         setImageMeta({ sizeZ: 1, sizeT: 1 });
      }
   }, [selectedImage]);
+
+  const loadChannels = async (imageId) => {
+      try {
+          const data = await fetchImageChannels(imageId);
+          setChannels(data.channels || []);
+          setImageMeta({ sizeZ: data.sizeZ || 1, sizeT: data.sizeT || 1 });
+      } catch (e) {
+          console.error("Error loading channels", e);
+          setImageMeta({ sizeZ: 1, sizeT: 1 });
+      }
+  };
   
   const loadAnnotations = async (imageId) => {
       setLoadingAnns(true);
@@ -140,6 +156,8 @@ const AnnotationTab = () => {
                         image={selectedImage}
                         annotations={annotations}
                         onAnnotationsChange={setAnnotations}
+                        channels={channels}
+                        imageMeta={imageMeta}
                         featureTypes={featureTypes}
                         onFeatureTypesChange={setFeatureTypes}
                      />

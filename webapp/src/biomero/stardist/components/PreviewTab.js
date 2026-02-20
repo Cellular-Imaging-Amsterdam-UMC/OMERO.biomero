@@ -14,6 +14,7 @@ const PreviewTab = () => {
   const [channels, setChannels] = useState([]);
   const [selectedChannel, setSelectedChannel] = useState(0);
   const [loadingChannels, setLoadingChannels] = useState(false);
+  const [imageMeta, setImageMeta] = useState({ sizeZ: 1, sizeT: 1 });
 
   // Helper to extract ID from string like "dataset-123"
   const getDatasetId = (selection) => {
@@ -32,6 +33,7 @@ const PreviewTab = () => {
       setSelectedImage(null);
       setChannels([]);
       setSelectedChannel(0);
+      setImageMeta({ sizeZ: 1, sizeT: 1 });
   };
 
   const handleImageSelect = (img) => {
@@ -44,6 +46,7 @@ const PreviewTab = () => {
       if (!selectedImage) {
           setChannels([]);
           setSelectedChannel(0);
+          setImageMeta({ sizeZ: 1, sizeT: 1 });
           return;
       }
 
@@ -52,12 +55,14 @@ const PreviewTab = () => {
           try {
               const data = await fetchImageChannels(selectedImage.id);
               setChannels(data.channels || []);
+              setImageMeta({ sizeZ: data.sizeZ || 1, sizeT: data.sizeT || 1 });
               // Default to first active channel, or channel 0
               const firstActive = (data.channels || []).find(ch => ch.active);
               setSelectedChannel(firstActive ? firstActive.index : 0);
           } catch (e) {
               console.error("Failed to load channels:", e);
               setChannels([]);
+              setImageMeta({ sizeZ: 1, sizeT: 1 });
           } finally {
               setLoadingChannels(false);
           }
@@ -119,6 +124,7 @@ const PreviewTab = () => {
                     model={selectedModel}
                     channel={selectedChannel}
                     channels={channels}
+                    imageMeta={imageMeta}
                  />
              </Card>
         </div>

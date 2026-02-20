@@ -96,6 +96,8 @@ def run_prediction(request, conn=None, **kwargs):
         image_id = data.get("image_id")
         model_name = data.get("model", "2D_versatile_fluo")
         channel = data.get("channel", 0)
+        z = data.get("z", 0)
+        t = data.get("t", 0)
 
         if not image_id:
             return JsonResponse({"error": "Missing image_id"}, status=400)
@@ -109,9 +111,9 @@ def run_prediction(request, conn=None, **kwargs):
         if channel < 0 or channel >= size_c:
             return JsonResponse({"error": f"Channel {channel} out of range (0-{size_c-1})"}, status=400)
 
-        # Fetch the specified channel plane (z=0, t=0)
+        # Fetch the specified channel plane
         pixels = image.getPrimaryPixels()
-        plane = pixels.getPlane(0, channel, 0)  # z=0, c=channel, t=0
+        plane = pixels.getPlane(z, channel, t)  # z=z, c=channel, t=t
 
         # Convert numpy array to PNG bytes
         from PIL import Image as PILImage

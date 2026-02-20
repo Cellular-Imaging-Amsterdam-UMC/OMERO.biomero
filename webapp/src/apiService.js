@@ -307,7 +307,7 @@ export const fetchImageChannels = async (imageId) => {
   }
 };
 
-export const runStardistPrediction = async (imageId, modelName, channel = 0) => {
+export const runStardistPrediction = async (imageId, modelName, channel = 0, z = 0, t = 0) => {
   try {
     const csrfToken = window.csrftoken;
     const endpoint = "/omero_biomero/api/stardist/predict/";
@@ -315,7 +315,7 @@ export const runStardistPrediction = async (imageId, modelName, channel = 0) => 
     const response = await apiRequest(
       endpoint,
       "POST",
-      { image_id: imageId, model: modelName, channel: channel },
+      { image_id: imageId, model: modelName, channel: channel, z: z, t: t },
       {
         headers: {
           "X-CSRFToken": csrfToken,

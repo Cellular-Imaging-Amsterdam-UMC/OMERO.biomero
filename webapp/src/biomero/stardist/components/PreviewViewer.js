@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { Button, Spinner, Callout, Checkbox, Divider, Tag } from "@blueprintjs/core";
+import { Button, Spinner, Callout, Checkbox, Divider, Tag, Slider } from "@blueprintjs/core";
 import { runStardistPrediction } from "../../../apiService";
+import ImageChannelControls from "./ImageChannelControls";
 
 /**
  * Assign a stable hue to each channel index so overlays look distinct.
@@ -9,7 +10,7 @@ import { runStardistPrediction } from "../../../apiService";
 const CHANNEL_HUES = [200, 30, 130, 310, 60, 270, 0, 170];
 const getChannelHue = (idx) => CHANNEL_HUES[idx % CHANNEL_HUES.length];
 
-const PreviewViewer = ({ image, model, channel = 0, channels = [] }) => {
+const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = { sizeZ: 1, sizeT: 1 } }) => {
   const canvasRef = useRef(null);
   const imgRef = useRef(null);
   const containerRef = useRef(null);
@@ -31,16 +32,15 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [] }) => {
   // { [channelIdx]: bool }
   const [channelVisibility, setChannelVisibility] = useState({});
 
-  // Constants
-  const Z = 0;
-  const T = 0;
+  const [z, setZ] = useState(0);
+  const [t, setT] = useState(0);
 
   // Build the OMERO render_image URL with channel visibility
   // Format: ?c=1,-2,3 (1-indexed, negative = hidden)
   const imageUrl = useMemo(() => {
     if (!image) return null;
 
-    const base = `/webgateway/render_image/${image.id}/${Z}/${T}/`;
+    const base = `/webgateway/render_image/${image.id}/${z}/${t}/`;
 
     if (channels.length <= 1) return base;
 
@@ -52,7 +52,7 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [] }) => {
     }).join(",");
 
     return `${base}?c=${channelParam}`;
-  }, [image, channels, channelVisibility]);
+  }, [image, channels, channelVisibility, z, t]);
 
   // Initialize channel visibility when channels change
   useEffect(() => {
@@ -71,6 +71,8 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [] }) => {
     setError(null);
     setZoom(1);
     setPan({ x: 0, y: 0 });
+    setZ(0);
+    setT(0);
     if (canvasRef.current) {
       const ctx = canvasRef.current.getContext("2d");
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -134,12 +136,14 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [] }) => {
     const ctx = canvasRef.current.getContext("2d");
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
-    Object.entries(predictions).forEach(([chIdx, data]) => {
-      if (!data.visible || !data.polygons) return;
+    Object.entries(predictions).forEach(([chIdx, chData]) => {
+      if (!chData.visible) return;
+      const planeData = chData.dataByPlane?.[`${z}_${t}`];
+      if (!planeData || !planeData.polygons) return;
 
       const hue = getChannelHue(parseInt(chIdx));
 
-      data.polygons.forEach((polygon, pIdx) => {
+      planeData.polygons.forEach((polygon, pIdx) => {
         const pts = polygon.points;
         if (!pts || pts.length === 0) return;
 
@@ -171,20 +175,23 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [] }) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await runStardistPrediction(image.id, model, channel);
+      const result = await runStardistPrediction(image.id, model, channel, z, t);
 
       if (result.error) {
         setError(result.error);
       } else {
-        // Accumulate: store predictions under the current channel key
-        setPredictions(prev => ({
-          ...prev,
-          [channel]: {
-            polygons: result.polygons || [],
-            count: result.count || 0,
-            visible: true,
+        // Accumulate: store predictions under the current channel key, grouping by z_t
+        setPredictions(prev => {
+          const next = { ...prev };
+          if (!next[channel]) {
+            next[channel] = { dataByPlane: {}, visible: true };
           }
-        }));
+          next[channel].dataByPlane[`${z}_${t}`] = {
+            polygons: result.polygons || [],
+            count: result.count || 0
+          };
+          return next;
+        });
       }
     } catch (e) {
       console.error("Preview failed", e);
@@ -222,7 +229,7 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [] }) => {
 
   // Total detected objects across all channels
   const totalCount = Object.values(predictions).reduce(
-    (sum, d) => sum + (d.count || 0), 0
+    (sum, chData) => sum + Object.values(chData.dataByPlane || {}).reduce((s, p) => s + (p.count || 0), 0), 0
   );
   const channelsWithPredictions = Object.keys(predictions).map(Number);
 
@@ -275,53 +282,90 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [] }) => {
         </Callout>
       )}
 
-      <div className="flex gap-3 items-start">
-        {/* Image viewer with zoom+pan */}
-        <div
-          ref={containerRef}
-          className="relative overflow-hidden border rounded bg-gray-200"
-          style={{ flex: '1 1 0', minHeight: '400px', maxHeight: '600px', cursor: isPanning ? 'grabbing' : 'grab' }}
-          onWheel={handleWheel}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onContextMenu={(e) => e.preventDefault()}
-        >
+      <div className="flex gap-3 items-start relative h-full">
+        {/* Z Slider (Left of image viewer) */}
+        {imageMeta?.sizeZ > 1 && (
+          <div className="flex flex-col items-center h-[500px]">
+            <span className="text-xs font-bold text-gray-500 mb-2">Z: {Math.max(1, z + 1)}/{imageMeta.sizeZ}</span>
+            <div className="flex-1 py-1">
+              <Slider
+                min={0}
+                max={Math.max(0, imageMeta.sizeZ - 1)}
+                stepSize={1}
+                value={z}
+                onChange={setZ}
+                vertical
+                showTrackFill={false}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 flex flex-col gap-2">
+          {/* Image viewer with zoom+pan */}
           <div
-            style={{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: '0 0',
-              transition: isPanning ? 'none' : 'transform 0.1s',
-            }}
-            className="inline-block relative"
+            ref={containerRef}
+            className="relative overflow-hidden border rounded bg-gray-200"
+            style={{ flex: '1 1 0', minHeight: '400px', maxHeight: '600px', cursor: isPanning ? 'grabbing' : 'grab' }}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onContextMenu={(e) => e.preventDefault()}
           >
-            <img
-              ref={imgRef}
-              src={imageUrl}
-              alt="Preview"
-              style={{ display: 'block', maxWidth: 'none' }}
-              onLoad={(e) => {
-                if (canvasRef.current) {
-                  canvasRef.current.width = e.target.naturalWidth;
-                  canvasRef.current.height = e.target.naturalHeight;
-                  canvasRef.current.style.width = e.target.naturalWidth + 'px';
-                  canvasRef.current.style.height = e.target.naturalHeight + 'px';
-                  drawOverlays();
-                }
+            <div
+              style={{
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transformOrigin: '0 0',
+                transition: isPanning ? 'none' : 'transform 0.1s',
               }}
-            />
-            <canvas
-              ref={canvasRef}
-              className="absolute top-0 left-0 pointer-events-none"
-            />
+              className="inline-block relative"
+            >
+              <img
+                ref={imgRef}
+                src={imageUrl}
+                alt="Preview"
+                style={{ display: 'block', maxWidth: 'none' }}
+                onLoad={(e) => {
+                  if (canvasRef.current) {
+                    canvasRef.current.width = e.target.naturalWidth;
+                    canvasRef.current.height = e.target.naturalHeight;
+                    canvasRef.current.style.width = e.target.naturalWidth + 'px';
+                    canvasRef.current.style.height = e.target.naturalHeight + 'px';
+                    drawOverlays();
+                  }
+                }}
+              />
+              <canvas
+                ref={canvasRef}
+                className="absolute top-0 left-0 pointer-events-none"
+              />
+            </div>
+
+            {loading && (
+              <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center rounded" style={{ zIndex: 10 }}>
+                <div className="bg-white rounded-lg p-4 flex items-center gap-3 shadow-lg">
+                  <Spinner size={24} />
+                  <span className="text-sm font-medium">Running StarDist on Ch {channel}...</span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {loading && (
-            <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center rounded" style={{ zIndex: 10 }}>
-              <div className="bg-white rounded-lg p-4 flex items-center gap-3 shadow-lg">
-                <Spinner size={24} />
-                <span className="text-sm font-medium">Running StarDist on Ch {channel}...</span>
+          {/* T Slider (Bottom of image viewer) */}
+          {imageMeta?.sizeT > 1 && (
+            <div className="flex items-center gap-3 mt-1 px-2">
+              <span className="text-xs font-bold text-gray-500 w-12 text-right">T: {Math.max(1, t + 1)}/{imageMeta.sizeT}</span>
+              <div className="flex-1">
+                <Slider
+                  min={0}
+                  max={Math.max(0, imageMeta.sizeT - 1)}
+                  stepSize={1}
+                  value={t}
+                  onChange={setT}
+                  showTrackFill={false}
+                />
               </div>
             </div>
           )}
@@ -332,31 +376,11 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [] }) => {
           <div className="w-52 flex flex-col gap-3 shrink-0">
             {/* Image Channel Visibility */}
             {channels.length > 1 && (
-              <div>
-                <div className="text-xs font-bold uppercase text-gray-500 mb-2">
-                  Image Channels
-                </div>
-                <div className="flex flex-col gap-1">
-                  {channels.map(ch => (
-                    <Checkbox
-                      key={ch.index}
-                      checked={channelVisibility[ch.index] !== false}
-                      onChange={() => toggleChannelVisibility(ch.index)}
-                      className="mb-0 flex items-center"
-                    >
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                        <span
-                          className="inline-block w-3 h-3 rounded-full border border-gray-300 shrink-0"
-                          style={{ backgroundColor: ch.color || '#ccc' }}
-                        />
-                        <span className="text-sm">
-                          {ch.name || `Channel ${ch.index}`}
-                        </span>
-                      </span>
-                    </Checkbox>
-                  ))}
-                </div>
-              </div>
+              <ImageChannelControls
+                channels={channels}
+                visibility={channelVisibility}
+                onToggle={toggleChannelVisibility}
+              />
             )}
 
             {/* Prediction Overlays */}
