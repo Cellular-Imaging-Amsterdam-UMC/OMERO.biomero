@@ -1,8 +1,9 @@
 import React, { useRef, useEffect, useState, useMemo } from "react";
 import { Button, Slider, ButtonGroup, Icon, Popover, Menu, MenuItem, InputGroup, Checkbox } from "@blueprintjs/core";
+import ImageChannelControls from "./ImageChannelControls";
 import { traceContours, subtractAnnotations, eraseFromAnnotations } from "../utils/GeometryUtils";
 
-const AnnotationViewer = ({ image, annotations, onAnnotationsChange, featureTypes, onFeatureTypesChange }) => {
+const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = [], imageMeta = { sizeZ: 1, sizeT: 1 }, featureTypes, onFeatureTypesChange }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   
@@ -31,12 +32,49 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, featureType
   // Offscreen canvas for brush
   const maskCanvas = useMemo(() => document.createElement("canvas"), []);
   
-  // Constants
-  const Z = 0;
-  const T = 0;
-  const imageUrl = image 
-    ? `/webgateway/render_image/${image.id}/${Z}/${T}/`
-    : null;
+  // Channel Visibility
+  const [channelVisibility, setChannelVisibility] = useState({});
+
+  useEffect(() => {
+    if (channels.length > 0) {
+      const vis = {};
+      channels.forEach(ch => {
+        vis[ch.index] = ch.active !== false;
+      });
+      setChannelVisibility(vis);
+    }
+  }, [channels]);
+
+  const toggleChannelVisibility = (idx) => {
+    setChannelVisibility(prev => ({
+      ...prev,
+      [idx]: !prev[idx]
+    }));
+  };
+  
+  const [z, setZ] = useState(0);
+  const [t, setT] = useState(0);
+
+  useEffect(() => {
+    setZ(0);
+    setT(0);
+  }, [image]);
+  
+  const imageUrl = useMemo(() => {
+    if (!image) return null;
+    const base = `/webgateway/render_image/${image.id}/${z}/${t}/`;
+    
+    if (channels.length <= 1) return base;
+
+    // Build channel string
+    const channelParam = channels.map(ch => {
+      const chNum = ch.index + 1; // OMERO uses 1-indexed
+      const visible = channelVisibility[ch.index] !== false; // default true
+      return visible ? `${chNum}` : `-${chNum}`;
+    }).join(",");
+
+    return `${base}?c=${channelParam}`;
+  }, [image, channels, channelVisibility, z, t]);
 
   useEffect(() => {
       // Sync active feature if list changes or empty
@@ -71,8 +109,10 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, featureType
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 1. Draw existing annotations
-      annotations.forEach((ann, idx) => {
+      // 1. Draw existing annotations for current plane
+      annotations
+        .filter(ann => (ann.z ?? 0) === z && (ann.t ?? 0) === t)
+        .forEach((ann, idx) => {
           if (!ann.points || ann.points.length < 2) return;
           const type = featureTypes.find(t => t.id === ann.typeId) || { color: "yellow" };
           
@@ -215,17 +255,19 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, featureType
       const height = canvasRef.current.height;
       
       if (mode === "subtract") {
-          let currentAnns = [...annotations];
+          let currentAnns = annotations.filter(a => (a.z ?? 0) === z && (a.t ?? 0) === t);
+          let otherAnns = annotations.filter(a => (a.z ?? 0) !== z || (a.t ?? 0) !== t);
           newPolys.forEach(erasePoly => {
                currentAnns = eraseFromAnnotations(erasePoly, currentAnns, width, height);
           });
-          onAnnotationsChange(currentAnns);
+          onAnnotationsChange([...otherAnns, ...currentAnns]);
       } else {
           const newAnns = newPolys.map(pts => ({
               id: crypto.randomUUID(),
               points: pts,
               typeId: activeFeatureType,
-              generated: true
+              generated: true,
+              z, t
           }));
           
           if (collisionDetection) {
@@ -239,19 +281,21 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, featureType
   const handleCollisionAndAdd = (newPolys) => {
       const width = canvasRef.current.width;
       const height = canvasRef.current.height;
-      let finalAnns = [...annotations];
+      let currentAnns = annotations.filter(a => (a.z ?? 0) === z && (a.t ?? 0) === t);
+      let otherAnns = annotations.filter(a => (a.z ?? 0) !== z || (a.t ?? 0) !== t);
       newPolys.forEach(newPoly => {
-           const resultPolys = subtractAnnotations(newPoly.points, finalAnns, width, height);
+           const resultPolys = subtractAnnotations(newPoly.points, currentAnns, width, height);
            resultPolys.forEach(pts => {
-               finalAnns.push({
+               currentAnns.push({
                    id: crypto.randomUUID(),
                    points: pts,
                    typeId: newPoly.typeId,
-                   generated: true
+                   generated: true,
+                   z, t
                });
            });
       });
-      onAnnotationsChange(finalAnns);
+      onAnnotationsChange([...otherAnns, ...currentAnns]);
   };
   
   const handleContextMenu = (e) => {
@@ -325,12 +369,23 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, featureType
        }
   };
 
-  if (!image) return <div>Select an image</div>;
+  if (!image) return <div className="p-4 text-gray-400">Select an image</div>;
 
   return (
-    <div className="flex h-full gap-4">
+    <div className="flex h-full gap-0">
        {/* Toolbar / Sidebar */}
        <div className="w-64 flex flex-col gap-4 p-2 border-r bg-gray-50 overflow-y-auto shrink-0">
+           {/* Image Channels */}
+           {channels.length > 1 && (
+               <div className="border-b pb-2">
+                   <ImageChannelControls 
+                        channels={channels}
+                        visibility={channelVisibility}
+                        onToggle={toggleChannelVisibility}
+                   />
+               </div>
+           )}
+
            {/* Tools */}
            <div className="flex flex-col gap-2">
                <h5>Tools</h5>
@@ -458,39 +513,78 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, featureType
        </div>
 
        {/* Canvas Area */}
-       <div className="flex-1 relative overflow-hidden bg-gray-200 border rounded cursor-crosshair" ref={containerRef} onWheel={handleWheel}>
-           <div 
-               style={{ 
-                   transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, 
-                   transformOrigin: "0 0",
-                   transition: isPanning ? "none" : "transform 0.1s"
-               }}
-               className="inline-block origin-top-left relative"
-           >
-               <img 
-                   src={imageUrl} 
-                   alt="work" 
-                   className="block pointer-events-none select-none max-w-none" 
-                   onLoad={handleImageLoad}
+       <div className="flex-1 flex gap-3 items-start relative h-full">
+         {/* Z Slider */}
+         {imageMeta?.sizeZ > 1 && (
+           <div className="flex flex-col items-center h-[500px]">
+             <span className="text-xs font-bold text-gray-500 mb-2">Z: {Math.max(1, z + 1)}/{imageMeta.sizeZ}</span>
+             <div className="flex-1 py-1">
+               <Slider
+                 min={0}
+                 max={Math.max(0, imageMeta.sizeZ - 1)}
+                 stepSize={1}
+                 value={z}
+                 onChange={setZ}
+                 vertical
+                 showTrackFill={false}
                />
-               <canvas 
-                   ref={canvasRef}
-                   className="absolute top-0 left-0 w-full h-full" 
-                   onMouseDown={handleMouseDown}
-                   onMouseMove={handleMouseMove}
-                   onMouseUp={handleMouseUp}
-                   onMouseLeave={handleMouseUp}
-                   onContextMenu={handleContextMenu}
-               />
+             </div>
            </div>
-           
-           {/* Zoom Controls Overlay */}
-           <div className="absolute bottom-4 right-4 flex gap-2">
-               <Button icon="minus" onClick={() => setZoom(z => Math.max(0.1, z * 0.8))} />
-               <Button text={`${Math.round(zoom * 100)}%`} disabled />
-               <Button icon="plus" onClick={() => setZoom(z => Math.min(10, z * 1.2))} />
-               <Button icon="reset" onClick={() => { setZoom(1); setPan({x:0,y:0}); }} />
+         )}
+
+         <div className="flex-1 flex flex-col gap-2 relative h-full">
+           <div className="flex-1 relative overflow-hidden bg-gray-200 border rounded cursor-crosshair" ref={containerRef} onWheel={handleWheel}>
+               <div 
+                   style={{ 
+                       transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, 
+                       transformOrigin: "0 0",
+                       transition: isPanning ? "none" : "transform 0.1s"
+                   }}
+                   className="inline-block origin-top-left relative"
+               >
+                   <img 
+                       src={imageUrl} 
+                       alt="work" 
+                       className="block pointer-events-none select-none max-w-none" 
+                       onLoad={handleImageLoad}
+                   />
+                   <canvas 
+                       ref={canvasRef}
+                       className="absolute top-0 left-0 w-full h-full" 
+                       onMouseDown={handleMouseDown}
+                       onMouseMove={handleMouseMove}
+                       onMouseUp={handleMouseUp}
+                       onMouseLeave={handleMouseUp}
+                       onContextMenu={handleContextMenu}
+                   />
+               </div>
+               
+               {/* Zoom Controls Overlay */}
+               <div className="absolute bottom-4 right-4 flex gap-2">
+                   <Button icon="minus" onClick={() => setZoom(prev => Math.max(0.1, prev * 0.8))} />
+                   <Button text={`${Math.round(zoom * 100)}%`} disabled />
+                   <Button icon="plus" onClick={() => setZoom(prev => Math.min(10, prev * 1.2))} />
+                   <Button icon="reset" onClick={() => { setZoom(1); setPan({x:0,y:0}); }} />
+               </div>
            </div>
+
+           {/* T Slider */}
+           {imageMeta?.sizeT > 1 && (
+             <div className="flex items-center gap-3 mt-1 px-2">
+               <span className="text-xs font-bold text-gray-500 w-12 text-right">T: {Math.max(1, t + 1)}/{imageMeta.sizeT}</span>
+               <div className="flex-1">
+                 <Slider
+                   min={0}
+                   max={Math.max(0, imageMeta.sizeT - 1)}
+                   stepSize={1}
+                   value={t}
+                   onChange={setT}
+                   showTrackFill={false}
+                 />
+               </div>
+             </div>
+           )}
+         </div>
        </div>
     </div>
   );

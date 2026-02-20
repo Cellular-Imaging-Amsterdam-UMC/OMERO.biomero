@@ -25437,13 +25437,17 @@ const fetchImageChannels = async imageId => {
 };
 const runStardistPrediction = async function (imageId, modelName) {
   let channel = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
+  let z = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 0;
+  let t = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 0;
   try {
     const csrfToken = window.csrftoken;
     const endpoint = "/omero_biomero/api/stardist/predict/";
     const response = await apiRequest(endpoint, "POST", {
       image_id: imageId,
       model: modelName,
-      channel: channel
+      channel: channel,
+      z: z,
+      t: t
     }, {
       headers: {
         "X-CSRFToken": csrfToken
@@ -29715,6 +29719,11 @@ const AnnotationTab = () => {
     color: "#0000ff"
   }]);
   const [loadingAnns, setLoadingAnns] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const [channels, setChannels] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
+  const [imageMeta, setImageMeta] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
+    sizeZ: 1,
+    sizeT: 1
+  });
   const [saving, setSaving] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
 
   // Need toaster for notifications
@@ -29740,10 +29749,32 @@ const AnnotationTab = () => {
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
     if (selectedImage) {
       loadAnnotations(selectedImage.id);
+      loadChannels(selectedImage.id);
     } else {
       setAnnotations([]);
+      setChannels([]);
+      setImageMeta({
+        sizeZ: 1,
+        sizeT: 1
+      });
     }
   }, [selectedImage]);
+  const loadChannels = async imageId => {
+    try {
+      const data = await (0,_apiService__WEBPACK_IMPORTED_MODULE_5__.fetchImageChannels)(imageId);
+      setChannels(data.channels || []);
+      setImageMeta({
+        sizeZ: data.sizeZ || 1,
+        sizeT: data.sizeT || 1
+      });
+    } catch (e) {
+      console.error("Error loading channels", e);
+      setImageMeta({
+        sizeZ: 1,
+        sizeT: 1
+      });
+    }
+  };
   const loadAnnotations = async imageId => {
     setLoadingAnns(true);
     try {
@@ -29845,6 +29876,8 @@ const AnnotationTab = () => {
             image: selectedImage,
             annotations: annotations,
             onAnnotationsChange: setAnnotations,
+            channels: channels,
+            imageMeta: imageMeta,
             featureTypes: featureTypes,
             onFeatureTypesChange: setFeatureTypes
           })
@@ -29870,14 +29903,16 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttonGroup.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/controls.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/slider/slider.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/icon/icon.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/inputGroup.js");
-/* harmony import */ var _utils_GeometryUtils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../utils/GeometryUtils */ "./src/biomero/stardist/utils/GeometryUtils.js");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttonGroup.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/controls.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/slider/slider.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/icon/icon.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/inputGroup.js");
+/* harmony import */ var _ImageChannelControls__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ImageChannelControls */ "./src/biomero/stardist/components/ImageChannelControls.js");
+/* harmony import */ var _utils_GeometryUtils__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../utils/GeometryUtils */ "./src/biomero/stardist/utils/GeometryUtils.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
 
 
 
@@ -29887,6 +29922,11 @@ const AnnotationViewer = _ref => {
     image,
     annotations,
     onAnnotationsChange,
+    channels = [],
+    imageMeta = {
+      sizeZ: 1,
+      sizeT: 1
+    },
     featureTypes,
     onFeatureTypesChange
   } = _ref;
@@ -29924,10 +29964,42 @@ const AnnotationViewer = _ref => {
   // Offscreen canvas for brush
   const maskCanvas = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(() => document.createElement("canvas"), []);
 
-  // Constants
-  const Z = 0;
-  const T = 0;
-  const imageUrl = image ? `/webgateway/render_image/${image.id}/${Z}/${T}/` : null;
+  // Channel Visibility
+  const [channelVisibility, setChannelVisibility] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({});
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    if (channels.length > 0) {
+      const vis = {};
+      channels.forEach(ch => {
+        vis[ch.index] = ch.active !== false;
+      });
+      setChannelVisibility(vis);
+    }
+  }, [channels]);
+  const toggleChannelVisibility = idx => {
+    setChannelVisibility(prev => ({
+      ...prev,
+      [idx]: !prev[idx]
+    }));
+  };
+  const [z, setZ] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(0);
+  const [t, setT] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(0);
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    setZ(0);
+    setT(0);
+  }, [image]);
+  const imageUrl = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(() => {
+    if (!image) return null;
+    const base = `/webgateway/render_image/${image.id}/${z}/${t}/`;
+    if (channels.length <= 1) return base;
+
+    // Build channel string
+    const channelParam = channels.map(ch => {
+      const chNum = ch.index + 1; // OMERO uses 1-indexed
+      const visible = channelVisibility[ch.index] !== false; // default true
+      return visible ? `${chNum}` : `-${chNum}`;
+    }).join(",");
+    return `${base}?c=${channelParam}`;
+  }, [image, channels, channelVisibility, z, t]);
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
     // Sync active feature if list changes or empty
     if (featureTypes.length > 0) {
@@ -29963,8 +30035,8 @@ const AnnotationViewer = _ref => {
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Draw existing annotations
-    annotations.forEach((ann, idx) => {
+    // 1. Draw existing annotations for current plane
+    annotations.filter(ann => (ann.z ?? 0) === z && (ann.t ?? 0) === t).forEach((ann, idx) => {
       if (!ann.points || ann.points.length < 2) return;
       const type = featureTypes.find(t => t.id === ann.typeId) || {
         color: "yellow"
@@ -30087,7 +30159,7 @@ const AnnotationViewer = _ref => {
       setIsDrawing(false);
       const ctx = maskCanvas.getContext("2d");
       const imageData = ctx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
-      const polys = (0,_utils_GeometryUtils__WEBPACK_IMPORTED_MODULE_1__.traceContours)(imageData);
+      const polys = (0,_utils_GeometryUtils__WEBPACK_IMPORTED_MODULE_2__.traceContours)(imageData);
       processNewPolygons(polys);
       draw();
     }
@@ -30104,17 +30176,20 @@ const AnnotationViewer = _ref => {
     const width = canvasRef.current.width;
     const height = canvasRef.current.height;
     if (mode === "subtract") {
-      let currentAnns = [...annotations];
+      let currentAnns = annotations.filter(a => (a.z ?? 0) === z && (a.t ?? 0) === t);
+      let otherAnns = annotations.filter(a => (a.z ?? 0) !== z || (a.t ?? 0) !== t);
       newPolys.forEach(erasePoly => {
-        currentAnns = (0,_utils_GeometryUtils__WEBPACK_IMPORTED_MODULE_1__.eraseFromAnnotations)(erasePoly, currentAnns, width, height);
+        currentAnns = (0,_utils_GeometryUtils__WEBPACK_IMPORTED_MODULE_2__.eraseFromAnnotations)(erasePoly, currentAnns, width, height);
       });
-      onAnnotationsChange(currentAnns);
+      onAnnotationsChange([...otherAnns, ...currentAnns]);
     } else {
       const newAnns = newPolys.map(pts => ({
         id: crypto.randomUUID(),
         points: pts,
         typeId: activeFeatureType,
-        generated: true
+        generated: true,
+        z,
+        t
       }));
       if (collisionDetection) {
         handleCollisionAndAdd(newAnns);
@@ -30126,19 +30201,22 @@ const AnnotationViewer = _ref => {
   const handleCollisionAndAdd = newPolys => {
     const width = canvasRef.current.width;
     const height = canvasRef.current.height;
-    let finalAnns = [...annotations];
+    let currentAnns = annotations.filter(a => (a.z ?? 0) === z && (a.t ?? 0) === t);
+    let otherAnns = annotations.filter(a => (a.z ?? 0) !== z || (a.t ?? 0) !== t);
     newPolys.forEach(newPoly => {
-      const resultPolys = (0,_utils_GeometryUtils__WEBPACK_IMPORTED_MODULE_1__.subtractAnnotations)(newPoly.points, finalAnns, width, height);
+      const resultPolys = (0,_utils_GeometryUtils__WEBPACK_IMPORTED_MODULE_2__.subtractAnnotations)(newPoly.points, currentAnns, width, height);
       resultPolys.forEach(pts => {
-        finalAnns.push({
+        currentAnns.push({
           id: crypto.randomUUID(),
           points: pts,
           typeId: newPoly.typeId,
-          generated: true
+          generated: true,
+          z,
+          t
         });
       });
     });
-    onAnnotationsChange(finalAnns);
+    onAnnotationsChange([...otherAnns, ...currentAnns]);
   };
   const handleContextMenu = e => {
     e.preventDefault();
@@ -30203,50 +30281,58 @@ const AnnotationViewer = _ref => {
       draw();
     }
   };
-  if (!image) return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+  if (!image) return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
+    className: "p-4 text-gray-400",
     children: "Select an image"
   });
-  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
-    className: "flex h-full gap-4",
-    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+    className: "flex h-full gap-0",
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
       className: "w-64 flex flex-col gap-4 p-2 border-r bg-gray-50 overflow-y-auto shrink-0",
-      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+      children: [channels.length > 1 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
+        className: "border-b pb-2",
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_ImageChannelControls__WEBPACK_IMPORTED_MODULE_1__["default"], {
+          channels: channels,
+          visibility: channelVisibility,
+          onToggle: toggleChannelVisibility
+        })
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
         className: "flex flex-col gap-2",
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("h5", {
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("h5", {
           children: "Tools"
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.ButtonGroup, {
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.ButtonGroup, {
           fill: true,
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
             icon: "hand",
             active: tool === "pan",
             onClick: () => setTool("pan"),
             title: "Pan/Zoom (Ctrl+Scroll)"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
             icon: "polygon-filter",
             active: tool === "polygon",
             onClick: () => setTool("polygon"),
             title: "Polygon (Right Click to Finish)",
             disabled: mode === "add" && featureTypes.length === 0
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
             icon: "draw",
             active: tool === "brush",
             onClick: () => setTool("brush"),
             title: "Brush",
             disabled: mode === "add" && featureTypes.length === 0
           })]
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
           className: "flex gap-2 items-center mt-2 px-1",
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("span", {
             className: "text-xs font-bold w-12",
             children: "Mode:"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.ButtonGroup, {
-            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.ButtonGroup, {
+            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
               small: true,
               active: mode === "add",
               onClick: () => setMode("add"),
               intent: mode === "add" ? "primary" : "none",
               children: "Add"
-            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
               small: true,
               active: mode === "subtract",
               onClick: () => setMode("subtract"),
@@ -30254,19 +30340,19 @@ const AnnotationViewer = _ref => {
               children: "Subtract"
             })]
           })]
-        }), mode === "add" && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+        }), mode === "add" && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
           className: "mt-2 px-1",
-          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Checkbox, {
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.Checkbox, {
             checked: collisionDetection,
             onChange: e => setCollisionDetection(e.target.checked),
             label: "Avoid Overlap",
             title: "When enabled, new annotations will be clipped by existing ones"
           })
-        }), tool === "brush" && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+        }), tool === "brush" && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
           className: "px-2 pt-2",
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("label", {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("label", {
             children: ["Brush Size: ", brushSize, " px"]
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.Slider, {
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Slider, {
             min: 5,
             max: 200,
             value: brushSize,
@@ -30274,21 +30360,21 @@ const AnnotationViewer = _ref => {
             labelStepSize: 50
           })]
         })]
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
         className: "border-t pt-2",
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("h5", {
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("h5", {
           children: "Features"
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
           className: "flex flex-col gap-2 mb-2",
-          children: featureTypes.map(ft => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+          children: featureTypes.map(ft => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
             className: `p-1 border rounded cursor-pointer flex items-center gap-2 ${activeFeatureType === ft.id ? 'ring-2 ring-blue-500 bg-blue-50' : 'bg-white'}`,
             onClick: () => setActiveFeatureType(ft.id),
-            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
               className: "w-4 h-4 rounded-full border",
               style: {
                 background: ft.color
               }
-            }), editingFeatureId === ft.id ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("input", {
+            }), editingFeatureId === ft.id ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("input", {
               className: "flex-1 min-w-0 text-sm border rounded px-1",
               value: ft.name,
               autoFocus: true,
@@ -30298,7 +30384,7 @@ const AnnotationViewer = _ref => {
               onKeyDown: e => {
                 if (e.key === 'Enter') setEditingFeatureId(null);
               }
-            }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+            }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("span", {
               className: "text-sm flex-1 truncate",
               onClick: e => {
                 e.stopPropagation();
@@ -30306,7 +30392,7 @@ const AnnotationViewer = _ref => {
                 setEditingFeatureId(ft.id);
               },
               children: ft.name
-            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Icon, {
+            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__.Icon, {
               icon: "cross",
               size: 12,
               className: "text-gray-400 hover:text-red-500",
@@ -30316,21 +30402,21 @@ const AnnotationViewer = _ref => {
               }
             })]
           }, ft.id))
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
           className: "flex gap-1 flex-col mt-2 p-2 bg-white rounded border",
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__.InputGroup, {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.InputGroup, {
             placeholder: "Name",
             value: newFeatureName,
             onChange: e => setNewFeatureName(e.target.value),
             small: true
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
             className: "flex gap-1",
-            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("input", {
+            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("input", {
               type: "color",
               value: newFeatureColor,
               onChange: e => setNewFeatureColor(e.target.value),
               className: "h-6 w-8 p-0 border-0 cursor-pointer"
-            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
               icon: "add",
               small: true,
               onClick: addFeatureType,
@@ -30340,27 +30426,27 @@ const AnnotationViewer = _ref => {
             })]
           })]
         })]
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
         className: "border-t pt-2 flex-1 overflow-auto min-h-[100px]",
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("h5", {
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("h5", {
           children: ["Annotations (", annotations.length, ")"]
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
           className: "flex flex-col gap-1",
           children: annotations.map((ann, i) => {
             const ft = featureTypes.find(t => t.id === ann.typeId);
-            return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+            return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
               className: "flex justify-between items-center text-xs p-1 bg-white border hover:bg-gray-100",
-              children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+              children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
                 className: "flex items-center gap-2",
-                children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+                children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
                   className: "w-2 h-2 rounded-full",
                   style: {
                     background: ft?.color || 'gray'
                   }
-                }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
+                }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("span", {
                   children: [ft?.name || 'Unknown', " #", i + 1]
                 })]
-              }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
+              }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
                 icon: "trash",
                 minimal: true,
                 small: true,
@@ -30370,51 +30456,90 @@ const AnnotationViewer = _ref => {
           })
         })]
       })]
-    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
-      className: "flex-1 relative overflow-hidden bg-gray-200 border rounded cursor-crosshair",
-      ref: containerRef,
-      onWheel: handleWheel,
-      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
-        style: {
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          transformOrigin: "0 0",
-          transition: isPanning ? "none" : "transform 0.1s"
-        },
-        className: "inline-block origin-top-left relative",
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("img", {
-          src: imageUrl,
-          alt: "work",
-          className: "block pointer-events-none select-none max-w-none",
-          onLoad: handleImageLoad
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("canvas", {
-          ref: canvasRef,
-          className: "absolute top-0 left-0 w-full h-full",
-          onMouseDown: handleMouseDown,
-          onMouseMove: handleMouseMove,
-          onMouseUp: handleMouseUp,
-          onMouseLeave: handleMouseUp,
-          onContextMenu: handleContextMenu
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+      className: "flex-1 flex gap-3 items-start relative h-full",
+      children: [imageMeta?.sizeZ > 1 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+        className: "flex flex-col items-center h-[500px]",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("span", {
+          className: "text-xs font-bold text-gray-500 mb-2",
+          children: ["Z: ", Math.max(1, z + 1), "/", imageMeta.sizeZ]
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
+          className: "flex-1 py-1",
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Slider, {
+            min: 0,
+            max: Math.max(0, imageMeta.sizeZ - 1),
+            stepSize: 1,
+            value: z,
+            onChange: setZ,
+            vertical: true,
+            showTrackFill: false
+          })
         })]
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
-        className: "absolute bottom-4 right-4 flex gap-2",
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
-          icon: "minus",
-          onClick: () => setZoom(z => Math.max(0.1, z * 0.8))
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
-          text: `${Math.round(zoom * 100)}%`,
-          disabled: true
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
-          icon: "plus",
-          onClick: () => setZoom(z => Math.min(10, z * 1.2))
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
-          icon: "reset",
-          onClick: () => {
-            setZoom(1);
-            setPan({
-              x: 0,
-              y: 0
-            });
-          }
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+        className: "flex-1 flex flex-col gap-2 relative h-full",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+          className: "flex-1 relative overflow-hidden bg-gray-200 border rounded cursor-crosshair",
+          ref: containerRef,
+          onWheel: handleWheel,
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+            style: {
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: "0 0",
+              transition: isPanning ? "none" : "transform 0.1s"
+            },
+            className: "inline-block origin-top-left relative",
+            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("img", {
+              src: imageUrl,
+              alt: "work",
+              className: "block pointer-events-none select-none max-w-none",
+              onLoad: handleImageLoad
+            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("canvas", {
+              ref: canvasRef,
+              className: "absolute top-0 left-0 w-full h-full",
+              onMouseDown: handleMouseDown,
+              onMouseMove: handleMouseMove,
+              onMouseUp: handleMouseUp,
+              onMouseLeave: handleMouseUp,
+              onContextMenu: handleContextMenu
+            })]
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+            className: "absolute bottom-4 right-4 flex gap-2",
+            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
+              icon: "minus",
+              onClick: () => setZoom(prev => Math.max(0.1, prev * 0.8))
+            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
+              text: `${Math.round(zoom * 100)}%`,
+              disabled: true
+            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
+              icon: "plus",
+              onClick: () => setZoom(prev => Math.min(10, prev * 1.2))
+            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Button, {
+              icon: "reset",
+              onClick: () => {
+                setZoom(1);
+                setPan({
+                  x: 0,
+                  y: 0
+                });
+              }
+            })]
+          })]
+        }), imageMeta?.sizeT > 1 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+          className: "flex items-center gap-3 mt-1 px-2",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("span", {
+            className: "text-xs font-bold text-gray-500 w-12 text-right",
+            children: ["T: ", Math.max(1, t + 1), "/", imageMeta.sizeT]
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
+            className: "flex-1",
+            children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Slider, {
+              min: 0,
+              max: Math.max(0, imageMeta.sizeT - 1),
+              stepSize: 1,
+              value: t,
+              onChange: setT,
+              showTrackFill: false
+            })
+          })]
         })]
       })]
     })]
@@ -30498,6 +30623,65 @@ const ChannelSelector = _ref => {
   });
 };
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (ChannelSelector);
+
+/***/ }),
+
+/***/ "./src/biomero/stardist/components/ImageChannelControls.js":
+/*!*****************************************************************!*\
+  !*** ./src/biomero/stardist/components/ImageChannelControls.js ***!
+  \*****************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/controls.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+
+
+const ImageChannelControls = _ref => {
+  let {
+    channels,
+    visibility,
+    onToggle
+  } = _ref;
+  if (!channels || channels.length <= 1) return null;
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("div", {
+      className: "text-xs font-bold uppercase text-gray-500 mb-2",
+      children: "Image Channels"
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("div", {
+      className: "flex flex-col gap-1",
+      children: channels.map(ch => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_2__.Checkbox, {
+        checked: visibility[ch.index] !== false,
+        onChange: () => onToggle(ch.index),
+        className: "mb-0 flex items-center",
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("span", {
+          style: {
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
+          },
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("span", {
+            className: "inline-block w-3 h-3 rounded-full border border-gray-300 shrink-0",
+            style: {
+              backgroundColor: ch.color || '#ccc'
+            }
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("span", {
+            className: "text-sm",
+            children: ch.name || `Channel ${ch.index}`
+          })]
+        })
+      }, ch.index))
+    })]
+  });
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (ImageChannelControls);
 
 /***/ }),
 
@@ -30781,6 +30965,10 @@ const PreviewTab = () => {
   const [channels, setChannels] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
   const [selectedChannel, setSelectedChannel] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(0);
   const [loadingChannels, setLoadingChannels] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const [imageMeta, setImageMeta] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
+    sizeZ: 1,
+    sizeT: 1
+  });
 
   // Helper to extract ID from string like "dataset-123"
   const getDatasetId = selection => {
@@ -30797,6 +30985,10 @@ const PreviewTab = () => {
     setSelectedImage(null);
     setChannels([]);
     setSelectedChannel(0);
+    setImageMeta({
+      sizeZ: 1,
+      sizeT: 1
+    });
   };
   const handleImageSelect = img => {
     setSelectedImage(img);
@@ -30808,6 +31000,10 @@ const PreviewTab = () => {
     if (!selectedImage) {
       setChannels([]);
       setSelectedChannel(0);
+      setImageMeta({
+        sizeZ: 1,
+        sizeT: 1
+      });
       return;
     }
     const loadChannels = async () => {
@@ -30815,12 +31011,20 @@ const PreviewTab = () => {
       try {
         const data = await (0,_apiService__WEBPACK_IMPORTED_MODULE_6__.fetchImageChannels)(selectedImage.id);
         setChannels(data.channels || []);
+        setImageMeta({
+          sizeZ: data.sizeZ || 1,
+          sizeT: data.sizeT || 1
+        });
         // Default to first active channel, or channel 0
         const firstActive = (data.channels || []).find(ch => ch.active);
         setSelectedChannel(firstActive ? firstActive.index : 0);
       } catch (e) {
         console.error("Failed to load channels:", e);
         setChannels([]);
+        setImageMeta({
+          sizeZ: 1,
+          sizeT: 1
+        });
       } finally {
         setLoadingChannels(false);
       }
@@ -30878,7 +31082,8 @@ const PreviewTab = () => {
             image: selectedImage,
             model: selectedModel,
             channel: selectedChannel,
-            channels: channels
+            channels: channels,
+            imageMeta: imageMeta
           })]
         })
       })]
@@ -30902,14 +31107,17 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/callout/callout.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/spinner/spinner.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/controls.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/divider/divider.js");
-/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/tag/tag.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/callout/callout.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/slider/slider.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/spinner/spinner.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/divider/divider.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/controls.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/tag/tag.js");
 /* harmony import */ var _apiService__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../apiService */ "./src/apiService.js");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var _ImageChannelControls__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./ImageChannelControls */ "./src/biomero/stardist/components/ImageChannelControls.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
 
 
 
@@ -30926,7 +31134,11 @@ const PreviewViewer = _ref => {
     image,
     model,
     channel = 0,
-    channels = []
+    channels = [],
+    imageMeta = {
+      sizeZ: 1,
+      sizeT: 1
+    }
   } = _ref;
   const canvasRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
   const imgRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
@@ -30953,16 +31165,14 @@ const PreviewViewer = _ref => {
   // Image channel visibility — which OMERO channels to render
   // { [channelIdx]: bool }
   const [channelVisibility, setChannelVisibility] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({});
-
-  // Constants
-  const Z = 0;
-  const T = 0;
+  const [z, setZ] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(0);
+  const [t, setT] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(0);
 
   // Build the OMERO render_image URL with channel visibility
   // Format: ?c=1,-2,3 (1-indexed, negative = hidden)
   const imageUrl = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(() => {
     if (!image) return null;
-    const base = `/webgateway/render_image/${image.id}/${Z}/${T}/`;
+    const base = `/webgateway/render_image/${image.id}/${z}/${t}/`;
     if (channels.length <= 1) return base;
 
     // Build channel string
@@ -30972,7 +31182,7 @@ const PreviewViewer = _ref => {
       return visible ? `${chNum}` : `-${chNum}`;
     }).join(",");
     return `${base}?c=${channelParam}`;
-  }, [image, channels, channelVisibility]);
+  }, [image, channels, channelVisibility, z, t]);
 
   // Initialize channel visibility when channels change
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
@@ -30994,6 +31204,8 @@ const PreviewViewer = _ref => {
       x: 0,
       y: 0
     });
+    setZ(0);
+    setT(0);
     if (canvasRef.current) {
       const ctx = canvasRef.current.getContext("2d");
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -31058,10 +31270,12 @@ const PreviewViewer = _ref => {
     const ctx = canvasRef.current.getContext("2d");
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     Object.entries(predictions).forEach(_ref2 => {
-      let [chIdx, data] = _ref2;
-      if (!data.visible || !data.polygons) return;
+      let [chIdx, chData] = _ref2;
+      if (!chData.visible) return;
+      const planeData = chData.dataByPlane?.[`${z}_${t}`];
+      if (!planeData || !planeData.polygons) return;
       const hue = getChannelHue(parseInt(chIdx));
-      data.polygons.forEach((polygon, pIdx) => {
+      planeData.polygons.forEach((polygon, pIdx) => {
         const pts = polygon.points;
         if (!pts || pts.length === 0) return;
         const strokeColor = `hsl(${hue}, 85%, 55%)`;
@@ -31088,19 +31302,27 @@ const PreviewViewer = _ref => {
     setLoading(true);
     setError(null);
     try {
-      const result = await (0,_apiService__WEBPACK_IMPORTED_MODULE_1__.runStardistPrediction)(image.id, model, channel);
+      const result = await (0,_apiService__WEBPACK_IMPORTED_MODULE_1__.runStardistPrediction)(image.id, model, channel, z, t);
       if (result.error) {
         setError(result.error);
       } else {
-        // Accumulate: store predictions under the current channel key
-        setPredictions(prev => ({
-          ...prev,
-          [channel]: {
-            polygons: result.polygons || [],
-            count: result.count || 0,
-            visible: true
+        // Accumulate: store predictions under the current channel key, grouping by z_t
+        setPredictions(prev => {
+          const next = {
+            ...prev
+          };
+          if (!next[channel]) {
+            next[channel] = {
+              dataByPlane: {},
+              visible: true
+            };
           }
-        }));
+          next[channel].dataByPlane[`${z}_${t}`] = {
+            polygons: result.polygons || [],
+            count: result.count || 0
+          };
+          return next;
+        });
       }
     } catch (e) {
       console.error("Preview failed", e);
@@ -31136,189 +31358,201 @@ const PreviewViewer = _ref => {
   };
 
   // Total detected objects across all channels
-  const totalCount = Object.values(predictions).reduce((sum, d) => sum + (d.count || 0), 0);
+  const totalCount = Object.values(predictions).reduce((sum, chData) => sum + Object.values(chData.dataByPlane || {}).reduce((s, p) => s + (p.count || 0), 0), 0);
   const channelsWithPredictions = Object.keys(predictions).map(Number);
   if (!image) {
-    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
       className: "flex items-center justify-center h-64 bg-gray-100 text-gray-400 border rounded",
       children: "Select an image to view"
     });
   }
-  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
     className: "flex flex-col gap-3",
-    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
       className: "flex items-center gap-3",
-      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.Button, {
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
         intent: "primary",
         onClick: handleRun,
         loading: loading,
         icon: "play",
         disabled: !model,
         children: "Run Preview"
-      }), channels.length > 1 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
+      }), channels.length > 1 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("span", {
         className: "text-xs px-2 py-1 rounded flex items-center gap-1",
         style: {
           background: 'rgba(0,0,0,0.06)'
         },
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("span", {
           className: "inline-block w-2 h-2 rounded-full",
           style: {
             backgroundColor: channels[channel]?.color || '#ccc'
           }
         }), channels[channel]?.name || `Ch ${channel}`]
-      }), totalCount > 0 && !loading && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
+      }), totalCount > 0 && !loading && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("span", {
         className: "text-sm text-gray-600",
-        children: ["Total: ", /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("strong", {
+        children: ["Total: ", /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("strong", {
           children: totalCount
         }), " object", totalCount !== 1 ? "s" : "", " across ", channelsWithPredictions.length, " channel", channelsWithPredictions.length !== 1 ? "s" : ""]
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("span", {
         className: "ml-auto"
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("span", {
         className: "text-xs text-gray-500",
         children: [Math.round(zoom * 100), "%"]
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.Button, {
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
         icon: "zoom-to-fit",
         minimal: true,
         small: true,
         onClick: resetView,
         title: "Reset zoom"
       })]
-    }), error && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Callout, {
+    }), error && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Callout, {
       intent: "danger",
       icon: "error",
       className: "mb-1",
       children: error
-    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
-      className: "flex gap-3 items-start",
-      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
-        ref: containerRef,
-        className: "relative overflow-hidden border rounded bg-gray-200",
-        style: {
-          flex: '1 1 0',
-          minHeight: '400px',
-          maxHeight: '600px',
-          cursor: isPanning ? 'grabbing' : 'grab'
-        },
-        onWheel: handleWheel,
-        onMouseDown: handleMouseDown,
-        onMouseMove: handleMouseMove,
-        onMouseUp: handleMouseUp,
-        onMouseLeave: handleMouseUp,
-        onContextMenu: e => e.preventDefault(),
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
-          style: {
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transformOrigin: '0 0',
-            transition: isPanning ? 'none' : 'transform 0.1s'
-          },
-          className: "inline-block relative",
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("img", {
-            ref: imgRef,
-            src: imageUrl,
-            alt: "Preview",
-            style: {
-              display: 'block',
-              maxWidth: 'none'
-            },
-            onLoad: e => {
-              if (canvasRef.current) {
-                canvasRef.current.width = e.target.naturalWidth;
-                canvasRef.current.height = e.target.naturalHeight;
-                canvasRef.current.style.width = e.target.naturalWidth + 'px';
-                canvasRef.current.style.height = e.target.naturalHeight + 'px';
-                drawOverlays();
-              }
-            }
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("canvas", {
-            ref: canvasRef,
-            className: "absolute top-0 left-0 pointer-events-none"
-          })]
-        }), loading && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
-          className: "absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center rounded",
-          style: {
-            zIndex: 10
-          },
-          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
-            className: "bg-white rounded-lg p-4 flex items-center gap-3 shadow-lg",
-            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Spinner, {
-              size: 24
-            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
-              className: "text-sm font-medium",
-              children: ["Running StarDist on Ch ", channel, "..."]
-            })]
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+      className: "flex gap-3 items-start relative h-full",
+      children: [imageMeta?.sizeZ > 1 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+        className: "flex flex-col items-center h-[500px]",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("span", {
+          className: "text-xs font-bold text-gray-500 mb-2",
+          children: ["Z: ", Math.max(1, z + 1), "/", imageMeta.sizeZ]
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
+          className: "flex-1 py-1",
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.Slider, {
+            min: 0,
+            max: Math.max(0, imageMeta.sizeZ - 1),
+            stepSize: 1,
+            value: z,
+            onChange: setZ,
+            vertical: true,
+            showTrackFill: false
           })
         })]
-      }), (channels.length > 1 || channelsWithPredictions.length > 0) && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
-        className: "w-52 flex flex-col gap-3 shrink-0",
-        children: [channels.length > 1 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
-            className: "text-xs font-bold uppercase text-gray-500 mb-2",
-            children: "Image Channels"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
-            className: "flex flex-col gap-1",
-            children: channels.map(ch => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.Checkbox, {
-              checked: channelVisibility[ch.index] !== false,
-              onChange: () => toggleChannelVisibility(ch.index),
-              className: "mb-0 flex items-center",
-              children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
-                style: {
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                },
-                children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
-                  className: "inline-block w-3 h-3 rounded-full border border-gray-300 shrink-0",
-                  style: {
-                    backgroundColor: ch.color || '#ccc'
-                  }
-                }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
-                  className: "text-sm",
-                  children: ch.name || `Channel ${ch.index}`
-                })]
-              })
-            }, ch.index))
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+        className: "flex-1 flex flex-col gap-2",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+          ref: containerRef,
+          className: "relative overflow-hidden border rounded bg-gray-200",
+          style: {
+            flex: '1 1 0',
+            minHeight: '400px',
+            maxHeight: '600px',
+            cursor: isPanning ? 'grabbing' : 'grab'
+          },
+          onWheel: handleWheel,
+          onMouseDown: handleMouseDown,
+          onMouseMove: handleMouseMove,
+          onMouseUp: handleMouseUp,
+          onMouseLeave: handleMouseUp,
+          onContextMenu: e => e.preventDefault(),
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+            style: {
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: '0 0',
+              transition: isPanning ? 'none' : 'transform 0.1s'
+            },
+            className: "inline-block relative",
+            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("img", {
+              ref: imgRef,
+              src: imageUrl,
+              alt: "Preview",
+              style: {
+                display: 'block',
+                maxWidth: 'none'
+              },
+              onLoad: e => {
+                if (canvasRef.current) {
+                  canvasRef.current.width = e.target.naturalWidth;
+                  canvasRef.current.height = e.target.naturalHeight;
+                  canvasRef.current.style.width = e.target.naturalWidth + 'px';
+                  canvasRef.current.style.height = e.target.naturalHeight + 'px';
+                  drawOverlays();
+                }
+              }
+            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("canvas", {
+              ref: canvasRef,
+              className: "absolute top-0 left-0 pointer-events-none"
+            })]
+          }), loading && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
+            className: "absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center rounded",
+            style: {
+              zIndex: 10
+            },
+            children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+              className: "bg-white rounded-lg p-4 flex items-center gap-3 shadow-lg",
+              children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Spinner, {
+                size: 24
+              }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("span", {
+                className: "text-sm font-medium",
+                children: ["Running StarDist on Ch ", channel, "..."]
+              })]
+            })
           })]
-        }), channelsWithPredictions.length > 0 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Divider, {
+        }), imageMeta?.sizeT > 1 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+          className: "flex items-center gap-3 mt-1 px-2",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("span", {
+            className: "text-xs font-bold text-gray-500 w-12 text-right",
+            children: ["T: ", Math.max(1, t + 1), "/", imageMeta.sizeT]
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
+            className: "flex-1",
+            children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.Slider, {
+              min: 0,
+              max: Math.max(0, imageMeta.sizeT - 1),
+              stepSize: 1,
+              value: t,
+              onChange: setT,
+              showTrackFill: false
+            })
+          })]
+        })]
+      }), (channels.length > 1 || channelsWithPredictions.length > 0) && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+        className: "w-52 flex flex-col gap-3 shrink-0",
+        children: [channels.length > 1 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_ImageChannelControls__WEBPACK_IMPORTED_MODULE_2__["default"], {
+          channels: channels,
+          visibility: channelVisibility,
+          onToggle: toggleChannelVisibility
+        }), channelsWithPredictions.length > 0 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__.Divider, {
             className: "mb-2"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
             className: "text-xs font-bold uppercase text-gray-500 mb-2",
             children: "Predictions"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("div", {
             className: "flex flex-col gap-1",
             children: channelsWithPredictions.map(chIdx => {
               const pred = predictions[chIdx];
               const chMeta = channels.find(c => c.index === chIdx);
               const hue = getChannelHue(chIdx);
-              return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+              return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("div", {
                 className: "flex items-center gap-2",
-                children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.Checkbox, {
+                children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Checkbox, {
                   checked: pred.visible,
                   onChange: () => togglePredictionVisibility(chIdx),
                   className: "mb-0 flex items-center",
-                  children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("span", {
+                  children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsxs)("span", {
                     style: {
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '6px'
                     },
-                    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+                    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("span", {
                       className: "inline-block w-3 h-3 rounded shrink-0",
                       style: {
                         backgroundColor: `hsl(${hue}, 85%, 55%)`,
                         border: `1px solid hsl(${hue}, 85%, 40%)`
                       }
-                    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+                    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)("span", {
                       className: "text-sm",
                       children: chMeta?.name || `Ch ${chIdx}`
-                    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__.Tag, {
+                    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__.Tag, {
                       minimal: true,
                       round: true,
                       small: true,
                       children: pred.count
                     })]
                   })
-                }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__.Button, {
+                }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_3__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__.Button, {
                   icon: "cross",
                   minimal: true,
                   small: true,
@@ -49912,6 +50146,9 @@ video {
 .h-\\[100px\\] {
   height: 100px !important;
 }
+.h-\\[500px\\] {
+  height: 500px !important;
+}
 .h-\\[60vh\\] {
   height: 60vh !important;
 }
@@ -50038,9 +50275,6 @@ video {
 .flex-shrink-0 {
   flex-shrink: 0 !important;
 }
-.shrink {
-  flex-shrink: 1 !important;
-}
 .shrink-0 {
   flex-shrink: 0 !important;
 }
@@ -50111,9 +50345,6 @@ video {
 .flex-col {
   flex-direction: column !important;
 }
-.place-content-start {
-  place-content: start !important;
-}
 .place-content-between {
   place-content: space-between !important;
 }
@@ -50131,6 +50362,9 @@ video {
 }
 .justify-between {
   justify-content: space-between !important;
+}
+.gap-0 {
+  gap: 0px !important;
 }
 .gap-1 {
   gap: 0.25rem !important;
@@ -50198,6 +50432,9 @@ video {
 }
 .border-0 {
   border-width: 0px !important;
+}
+.border-b {
+  border-bottom-width: 1px !important;
 }
 .border-r {
   border-right-width: 1px !important;
@@ -50362,6 +50599,9 @@ video {
 }
 .text-center {
   text-align: center !important;
+}
+.text-right {
+  text-align: right !important;
 }
 .text-base {
   font-size: 1rem !important;
@@ -50566,7 +50806,7 @@ video {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 }
-`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"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nB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AA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","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n"],"sourceRoot":""}]);
+`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"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nB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AA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","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
@@ -122674,4 +122914,4 @@ window.onload = function () {
 
 /******/ })()
 ;
-//# sourceMappingURL=main.42eec548441d765b0b89.js.map
+//# sourceMappingURL=main.6ae4f6f8182ab4cb7296.js.map
