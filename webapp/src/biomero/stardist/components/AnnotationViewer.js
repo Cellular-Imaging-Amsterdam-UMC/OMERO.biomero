@@ -307,31 +307,35 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
       }
   };
   
-  const handleWheel = (e) => {
-      e.preventDefault();
-      
+  useEffect(() => {
       const container = containerRef.current;
       if (!container) return;
 
-      const rect = container.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
+      const handleWheel = (e) => {
+          e.preventDefault();
+          const rect = container.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          const mouseY = e.clientY - rect.top;
 
-      // Define zoom speed and limits
-      const zoomSpeed = 0.001;
-      const scaleAmount = -e.deltaY * zoomSpeed;
-      const newZoom = Math.min(Math.max(0.1, zoom * (1 + scaleAmount)), 20);
+          const zoomSpeed = 0.001;
+          const scaleAmount = -e.deltaY * zoomSpeed;
 
-      if (newZoom !== zoom) {
-          // Adjust pan to zoom relative to mouse position
-          const zoomRatio = newZoom / zoom;
-          setPan(p => ({
-              x: mouseX - (mouseX - p.x) * zoomRatio,
-              y: mouseY - (mouseY - p.y) * zoomRatio
-          }));
-          setZoom(newZoom);
-      }
-  };
+          setZoom(prevZoom => {
+              const newZoom = Math.min(Math.max(0.1, prevZoom * (1 + scaleAmount)), 20);
+              if (newZoom !== prevZoom) {
+                  const zoomRatio = newZoom / prevZoom;
+                  setPan(p => ({
+                      x: mouseX - (mouseX - p.x) * zoomRatio,
+                      y: mouseY - (mouseY - p.y) * zoomRatio
+                  }));
+              }
+              return newZoom;
+          });
+      };
+
+      container.addEventListener("wheel", handleWheel, { passive: false });
+      return () => container.removeEventListener("wheel", handleWheel);
+  }, [image]);
 
   const deleteAnnotation = (id) => {
       onAnnotationsChange(annotations.filter(a => a.id !== id));
@@ -513,27 +517,28 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
        </div>
 
        {/* Canvas Area */}
-       <div className="flex-1 flex gap-3 items-start relative h-full">
+       <div className="flex-1 flex items-stretch relative min-h-0 overflow-hidden">
          {/* Z Slider */}
-         {imageMeta?.sizeZ > 1 && (
-           <div className="flex flex-col items-center h-[500px]">
-             <span className="text-xs font-bold text-gray-500 mb-2">Z: {Math.max(1, z + 1)}/{imageMeta.sizeZ}</span>
-             <div className="flex-1 py-1">
-               <Slider
-                 min={0}
-                 max={Math.max(0, imageMeta.sizeZ - 1)}
-                 stepSize={1}
-                 value={z}
-                 onChange={setZ}
-                 vertical
-                 showTrackFill={false}
-               />
-             </div>
+         <div className="flex flex-col items-center pt-1 shrink-0 pb-6 w-12">
+           <span className="text-xs font-bold text-gray-500 mb-2 mr-[20px]">Z:</span>
+           <span className="text-xs text-gray-400 mb-2 mr-[20px]">{Math.max(1, z + 1)}/{Math.max(1, imageMeta?.sizeZ || 1)}</span>
+           <div className="flex-1 py-1">
+             <Slider
+               min={0}
+               max={Math.max(0, (imageMeta?.sizeZ || 1) - 1)}
+               stepSize={1}
+               value={z}
+               onChange={setZ}
+               vertical
+               showTrackFill={false}
+               labelRenderer={false}
+               disabled={!imageMeta || imageMeta.sizeZ <= 1}
+             />
            </div>
-         )}
+         </div>
 
-         <div className="flex-1 flex flex-col gap-2 relative h-full">
-           <div className="flex-1 relative overflow-hidden bg-gray-200 border rounded cursor-crosshair" ref={containerRef} onWheel={handleWheel}>
+         <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0">
+           <div className="flex-1 relative overflow-hidden bg-gray-200 border rounded cursor-crosshair min-h-0 max-h-[calc(100vh-420px)]" ref={containerRef}>
                <div 
                    style={{ 
                        transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, 
@@ -569,25 +574,26 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
            </div>
 
            {/* T Slider */}
-           {imageMeta?.sizeT > 1 && (
-             <div className="flex items-center gap-3 mt-1 px-2">
-               <span className="text-xs font-bold text-gray-500 w-12 text-right">T: {Math.max(1, t + 1)}/{imageMeta.sizeT}</span>
-               <div className="flex-1">
-                 <Slider
-                   min={0}
-                   max={Math.max(0, imageMeta.sizeT - 1)}
-                   stepSize={1}
-                   value={t}
-                   onChange={setT}
-                   showTrackFill={false}
-                 />
-               </div>
+           <div className="flex items-center gap-3 shrink-0 pb-1 w-full pl-2 pr-6">
+             <span className="text-xs font-bold text-gray-500 text-right">T:</span>
+             <span className="text-xs text-gray-400 w-6 text-right">{Math.max(1, t + 1)}/{Math.max(1, imageMeta?.sizeT || 1)}</span>
+             <div className="flex-1">
+               <Slider
+                 min={0}
+                 max={Math.max(0, (imageMeta?.sizeT || 1) - 1)}
+                 stepSize={1}
+                 value={t}
+                 onChange={setT}
+                 showTrackFill={false}
+                 labelRenderer={false}
+                 disabled={!imageMeta || imageMeta.sizeT <= 1}
+               />
              </div>
-           )}
+           </div>
          </div>
        </div>
     </div>
   );
 };
-export default AnnotationViewer;
 
+export default AnnotationViewer;

@@ -106,9 +106,9 @@ const AnnotationTab = () => {
   };
 
   return (
-    <div className="p-4 flex flex-col gap-4 h-full overflow-y-auto">
-      <div className="flex justify-between items-center">
-            <H4>Annotate Training Data</H4>
+    <div className="p-4 flex flex-col gap-4 h-full overflow-hidden">
+      <div className="flex justify-between items-center shrink-0">
+            <H4 className="m-0">Annotate Training Data</H4>
             <div className="flex gap-2">
                 <Button 
                     intent="primary" 
@@ -122,8 +122,8 @@ const AnnotationTab = () => {
             </div>
       </div>
       
-      <div className="flex gap-4 h-full">
-        <div className="w-1/4 flex flex-col gap-4">
+      <div className="flex gap-4 flex-1 min-h-0">
+        <div className="w-1/4 flex flex-col gap-4 overflow-y-auto min-h-0 pr-1 shrink-0">
              <Card>
                 <DatasetSelectWithPopover 
                     label="Select Dataset"
@@ -145,8 +145,8 @@ const AnnotationTab = () => {
              </Card>
         </div>
 
-        <div className="w-3/4 flex flex-col h-[calc(100vh-300px)]">
-             <Card className="h-full flex flex-col p-0 overflow-hidden">
+        <div className="w-3/4 flex flex-col min-w-0">
+             <Card className="flex-1 flex flex-col p-0 overflow-hidden min-h-0 shadow-none border">
                  {loadingAnns ? (
                      <div className="flex justify-center items-center h-full">
                          <Spinner />

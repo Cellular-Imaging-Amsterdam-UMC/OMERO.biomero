@@ -70,7 +70,7 @@ const StardistApp = () => {
         <div className="p-4 h-full overflow-hidden">
         <Tabs
             id="stardist-tabs"
-            className="h-full"
+            className="h-[calc(100vh-200px)]"
             animate={true}
             renderActiveTabPanelOnly={false}
             large={true}
