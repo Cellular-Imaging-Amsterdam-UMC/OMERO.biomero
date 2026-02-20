@@ -72,11 +72,9 @@ const PreviewTab = () => {
   }, [selectedImage]);
 
   return (
-    <div className="p-4 flex flex-col gap-4 h-full overflow-y-auto">
-      <H4>Preview Stardist Models</H4>
-      
-      <div className="flex gap-4">
-        <div className="w-1/3 flex flex-col gap-4">
+    <div className="p-4 flex flex-col gap-4 h-full overflow-hidden">
+      <div className="flex gap-4 flex-1 min-h-0">
+        <div className="w-1/3 flex flex-col gap-4 overflow-y-auto min-h-0 pr-1">
              <Card>
                 <DatasetSelectWithPopover 
                     label="Select Dataset"
@@ -116,16 +114,18 @@ const PreviewTab = () => {
              </Card>
         </div>
 
-        <div className="w-2/3">
-             <Card className="h-full">
-                 <h5 className="bp5-heading mb-4">Preview</h5>
-                 <PreviewViewer 
+        <div className="w-2/3 flex flex-col min-w-0">
+             <Card className="flex-1 flex flex-col min-h-0 min-w-0 pb-0 shadow-none border">
+                 <h5 className="bp5-heading mb-2">Preview</h5>
+                 <div className="flex-1 min-h-0 mt-2">
+                   <PreviewViewer 
                     image={selectedImage}
                     model={selectedModel}
                     channel={selectedChannel}
                     channels={channels}
                     imageMeta={imageMeta}
                  />
+                 </div>
              </Card>
         </div>
       </div>
