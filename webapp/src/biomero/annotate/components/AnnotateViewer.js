@@ -25,7 +25,13 @@
  * Let's just fork the URL construction.
  */
 
-import React, { useRef, useEffect, useState, useMemo } from "react";
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   Button,
   Slider,
@@ -33,12 +39,14 @@ import {
   Icon,
   InputGroup,
   Checkbox,
+  Spinner,
 } from "@blueprintjs/core";
 import {
   traceContours,
   subtractAnnotations,
   eraseFromAnnotations,
 } from "../../stardist/utils/GeometryUtils";
+import { samSetImage, samPredict } from "../../../apiService";
 
 /**
  * AnnotateViewer — adapted from StarDist AnnotationViewer with z/t/c support.
@@ -72,7 +80,7 @@ const AnnotateViewer = ({
 
   // Feature Types State
   const [activeFeatureType, setActiveFeatureType] = useState(
-    featureTypes[0]?.id || "1"
+    featureTypes[0]?.id || "1",
   );
   const [newFeatureName, setNewFeatureName] = useState("");
   const [newFeatureColor, setNewFeatureColor] = useState("#ff0000");
@@ -81,6 +89,14 @@ const AnnotateViewer = ({
   // Interaction State
   const [currentPoints, setCurrentPoints] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
+
+  // SAM State
+  const [samPoints, setSamPoints] = useState([]);
+  const [samBox, setSamBox] = useState(null);
+  const [samBoxStart, setSamBoxStart] = useState(null);
+  const [samPreviewPolys, setSamPreviewPolys] = useState([]);
+  const [samCacheKey, setSamCacheKey] = useState(null);
+  const [samLoading, setSamLoading] = useState(false);
 
   const maskCanvas = useMemo(() => document.createElement("canvas"), []);
 
@@ -173,11 +189,69 @@ const AnnotateViewer = ({
         ctx.fill();
       });
     }
+
+    // 3. Draw SAM prompts and preview
+    if (tool === "sam-point" || tool === "sam-box") {
+      samPoints.forEach((p) => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+        ctx.fillStyle = p.label === 1 ? "#00ff00" : "#ff0000";
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+
+      if (samBox) {
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = "#3b82f6";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+          samBox.x1,
+          samBox.y1,
+          samBox.x2 - samBox.x1,
+          samBox.y2 - samBox.y1,
+        );
+        ctx.setLineDash([]);
+      }
+
+      const previewType = featureTypes.find(
+        (ft) => ft.id === activeFeatureType,
+      );
+      const previewColor = previewType?.color || "#00ff00";
+      samPreviewPolys.forEach((pts) => {
+        if (!pts || pts.length < 3) return;
+        ctx.setLineDash([8, 4]);
+        ctx.strokeStyle = previewColor;
+        ctx.lineWidth = 2;
+        ctx.fillStyle = previewColor + "33";
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i][0], pts[i][1]);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fill();
+        ctx.setLineDash([]);
+      });
+    }
   };
 
   useEffect(() => {
     requestAnimationFrame(draw);
-  }, [annotations, currentPoints, zoom, pan, featureTypes, mode]);
+  }, [
+    annotations,
+    currentPoints,
+    zoom,
+    pan,
+    featureTypes,
+    mode,
+    samPoints,
+    samBox,
+    samPreviewPolys,
+    tool,
+  ]);
 
   // --- Handlers ---
   const handleMouseDown = (e) => {
@@ -215,6 +289,15 @@ const AnnotateViewer = ({
       mCtx.beginPath();
       mCtx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
       mCtx.fill();
+    } else if (tool === "sam-point") {
+      const label = e.shiftKey ? 0 : 1;
+      const newPoints = [...samPoints, { x: pt.x, y: pt.y, label }];
+      setSamPoints(newPoints);
+      runSamPredict(newPoints, null);
+    } else if (tool === "sam-box") {
+      setSamBoxStart({ x: pt.x, y: pt.y });
+      setSamBox(null);
+      setSamPreviewPolys([]);
     }
   };
 
@@ -234,16 +317,26 @@ const AnnotateViewer = ({
       mCtx.fill();
       const ctx = canvasRef.current.getContext("2d");
       const type = featureTypes.find((t) => t.id === activeFeatureType);
-      const color =
-        mode === "subtract" ? "#ff0000" : type?.color || "yellow";
+      const color = mode === "subtract" ? "#ff0000" : type?.color || "yellow";
       ctx.fillStyle = color + "80";
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    if (tool === "sam-box" && samBoxStart) {
+      const pt = getCanvasPoint(e);
+      setSamBox({
+        x1: Math.min(samBoxStart.x, pt.x),
+        y1: Math.min(samBoxStart.y, pt.y),
+        x2: Math.max(samBoxStart.x, pt.x),
+        y2: Math.max(samBoxStart.y, pt.y),
+      });
+      draw();
+    }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e) => {
     if (tool === "pan") {
       setIsPanning(false);
       return;
@@ -255,11 +348,26 @@ const AnnotateViewer = ({
         0,
         0,
         maskCanvas.width,
-        maskCanvas.height
+        maskCanvas.height,
       );
       const polys = traceContours(imageData);
       processNewPolygons(polys);
       draw();
+    }
+
+    if (tool === "sam-box" && samBoxStart && e) {
+      const pt = getCanvasPoint(e);
+      const box = {
+        x1: Math.min(samBoxStart.x, pt.x),
+        y1: Math.min(samBoxStart.y, pt.y),
+        x2: Math.max(samBoxStart.x, pt.x),
+        y2: Math.max(samBoxStart.y, pt.y),
+      };
+      setSamBoxStart(null);
+      if (Math.abs(box.x2 - box.x1) > 3 && Math.abs(box.y2 - box.y1) > 3) {
+        setSamBox(box);
+        runSamPredict(null, box);
+      }
     }
   };
 
@@ -282,7 +390,7 @@ const AnnotateViewer = ({
           erasePoly,
           currentAnns,
           width,
-          height
+          height,
         );
       });
       onAnnotationsChange(currentAnns);
@@ -310,7 +418,7 @@ const AnnotateViewer = ({
         newPoly.points,
         finalAnns,
         width,
-        height
+        height,
       );
       resultPolys.forEach((pts) => {
         finalAnns.push({
@@ -374,7 +482,7 @@ const AnnotateViewer = ({
 
   const updateFeatureName = (id, newName) => {
     onFeatureTypesChange(
-      featureTypes.map((ft) => (ft.id === id ? { ...ft, name: newName } : ft))
+      featureTypes.map((ft) => (ft.id === id ? { ...ft, name: newName } : ft)),
     );
   };
 
@@ -398,6 +506,104 @@ const AnnotateViewer = ({
       image._height = imageDims.height;
     }
   }, [imageDims, image]);
+
+  // --- SAM Helpers ---
+
+  // Clear SAM state when image changes
+  useEffect(() => {
+    setSamCacheKey(null);
+    setSamPoints([]);
+    setSamBox(null);
+    setSamBoxStart(null);
+    setSamPreviewPolys([]);
+  }, [image?.id, Z, T, C]);
+
+  const ensureSamImage = useCallback(async () => {
+    if (samCacheKey) return samCacheKey;
+    if (!image) return null;
+    try {
+      const res = await samSetImage(image.id, Z, T, C ?? 0);
+      setSamCacheKey(res.cache_key);
+      return res.cache_key;
+    } catch (e) {
+      console.error("SAM set_image failed:", e);
+      return null;
+    }
+  }, [image, Z, T, C, samCacheKey]);
+
+  const runSamPredict = useCallback(
+    async (points, box) => {
+      setSamLoading(true);
+      try {
+        const key = await ensureSamImage();
+        if (!key) return;
+        const kwargs = {
+          imageId: image.id,
+          z: Z,
+          t: T,
+          channel: C ?? 0,
+        };
+        if (points && points.length > 0) {
+          kwargs.points = points.map((p) => [p.x, p.y]);
+          kwargs.labels = points.map((p) => p.label);
+        }
+        if (box) {
+          kwargs.bboxes = [[box.x1, box.y1, box.x2, box.y2]];
+        }
+        const res = await samPredict(key, kwargs);
+        setSamPreviewPolys(res.polygons || []);
+      } catch (e) {
+        console.error("SAM predict failed:", e);
+      } finally {
+        setSamLoading(false);
+      }
+    },
+    [ensureSamImage, image, Z, T, C],
+  );
+
+  const acceptSamPreview = useCallback(() => {
+    if (samPreviewPolys.length === 0) return;
+    const newAnns = samPreviewPolys.map((pts) => ({
+      id: crypto.randomUUID(),
+      points: pts,
+      typeId: activeFeatureType,
+      generated: true,
+    }));
+    if (collisionDetection) {
+      handleCollisionAndAdd(newAnns);
+    } else {
+      onAnnotationsChange([...annotations, ...newAnns]);
+    }
+    clearSam();
+  }, [
+    samPreviewPolys,
+    activeFeatureType,
+    collisionDetection,
+    annotations,
+    onAnnotationsChange,
+  ]);
+
+  const clearSam = () => {
+    setSamPoints([]);
+    setSamBox(null);
+    setSamBoxStart(null);
+    setSamPreviewPolys([]);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (tool !== "sam-point" && tool !== "sam-box") return;
+      if (e.key === "Enter") {
+        e.preventDefault();
+        acceptSamPreview();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        clearSam();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [tool, acceptSamPreview]);
 
   if (!image) return <div>Select an image</div>;
 
@@ -428,7 +634,59 @@ const AnnotateViewer = ({
               title="Brush"
               disabled={mode === "add" && featureTypes.length === 0}
             />
+            <Button
+              icon="locate"
+              active={tool === "sam-point"}
+              onClick={() => {
+                setTool("sam-point");
+                clearSam();
+              }}
+              title="SAM Point Prompt (Click=fg, Shift+Click=bg)"
+              disabled={mode !== "add" || featureTypes.length === 0}
+            />
+            <Button
+              icon="select"
+              active={tool === "sam-box"}
+              onClick={() => {
+                setTool("sam-box");
+                clearSam();
+              }}
+              title="SAM Box Prompt (Drag rectangle)"
+              disabled={mode !== "add" || featureTypes.length === 0}
+            />
           </ButtonGroup>
+
+          {/* SAM controls */}
+          {(tool === "sam-point" || tool === "sam-box") && (
+            <div className="flex flex-col gap-1 mt-1 px-1">
+              <div className="flex gap-1 items-center">
+                <Button
+                  small
+                  intent="success"
+                  icon="tick"
+                  onClick={acceptSamPreview}
+                  disabled={samPreviewPolys.length === 0}
+                >
+                  Accept
+                </Button>
+                <Button small icon="cross" onClick={clearSam}>
+                  Clear
+                </Button>
+                {samLoading && <Spinner size={16} />}
+              </div>
+              {tool === "sam-point" && (
+                <span className="text-xs text-gray-500">
+                  Click=foreground, Shift+Click=background. Enter=accept,
+                  Esc=clear
+                </span>
+              )}
+              {tool === "sam-box" && (
+                <span className="text-xs text-gray-500">
+                  Drag rectangle around object. Enter=accept, Esc=clear
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-2 items-center mt-2 px-1">
             <span className="text-xs font-bold w-12">Mode:</span>

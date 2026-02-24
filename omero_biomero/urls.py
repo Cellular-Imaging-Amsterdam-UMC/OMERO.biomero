@@ -6,6 +6,7 @@ from . import (
     annotate_ai_views,
     biomero_views,
     importer_views,
+    sam_views,
     stardist_views,
 )
 
@@ -88,6 +89,17 @@ urlpatterns = [
         "api/stardist/predict/",
         stardist_views.run_prediction,
         name="stardist_predict",
+    ),
+    # SAM URLs
+    path(
+        "api/sam/set_image/",
+        sam_views.set_image,
+        name="sam_set_image",
+    ),
+    path(
+        "api/sam/predict/",
+        sam_views.predict,
+        name="sam_predict",
     ),
     # Annotate AI URLs
     path(

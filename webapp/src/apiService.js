@@ -299,7 +299,13 @@ export const fetchImageChannels = async (imageId) => {
   }
 };
 
-export const runStardistPrediction = async (imageId, modelName, channel = 0, z = 0, t = 0) => {
+export const runStardistPrediction = async (
+  imageId,
+  modelName,
+  channel = 0,
+  z = 0,
+  t = 0,
+) => {
   try {
     const csrfToken = window.csrftoken;
     const endpoint = "/omero_biomero/api/stardist/predict/";
@@ -542,6 +548,48 @@ export const fetchAnnotateAnnotation = async (imageId, tableId) => {
     "GET",
   );
 };
+
+// ---------------------------------------------------------------------------
+// SAM endpoints
+// ---------------------------------------------------------------------------
+
+export const samSetImage = async (imageId, z, t, channel) => {
+  const csrfToken = window.csrftoken;
+  return apiRequest(
+    "/omero_biomero/api/sam/set_image/",
+    "POST",
+    {
+      image_id: imageId,
+      z,
+      t,
+      channel,
+    },
+    {
+      headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+    },
+  );
+};
+
+export const samPredict = async (
+  cacheKey,
+  { points, labels, bboxes, imageId, z, t, channel } = {},
+) => {
+  const csrfToken = window.csrftoken;
+  const payload = { cache_key: cacheKey };
+  // Always send image params so the backend can re-fetch on cache miss
+  if (imageId != null) payload.image_id = imageId;
+  if (z != null) payload.z = z;
+  if (t != null) payload.t = t;
+  if (channel != null) payload.channel = channel;
+  if (points) payload.points = points;
+  if (labels) payload.labels = labels;
+  if (bboxes) payload.bboxes = bboxes;
+  return apiRequest("/omero_biomero/api/sam/predict/", "POST", payload, {
+    headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+  });
+};
+
+// ---------------------------------------------------------------------------
 
 export const getAnnotateProgress = async (tableId) => {
   return apiRequest(
