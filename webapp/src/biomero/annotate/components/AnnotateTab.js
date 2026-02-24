@@ -8,6 +8,7 @@ import {
   saveAnnotateAnnotation,
   fetchAnnotateAnnotation,
   getAnnotateProgress,
+  getAnnotateImageChannels,
 } from "../../../apiService";
 
 const AnnotateTab = ({
@@ -29,6 +30,7 @@ const AnnotateTab = ({
   const [featureTypes, setFeatureTypes] = useState([
     { id: "1", name: "Object", color: "#00ff00" },
   ]);
+  const [channelInfo, setChannelInfo] = useState(null);
 
   // Load table detail when tableId changes or on mount
   useEffect(() => {
@@ -98,6 +100,20 @@ const AnnotateTab = ({
         c: selectedUnit.channel >= 0 ? selectedUnit.channel : 0,
       }
     : null;
+
+  // Fetch channel info for contrast slider
+  useEffect(() => {
+    if (currentImage) {
+      getAnnotateImageChannels(currentImage.id)
+        .then((data) => {
+          const ch = data.channels?.find((c) => c.index === currentImage.c);
+          setChannelInfo(ch || null);
+        })
+        .catch(() => setChannelInfo(null));
+    } else {
+      setChannelInfo(null);
+    }
+  }, [currentImage?.id, currentImage?.c]);
 
   const handleSaveAndNext = async () => {
     if (!selectedUnit || annotations.length === 0) {
@@ -264,6 +280,7 @@ const AnnotateTab = ({
               onAnnotationsChange={setAnnotations}
               featureTypes={featureTypes}
               onFeatureTypesChange={setFeatureTypes}
+              channelInfo={channelInfo}
             />
           ) : (
             <div className="flex justify-center items-center h-full text-gray-400">

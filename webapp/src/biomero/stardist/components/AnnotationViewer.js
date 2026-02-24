@@ -74,16 +74,26 @@ const AnnotationViewer = ({
 
   // Channel Visibility
   const [channelVisibility, setChannelVisibility] = useState({});
+  const [channelWindows, setChannelWindows] = useState({});
 
   useEffect(() => {
     if (channels.length > 0) {
       const vis = {};
+      const wins = {};
       channels.forEach((ch) => {
         vis[ch.index] = ch.active !== false;
+        if (ch.window) {
+          wins[ch.index] = { start: ch.window.start, end: ch.window.end };
+        }
       });
       setChannelVisibility(vis);
+      setChannelWindows(wins);
     }
   }, [channels]);
+
+  const handleWindowChange = (idx, { start, end }) => {
+    setChannelWindows((prev) => ({ ...prev, [idx]: { start, end } }));
+  };
 
   const toggleChannelVisibility = (idx) => {
     setChannelVisibility((prev) => ({
@@ -104,19 +114,25 @@ const AnnotationViewer = ({
     if (!image) return null;
     const base = `/webgateway/render_image/${image.id}/${z}/${t}/`;
 
-    if (channels.length <= 1) return base;
+    if (channels.length <= 1) return `${base}?q=0.9`;
 
-    // Build channel string
+    // Build channel string with window/color parameters
     const channelParam = channels
       .map((ch) => {
         const chNum = ch.index + 1; // OMERO uses 1-indexed
-        const visible = channelVisibility[ch.index] !== false; // default true
-        return visible ? `${chNum}` : `-${chNum}`;
+        const visible = channelVisibility[ch.index] !== false;
+        const prefix = visible ? "" : "-";
+        const win = channelWindows[ch.index];
+        if (win) {
+          const color = (ch.color || "#ffffff").replace("#", "");
+          return `${prefix}${chNum}|${win.start}:${win.end}$${color}`;
+        }
+        return `${prefix}${chNum}`;
       })
       .join(",");
 
-    return `${base}?c=${channelParam}`;
-  }, [image, channels, channelVisibility, z, t]);
+    return `${base}?c=${channelParam}&q=0.9`;
+  }, [image, channels, channelVisibility, channelWindows, z, t]);
 
   useEffect(() => {
     // Sync active feature if list changes or empty
@@ -665,13 +681,15 @@ const AnnotationViewer = ({
     <div className="flex h-full gap-0">
       {/* Toolbar / Sidebar */}
       <div className="w-64 flex flex-col gap-4 p-2 border-r bg-gray-50 overflow-y-auto shrink-0">
-        {/* Image Channels */}
-        {channels.length > 1 && (
+        {/* Image Channels / Contrast */}
+        {channels.length > 0 && (
           <div className="border-b pb-2">
             <ImageChannelControls
               channels={channels}
               visibility={channelVisibility}
               onToggle={toggleChannelVisibility}
+              channelWindows={channelWindows}
+              onWindowChange={handleWindowChange}
             />
           </div>
         )}

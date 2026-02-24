@@ -1,12 +1,13 @@
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST, require_GET
-from omeroweb.webclient.decorators import login_required
 import json
 import logging
 import os
-import requests as http_requests
-from omero.gateway import BlitzGateway
+
 import omero
+import requests as http_requests
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET, require_POST
+from omero.gateway import BlitzGateway
+from omeroweb.webclient.decorators import login_required
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,16 @@ def list_models(request, conn=None, **kwargs):
         logger.warning(f"StarDist service unreachable, returning defaults: {e}")
         # Fallback to hardcoded list
         models = [
-            {"value": "2D_versatile_fluo", "label": "2D_versatile_fluo (Built-in)", "type": "builtin"},
-            {"value": "2D_versatile_he", "label": "2D_versatile_he (Built-in)", "type": "builtin"},
+            {
+                "value": "2D_versatile_fluo",
+                "label": "2D_versatile_fluo (Built-in)",
+                "type": "builtin",
+            },
+            {
+                "value": "2D_versatile_he",
+                "label": "2D_versatile_he (Built-in)",
+                "type": "builtin",
+            },
             {"value": "2D_demo", "label": "2D_demo (Built-in)", "type": "builtin"},
         ]
         return JsonResponse({"models": models})
@@ -60,19 +69,29 @@ def get_image_channels(request, conn=None, **kwargs):
         for idx, ch in enumerate(image.getChannels()):
             # getColor() returns an RGBA color object
             color = ch.getColor()
-            channels.append({
-                "index": idx,
-                "name": ch.getLabel(),
-                "color": color.getHtml() if color else "#ffffff",
-                "active": ch.isActive(),
-            })
+            channels.append(
+                {
+                    "index": idx,
+                    "name": ch.getLabel(),
+                    "color": color.getHtml() if color else "#ffffff",
+                    "active": ch.isActive(),
+                    "window": {
+                        "start": ch.getWindowStart(),
+                        "end": ch.getWindowEnd(),
+                        "min": ch.getWindowMin(),
+                        "max": ch.getWindowMax(),
+                    },
+                }
+            )
 
-        return JsonResponse({
-            "channels": channels,
-            "sizeC": image.getSizeC(),
-            "sizeZ": image.getSizeZ(),
-            "sizeT": image.getSizeT(),
-        })
+        return JsonResponse(
+            {
+                "channels": channels,
+                "sizeC": image.getSizeC(),
+                "sizeZ": image.getSizeZ(),
+                "sizeT": image.getSizeT(),
+            }
+        )
 
     except Exception as e:
         logger.error("Error fetching image channels", exc_info=True)
@@ -84,10 +103,10 @@ def get_image_channels(request, conn=None, **kwargs):
 def run_prediction(request, conn=None, **kwargs):
     """
     Run StarDist prediction on an OMERO image.
-    
+
     Expects JSON body:
       { "image_id": int, "model": str, "channel": int (optional, default 0) }
-    
+
     Fetches the specified channel plane from OMERO, sends it to the stardist
     container, and returns the detected polygons.
     """
@@ -109,21 +128,27 @@ def run_prediction(request, conn=None, **kwargs):
         # Validate channel index
         size_c = image.getSizeC()
         if channel < 0 or channel >= size_c:
-            return JsonResponse({"error": f"Channel {channel} out of range (0-{size_c-1})"}, status=400)
+            return JsonResponse(
+                {"error": f"Channel {channel} out of range (0-{size_c - 1})"},
+                status=400,
+            )
 
         # Fetch the specified channel plane
         pixels = image.getPrimaryPixels()
         plane = pixels.getPlane(z, channel, t)  # z=z, c=channel, t=t
 
         # Convert numpy array to PNG bytes
-        from PIL import Image as PILImage
         import io
+
         import numpy as np
+        from PIL import Image as PILImage
 
         # Normalize to 8-bit for transport
         if plane.dtype != np.uint8:
             pmin, pmax = np.percentile(plane, (1, 99.8))
-            plane_norm = np.clip((plane - pmin) / (pmax - pmin + 1e-8) * 255, 0, 255).astype(np.uint8)
+            plane_norm = np.clip(
+                (plane - pmin) / (pmax - pmin + 1e-8) * 255, 0, 255
+            ).astype(np.uint8)
         else:
             plane_norm = plane
 
@@ -150,7 +175,10 @@ def run_prediction(request, conn=None, **kwargs):
 
     except http_requests.exceptions.ConnectionError:
         logger.error("StarDist service is not reachable")
-        return JsonResponse({"error": "StarDist service is not reachable. Is the container running?"}, status=503)
+        return JsonResponse(
+            {"error": "StarDist service is not reachable. Is the container running?"},
+            status=503,
+        )
     except http_requests.exceptions.Timeout:
         logger.error("StarDist prediction timed out")
         return JsonResponse({"error": "Prediction timed out"}, status=504)
@@ -170,13 +198,13 @@ def fetch_annotations(request, conn=None, **kwargs):
         image_id = request.GET.get("image")
         if not image_id:
             return JsonResponse({"error": "Missing image ID"}, status=400)
-            
+
         image = conn.getObject("Image", image_id)
         if not image:
             return JsonResponse({"error": "Image not found"}, status=404)
-            
+
         FILENAME = "stardist_data.json"
-        
+
         # Find the annotation
         for ann in image.listAnnotations():
             if isinstance(ann, omero.gateway.FileAnnotationWrapper):
@@ -185,14 +213,14 @@ def fetch_annotations(request, conn=None, **kwargs):
                     content = b""
                     for chunk in ann.getFileInChunks():
                         content += chunk
-                    
+
                     # Parse JSON
                     data = json.loads(content)
                     return JsonResponse(data)
-                    
+
         # If not found
         return JsonResponse({"annotations": [], "featureTypes": []})
-        
+
     except Exception as e:
         logger.error("Error fetching annotations", exc_info=True)
         return JsonResponse({"error": str(e)}, status=500)
@@ -206,7 +234,7 @@ def save_annotations(request, conn=None, **kwargs):
     Expects JSON body: { imageId, data }
     """
     try:
-        if request.content_type == 'application/json':
+        if request.content_type == "application/json":
             data = json.loads(request.body)
             image_id = data.get("imageId")
             annotation_data = data.get("data")
@@ -229,45 +257,45 @@ def save_annotations(request, conn=None, **kwargs):
 
         FILENAME = "stardist_data.json"
         existing_file_ann = None
-        
+
         for ann in image.listAnnotations():
             if isinstance(ann, omero.gateway.FileAnnotationWrapper):
                 if ann.getFile().getName() == FILENAME:
                     existing_file_ann = ann
                     break
-        
+
         import tempfile
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix=".json") as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as tmp:
             json.dump(annotation_data, tmp)
             tmp_path = tmp.name
-            
+
         try:
             if existing_file_ann:
                 try:
                     conn.deleteObjects("Annotation", [existing_file_ann.getId()])
                 except Exception:
                     pass
-            
+
             namespace = "biomero.stardist.annotations"
-            
+
             file_ann = conn.createFileAnnfromLocalFile(
-                tmp_path, 
-                mimetype="application/json", 
-                ns=namespace, 
-                desc="Stardist Training Annotations"
+                tmp_path,
+                mimetype="application/json",
+                ns=namespace,
+                desc="Stardist Training Annotations",
             )
-            
+
             # Rename the file
             original_file = file_ann.getFile()
-            original_file.setName(FILENAME) 
+            original_file.setName(FILENAME)
             original_file.save()
-            
+
             # Attach to Image
             image.linkAnnotation(file_ann)
 
             return JsonResponse({"success": True, "fileId": original_file.getId()})
-            
+
         finally:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
@@ -286,7 +314,7 @@ def run_training(request, conn=None, **kwargs):
     """
     try:
         data = json.loads(request.body)
-        
+
         script_params = {
             "Dataset_ID": data.get("dataset_id"),
             "Epochs": data.get("epochs", 100),
@@ -295,7 +323,7 @@ def run_training(request, conn=None, **kwargs):
             "Patch_Size": data.get("patch_size", 256),
             "Model_Name": data.get("model_name", "my_model"),
         }
-        
+
         svc = conn.getScriptService()
         scripts = svc.getScripts()
         script_id = None
@@ -303,10 +331,12 @@ def run_training(request, conn=None, **kwargs):
             if s.getName().getValue() == "stardist_train.py":
                 script_id = s.getId().getValue()
                 break
-        
+
         if not script_id:
-            return JsonResponse({"error": "stardist_train.py script not found on server"}, status=404)
-            
+            return JsonResponse(
+                {"error": "stardist_train.py script not found on server"}, status=404
+            )
+
         inputs = {}
         for k, v in script_params.items():
             if k == "Dataset_ID":
@@ -320,7 +350,7 @@ def run_training(request, conn=None, **kwargs):
 
         proc = svc.runScript(script_id, inputs, None)
         job_id = proc.getJob().getId().getValue()
-        
+
         return JsonResponse({"success": True, "job_id": job_id})
 
     except Exception as e:

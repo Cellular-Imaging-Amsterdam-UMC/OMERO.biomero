@@ -35,6 +35,7 @@ import React, {
 import {
   Button,
   Slider,
+  RangeSlider,
   ButtonGroup,
   Icon,
   InputGroup,
@@ -62,6 +63,7 @@ const AnnotateViewer = ({
   onAnnotationsChange,
   featureTypes,
   onFeatureTypesChange,
+  channelInfo,
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -103,18 +105,34 @@ const AnnotateViewer = ({
   // Track actual image dimensions for the save flow
   const [imageDims, setImageDims] = useState({ width: 0, height: 0 });
 
+  // Contrast state
+  const [contrastWindow, setContrastWindow] = useState({ start: 0, end: 255 });
+
+  useEffect(() => {
+    if (channelInfo?.window) {
+      setContrastWindow({
+        start: channelInfo.window.start,
+        end: channelInfo.window.end,
+      });
+    } else {
+      setContrastWindow({ start: 0, end: 255 });
+    }
+  }, [channelInfo, image?.id]);
+
   // Build image URL with z/t/c support
   const Z = image?.z ?? 0;
   const T = image?.t ?? 0;
   const C = image?.c;
-  let imageUrl = null;
-  if (image) {
-    imageUrl = `/webgateway/render_image/${image.id}/${Z}/${T}/`;
-    // Optionally select a single channel
+  const imageUrl = useMemo(() => {
+    if (!image) return null;
+    let url = `/webgateway/render_image/${image.id}/${Z}/${T}/`;
     if (C !== undefined && C !== null) {
-      imageUrl += `?c=${C + 1}|0:255$FFFFFF`;
+      url += `?c=${C + 1}|${contrastWindow.start}:${contrastWindow.end}$FFFFFF&q=0.9`;
+    } else {
+      url += `?q=0.9`;
     }
-  }
+    return url;
+  }, [image, Z, T, C, contrastWindow]);
 
   useEffect(() => {
     if (featureTypes.length > 0) {
@@ -611,6 +629,32 @@ const AnnotateViewer = ({
     <div className="flex h-full gap-4">
       {/* Toolbar */}
       <div className="w-64 flex flex-col gap-4 p-2 border-r bg-gray-50 overflow-y-auto shrink-0">
+        {/* Contrast slider */}
+        {C !== undefined && C !== null && (
+          <div className="border-b pb-2">
+            <div className="text-xs font-bold uppercase text-gray-500 mb-2">
+              Contrast
+            </div>
+            <div className="px-1">
+              <RangeSlider
+                min={channelInfo?.window?.min ?? 0}
+                max={channelInfo?.window?.max ?? 255}
+                stepSize={Math.max(
+                  1,
+                  Math.floor(
+                    ((channelInfo?.window?.max ?? 255) -
+                      (channelInfo?.window?.min ?? 0)) /
+                      500,
+                  ),
+                )}
+                value={[contrastWindow.start, contrastWindow.end]}
+                onChange={([start, end]) => setContrastWindow({ start, end })}
+                labelRenderer={false}
+              />
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col gap-2">
           <h5>Tools</h5>
           <ButtonGroup fill>

@@ -1,5 +1,19 @@
-import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { Button, Spinner, Callout, Checkbox, Divider, Tag, Slider } from "@blueprintjs/core";
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
+import {
+  Button,
+  Spinner,
+  Callout,
+  Checkbox,
+  Divider,
+  Tag,
+  Slider,
+} from "@blueprintjs/core";
 import { runStardistPrediction } from "../../../apiService";
 import ImageChannelControls from "./ImageChannelControls";
 
@@ -10,7 +24,13 @@ import ImageChannelControls from "./ImageChannelControls";
 const CHANNEL_HUES = [200, 30, 130, 310, 60, 270, 0, 170];
 const getChannelHue = (idx) => CHANNEL_HUES[idx % CHANNEL_HUES.length];
 
-const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = { sizeZ: 1, sizeT: 1 } }) => {
+const PreviewViewer = ({
+  image,
+  model,
+  channel = 0,
+  channels = [],
+  imageMeta = { sizeZ: 1, sizeT: 1 },
+}) => {
   const canvasRef = useRef(null);
   const imgRef = useRef(null);
   const containerRef = useRef(null);
@@ -31,6 +51,7 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
   // Image channel visibility — which OMERO channels to render
   // { [channelIdx]: bool }
   const [channelVisibility, setChannelVisibility] = useState({});
+  const [channelWindows, setChannelWindows] = useState({});
 
   const [z, setZ] = useState(0);
   const [t, setT] = useState(0);
@@ -42,28 +63,45 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
 
     const base = `/webgateway/render_image/${image.id}/${z}/${t}/`;
 
-    if (channels.length <= 1) return base;
+    if (channels.length <= 1) return `${base}?q=0.9`;
 
-    // Build channel string
-    const channelParam = channels.map(ch => {
-      const chNum = ch.index + 1; // OMERO uses 1-indexed
-      const visible = channelVisibility[ch.index] !== false; // default true
-      return visible ? `${chNum}` : `-${chNum}`;
-    }).join(",");
+    // Build channel string with window/color parameters
+    const channelParam = channels
+      .map((ch) => {
+        const chNum = ch.index + 1;
+        const visible = channelVisibility[ch.index] !== false;
+        const prefix = visible ? "" : "-";
+        const win = channelWindows[ch.index];
+        if (win) {
+          const color = (ch.color || "#ffffff").replace("#", "");
+          return `${prefix}${chNum}|${win.start}:${win.end}$${color}`;
+        }
+        return `${prefix}${chNum}`;
+      })
+      .join(",");
 
-    return `${base}?c=${channelParam}`;
-  }, [image, channels, channelVisibility, z, t]);
+    return `${base}?c=${channelParam}&q=0.9`;
+  }, [image, channels, channelVisibility, channelWindows, z, t]);
 
-  // Initialize channel visibility when channels change
+  // Initialize channel visibility and contrast windows when channels change
   useEffect(() => {
     if (channels.length > 0) {
       const vis = {};
-      channels.forEach(ch => {
-        vis[ch.index] = ch.active !== false; // default to OMERO's active state
+      const wins = {};
+      channels.forEach((ch) => {
+        vis[ch.index] = ch.active !== false;
+        if (ch.window) {
+          wins[ch.index] = { start: ch.window.start, end: ch.window.end };
+        }
       });
       setChannelVisibility(vis);
+      setChannelWindows(wins);
     }
   }, [channels]);
+
+  const handleWindowChange = (idx, { start, end }) => {
+    setChannelWindows((prev) => ({ ...prev, [idx]: { start, end } }));
+  };
 
   // Clear all predictions and reset view when image or model changes
   useEffect(() => {
@@ -93,11 +131,14 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
       const zoomSpeed = 0.001;
       const scaleAmount = -e.deltaY * zoomSpeed;
 
-      setZoom(prevZoom => {
-        const newZoom = Math.min(Math.max(0.1, prevZoom * (1 + scaleAmount)), 20);
+      setZoom((prevZoom) => {
+        const newZoom = Math.min(
+          Math.max(0.1, prevZoom * (1 + scaleAmount)),
+          20,
+        );
         if (newZoom !== prevZoom) {
           const zoomRatio = newZoom / prevZoom;
-          setPan(p => ({
+          setPan((p) => ({
             x: mouseX - (mouseX - p.x) * zoomRatio,
             y: mouseY - (mouseY - p.y) * zoomRatio,
           }));
@@ -106,8 +147,8 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
       });
     };
 
-      container.addEventListener("wheel", handleWheel, { passive: false });
-      return () => container.removeEventListener("wheel", handleWheel);
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
   }, [image]);
 
   const handleMouseDown = (e) => {
@@ -119,7 +160,7 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
 
   const handleMouseMove = (e) => {
     if (isPanning) {
-      setPan(p => ({
+      setPan((p) => ({
         x: p.x + (e.clientX - lastPanPoint.x),
         y: p.y + (e.clientY - lastPanPoint.y),
       }));
@@ -182,20 +223,26 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
     setLoading(true);
     setError(null);
     try {
-      const result = await runStardistPrediction(image.id, model, channel, z, t);
+      const result = await runStardistPrediction(
+        image.id,
+        model,
+        channel,
+        z,
+        t,
+      );
 
       if (result.error) {
         setError(result.error);
       } else {
         // Accumulate: store predictions under the current channel key, grouping by z_t
-        setPredictions(prev => {
+        setPredictions((prev) => {
           const next = { ...prev };
           if (!next[channel]) {
             next[channel] = { dataByPlane: {}, visible: true };
           }
           next[channel].dataByPlane[`${z}_${t}`] = {
             polygons: result.polygons || [],
-            count: result.count || 0
+            count: result.count || 0,
           };
           return next;
         });
@@ -210,17 +257,17 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
   };
 
   const togglePredictionVisibility = (chIdx) => {
-    setPredictions(prev => ({
+    setPredictions((prev) => ({
       ...prev,
       [chIdx]: {
         ...prev[chIdx],
         visible: !prev[chIdx].visible,
-      }
+      },
     }));
   };
 
   const clearPrediction = (chIdx) => {
-    setPredictions(prev => {
+    setPredictions((prev) => {
       const next = { ...prev };
       delete next[chIdx];
       return next;
@@ -228,7 +275,7 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
   };
 
   const toggleChannelVisibility = (chIdx) => {
-    setChannelVisibility(prev => ({
+    setChannelVisibility((prev) => ({
       ...prev,
       [chIdx]: !prev[chIdx],
     }));
@@ -236,7 +283,13 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
 
   // Total detected objects across all channels
   const totalCount = Object.values(predictions).reduce(
-    (sum, chData) => sum + Object.values(chData.dataByPlane || {}).reduce((s, p) => s + (p.count || 0), 0), 0
+    (sum, chData) =>
+      sum +
+      Object.values(chData.dataByPlane || {}).reduce(
+        (s, p) => s + (p.count || 0),
+        0,
+      ),
+    0,
   );
   const channelsWithPredictions = Object.keys(predictions).map(Number);
 
@@ -263,10 +316,13 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
         </Button>
 
         {channels.length > 1 && (
-          <span className="text-xs px-2 py-1 rounded flex items-center gap-1" style={{background: 'rgba(0,0,0,0.06)'}}>
+          <span
+            className="text-xs px-2 py-1 rounded flex items-center gap-1"
+            style={{ background: "rgba(0,0,0,0.06)" }}
+          >
             <span
               className="inline-block w-2 h-2 rounded-full"
-              style={{ backgroundColor: channels[channel]?.color || '#ccc' }}
+              style={{ backgroundColor: channels[channel]?.color || "#ccc" }}
             />
             {channels[channel]?.name || `Ch ${channel}`}
           </span>
@@ -274,13 +330,22 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
 
         {totalCount > 0 && !loading && (
           <span className="text-sm text-gray-600">
-            Total: <strong>{totalCount}</strong> object{totalCount !== 1 ? "s" : ""} across {channelsWithPredictions.length} channel{channelsWithPredictions.length !== 1 ? "s" : ""}
+            Total: <strong>{totalCount}</strong> object
+            {totalCount !== 1 ? "s" : ""} across{" "}
+            {channelsWithPredictions.length} channel
+            {channelsWithPredictions.length !== 1 ? "s" : ""}
           </span>
         )}
 
         <span className="ml-auto" />
         <span className="text-xs text-gray-500">{Math.round(zoom * 100)}%</span>
-        <Button icon="zoom-to-fit" minimal small onClick={resetView} title="Reset zoom" />
+        <Button
+          icon="zoom-to-fit"
+          minimal
+          small
+          onClick={resetView}
+          title="Reset zoom"
+        />
       </div>
 
       {error && (
@@ -292,8 +357,12 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
       <div className="flex gap-3 items-stretch relative flex-1 min-h-0 overflow-hidden">
         {/* Z Slider (Left of image viewer) */}
         <div className="flex flex-col items-center pt-1 shrink-0 pb-6 w-12">
-          <span className="text-xs font-bold text-gray-500 mb-2 mr-[20px]">Z:</span>
-          <span className="text-xs text-gray-400 mb-2 mr-[20px]">{Math.max(1, z + 1)}/{Math.max(1, imageMeta?.sizeZ || 1)}</span>
+          <span className="text-xs font-bold text-gray-500 mb-2 mr-[20px]">
+            Z:
+          </span>
+          <span className="text-xs text-gray-400 mb-2 mr-[20px]">
+            {Math.max(1, z + 1)}/{Math.max(1, imageMeta?.sizeZ || 1)}
+          </span>
           <div className="flex-1 py-1">
             <Slider
               min={0}
@@ -314,7 +383,7 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
           <div
             ref={containerRef}
             className="relative overflow-hidden border rounded bg-gray-200 flex-1 min-h-0 max-h-[calc(100vh-420px)]"
-            style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
+            style={{ cursor: isPanning ? "grabbing" : "grab" }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -324,8 +393,8 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
             <div
               style={{
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                transformOrigin: '0 0',
-                transition: isPanning ? 'none' : 'transform 0.1s',
+                transformOrigin: "0 0",
+                transition: isPanning ? "none" : "transform 0.1s",
               }}
               className="inline-block relative"
             >
@@ -333,13 +402,15 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
                 ref={imgRef}
                 src={imageUrl}
                 alt="Preview"
-                style={{ display: 'block', maxWidth: 'none' }}
+                style={{ display: "block", maxWidth: "none" }}
                 onLoad={(e) => {
                   if (canvasRef.current) {
                     canvasRef.current.width = e.target.naturalWidth;
                     canvasRef.current.height = e.target.naturalHeight;
-                    canvasRef.current.style.width = e.target.naturalWidth + 'px';
-                    canvasRef.current.style.height = e.target.naturalHeight + 'px';
+                    canvasRef.current.style.width =
+                      e.target.naturalWidth + "px";
+                    canvasRef.current.style.height =
+                      e.target.naturalHeight + "px";
                     drawOverlays();
                   }
                 }}
@@ -351,10 +422,15 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
             </div>
 
             {loading && (
-              <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center rounded" style={{ zIndex: 10 }}>
+              <div
+                className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center rounded"
+                style={{ zIndex: 10 }}
+              >
                 <div className="bg-white rounded-lg p-4 flex items-center gap-3 shadow-lg">
                   <Spinner size={24} />
-                  <span className="text-sm font-medium">Running StarDist on Ch {channel}...</span>
+                  <span className="text-sm font-medium">
+                    Running StarDist on Ch {channel}...
+                  </span>
                 </div>
               </div>
             )}
@@ -362,8 +438,12 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
 
           {/* T Slider (Bottom of image viewer) */}
           <div className="flex items-center gap-3 shrink-0 pb-1 w-full pl-2 pr-6">
-            <span className="text-xs font-bold text-gray-500 text-right">T:</span>
-            <span className="text-xs text-gray-400 w-6 text-right">{Math.max(1, t + 1)}/{Math.max(1, imageMeta?.sizeT || 1)}</span>
+            <span className="text-xs font-bold text-gray-500 text-right">
+              T:
+            </span>
+            <span className="text-xs text-gray-400 w-6 text-right">
+              {Math.max(1, t + 1)}/{Math.max(1, imageMeta?.sizeT || 1)}
+            </span>
             <div className="flex-1">
               <Slider
                 min={0}
@@ -388,6 +468,8 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
                 channels={channels}
                 visibility={channelVisibility}
                 onToggle={toggleChannelVisibility}
+                channelWindows={channelWindows}
+                onWindowChange={handleWindowChange}
               />
             )}
 
@@ -399,9 +481,9 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
                   Predictions
                 </div>
                 <div className="flex flex-col gap-1">
-                  {channelsWithPredictions.map(chIdx => {
+                  {channelsWithPredictions.map((chIdx) => {
                     const pred = predictions[chIdx];
-                    const chMeta = channels.find(c => c.index === chIdx);
+                    const chMeta = channels.find((c) => c.index === chIdx);
                     const hue = getChannelHue(chIdx);
                     return (
                       <div key={chIdx} className="flex items-center gap-2">
@@ -410,7 +492,13 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
                           onChange={() => togglePredictionVisibility(chIdx)}
                           className="mb-0 flex items-center"
                         >
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "6px",
+                            }}
+                          >
                             <span
                               className="inline-block w-3 h-3 rounded shrink-0"
                               style={{
