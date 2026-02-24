@@ -6,7 +6,7 @@ export const apiRequest = async (
   endpoint,
   method = "GET",
   data = null,
-  options = {}
+  options = {},
 ) => {
   try {
     const response = await axios({
@@ -139,7 +139,7 @@ export const fetchImages = async (
   page = 1,
   sizeXYZ = false,
   date = false,
-  group = -1
+  group = -1,
 ) => {
   const { urls } = getDjangoConstants(); // Get the URLs from Django constants
 
@@ -180,9 +180,9 @@ export const runWorkflow = async (workflowName, params = {}) => {
     const csrfToken = window.csrftoken;
 
     // Prepare the payload with script_name and optional params
-  const payload = { workflow_name: workflowName, params };
-  const endpoint = `${urls.api_run_workflow}${workflowName}/jobs/`;
-  const response = await apiRequest(endpoint, "POST", payload, {
+    const payload = { workflow_name: workflowName, params };
+    const endpoint = `${urls.api_run_workflow}${workflowName}/jobs/`;
+    const response = await apiRequest(endpoint, "POST", payload, {
       headers: {
         "X-CSRFToken": csrfToken, // Include CSRF token in request headers
       },
@@ -236,7 +236,7 @@ export const postUpload = async (upload) => {
         headers: {
           "X-CSRFToken": csrfToken, // Include CSRF token in request headers
         },
-      }
+      },
     );
 
     return response; // Return the API response
@@ -249,18 +249,13 @@ export const postUpload = async (upload) => {
 export const runStardistTraining = async (params) => {
   try {
     const csrfToken = window.csrftoken;
-    const endpoint = "/omero_biomero/api/stardist/train/"; 
-    
-    const response = await apiRequest(
-      endpoint,
-      "POST",
-      params,
-      {
-        headers: {
-          "X-CSRFToken": csrfToken,
-        },
-      }
-    );
+    const endpoint = "/omero_biomero/api/stardist/train/";
+
+    const response = await apiRequest(endpoint, "POST", params, {
+      headers: {
+        "X-CSRFToken": csrfToken,
+      },
+    });
     return response;
   } catch (error) {
     console.error("Error running stardist training:", error);
@@ -277,8 +272,16 @@ export const fetchStardistModels = async () => {
     console.error("Error fetching stardist models:", error);
     // Return built-in defaults as fallback
     return [
-      { value: "2D_versatile_fluo", label: "2D_versatile_fluo (Built-in)", type: "builtin" },
-      { value: "2D_versatile_he", label: "2D_versatile_he (Built-in)", type: "builtin" },
+      {
+        value: "2D_versatile_fluo",
+        label: "2D_versatile_fluo (Built-in)",
+        type: "builtin",
+      },
+      {
+        value: "2D_versatile_he",
+        label: "2D_versatile_he (Built-in)",
+        type: "builtin",
+      },
       { value: "2D_demo", label: "2D_demo (Built-in)", type: "builtin" },
     ];
   }
@@ -300,7 +303,7 @@ export const runStardistPrediction = async (imageId, modelName, channel = 0, z =
   try {
     const csrfToken = window.csrftoken;
     const endpoint = "/omero_biomero/api/stardist/predict/";
-    
+
     const response = await apiRequest(
       endpoint,
       "POST",
@@ -309,7 +312,7 @@ export const runStardistPrediction = async (imageId, modelName, channel = 0, z =
         headers: {
           "X-CSRFToken": csrfToken,
         },
-      }
+      },
     );
     return response;
   } catch (error) {
@@ -322,41 +325,45 @@ export const fetchMapAnnotations = async (imageId) => {
   if (!imageId) return [];
   // Use our custom endpoint that reads FileAnnotation
   try {
-      const endpoint = `/omero_biomero/api/stardist/fetch_annotations/?image=${imageId}`;
-      const response = await apiRequest(endpoint, "GET");
-      
-      // Response is just the data object { annotations: [], featureTypes: [] }
-      // We wrap it in a structure compatible with existing "fetch" return if needed?
-      // But let's just return the raw data and update AnnotationTab to handle it.
-      return response; 
+    const endpoint = `/omero_biomero/api/stardist/fetch_annotations/?image=${imageId}`;
+    const response = await apiRequest(endpoint, "GET");
+
+    // Response is just the data object { annotations: [], featureTypes: [] }
+    // We wrap it in a structure compatible with existing "fetch" return if needed?
+    // But let's just return the raw data and update AnnotationTab to handle it.
+    return response;
   } catch (error) {
-      console.error("Error fetching annotations:", error);
-      return { annotations: [], featureTypes: [] };
+    console.error("Error fetching annotations:", error);
+    return { annotations: [], featureTypes: [] };
   }
 };
 
-export const saveMapAnnotation = async (imageId, annotationData, annotationId = null) => {
-    // New Implementation: Save as FileAnnotation via custom view
-    const endpoint = "/omero_biomero/api/stardist/save_annotations/";
-    const csrfToken = window.csrftoken;
-    
-    try {
-        const payload = {
-            imageId: imageId,
-            data: annotationData
-        };
-        
-        const response = await apiRequest(endpoint, "POST", payload, {
-             headers: {
-                "X-CSRFToken": csrfToken,
-                "Content-Type": "application/json"
-             },
-        });
-        return response;
-    } catch (error) {
-        console.error("Error saving annotations:", error);
-        throw error;
-    }
+export const saveMapAnnotation = async (
+  imageId,
+  annotationData,
+  annotationId = null,
+) => {
+  // New Implementation: Save as FileAnnotation via custom view
+  const endpoint = "/omero_biomero/api/stardist/save_annotations/";
+  const csrfToken = window.csrftoken;
+
+  try {
+    const payload = {
+      imageId: imageId,
+      data: annotationData,
+    };
+
+    const response = await apiRequest(endpoint, "POST", payload, {
+      headers: {
+        "X-CSRFToken": csrfToken,
+        "Content-Type": "application/json",
+      },
+    });
+    return response;
+  } catch (error) {
+    console.error("Error saving annotations:", error);
+    throw error;
+  }
 };
 
 export const createContainer = async (
@@ -364,7 +371,7 @@ export const createContainer = async (
   name,
   description,
   targetContainerId,
-  targetContainerType
+  targetContainerType,
 ) => {
   const { urls } = getDjangoConstants(); // Base URL for the API from Django constants
 
@@ -414,7 +421,7 @@ export const postGroupMappings = async (mappings) => {
         headers: {
           "X-CSRFToken": csrfToken,
         },
-      }
+      },
     );
     return response;
   } catch (error) {
@@ -435,6 +442,116 @@ export const fetchPlatesData = async (item) => {
   return apiRequest(urls.api_plates, "GET", null, { params });
 };
 
+// ---------------------------------------------------------------------------
+// Annotate AI endpoints
+// ---------------------------------------------------------------------------
+
+export const getAnnotateContainers = async (type = "dataset") => {
+  const endpoint = `/omero_biomero/api/annotate/containers/?type=${type}`;
+  return apiRequest(endpoint, "GET");
+};
+
+export const getContainerImages = async (type, id) => {
+  const endpoint = `/omero_biomero/api/annotate/container_images/?type=${type}&id=${id}`;
+  return apiRequest(endpoint, "GET");
+};
+
+export const getAnnotateImageChannels = async (imageId) => {
+  if (!imageId) return { channels: [], sizeC: 0 };
+  const endpoint = `/omero_biomero/api/annotate/image_channels/?image=${imageId}`;
+  return apiRequest(endpoint, "GET");
+};
+
+export const createAnnotateConfig = async (configData) => {
+  const csrfToken = window.csrftoken;
+  return apiRequest("/omero_biomero/api/annotate/config/", "POST", configData, {
+    headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+  });
+};
+
+export const loadAnnotateConfig = async (type, id) => {
+  return apiRequest(
+    `/omero_biomero/api/annotate/config/?type=${type}&id=${id}`,
+    "GET",
+  );
+};
+
+export const createTrackingTable = async (configData) => {
+  const csrfToken = window.csrftoken;
+  return apiRequest(
+    "/omero_biomero/api/annotate/tracking_table/",
+    "POST",
+    configData,
+    {
+      headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+    },
+  );
+};
+
+export const listTrackingTables = async (type, id) => {
+  return apiRequest(
+    `/omero_biomero/api/annotate/tracking_table/?type=${type}&id=${id}`,
+    "GET",
+  );
+};
+
+export const getTrackingTableDetail = async (tableId) => {
+  return apiRequest(
+    `/omero_biomero/api/annotate/tracking_table/${tableId}/`,
+    "GET",
+  );
+};
+
+export const saveAnnotateAnnotation = async (
+  imageId,
+  annotations,
+  tableId,
+  unitIndex,
+  zSlice,
+  timepoint,
+  channel,
+  patchOffset,
+  configName,
+) => {
+  const csrfToken = window.csrftoken;
+
+  // Width/height omitted — the backend uses actual OMERO image dimensions
+  return apiRequest(
+    "/omero_biomero/api/annotate/save_annotation/",
+    "POST",
+    {
+      image_id: imageId,
+      annotations: annotations,
+      table_id: tableId,
+      unit_index: unitIndex,
+      z_slice: zSlice,
+      timepoint: timepoint,
+      channel: channel,
+      patch_offset: patchOffset,
+      config_name: configName,
+    },
+    {
+      headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+    },
+  );
+};
+
+export const fetchAnnotateAnnotation = async (imageId, tableId) => {
+  return apiRequest(
+    `/omero_biomero/api/annotate/fetch_annotation/?image=${imageId}&table_id=${tableId}`,
+    "GET",
+  );
+};
+
+export const getAnnotateProgress = async (tableId) => {
+  return apiRequest(
+    `/omero_biomero/api/annotate/progress/?table_id=${tableId}`,
+    "GET",
+  );
+};
+
+// ---------------------------------------------------------------------------
+
 export const fetchPlateImages = async (plateId) => {
   const { urls } = getDjangoConstants();
 
@@ -447,7 +564,7 @@ export const fetchPlateImages = async (plateId) => {
     // Get paginated wells
     const response = await apiRequest(
       `${urls.api_wells}?plate=${plateId}&offset=${offset}&limit=${limit}`,
-      "GET"
+      "GET",
     );
 
     // Extract images from wells
