@@ -46,7 +46,7 @@ import {
   traceContours,
   subtractAnnotations,
   eraseFromAnnotations,
-} from "../../stardist/utils/GeometryUtils";
+} from "../utils/GeometryUtils";
 import { samSetImage, samPredict } from "../../../apiService";
 
 /**

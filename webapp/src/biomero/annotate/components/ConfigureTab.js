@@ -20,6 +20,7 @@ import {
   createAnnotateConfig,
   createTrackingTable,
   listTrackingTables,
+  loadAnnotateConfig,
   getAnnotateImageChannels,
   getContainerImages,
 } from "../../../apiService";
@@ -75,6 +76,7 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
   const [saving, setSaving] = useState(false);
   const [initializing, setInitializing] = useState(false);
   const [existingTables, setExistingTables] = useState([]);
+  const [savedConfigs, setSavedConfigs] = useState([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [imageChannelInfo, setImageChannelInfo] = useState(null);
   const [containerImages, setContainerImages] = useState([]);
@@ -89,10 +91,15 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
       .filter((id) => id !== null);
     setContainerIds(ids);
 
-    // Check for existing tables when container changes
+    // Check for existing tables and saved configs when container changes
     if (ids.length > 0) {
       checkExistingTables(ids[0]);
       loadContainerImages(ids[0]);
+      loadAnnotateConfig(containerType, ids[0])
+        .then((result) => setSavedConfigs(result.configs || []))
+        .catch(() => setSavedConfigs([]));
+    } else {
+      setSavedConfigs([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContainers]);
@@ -105,55 +112,57 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [containerImages]);
 
-  // Restore existing config if provided
-  useEffect(() => {
-    if (existingConfig) {
-      setName(existingConfig.name || "annotation_workflow");
-      if (existingConfig.study) {
-        setStudyTitle(existingConfig.study.title || "");
-        setStudyDescription(existingConfig.study.description || "");
-        setOrganism(existingConfig.study.organism || "");
-        setImagingMethod(existingConfig.study.imaging_method || "");
-      }
-      if (existingConfig.annotation_methodology) {
-        setAnnotationType(
-          existingConfig.annotation_methodology.annotation_type ||
-            "segmentation_mask",
-        );
-        setAnnotationMethod(
-          existingConfig.annotation_methodology.annotation_method || "manual",
-        );
-        setAnnotationCriteria(
-          existingConfig.annotation_methodology.annotation_criteria || "",
-        );
-      }
-      if (existingConfig.omero) {
-        setContainerType(existingConfig.omero.container_type || "dataset");
-      }
-      if (existingConfig.spatial_coverage) {
-        const sc = existingConfig.spatial_coverage;
-        setChannels(sc.channels || [0]);
-        setLabelChannel(sc.label_channel ?? sc.channels?.[0] ?? 0);
-        setZSlices(sc.z_slices || [0]);
-        setZSliceMode(sc.z_slice_mode || "specific");
-        setTimepoints(sc.timepoints || [0]);
-        setTimepointMode(sc.timepoint_mode || "specific");
-        setThreeD(sc.three_d || false);
-        setUsePatches(sc.use_patches || false);
-        setPatchSize(sc.patch_size || [512, 512]);
-        setPatchesPerImage(sc.patches_per_image || 1);
-      }
-      if (existingConfig.training) {
-        const tr = existingConfig.training;
-        setSegmentAll(tr.segment_all || false);
-        setTrainN(tr.train_n ?? 3);
-        setValidateN(tr.validate_n ?? 2);
-        setTestN(tr.test_n ?? 0);
-        setTrainFraction(tr.train_fraction ?? 0.7);
-        setValFraction(tr.validation_fraction ?? 0.3);
-        setTestFraction(tr.test_fraction ?? 0.0);
-      }
+  const applyConfigToForm = (cfg) => {
+    setName(cfg.name || "annotation_workflow");
+    if (cfg.study) {
+      setStudyTitle(cfg.study.title || "");
+      setStudyDescription(cfg.study.description || "");
+      setOrganism(cfg.study.organism || "");
+      setImagingMethod(cfg.study.imaging_method || "");
     }
+    if (cfg.annotation_methodology) {
+      setAnnotationType(
+        cfg.annotation_methodology.annotation_type || "segmentation_mask",
+      );
+      setAnnotationMethod(
+        cfg.annotation_methodology.annotation_method || "manual",
+      );
+      setAnnotationCriteria(
+        cfg.annotation_methodology.annotation_criteria || "",
+      );
+    }
+    if (cfg.omero) {
+      setContainerType(cfg.omero.container_type || "dataset");
+    }
+    if (cfg.spatial_coverage) {
+      const sc = cfg.spatial_coverage;
+      setChannels(sc.channels || [0]);
+      setLabelChannel(sc.label_channel ?? sc.channels?.[0] ?? 0);
+      setZSlices(sc.z_slices || [0]);
+      setZSliceMode(sc.z_slice_mode || "specific");
+      setTimepoints(sc.timepoints || [0]);
+      setTimepointMode(sc.timepoint_mode || "specific");
+      setThreeD(sc.three_d || false);
+      setUsePatches(sc.use_patches || false);
+      setPatchSize(sc.patch_size || [512, 512]);
+      setPatchesPerImage(sc.patches_per_image || 1);
+    }
+    if (cfg.training) {
+      const tr = cfg.training;
+      setSegmentAll(tr.segment_all || false);
+      setTrainN(tr.train_n ?? 3);
+      setValidateN(tr.validate_n ?? 2);
+      setTestN(tr.test_n ?? 0);
+      setTrainFraction(tr.train_fraction ?? 0.7);
+      setValFraction(tr.validation_fraction ?? 0.3);
+      setTestFraction(tr.test_fraction ?? 0.0);
+    }
+  };
+
+  // Restore existing config if provided from parent
+  useEffect(() => {
+    if (existingConfig) applyConfigToForm(existingConfig);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingConfig]);
 
   const checkExistingTables = async (containerId) => {
@@ -357,6 +366,32 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
           />
         </div>
       </div>
+
+      {/* Saved annotation configs */}
+      {savedConfigs.length > 0 && (
+        <Callout
+          intent="success"
+          icon="saved"
+          title="Saved annotation configurations"
+        >
+          <p>
+            Found {savedConfigs.length} saved config(s) for this container.
+            Click one to restore all settings:
+          </p>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {savedConfigs.map((cfg, i) => (
+              <Button
+                key={i}
+                small
+                outlined
+                icon="import"
+                text={cfg.name || `Config ${i + 1}`}
+                onClick={() => applyConfigToForm(cfg)}
+              />
+            ))}
+          </div>
+        </Callout>
+      )}
 
       {/* Existing tables notice */}
       {existingTables.length > 0 && (

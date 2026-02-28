@@ -12,7 +12,6 @@ import "./tailwind.css";
 import { AppProvider } from "./AppContext";
 import BiomeroApp from "./biomero/BiomeroApp";
 import ImporterApp from "./importer/ImporterApp";
-import StardistApp from "./biomero/stardist/StardistApp";
 import AnnotateApp from "./biomero/annotate/AnnotateApp";
 import {
   Navbar,
@@ -119,17 +118,6 @@ const AppRouter = () => {
                   onClick={() => navigate("?tab=stardist")}
                   outlined={appName === "stardist"}
                 />
-                <Button
-                  className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
-                    appName === "annotate"
-                      ? "bp5-intent-primary font-bold shadow-md"
-                      : ""
-                  }`}
-                  icon="annotation"
-                  text="Annotate"
-                  onClick={() => navigate("?tab=annotate")}
-                  outlined={appName === "annotate"}
-                />
               </>
             )}
           </NavbarGroup>
@@ -138,8 +126,6 @@ const AppRouter = () => {
           {appName === "biomero" ? (
             <BiomeroApp />
           ) : appName === "stardist" ? (
-            <StardistApp />
-          ) : appName === "annotate" ? (
             <AnnotateApp />
           ) : (
             <ImporterApp />

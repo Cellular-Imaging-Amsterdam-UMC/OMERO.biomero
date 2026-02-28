@@ -63,7 +63,7 @@ const PreviewViewer = ({
 
     const base = `/webgateway/render_image/${image.id}/${z}/${t}/`;
 
-    if (channels.length <= 1) return `${base}?q=0.9`;
+    if (channels.length === 0) return `${base}?q=0.9`;
 
     // Build channel string with window/color parameters
     const channelParam = channels
@@ -460,10 +460,10 @@ const PreviewViewer = ({
         </div>
 
         {/* Controls sidebar */}
-        {(channels.length > 1 || channelsWithPredictions.length > 0) && (
+        {(channels.length > 0 || channelsWithPredictions.length > 0) && (
           <div className="w-52 flex flex-col gap-3 shrink-0">
-            {/* Image Channel Visibility */}
-            {channels.length > 1 && (
+            {/* Image Channels / Contrast */}
+            {channels.length > 0 && (
               <ImageChannelControls
                 channels={channels}
                 visibility={channelVisibility}
