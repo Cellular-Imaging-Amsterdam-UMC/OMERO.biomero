@@ -549,6 +549,13 @@ export const fetchAnnotateAnnotation = async (imageId, tableId) => {
   );
 };
 
+export const fetchAllImageAnnotations = async (imageId) => {
+  return apiRequest(
+    `/omero_biomero/api/annotate/fetch_annotation/?image=${imageId}`,
+    "GET",
+  );
+};
+
 // ---------------------------------------------------------------------------
 // SAM endpoints
 // ---------------------------------------------------------------------------

@@ -14,7 +14,11 @@ import {
   Tag,
   Slider,
 } from "@blueprintjs/core";
-import { runStardistPrediction } from "../../../apiService";
+import {
+  runStardistPrediction,
+  saveAnnotateAnnotation,
+  fetchAllImageAnnotations,
+} from "../../../apiService";
 import ImageChannelControls from "./ImageChannelControls";
 
 /**
@@ -23,6 +27,10 @@ import ImageChannelControls from "./ImageChannelControls";
  */
 const CHANNEL_HUES = [200, 30, 130, 310, 60, 270, 0, 170];
 const getChannelHue = (idx) => CHANNEL_HUES[idx % CHANNEL_HUES.length];
+
+// Warm hues for existing ROI layers — distinct from the prediction palette
+const ROI_HUES = [43, 16, 340, 160, 290, 220];
+const getRoiHue = (idx) => ROI_HUES[idx % ROI_HUES.length];
 
 const PreviewViewer = ({
   image,
@@ -43,6 +51,11 @@ const PreviewViewer = ({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveResult, setSaveResult] = useState(null); // null | { ok: bool, msg: string }
+
+  const [existingAnnotations, setExistingAnnotations] = useState([]); // parsed ROI polygons
+  const [existingRoiVisibility, setExistingRoiVisibility] = useState({}); // roiId → bool
 
   // Accumulated predictions keyed by channel index
   // { [channelIdx]: { polygons: [...], count: int, visible: bool } }
@@ -107,6 +120,7 @@ const PreviewViewer = ({
   useEffect(() => {
     setPredictions({});
     setError(null);
+    setSaveResult(null);
     setZoom(1);
     setPan({ x: 0, y: 0 });
     setZ(0);
@@ -116,6 +130,46 @@ const PreviewViewer = ({
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
   }, [image, model]);
+
+  // Parse a GeoJSON FeatureCollection into the internal annotation format and
+  // update state, preserving existing visibility choices for known ROIs.
+  const applyAnnotationFeatures = useCallback((fc) => {
+    const parsed = (fc.features || [])
+      .map((f) => {
+        const pts = f.geometry?.coordinates?.[0];
+        const plane = f.geometry?.plane;
+        if (!pts || pts.length < 3) return null;
+        return {
+          id: f.id,
+          points: pts,
+          z: plane?.z ?? 0,
+          t: plane?.t ?? 0,
+          c: plane?.c ?? -1,
+          roiId: f.properties?.roiId,
+        };
+      })
+      .filter(Boolean);
+    setExistingAnnotations(parsed);
+    // Initialise visibility for any new ROI IDs (default: visible)
+    setExistingRoiVisibility((prev) => {
+      const next = { ...prev };
+      parsed.forEach((ann) => {
+        const key = String(ann.roiId ?? ann.id);
+        if (!(key in next)) next[key] = true;
+      });
+      return next;
+    });
+  }, []);
+
+  // Fetch existing ROI annotations when image changes
+  useEffect(() => {
+    setExistingAnnotations([]);
+    setExistingRoiVisibility({});
+    if (!image) return;
+    fetchAllImageAnnotations(image.id)
+      .then(applyAnnotationFeatures)
+      .catch(() => setExistingAnnotations([]));
+  }, [image?.id, applyAnnotationFeatures]);
 
   // --- Zoom & Pan handlers ---
   useEffect(() => {
@@ -177,13 +231,53 @@ const PreviewViewer = ({
     setPan({ x: 0, y: 0 });
   };
 
-  // Redraw canvas whenever predictions change
+  // Group existing annotations by OMERO ROI ID for per-layer display
+  const roiGroups = useMemo(() => {
+    const map = new Map();
+    existingAnnotations.forEach((ann) => {
+      const key = String(ann.roiId ?? ann.id);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(ann);
+    });
+    return Array.from(map.entries()).map(([roiId, shapes]) => ({ roiId, shapes }));
+  }, [existingAnnotations]);
+
+  // Redraw canvas whenever predictions or existing annotations change
   const drawOverlays = useCallback(() => {
     if (!canvasRef.current) return;
 
     const ctx = canvasRef.current.getContext("2d");
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
+    // Draw existing ROI layers first (underneath predictions), one colour per ROI
+    roiGroups.forEach((group, idx) => {
+      if (!existingRoiVisibility[group.roiId]) return;
+      const hue = getRoiHue(idx);
+      const planeShapes = group.shapes.filter(
+        (ann) => ann.z === z && ann.t === t,
+      );
+      if (planeShapes.length === 0) return;
+      ctx.save();
+      ctx.setLineDash([5, 3]);
+      ctx.strokeStyle = `hsla(${hue}, 90%, 55%, 0.9)`;
+      ctx.lineWidth = 1.5;
+      ctx.fillStyle = `hsla(${hue}, 90%, 55%, 0.08)`;
+      planeShapes.forEach((ann) => {
+        const pts = ann.points;
+        if (!pts || pts.length < 3) return;
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i][0], pts[i][1]);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fill();
+      });
+      ctx.restore();
+    });
+
+    // Draw StarDist prediction overlays on top
     Object.entries(predictions).forEach(([chIdx, chData]) => {
       if (!chData.visible) return;
       const planeData = chData.dataByPlane?.[`${z}_${t}`];
@@ -191,7 +285,7 @@ const PreviewViewer = ({
 
       const hue = getChannelHue(parseInt(chIdx));
 
-      planeData.polygons.forEach((polygon, pIdx) => {
+      planeData.polygons.forEach((polygon) => {
         const pts = polygon.points;
         if (!pts || pts.length === 0) return;
 
@@ -212,7 +306,7 @@ const PreviewViewer = ({
         ctx.fill();
       });
     });
-  }, [predictions]);
+  }, [predictions, roiGroups, existingRoiVisibility, z, t]);
 
   useEffect(() => {
     drawOverlays();
@@ -281,6 +375,10 @@ const PreviewViewer = ({
     }));
   };
 
+  const toggleRoiVisibility = (roiId) => {
+    setExistingRoiVisibility((prev) => ({ ...prev, [roiId]: !prev[roiId] }));
+  };
+
   // Total detected objects across all channels
   const totalCount = Object.values(predictions).reduce(
     (sum, chData) =>
@@ -292,6 +390,64 @@ const PreviewViewer = ({
     0,
   );
   const channelsWithPredictions = Object.keys(predictions).map(Number);
+
+  const hasPredictionsForCurrentPlane = channelsWithPredictions.some(
+    (chIdx) =>
+      predictions[chIdx]?.dataByPlane?.[`${z}_${t}`]?.polygons?.length > 0,
+  );
+
+  const handleSaveAnnotations = async () => {
+    if (!image) return;
+    setSaving(true);
+    setSaveResult(null);
+    try {
+      let saved = 0;
+      for (const chIdx of channelsWithPredictions) {
+        const planeData = predictions[chIdx]?.dataByPlane?.[`${z}_${t}`];
+        if (!planeData?.polygons?.length) continue;
+
+        const geojsonPayload = {
+          type: "FeatureCollection",
+          features: planeData.polygons.map((polygon) => ({
+            type: "Feature",
+            id: crypto.randomUUID(),
+            geometry: {
+              type: "Polygon",
+              coordinates: [polygon.points],
+              plane: { c: chIdx, z, t },
+            },
+            properties: { objectType: "annotation" },
+          })),
+        };
+
+        await saveAnnotateAnnotation(
+          image.id,
+          geojsonPayload,
+          null, // tableId — optional, skips tracking table update
+          null, // unitIndex
+          z, // zSlice
+          t, // timepoint
+          chIdx, // channel
+          null, // patchOffset
+          "stardist_preview", // configName
+        );
+        saved++;
+      }
+      setSaveResult({
+        ok: true,
+        msg: `Saved ${saved} channel(s) as OMERO ROIs`,
+      });
+      // Refresh existing ROI layers so newly saved polygons appear immediately
+      fetchAllImageAnnotations(image.id)
+        .then(applyAnnotationFeatures)
+        .catch(() => {});
+    } catch (e) {
+      const msg = e.response?.data?.error || e.message || "Save failed";
+      setSaveResult({ ok: false, msg });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (!image) {
     return (
@@ -313,6 +469,17 @@ const PreviewViewer = ({
           disabled={!model}
         >
           Run Preview
+        </Button>
+
+        <Button
+          intent="success"
+          icon="floppy-disk"
+          onClick={handleSaveAnnotations}
+          loading={saving}
+          disabled={!hasPredictionsForCurrentPlane}
+          title="Save current plane predictions as OMERO ROIs"
+        >
+          Save as Annotation
         </Button>
 
         {channels.length > 1 && (
@@ -351,6 +518,16 @@ const PreviewViewer = ({
       {error && (
         <Callout intent="danger" icon="error" className="mb-1">
           {error}
+        </Callout>
+      )}
+
+      {saveResult && (
+        <Callout
+          intent={saveResult.ok ? "success" : "danger"}
+          icon={saveResult.ok ? "tick" : "error"}
+          className="mb-1"
+        >
+          {saveResult.msg}
         </Callout>
       )}
 
@@ -460,7 +637,9 @@ const PreviewViewer = ({
         </div>
 
         {/* Controls sidebar */}
-        {(channels.length > 0 || channelsWithPredictions.length > 0) && (
+        {(channels.length > 0 ||
+          channelsWithPredictions.length > 0 ||
+          roiGroups.length > 0) && (
           <div className="w-52 flex flex-col gap-3 shrink-0">
             {/* Image Channels / Contrast */}
             {channels.length > 0 && (
@@ -471,6 +650,55 @@ const PreviewViewer = ({
                 channelWindows={channelWindows}
                 onWindowChange={handleWindowChange}
               />
+            )}
+
+            {/* Existing ROI layers */}
+            {roiGroups.length > 0 && (
+              <div>
+                <Divider className="mb-2" />
+                <div className="text-xs font-bold uppercase text-gray-500 mb-2">
+                  Existing ROIs
+                </div>
+                <div className="flex flex-col gap-1">
+                  {roiGroups.map((group, idx) => {
+                    const hue = getRoiHue(idx);
+                    const onPlane = group.shapes.filter(
+                      (a) => a.z === z && a.t === t,
+                    ).length;
+                    return (
+                      <div key={group.roiId} className="flex items-center gap-2">
+                        <Checkbox
+                          checked={!!existingRoiVisibility[group.roiId]}
+                          onChange={() => toggleRoiVisibility(group.roiId)}
+                          className="mb-0 flex items-center"
+                        >
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "6px",
+                            }}
+                          >
+                            <span
+                              className="inline-block w-3 h-3 rounded shrink-0"
+                              style={{
+                                backgroundColor: `hsla(${hue}, 90%, 55%, 0.35)`,
+                                border: `1.5px dashed hsla(${hue}, 90%, 45%, 0.9)`,
+                              }}
+                            />
+                            <span className="text-sm truncate max-w-[70px]" title={`ROI ${group.roiId}`}>
+                              ROI {group.roiId}
+                            </span>
+                            <Tag minimal round small>
+                              {onPlane}/{group.shapes.length}
+                            </Tag>
+                          </span>
+                        </Checkbox>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             )}
 
             {/* Prediction Overlays */}
