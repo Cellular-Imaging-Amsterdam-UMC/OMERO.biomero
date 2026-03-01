@@ -80,6 +80,22 @@ def _get_omero_annotate_ai():
 _get_omero_annotate_ai._last_error = None
 
 
+def _annotations_from_geojson(data):
+    """Normalise annotation input to a list of ``{points: [[x, y], ...]}`` dicts.
+
+    Accepts either a GeoJSON FeatureCollection or the legacy list format.
+    """
+    if isinstance(data, dict) and data.get("type") == "FeatureCollection":
+        result = []
+        for feature in data.get("features", []):
+            coords = feature.get("geometry", {}).get("coordinates", [])
+            if coords:
+                result.append({"points": coords[0]})
+        return result
+    # Legacy: list of {points: [...]}
+    return data
+
+
 def polygons_to_label_mask(annotations, width, height):
     """Convert web polygon annotations to a label mask image.
 
@@ -679,7 +695,7 @@ def save_annotation(request, conn=None, **kwargs):
     try:
         data = json.loads(request.body)
         image_id = data["image_id"]
-        annotations = data["annotations"]
+        annotations = _annotations_from_geojson(data["annotations"])
         table_id = data.get("table_id")
         unit_index = data.get("unit_index")
         width = data.get("width")
@@ -838,29 +854,43 @@ def fetch_annotation(request, conn=None, **kwargs):
         roi_service = conn.getRoiService()
         result = roi_service.findByImage(int(image_id), None)
 
-        annotations = []
+        features = []
         for roi in result.rois:
             for shape in roi.copyShapes():
-                # Convert OMERO shapes to polygon points
-                points = _shape_to_points(shape)
-                if points:
-                    annotations.append(
-                        {
-                            "id": str(shape.getId().getValue()),
-                            "points": points,
-                            "typeId": "1",
+                shape_data = _shape_to_points(shape)
+                if shape_data:
+                    feature = {
+                        "type": "Feature",
+                        "id": str(shape.getId().getValue()),
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [shape_data["points"]],
+                            "plane": {
+                                "c": -1,
+                                "z": shape_data["z"],
+                                "t": shape_data["t"],
+                            },
+                        },
+                        "properties": {
+                            "objectType": "annotation",
                             "roiId": roi.getId().getValue(),
-                        }
-                    )
+                        },
+                    }
+                    features.append(feature)
 
-        return JsonResponse({"annotations": annotations})
+        return JsonResponse({"type": "FeatureCollection", "features": features})
     except Exception as e:
         logger.error("Error fetching annotations", exc_info=True)
         return JsonResponse({"error": str(e)}, status=500)
 
 
 def _shape_to_points(shape):
-    """Convert an OMERO shape to a list of [x, y] points."""
+    """Convert an OMERO PolygonI shape to a dict with points and plane info.
+
+    Returns:
+        dict with keys ``points`` ([[x, y], ...]), ``z``, ``t``, or None if
+        the shape has fewer than 3 points or is not a Polygon.
+    """
     if isinstance(shape, omero.model.PolygonI):
         points_str = shape.getPoints().getValue()
         points = []
@@ -871,7 +901,11 @@ def _shape_to_points(shape):
                     points.append([float(coords[0]), float(coords[1])])
                 except ValueError:
                     continue
-        return points if len(points) >= 3 else None
+        if len(points) < 3:
+            return None
+        z = shape.getTheZ().getValue() if shape.getTheZ() else 0
+        t = shape.getTheT().getValue() if shape.getTheT() else 0
+        return {"points": points, "z": z, "t": t}
     return None
 
 

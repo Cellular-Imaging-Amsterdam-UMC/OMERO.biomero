@@ -79,7 +79,14 @@ const AnnotateTab = ({
     if (!unit || !unit.image_id) return;
     try {
       const result = await fetchAnnotateAnnotation(unit.image_id, tableId);
-      setAnnotations(result.annotations || []);
+      const features = result.features || [];
+      const loaded = features.map((f) => ({
+        id: f.id,
+        points: f.geometry.coordinates[0],
+        typeId: f.properties?.typeId || "1",
+        roiId: f.properties?.roiId,
+      }));
+      setAnnotations(loaded);
     } catch (e) {
       console.error("Error loading annotations:", e);
       setAnnotations([]);
@@ -130,9 +137,25 @@ const AnnotateTab = ({
       // get dimensions from the canvas or pass them from the image.
       // For now, use a reasonable approach: get from the first annotation
       // point bounds or the image metadata in the unit.
+      const zSlice = selectedUnit.z_slice >= 0 ? selectedUnit.z_slice : 0;
+      const timepoint = selectedUnit.timepoint >= 0 ? selectedUnit.timepoint : 0;
+      const channel = selectedUnit.channel >= 0 ? selectedUnit.channel : -1;
+      const geojsonPayload = {
+        type: "FeatureCollection",
+        features: annotations.map((ann) => ({
+          type: "Feature",
+          id: ann.id,
+          geometry: {
+            type: "Polygon",
+            coordinates: [ann.points],
+            plane: { c: channel, z: zSlice, t: timepoint },
+          },
+          properties: { objectType: "annotation" },
+        })),
+      };
       const result = await saveAnnotateAnnotation(
         selectedUnit.image_id,
-        annotations,
+        geojsonPayload,
         tableId,
         selectedUnitIndex,
         selectedUnit.z_slice >= 0 ? selectedUnit.z_slice : null,
