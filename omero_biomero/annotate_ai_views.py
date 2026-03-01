@@ -749,6 +749,11 @@ def save_annotation(request, conn=None, **kwargs):
             if tmp_path and os.path.exists(tmp_path):
                 os.remove(tmp_path)
 
+        # Persist GeoJSON as a namespaced FileAnnotation so that fetch_annotation
+        # can retrieve annotations per-workflow without scanning all ROIs.
+        namespace = f"omero.biomero.annotations.{config_name}"
+        _save_geojson_file_ann(conn, image_id, data["annotations"], namespace)
+
         # Update tracking table if provided
         if table_id is not None and unit_index is not None:
             _update_tracking_table_row(
@@ -760,6 +765,7 @@ def save_annotation(request, conn=None, **kwargs):
                 "success": True,
                 "label_id": label_id,
                 "roi_id": roi_id,
+                "namespace": namespace,
             }
         )
     except KeyError as e:
@@ -767,6 +773,85 @@ def save_annotation(request, conn=None, **kwargs):
     except Exception as e:
         logger.error("Error saving annotation", exc_info=True)
         return JsonResponse({"error": str(e)}, status=500)
+
+
+def _save_geojson_file_ann(conn, image_id, geojson, namespace):
+    """Persist a GeoJSON FeatureCollection as a namespaced FileAnnotation on an image.
+
+    Any existing FileAnnotation with the same namespace is replaced, so
+    re-annotating the same processing unit stays idempotent.
+
+    Args:
+        conn: OMERO connection
+        image_id: OMERO Image ID
+        geojson: GeoJSON FeatureCollection dict (the original request payload)
+        namespace: OMERO namespace string, e.g. ``omero.biomero.annotations.my_workflow``
+    """
+    image = conn.getObject("Image", image_id)
+    if not image:
+        logger.warning("_save_geojson_file_ann: image %s not found", image_id)
+        return
+
+    # Remove any pre-existing annotation for this namespace
+    to_delete = [
+        ann.getId()
+        for ann in image.listAnnotations()
+        if isinstance(ann, omero.gateway.FileAnnotationWrapper)
+        and ann.getNs() == namespace
+    ]
+    if to_delete:
+        try:
+            conn.deleteObjects("Annotation", to_delete, wait=True)
+        except Exception:
+            logger.warning(
+                "Could not delete old GeoJSON annotation for ns=%s", namespace
+            )
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".geojson", delete=False
+    ) as tmp:
+        json.dump(geojson, tmp)
+        tmp_path = tmp.name
+
+    try:
+        file_ann = conn.createFileAnnfromLocalFile(
+            tmp_path,
+            mimetype="application/geo+json",
+            ns=namespace,
+            desc=namespace,
+        )
+        image.linkAnnotation(file_ann)
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
+def _config_name_from_table_id(conn, table_id):
+    """Derive the annotation workflow config name from a tracking table FileAnnotation.
+
+    The table is stored with filename ``annotate_ai_<config_name>`` by convention
+    (see ``_create_tracking_table``).  Returns ``None`` if the pattern is not matched.
+
+    Args:
+        conn: OMERO connection
+        table_id: FileAnnotation ID of the tracking table
+
+    Returns:
+        str config name, or None
+    """
+    try:
+        file_ann = conn.getObject("FileAnnotation", int(table_id))
+        if not file_ann:
+            return None
+        filename = file_ann.getFileName() or ""
+        # Strip any extension that ezomero / HDF5 backend may have appended
+        stem = filename.split(".")[0]
+        prefix = "annotate_ai_"
+        if stem.startswith(prefix):
+            return stem[len(prefix):]
+    except Exception:
+        logger.debug("Could not derive config_name from table_id=%s", table_id)
+    return None
 
 
 def _update_tracking_table_row(conn, lib, table_id, unit_index, roi_id, label_id):
@@ -835,22 +920,58 @@ def _update_tracking_table_row(conn, lib, table_id, unit_index, roi_id, label_id
 @login_required()
 @require_GET
 def fetch_annotation(request, conn=None, **kwargs):
-    """Fetch existing ROI shapes for an image from OMERO.
+    """Fetch existing annotations for an image from OMERO.
+
+    Looks for a namespaced GeoJSON FileAnnotation first (written by
+    ``save_annotation`` for each workflow).  Falls back to scanning all ROI
+    shapes when no matching FileAnnotation is found, preserving backwards
+    compatibility with annotations created before namespace support was added.
 
     Query params:
-        image – image id
-        table_id – tracking table id (optional, for context)
+        image      – image id (required)
+        table_id   – tracking table FileAnnotation id; used to derive the
+                     workflow namespace when ``config_name`` is not given
+        config_name – explicit workflow name / namespace suffix (optional)
     """
     image_id = request.GET.get("image")
     if not image_id:
         return JsonResponse({"error": "Missing image ID"}, status=400)
+
+    table_id = request.GET.get("table_id")
+    config_name = request.GET.get("config_name")
 
     try:
         image = conn.getObject("Image", int(image_id))
         if not image:
             return JsonResponse({"error": "Image not found"}, status=404)
 
-        # Collect ROI shapes
+        # ----------------------------------------------------------------
+        # 1. Namespace-aware path: look for a GeoJSON FileAnnotation
+        # ----------------------------------------------------------------
+        if not config_name and table_id:
+            config_name = _config_name_from_table_id(conn, table_id)
+
+        if config_name:
+            namespace = f"omero.biomero.annotations.{config_name}"
+            for ann in image.listAnnotations():
+                if (
+                    isinstance(ann, omero.gateway.FileAnnotationWrapper)
+                    and ann.getNs() == namespace
+                ):
+                    try:
+                        content = b"".join(ann.getFileInChunks())
+                        geojson = json.loads(content)
+                        # Ensure it is a FeatureCollection
+                        if geojson.get("type") == "FeatureCollection":
+                            return JsonResponse(geojson)
+                    except Exception:
+                        logger.warning(
+                            "Could not read GeoJSON FileAnnotation %s", ann.getId()
+                        )
+
+        # ----------------------------------------------------------------
+        # 2. Fallback: reconstruct from ROI shapes (pre-namespace data)
+        # ----------------------------------------------------------------
         roi_service = conn.getRoiService()
         result = roi_service.findByImage(int(image_id), None)
 
@@ -859,24 +980,25 @@ def fetch_annotation(request, conn=None, **kwargs):
             for shape in roi.copyShapes():
                 shape_data = _shape_to_points(shape)
                 if shape_data:
-                    feature = {
-                        "type": "Feature",
-                        "id": str(shape.getId().getValue()),
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [shape_data["points"]],
-                            "plane": {
-                                "c": -1,
-                                "z": shape_data["z"],
-                                "t": shape_data["t"],
+                    features.append(
+                        {
+                            "type": "Feature",
+                            "id": str(shape.getId().getValue()),
+                            "geometry": {
+                                "type": "Polygon",
+                                "coordinates": [shape_data["points"]],
+                                "plane": {
+                                    "c": -1,
+                                    "z": shape_data["z"],
+                                    "t": shape_data["t"],
+                                },
                             },
-                        },
-                        "properties": {
-                            "objectType": "annotation",
-                            "roiId": roi.getId().getValue(),
-                        },
-                    }
-                    features.append(feature)
+                            "properties": {
+                                "objectType": "annotation",
+                                "roiId": roi.getId().getValue(),
+                            },
+                        }
+                    )
 
         return JsonResponse({"type": "FeatureCollection", "features": features})
     except Exception as e:
