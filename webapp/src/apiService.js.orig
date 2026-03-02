@@ -518,6 +518,16 @@ export const deleteTrackingTable = async (tableId) => {
   );
 };
 
+export const deleteTrackingTable = async (tableId) => {
+  const csrfToken = window.csrftoken;
+  return apiRequest(
+    `/omero_biomero/api/annotate/tracking_table/${tableId}/`,
+    "DELETE",
+    null,
+    { headers: { "X-CSRFToken": csrfToken } },
+  );
+};
+
 export const saveAnnotateAnnotation = async (
   imageId,
   annotations,

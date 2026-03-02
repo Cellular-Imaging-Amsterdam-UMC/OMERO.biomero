@@ -340,18 +340,6 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
     }
   };
 
-  const handleDeleteTable = async (table) => {
-    try {
-      await deleteTrackingTable(table.id);
-      setExistingTables((prev) => prev.filter((t) => t.id !== table.id));
-      toaster?.show({ message: `Deleted table: ${table.name}`, intent: "success" });
-    } catch (e) {
-      toaster?.show({ message: `Failed to delete: ${e.message}`, intent: "danger" });
-    } finally {
-      setTableToDelete(null);
-    }
-  };
-
   const handleInitialize = async () => {
     if (containerIds.length === 0) {
       toaster?.show({
