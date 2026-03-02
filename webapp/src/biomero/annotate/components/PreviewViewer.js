@@ -239,7 +239,10 @@ const PreviewViewer = ({
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(ann);
     });
-    return Array.from(map.entries()).map(([roiId, shapes]) => ({ roiId, shapes }));
+    return Array.from(map.entries()).map(([roiId, shapes]) => ({
+      roiId,
+      shapes,
+    }));
   }, [existingAnnotations]);
 
   // Redraw canvas whenever predictions or existing annotations change
@@ -657,7 +660,7 @@ const PreviewViewer = ({
               <div>
                 <Divider className="mb-2" />
                 <div className="text-xs font-bold uppercase text-gray-500 mb-2">
-                  Existing ROIs
+                  Existing Annotations
                 </div>
                 <div className="flex flex-col gap-1">
                   {roiGroups.map((group, idx) => {
@@ -666,7 +669,10 @@ const PreviewViewer = ({
                       (a) => a.z === z && a.t === t,
                     ).length;
                     return (
-                      <div key={group.roiId} className="flex items-center gap-2">
+                      <div
+                        key={group.roiId}
+                        className="flex items-center gap-2"
+                      >
                         <Checkbox
                           checked={!!existingRoiVisibility[group.roiId]}
                           onChange={() => toggleRoiVisibility(group.roiId)}
@@ -686,7 +692,10 @@ const PreviewViewer = ({
                                 border: `1.5px dashed hsla(${hue}, 90%, 45%, 0.9)`,
                               }}
                             />
-                            <span className="text-sm truncate max-w-[70px]" title={`ROI ${group.roiId}`}>
+                            <span
+                              className="text-sm truncate max-w-[70px]"
+                              title={`ROI ${group.roiId}`}
+                            >
                               ROI {group.roiId}
                             </span>
                             <Tag minimal round small>
