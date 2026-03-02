@@ -13,6 +13,8 @@ import {
   Spinner,
   Collapse,
   Tag,
+  Alert,
+  Icon,
 } from "@blueprintjs/core";
 import DatasetSelectWithPopover from "../../components/DatasetSelectWithPopover";
 import { useAppContext } from "../../../AppContext";
@@ -23,10 +25,11 @@ import {
   loadAnnotateConfig,
   getAnnotateImageChannels,
   getContainerImages,
+  deleteTrackingTable,
 } from "../../../apiService";
 
 const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
-  const { toaster } = useAppContext();
+  const { toaster, state } = useAppContext();
 
   // --- Workflow metadata ---
   const [name, setName] = useState("annotation_workflow");
@@ -78,8 +81,10 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
   const [existingTables, setExistingTables] = useState([]);
   const [savedConfigs, setSavedConfigs] = useState([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showMethodology, setShowMethodology] = useState(false);
   const [imageChannelInfo, setImageChannelInfo] = useState(null);
   const [containerImages, setContainerImages] = useState([]);
+  const [tableToDelete, setTableToDelete] = useState(null);
 
   // Parse container IDs from selection
   useEffect(() => {
@@ -265,7 +270,7 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
     };
   };
 
-  const handleSaveConfig = async () => {
+  const handleValidateConfig = async () => {
     if (containerIds.length === 0) {
       toaster?.show({
         message: "Please select a container first",
@@ -273,13 +278,44 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
       });
       return;
     }
+    // Collect validation issues
+    const errors = [];
+    const warnings = [];
+    if (imageChannelInfo) {
+      const badChannels = channels.filter((c) => c >= imageChannelInfo.sizeC);
+      if (badChannels.length > 0)
+        errors.push(`Channel indices out of range (max ${imageChannelInfo.sizeC - 1}): ${badChannels.join(", ")}`);
+      if (labelChannel >= imageChannelInfo.sizeC)
+        errors.push(`Segmentation channel ${labelChannel} exceeds available channels (0–${imageChannelInfo.sizeC - 1})`);
+    }
+    if (segmentAll) {
+      const total = trainFraction + valFraction + testFraction;
+      if (Math.abs(total - 1.0) > 0.01)
+        warnings.push(`Fractions sum to ${(total * 100).toFixed(0)}%, not 100%`);
+    } else {
+      const total = trainN + validateN + testN;
+      if (total > containerImages.length)
+        warnings.push(`Requested ${total} images but container only has ${containerImages.length}`);
+      if (trainN === 0)
+        errors.push("Training image count must be at least 1");
+    }
+    if (errors.length > 0) {
+      toaster?.show({
+        message: `Validation failed: ${errors[0]}`,
+        intent: "danger",
+        timeout: 6000,
+      });
+      return;
+    }
     setSaving(true);
     try {
       const configData = buildConfigData();
       await createAnnotateConfig(configData);
+      const warningNote = warnings.length > 0 ? ` (warning: ${warnings[0]})` : "";
       toaster?.show({
-        message: "Configuration saved to OMERO",
-        intent: "success",
+        message: `Configuration valid and saved${warningNote}`,
+        intent: warnings.length > 0 ? "warning" : "success",
+        timeout: 5000,
       });
     } catch (e) {
       console.error("Error saving config:", e);
@@ -289,6 +325,18 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteTable = async (table) => {
+    try {
+      await deleteTrackingTable(table.id);
+      setExistingTables((prev) => prev.filter((t) => t.id !== table.id));
+      toaster?.show({ message: `Deleted table: ${table.name}`, intent: "success" });
+    } catch (e) {
+      toaster?.show({ message: `Failed to delete: ${e.message}`, intent: "danger" });
+    } finally {
+      setTableToDelete(null);
     }
   };
 
@@ -350,9 +398,9 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
         <H4>Configure FAIR Annotation Workflow</H4>
         <div className="flex gap-2">
           <Button
-            icon="floppy-disk"
-            text="Save Config"
-            onClick={handleSaveConfig}
+            icon="tick-circle"
+            text="Validate Config"
+            onClick={handleValidateConfig}
             loading={saving}
             disabled={containerIds.length === 0}
           />
@@ -366,6 +414,101 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
           />
         </div>
       </div>
+
+      {/* Data Source — full width, first */}
+      <Card>
+        <h5 className="bp5-heading mb-3">Data Source</h5>
+        <div className="flex gap-4 items-start">
+          <FormGroup label="Container Type" className="mb-0">
+            <HTMLSelect
+              value={containerType}
+              onChange={(e) => {
+                setContainerType(e.target.value);
+                setSelectedContainers([]);
+              }}
+              options={[
+                { label: "Dataset", value: "dataset" },
+                { label: "Plate", value: "plate" },
+              ]}
+            />
+          </FormGroup>
+          <div className="flex-1">
+            <DatasetSelectWithPopover
+              label="Select Container"
+              value={selectedContainers}
+              onChange={setSelectedContainers}
+              multiSelect={true}
+              allowedCategories={
+                containerType === "dataset" ? ["datasets"] : ["plates"]
+              }
+              buttonText={
+                selectedContainers.length
+                  ? `${selectedContainers.length} selected`
+                  : "Select Container"
+              }
+            />
+            {containerIds.length > 0 && (
+              <div className="mt-1 text-sm text-gray-600">
+                {selectedContainers
+                  .map(
+                    (id) =>
+                      state?.omeroFileTreeData?.[id]?.data ||
+                      id.replace(/^(dataset|plate)-/, ""),
+                  )
+                  .join(", ")}{" "}
+                ({containerImages.length} images)
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Well filtering for plates */}
+        {containerType === "plate" && (
+          <div className="mt-3 border-t pt-3">
+            <h6 className="bp5-heading mb-2">Well Filtering</h6>
+            <div className="flex gap-2 mb-2">
+              <InputGroup
+                small
+                placeholder="Key (e.g., cellline)"
+                value={wellFilterKey}
+                onChange={(e) => setWellFilterKey(e.target.value)}
+              />
+              <InputGroup
+                small
+                placeholder="Values (comma-separated)"
+                value={wellFilterValues}
+                onChange={(e) => setWellFilterValues(e.target.value)}
+              />
+              <Button
+                small
+                icon="add"
+                onClick={addWellFilter}
+                disabled={!wellFilterKey}
+              />
+            </div>
+            <HTMLSelect
+              small
+              value={wellFilterMode}
+              onChange={(e) => setWellFilterMode(e.target.value)}
+              options={[
+                { label: "Include matching", value: "include" },
+                { label: "Exclude matching", value: "exclude" },
+              ]}
+            />
+            <div className="flex flex-wrap gap-1 mt-2">
+              {Object.entries(wellFilters).map(([key, values]) => (
+                <Tag
+                  key={key}
+                  onRemove={() => removeWellFilter(key)}
+                  intent="primary"
+                >
+                  {key}: {values.join(", ")}
+                </Tag>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* Saved annotation configs */}
       {savedConfigs.length > 0 && (
@@ -402,29 +545,51 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
         >
           <p>
             Found {existingTables.length} existing table(s) on this container.
-            You can resume from one:
+            Resume one or delete it to start fresh:
           </p>
-          <div className="flex flex-wrap gap-2 mt-2">
+          <div className="flex flex-col gap-2 mt-2">
             {existingTables.map((table) => (
-              <Button
-                key={table.id}
-                small
-                outlined
-                icon="repeat"
-                text={`${table.name} (ID: ${table.id})`}
-                onClick={() => handleLoadExistingTable(table)}
-              />
+              <div key={table.id} className="flex items-center gap-2">
+                <Button
+                  small
+                  outlined
+                  icon="repeat"
+                  text={table.name}
+                  onClick={() => handleLoadExistingTable(table)}
+                />
+                <Button
+                  small
+                  minimal
+                  icon="trash"
+                  intent="danger"
+                  onClick={() => setTableToDelete(table)}
+                />
+              </div>
             ))}
           </div>
         </Callout>
       )}
+      <Alert
+        isOpen={tableToDelete !== null}
+        onCancel={() => setTableToDelete(null)}
+        onConfirm={() => handleDeleteTable(tableToDelete)}
+        intent="danger"
+        icon="trash"
+        cancelButtonText="Cancel"
+        confirmButtonText="Delete"
+      >
+        <p>
+          Delete tracking table <strong>{tableToDelete?.name}</strong>? This
+          cannot be undone.
+        </p>
+      </Alert>
 
       <div className="grid grid-cols-2 gap-4">
-        {/* Left column: Workflow + Container */}
+        {/* Left column: Workflow metadata + Annotation methodology */}
         <div className="flex flex-col gap-4">
           {/* Workflow metadata */}
           <Card>
-            <h5 className="bp5-heading mb-3">Workflow Metadata</h5>
+            <h5 className="bp5-heading mb-3">Annotation Set Metadata</h5>
             <FormGroup label="Workflow Name" labelFor="wf-name">
               <InputGroup
                 id="wf-name"
@@ -468,125 +633,59 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
             </div>
           </Card>
 
-          {/* Container selection */}
-          <Card>
-            <h5 className="bp5-heading mb-3">Data Source</h5>
-            <FormGroup label="Container Type">
-              <HTMLSelect
-                value={containerType}
-                onChange={(e) => {
-                  setContainerType(e.target.value);
-                  setSelectedContainers([]);
-                }}
-                options={[
-                  { label: "Dataset", value: "dataset" },
-                  { label: "Plate", value: "plate" },
-                ]}
-              />
-            </FormGroup>
-            <DatasetSelectWithPopover
-              label="Select Container"
-              value={selectedContainers}
-              onChange={setSelectedContainers}
-              multiSelect={true}
-              allowedCategories={
-                containerType === "dataset" ? ["datasets"] : ["plates"]
-              }
-              buttonText={
-                selectedContainers.length
-                  ? `${selectedContainers.length} selected`
-                  : "Select Container"
-              }
-            />
-            {containerIds.length > 0 && (
-              <div className="mt-2 text-sm text-gray-600">
-                Container IDs: {containerIds.join(", ")} (
-                {containerImages.length} images)
-              </div>
-            )}
-
-            {/* Well filtering for plates */}
-            {containerType === "plate" && (
-              <div className="mt-3 border-t pt-3">
-                <h6 className="bp5-heading mb-2">Well Filtering</h6>
-                <div className="flex gap-2 mb-2">
-                  <InputGroup
-                    small
-                    placeholder="Key (e.g., cellline)"
-                    value={wellFilterKey}
-                    onChange={(e) => setWellFilterKey(e.target.value)}
-                  />
-                  <InputGroup
-                    small
-                    placeholder="Values (comma-separated)"
-                    value={wellFilterValues}
-                    onChange={(e) => setWellFilterValues(e.target.value)}
-                  />
-                  <Button
-                    small
-                    icon="add"
-                    onClick={addWellFilter}
-                    disabled={!wellFilterKey}
-                  />
-                </div>
-                <HTMLSelect
-                  small
-                  value={wellFilterMode}
-                  onChange={(e) => setWellFilterMode(e.target.value)}
-                  options={[
-                    { label: "Include matching", value: "include" },
-                    { label: "Exclude matching", value: "exclude" },
-                  ]}
-                />
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {Object.entries(wellFilters).map(([key, values]) => (
-                    <Tag
-                      key={key}
-                      onRemove={() => removeWellFilter(key)}
-                      intent="primary"
-                    >
-                      {key}: {values.join(", ")}
-                    </Tag>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Card>
-
           {/* Annotation methodology */}
           <Card>
-            <h5 className="bp5-heading mb-3">Annotation Methodology</h5>
-            <FormGroup label="Annotation Type">
-              <HTMLSelect
-                value={annotationType}
-                onChange={(e) => setAnnotationType(e.target.value)}
-                options={[
-                  { label: "Segmentation Mask", value: "segmentation_mask" },
-                  { label: "Bounding Box", value: "bounding_box" },
-                  { label: "Point", value: "point" },
-                  { label: "Classification", value: "classification" },
-                ]}
+            <div className="flex items-center justify-between mb-1">
+              <h5 className="bp5-heading mb-0">Annotation Methodology</h5>
+              <Button
+                minimal
+                small
+                icon={showMethodology ? "chevron-up" : "chevron-down"}
+                text={showMethodology ? "Hide" : "Show"}
+                onClick={() => setShowMethodology(!showMethodology)}
               />
-            </FormGroup>
-            <FormGroup label="Annotation Method">
-              <HTMLSelect
-                value={annotationMethod}
-                onChange={(e) => setAnnotationMethod(e.target.value)}
-                options={[
-                  { label: "Manual", value: "manual" },
-                  { label: "Semi-automatic", value: "semi_automatic" },
-                  { label: "Automatic", value: "automatic" },
-                ]}
-              />
-            </FormGroup>
-            <FormGroup label="Annotation Criteria">
-              <TextArea
-                fill
-                value={annotationCriteria}
-                onChange={(e) => setAnnotationCriteria(e.target.value)}
-                placeholder="Describe what should be annotated and how..."
-              />
-            </FormGroup>
+            </div>
+            {!showMethodology && (
+              <div className="text-xs text-gray-500 mt-1">
+                Type: <strong>{annotationType.replace(/_/g, " ")}</strong> &middot; Method:{" "}
+                <strong>{annotationMethod.replace(/_/g, " ")}</strong>
+              </div>
+            )}
+            <Collapse isOpen={showMethodology}>
+              <div className="mt-3">
+                <FormGroup label="Annotation Type">
+                  <HTMLSelect
+                    value={annotationType}
+                    onChange={(e) => setAnnotationType(e.target.value)}
+                    options={[
+                      { label: "Segmentation Mask", value: "segmentation_mask" },
+                      { label: "Bounding Box", value: "bounding_box" },
+                      { label: "Point", value: "point" },
+                      { label: "Classification", value: "classification" },
+                    ]}
+                  />
+                </FormGroup>
+                <FormGroup label="Annotation Method">
+                  <HTMLSelect
+                    value={annotationMethod}
+                    onChange={(e) => setAnnotationMethod(e.target.value)}
+                    options={[
+                      { label: "Manual", value: "manual" },
+                      { label: "Semi-automatic", value: "semi_automatic" },
+                      { label: "Automatic", value: "automatic" },
+                    ]}
+                  />
+                </FormGroup>
+                <FormGroup label="Annotation Criteria">
+                  <TextArea
+                    fill
+                    value={annotationCriteria}
+                    onChange={(e) => setAnnotationCriteria(e.target.value)}
+                    placeholder="Describe what should be annotated and how..."
+                  />
+                </FormGroup>
+              </div>
+            </Collapse>
           </Card>
         </div>
 
@@ -608,6 +707,12 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
                   if (vals.length > 0) setChannels(vals);
                 }}
                 placeholder="0, 1, 2"
+                intent={
+                  imageChannelInfo &&
+                  channels.some((c) => c >= imageChannelInfo.sizeC)
+                    ? "danger"
+                    : "none"
+                }
               />
               {imageChannelInfo && (
                 <div className="mt-1 text-xs text-gray-500">
@@ -617,16 +722,36 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
                     .join(", ")}
                 </div>
               )}
+              {imageChannelInfo &&
+                channels.some((c) => c >= imageChannelInfo.sizeC) && (
+                  <div className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                    <Icon icon="warning-sign" size={10} />
+                    Indices out of range (max {imageChannelInfo.sizeC - 1})
+                  </div>
+                )}
             </FormGroup>
             <FormGroup
-              label="Label Channel"
-              helperText="Channel used for segmentation"
+              label="Segmentation Channel"
+              helperText={
+                imageChannelInfo
+                  ? `Channel the model trains on to predict masks (0–${imageChannelInfo.sizeC - 1}${
+                      imageChannelInfo.channels[labelChannel]
+                        ? `: ${imageChannelInfo.channels[labelChannel].name}`
+                        : ""
+                    })`
+                  : "Channel the model trains on to predict masks"
+              }
             >
               <NumericInput
                 value={labelChannel}
                 onValueChange={setLabelChannel}
                 min={0}
                 max={imageChannelInfo?.sizeC - 1 || 10}
+                intent={
+                  imageChannelInfo && labelChannel >= imageChannelInfo.sizeC
+                    ? "danger"
+                    : "none"
+                }
               />
             </FormGroup>
 
@@ -813,8 +938,14 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
               <h5 className="bp5-heading mb-2">Summary</h5>
               <div className="text-sm space-y-1">
                 <div>
-                  <strong>Container:</strong> {containerType} (
-                  {containerIds.join(", ")})
+                  <strong>Container:</strong>{" "}
+                  {selectedContainers
+                    .map(
+                      (id) =>
+                        state?.omeroFileTreeData?.[id]?.data ||
+                        id.replace(/^(dataset|plate)-/, ""),
+                    )
+                    .join(", ")}
                 </div>
                 <div>
                   <strong>Images:</strong> {containerImages.length}
