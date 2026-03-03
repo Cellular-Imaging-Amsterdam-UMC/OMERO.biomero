@@ -39,9 +39,11 @@ const PreviewViewer = ({
   channels = [],
   imageMeta = { sizeZ: 1, sizeT: 1 },
 }) => {
-  const canvasRef = useRef(null);
   const imgRef = useRef(null);
   const containerRef = useRef(null);
+
+  // Track natural image dimensions for the SVG viewBox
+  const [imageDims, setImageDims] = useState({ w: 0, h: 0 });
 
   // Zoom & Pan state
   const [zoom, setZoom] = useState(1);
@@ -125,10 +127,7 @@ const PreviewViewer = ({
     setPan({ x: 0, y: 0 });
     setZ(0);
     setT(0);
-    if (canvasRef.current) {
-      const ctx = canvasRef.current.getContext("2d");
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    }
+    setImageDims({ w: 0, h: 0 });
   }, [image, model]);
 
   // Parse a GeoJSON FeatureCollection into the internal annotation format and
@@ -244,76 +243,6 @@ const PreviewViewer = ({
       shapes,
     }));
   }, [existingAnnotations]);
-
-  // Redraw canvas whenever predictions or existing annotations change
-  const drawOverlays = useCallback(() => {
-    if (!canvasRef.current) return;
-
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-
-    // Draw existing ROI layers first (underneath predictions), one colour per ROI
-    roiGroups.forEach((group, idx) => {
-      if (!existingRoiVisibility[group.roiId]) return;
-      const hue = getRoiHue(idx);
-      const planeShapes = group.shapes.filter(
-        (ann) => ann.z === z && ann.t === t,
-      );
-      if (planeShapes.length === 0) return;
-      ctx.save();
-      ctx.setLineDash([5, 3]);
-      ctx.strokeStyle = `hsla(${hue}, 90%, 55%, 0.9)`;
-      ctx.lineWidth = 1.5;
-      ctx.fillStyle = `hsla(${hue}, 90%, 55%, 0.08)`;
-      planeShapes.forEach((ann) => {
-        const pts = ann.points;
-        if (!pts || pts.length < 3) return;
-        ctx.beginPath();
-        ctx.moveTo(pts[0][0], pts[0][1]);
-        for (let i = 1; i < pts.length; i++) {
-          ctx.lineTo(pts[i][0], pts[i][1]);
-        }
-        ctx.closePath();
-        ctx.stroke();
-        ctx.fill();
-      });
-      ctx.restore();
-    });
-
-    // Draw StarDist prediction overlays on top
-    Object.entries(predictions).forEach(([chIdx, chData]) => {
-      if (!chData.visible) return;
-      const planeData = chData.dataByPlane?.[`${z}_${t}`];
-      if (!planeData || !planeData.polygons) return;
-
-      const hue = getChannelHue(parseInt(chIdx));
-
-      planeData.polygons.forEach((polygon) => {
-        const pts = polygon.points;
-        if (!pts || pts.length === 0) return;
-
-        const strokeColor = `hsl(${hue}, 85%, 55%)`;
-        const fillColor = `hsla(${hue}, 85%, 55%, 0.12)`;
-
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 2;
-        ctx.fillStyle = fillColor;
-
-        ctx.beginPath();
-        ctx.moveTo(pts[0][0], pts[0][1]);
-        for (let i = 1; i < pts.length; i++) {
-          ctx.lineTo(pts[i][0], pts[i][1]);
-        }
-        ctx.closePath();
-        ctx.stroke();
-        ctx.fill();
-      });
-    });
-  }, [predictions, roiGroups, existingRoiVisibility, z, t]);
-
-  useEffect(() => {
-    drawOverlays();
-  }, [drawOverlays]);
 
   const handleRun = async () => {
     if (!image || !model) return;
@@ -583,22 +512,61 @@ const PreviewViewer = ({
                 src={imageUrl}
                 alt="Preview"
                 style={{ display: "block", maxWidth: "none" }}
-                onLoad={(e) => {
-                  if (canvasRef.current) {
-                    canvasRef.current.width = e.target.naturalWidth;
-                    canvasRef.current.height = e.target.naturalHeight;
-                    canvasRef.current.style.width =
-                      e.target.naturalWidth + "px";
-                    canvasRef.current.style.height =
-                      e.target.naturalHeight + "px";
-                    drawOverlays();
-                  }
-                }}
+                onLoad={(e) =>
+                  setImageDims({
+                    w: e.target.naturalWidth,
+                    h: e.target.naturalHeight,
+                  })
+                }
               />
-              <canvas
-                ref={canvasRef}
-                className="absolute top-0 left-0 pointer-events-none"
-              />
+              {imageDims.w > 0 && (
+                <svg
+                  className="absolute top-0 left-0 pointer-events-none"
+                  style={{ width: imageDims.w, height: imageDims.h }}
+                  viewBox={`0 0 ${imageDims.w} ${imageDims.h}`}
+                >
+                  {roiGroups.map((group, idx) => {
+                    if (!existingRoiVisibility[group.roiId]) return null;
+                    const hue = getRoiHue(idx);
+                    return group.shapes
+                      .filter((ann) => ann.z === z && ann.t === t)
+                      .map((ann, si) => {
+                        const pts = ann.points;
+                        if (!pts || pts.length < 3) return null;
+                        return (
+                          <polygon
+                            key={`${group.roiId}-${si}`}
+                            points={pts.map((p) => p.join(",")).join(" ")}
+                            fill={`hsla(${hue},90%,55%,0.08)`}
+                            stroke={`hsla(${hue},90%,55%,0.9)`}
+                            strokeWidth="1.5"
+                            vectorEffect="non-scaling-stroke"
+                          />
+                        );
+                      });
+                  })}
+                  {Object.entries(predictions).map(([chIdx, chData]) => {
+                    if (!chData.visible) return null;
+                    const planeData = chData.dataByPlane?.[`${z}_${t}`];
+                    if (!planeData?.polygons) return null;
+                    const hue = getChannelHue(parseInt(chIdx));
+                    return planeData.polygons.map((polygon, pi) => {
+                      const pts = polygon.points;
+                      if (!pts || pts.length === 0) return null;
+                      return (
+                        <polygon
+                          key={`pred-${chIdx}-${pi}`}
+                          points={pts.map((p) => p.join(",")).join(" ")}
+                          fill={`hsla(${hue},85%,55%,0.12)`}
+                          stroke={`hsl(${hue},85%,55%)`}
+                          strokeWidth="1.5"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      );
+                    });
+                  })}
+                </svg>
+              )}
             </div>
 
             {loading && (
