@@ -128,9 +128,9 @@ const AnnotateViewer = ({
     if (!image) return null;
     let url = `/webgateway/render_image/${image.id}/${Z}/${T}/`;
     if (C !== undefined && C !== null) {
-      url += `?c=${C + 1}|${contrastWindow.start}:${contrastWindow.end}$FFFFFF&q=0.9`;
+      url += `?c=${C + 1}|${contrastWindow.start}:${contrastWindow.end}$FFFFFF&q=1.0`;
     } else {
-      url += `?q=0.9`;
+      url += `?q=1.0`;
     }
     return url;
   }, [image, Z, T, C, contrastWindow]);

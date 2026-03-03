@@ -76,7 +76,7 @@ const PreviewViewer = ({
 
     const base = `/webgateway/render_image/${image.id}/${z}/${t}/`;
 
-    if (channels.length === 0) return `${base}?q=0.9`;
+    if (channels.length === 0) return `${base}?q=1.0`;
 
     // Build channel string with window/color parameters
     const channelParam = channels
@@ -93,7 +93,7 @@ const PreviewViewer = ({
       })
       .join(",");
 
-    return `${base}?c=${channelParam}&q=0.9`;
+    return `${base}?c=${channelParam}&q=1.0`;
   }, [image, channels, channelVisibility, channelWindows, z, t]);
 
   // Initialize channel visibility and contrast windows when channels change
