@@ -70,6 +70,7 @@ const AnnotateViewer = ({
 
   // View State
   const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
@@ -149,9 +150,15 @@ const AnnotateViewer = ({
 
   // Reset view when image changes
   useEffect(() => {
+    zoomRef.current = 1;
     setZoom(1);
     setPan({ x: 0, y: 0 });
   }, [image?.id, Z, T, C]);
+
+  // Keep zoomRef in sync with zoom state (for button-triggered zoom changes)
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
 
   // --- Drawing Helpers ---
   const getCanvasPoint = (e) => {
@@ -261,8 +268,6 @@ const AnnotateViewer = ({
   }, [
     annotations,
     currentPoints,
-    zoom,
-    pan,
     featureTypes,
     mode,
     samPoints,
@@ -468,9 +473,11 @@ const AnnotateViewer = ({
     const mouseY = e.clientY - rect.top;
     const zoomSpeed = 0.001;
     const scaleAmount = -e.deltaY * zoomSpeed;
-    const newZoom = Math.min(Math.max(0.1, zoom * (1 + scaleAmount)), 20);
-    if (newZoom !== zoom) {
-      const zoomRatio = newZoom / zoom;
+    const currentZoom = zoomRef.current;
+    const newZoom = Math.min(Math.max(0.1, currentZoom * (1 + scaleAmount)), 20);
+    if (newZoom !== currentZoom) {
+      const zoomRatio = newZoom / currentZoom;
+      zoomRef.current = newZoom;
       setPan((p) => ({
         x: mouseX - (mouseX - p.x) * zoomRatio,
         y: mouseY - (mouseY - p.y) * zoomRatio,
