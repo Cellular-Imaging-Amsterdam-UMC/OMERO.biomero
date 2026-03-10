@@ -15,6 +15,7 @@ import {
   Slider,
   TabPanel,
 } from "@blueprintjs/core";
+import { fetchPlateImages } from "../../apiService";
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover";
 import { useAppContext } from "../../AppContext";
 
@@ -26,6 +27,12 @@ const WorkflowInput = () => {
   const [selectedImageIds, setSelectedImageIds] = useState([]);
   const [activeTab, setActiveTab] = useState("grid"); // Tabs: "list" or "grid"
   const [zoom, setZoom] = useState(7); // Starting size 65px, like OMERO
+  const [selectedPlate, setSelectedPlate] = useState(null);
+  const [plateWellCount, setPlateWellCount] = useState(null);
+  const [plateGridData, setPlateGridData] = useState(null);
+  
+  // Get input mode from formData instead of local state
+  const inputMode = state.formData?.workflowMode || "dataset";
 
   // Load images when datasets change
   useEffect(() => {
@@ -60,6 +67,56 @@ const WorkflowInput = () => {
       setFilteredImages(state.images);
     }
   }, [state.images]);
+
+  // Fetch well count when plate is selected
+  useEffect(() => {
+    const fetchPlateWellCount = async () => {
+      if (selectedPlate?.id) {
+        try {
+          setPlateWellCount("Fetching...");
+          setPlateGridData(null);
+          // Use the same endpoint as OMERO webclient for plate grid data
+          const response = await fetch(
+            `${window.location.origin}/webgateway/plate/${selectedPlate.id}/0/`
+          );
+          const text = await response.text();
+          
+          // Parse both JSONP and plain JSON responses
+          let plateData;
+          if (text.includes('jQuery') && text.includes('({') && text.includes('})')) {
+            // JSONP format: jQuery123({...})
+            const jsonStart = text.indexOf('({') + 1;
+            const jsonEnd = text.lastIndexOf('})');
+            plateData = JSON.parse(text.substring(jsonStart, jsonEnd));
+          } else {
+            // Plain JSON format
+            plateData = JSON.parse(text);
+          }
+          
+          // Store the complete grid data for visualization
+          setPlateGridData(plateData);
+          
+          // Calculate well information from grid
+          const totalPositions = plateData.rowlabels.length * plateData.collabels.length;
+          const wellsWithImages = plateData.grid.flat().filter(cell => cell !== null).length;
+          
+          // Format well count info
+          const plateFormat = `${plateData.rowlabels.length}×${plateData.collabels.length}`;
+          if (wellsWithImages === totalPositions) {
+            setPlateWellCount(`${totalPositions} wells (${plateFormat})`);
+          } else {
+            setPlateWellCount(`${wellsWithImages}/${totalPositions} wells (${plateFormat})`);
+          }
+        } catch (error) {
+          console.error("Error fetching plate details:", error);
+          setPlateWellCount("Error loading");
+          setPlateGridData(null);
+        }
+      }
+    };
+
+    fetchPlateWellCount();
+  }, [selectedPlate?.id]);
 
   // Update the filtered list dynamically as the search query changes
   useEffect(() => {
@@ -123,55 +180,220 @@ const WorkflowInput = () => {
 
   // Save selected IDs when proceeding to the next step
   useEffect(() => {
-    updateState({
-      formData: {
-        ...state.formData,
-        IDs: selectedImageIds,
-      },
+    if (inputMode === "plate" && selectedPlate) {
+      // For plate mode, save plate ID and set data type to PLATE
+      updateState({
+        formData: {
+          ...state.formData,
+          IDs: [selectedPlate.id],
+          Data_Type: "Plate", // Backend expects "Plate" (case sensitive!)
+          plateMode: true,
+          useZarrFormat: true, // Force zarr format for plates
+        },
+      });
+    } else if (inputMode === "dataset") {
+      // For dataset mode, save image IDs and set data type to IMAGE
+      updateState({
+        formData: {
+          ...state.formData,
+          IDs: selectedImageIds,
+          Data_Type: "Image", // Backend expects "Image" (case sensitive!)
+          plateMode: false,
+          // Don't override useZarrFormat for dataset mode - let users choose
+        },
+      });
+    }
+  }, [selectedImageIds, selectedPlate, inputMode]);
+
+  // Reset selections when input mode changes (controlled from parent)
+  useEffect(() => {
+    // Clear selections when switching between modes
+    setSelectedPlate(null);
+    setPlateWellCount(null);
+    setPlateGridData(null);
+    updateState({ inputDatasets: [] });
+  }, [inputMode]);
+
+  // Render plate grid visualization
+  const renderPlateGrid = () => {
+    if (!plateGridData) return null;
+
+    const { grid, rowlabels, collabels } = plateGridData;
+    
+    // Find min/max occupied positions to create a compact view
+    let minRow = rowlabels.length, maxRow = -1, minCol = collabels.length, maxCol = -1;
+    grid.forEach((row, rowIdx) => {
+      row.forEach((cell, colIdx) => {
+        if (cell !== null) {
+          minRow = Math.min(minRow, rowIdx);
+          maxRow = Math.max(maxRow, rowIdx);
+          minCol = Math.min(minCol, colIdx);
+          maxCol = Math.max(maxCol, colIdx);
+        }
+      });
     });
-  }, [selectedImageIds]);
+
+    // If no images, show message
+    if (minRow > maxRow) {
+      return (
+        <div className="text-center text-gray-500 text-sm p-4">
+          No images in this plate
+        </div>
+      );
+    }
+
+    // Add padding for context (show some empty wells around occupied ones)
+    const padding = 1;
+    const startRow = Math.max(0, minRow - padding);
+    const endRow = Math.min(rowlabels.length - 1, maxRow + padding);
+    const startCol = Math.max(0, minCol - padding);
+    const endCol = Math.min(collabels.length - 1, maxCol + padding);
+
+    return (
+      <div className="mt-3">
+        <div className="text-sm text-gray-600 mb-2">Plate Layout Preview:</div>
+        <div className="border rounded p-2 bg-gray-50 inline-block">
+          {/* Column headers */}
+          <div className="flex">
+            <div className="w-6"></div> {/* Empty corner */}
+            {collabels.slice(startCol, endCol + 1).map((colLabel, idx) => (
+              <div key={colLabel} className="w-12 h-6 text-center text-xs font-medium text-gray-700 flex items-center justify-center">
+                {colLabel}
+              </div>
+            ))}
+          </div>
+          
+          {/* Rows with data */}
+          {rowlabels.slice(startRow, endRow + 1).map((rowLabel, rowIdx) => (
+            <div key={rowLabel} className="flex">
+              {/* Row header */}
+              <div className="w-6 h-12 text-center text-xs font-medium text-gray-700 flex items-center justify-center">
+                {rowLabel}
+              </div>
+              
+              {/* Well cells */}
+              {grid[startRow + rowIdx].slice(startCol, endCol + 1).map((cell, colIdx) => (
+                <div key={`${rowLabel}${collabels[startCol + colIdx]}`} className="w-12 h-12 p-0.5">
+                  {cell ? (
+                    <Tooltip content={`${rowLabel}${collabels[startCol + colIdx]}: ${cell.name}`}>
+                      <div className="w-full h-full border border-blue-300 rounded overflow-hidden bg-white shadow-sm">
+                        <img
+                          src={cell.thumb_url}
+                          alt={`Well ${rowLabel}${collabels[startCol + colIdx]}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </Tooltip>
+                  ) : (
+                    <div className="w-full h-full border border-gray-200 rounded bg-gray-100"></div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <DialogBody className="flex flex-col min-h-[75vh]">
       <div className="w-full">
-        <H6 className="mb-2">Select Input Data</H6>
-        <DatasetSelectWithPopover
-          value={state.inputDatasets.map((dataset) => dataset?.data) || []}
-          label="Select dataset or screen"
-          tooltip="Select the OMERO dataset or screen as workflow input."
-          onChange={(datasets, type) => {
-            const inputDatasets = datasets
-              .map((dataset) => {
-                // Handle both `index` (dataset key) and `data` (dataset value)
-                const resolvedDataset =
-                  state.omeroFileTreeData[dataset] || // Case 1: dataset is already the key/index
+        <H6 className="mb-2">
+          {inputMode === "plate" ? "Select Input Plate" : "Select Input Data"}
+        </H6>
+        
+        {inputMode === "dataset" ? (
+          // Original dataset selection UI
+          <DatasetSelectWithPopover
+            value={state.inputDatasets.map((dataset) => dataset?.data) || []}
+            label="Select datasets"
+            placeholder="Add new dataset name or select..."
+            buttonText="Add Datasets"
+            tooltip="Select the OMERO datasets as workflow input."
+            onChange={(datasets, type) => {
+              const inputDatasets = datasets
+                .map((dataset) => {
+                  // Handle both `index` (dataset key) and `data` (dataset value)
+                  const resolvedDataset =
+                    state.omeroFileTreeData[dataset] || // Case 1: dataset is already the key/index
+                    Object.values(state.omeroFileTreeData).find(
+                      (node) => node.data === dataset
+                    ); // Case 2: dataset is the data value (e.g. name typed by user)
+                  return resolvedDataset;
+                })
+                .filter(Boolean); // Filter out any unresolved datasets
+              if (type === "manual") {
+                updateState({ inputDatasets }); // full info
+              } else {
+                updateState({
+                  inputDatasets: [
+                    // Adding, keep unique
+                    ...new Map(
+                      [...state.inputDatasets, ...inputDatasets].map((item) => [
+                        item.index,
+                        item,
+                      ])
+                    ).values(),
+                  ],
+                });
+              }
+            }}
+            multiSelect={true}
+            allowedCategories={["datasets"]}
+          />
+        ) : (
+          // Plate selection UI (automatically enabled for plate workflows)
+          <DatasetSelectWithPopover
+            value={selectedPlate ? [selectedPlate.data] : []} 
+            label="Select plate"
+            placeholder="Add new plate name or select..."
+            buttonText="Add Plate"
+            tooltip="Select the OMERO plate as workflow input (Zarr format will be used automatically)."
+            onChange={(plates, type) => {
+              if (plates.length > 0) {
+                const resolvedPlate =
+                  state.omeroFileTreeData[plates[0]] || // Case 1: plate is already the key/index
                   Object.values(state.omeroFileTreeData).find(
-                    (node) => node.data === dataset
-                  ); // Case 2: dataset is the data value (e.g. name typed by user)
-                return resolvedDataset;
-              })
-              .filter(Boolean); // Filter out any unresolved datasets
-            if (type === "manual") {
-              updateState({ inputDatasets }); // full info
-            } else {
-              updateState({
-                inputDatasets: [
-                  // Adding, keep unique
-                  ...new Map(
-                    [...state.inputDatasets, ...inputDatasets].map((item) => [
-                      item.index,
-                      item,
-                    ])
-                  ).values(),
-                ],
-              });
-            }
-          }}
-          multiSelect={true}
-          allowedCategories={["datasets", "plates"]}
-        />
-        {state.inputDatasets?.length > 0 && (
-          <>
+                    (node) => node.data === plates[0]
+                  ); // Case 2: plate is the data value
+                setSelectedPlate(resolvedPlate);
+                setPlateWellCount(null); // Reset well count when changing plates
+                setPlateGridData(null); // Reset grid data when changing plates
+              } else {
+                setSelectedPlate(null);
+                setPlateWellCount(null);
+                setPlateGridData(null);
+              }
+            }}
+            multiSelect={false}
+            allowedCategories={["plates"]}
+          />
+        )}
+        
+        {/* Plate Preview */}
+        {inputMode === "plate" && selectedPlate && (
+          <Card className="mt-4 p-4">
+            <H6>Plate Preview</H6>
+            <div className="text-sm text-gray-600">
+              <p><strong>Name:</strong> {selectedPlate.data}</p>
+              <p><strong>ID:</strong> {selectedPlate.id}</p>
+              <p><strong>Wells:</strong> {
+                plateWellCount !== null ? plateWellCount : 
+                (selectedPlate.childCount ? selectedPlate.childCount : "Fetching...")
+              }</p>
+              <p className="mt-2 text-blue-600">
+                ⚡ This plate will be processed in <strong>Zarr format</strong> automatically
+              </p>
+            </div>
+            {/* Plate Grid Visualization */}
+            {renderPlateGrid()}
+          </Card>
+        )}
+        
+      </div>
+      {inputMode === "dataset" && state.inputDatasets?.length > 0 && (
+        <>
             {/* Filter bar and buttons */}
             <div className="pb-2">
               <FormGroup label="Filter filenames" className="mb-4">
@@ -391,10 +613,9 @@ const WorkflowInput = () => {
                 </Tooltip>
               </ButtonGroup>
             </div>
-          </>
-        )}
-      </div>
-      {state.inputDatasets?.length > 0 && (
+        </>
+      )}
+      {inputMode === "dataset" && state.inputDatasets?.length > 0 && (
         <div className="p-1 h-full overflow-hidden">
           <Tabs
             id="workflow-input-tabs"

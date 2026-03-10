@@ -8,6 +8,7 @@ import {
   Icon,
   H4,
   ButtonGroup,
+  Switch,
 } from "@blueprintjs/core";
 
 const ModelCard = ({
@@ -142,6 +143,31 @@ const ModelCard = ({
         />
       </FormGroup>
 
+      {/* Workflow Input Configuration */}
+      <FormGroup
+        label="Workflow Input Requirements"
+        subLabel="Configure if this workflow requires plate inputs (forces ZARR format)."
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">
+              Plate Workflow (ZARR Only)
+            </span>
+            <span className="text-xs text-gray-500">
+              Enable for workflows that process entire plates and require ZARR format
+            </span>
+          </div>
+          <Switch
+            checked={item.isPlateWorkflow || false}
+            disabled={!editable}
+            onChange={(e) => {
+              const isChecked = e.target.checked;
+              onChange(index, "isPlateWorkflow", isChecked);
+            }}
+          />
+        </div>
+      </FormGroup>
+
       <FormGroup
         label={
           <span>
@@ -224,8 +250,7 @@ const ModelCard = ({
                 Run with specific GPU: <code>gres=gpu:1g.10gb:1</code>
               </li>
               <li>
-                Run on a specific partition:{" "}
-                <code>partition=luna-gpu-short</code>
+                Run on a specific partition: <code>partition=luna-gpu-short</code>
               </li>
               <li>
                 Use more CPU memory: <code>mem=15GB</code>

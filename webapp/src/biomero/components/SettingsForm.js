@@ -77,10 +77,17 @@ const SettingsForm = () => {
         .filter(([key]) => key.endsWith("_repo")) // Filter for relevant keys
         .map(([key, value]) => {
           const prefix = key.replace("_repo", ""); // Extract the prefix
+          
+          // Check if this workflow is marked as plate workflow in UI config
+          const plateWorkflows = state.config.UI?.plate_workflows ? 
+            JSON.parse(state.config.UI.plate_workflows || '[]') : [];
+          const isPlateWorkflow = plateWorkflows.includes(prefix);
+          
           return {
             name: state.config.MODELS[prefix], // e.g., "cellpose"
             repo: value, // e.g., the repo URL
             job: state.config.MODELS[`${prefix}_job`], // e.g., "jobs/cellpose.sh"
+            isPlateWorkflow: isPlateWorkflow, // Boolean flag from UI list
             extraParams: extractExtraParams(prefix), // Handle the extraParams here
           };
         });
@@ -335,6 +342,7 @@ const SettingsForm = () => {
       acc[model.name] = model.name;
       acc[`${model.name}_repo`] = model.repo;
       acc[`${model.name}_job`] = model.job;
+      
       if (model.extraParams) {
         Object.entries(model.extraParams).forEach(([key, value]) => {
           acc[key] = value;
@@ -342,6 +350,11 @@ const SettingsForm = () => {
       }
       return acc;
     }, {});
+
+    // Collect plate workflows into a JSON list
+    const plateWorkflows = settingsForm.MODELS
+      .filter(model => model.isPlateWorkflow)
+      .map(model => model.name);
 
     const converters = settingsForm.CONVERTERS.reduce((acc, converter) => {
       acc[converter.key] = converter.value;
@@ -352,6 +365,10 @@ const SettingsForm = () => {
       ...settingsForm,
       CONVERTERS: converters,
       MODELS: models,
+      UI: {
+        ...settingsForm.UI,
+        plate_workflows: JSON.stringify(plateWorkflows)
+      }
     };
   };
 

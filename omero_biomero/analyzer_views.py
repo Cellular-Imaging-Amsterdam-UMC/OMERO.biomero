@@ -432,8 +432,13 @@ def get_slurm_status(request, conn=None, **kwargs):
     """
     Check SLURM cluster availability and get workflow version information.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # Use the main workflow script name - same approach as run_workflow_script
     script_name = "SLURM_Run_Workflow.py"  # Contains all workflow version info
+    
+    logger.info(f"Starting SLURM status check for script: {script_name}")
     
     try:
         scriptService = conn.getScriptService()
@@ -447,9 +452,11 @@ def get_slurm_status(request, conn=None, **kwargs):
                 break
 
         if not script:
+            error_msg = f"SLURM script '{script_name}' not found on server"
+            logger.error(error_msg)
             return JsonResponse({
                 "status": "offline",
-                "message": f"SLURM script '{script_name}' not found on server",
+                "message": error_msg,
                 "last_checked": datetime.datetime.now().isoformat(),
                 "icon": "error",
                 "intent": "danger",
@@ -458,7 +465,11 @@ def get_slurm_status(request, conn=None, **kwargs):
         
         # Get the script ID and fetch params
         script_id = int(unwrap(script.id))
+        logger.info(f"Found script with ID: {script_id}")
+        
         params = scriptService.getParams(script_id)
+        logger.info(f"Retrieved script parameters successfully")
+        logger.info(f"Retrieved script parameters")
         
         # Extract workflow versions from params
         workflow_versions = {}
@@ -504,8 +515,11 @@ def get_slurm_status(request, conn=None, **kwargs):
             "workflow_versions": workflow_versions
         }
         
+        logger.info(f"SLURM status check successful. Status: {status['status']}, Workflows: {total_workflows}")
+        
     except Exception as e:
         error_msg = str(e)
+        logger.error(f"SLURM status check failed: {error_msg}", exc_info=True)
         if "Can't find params" in error_msg or "NoValidConnectionsError" in error_msg:
             status = {
                 "status": "offline", 

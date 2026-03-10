@@ -19,6 +19,7 @@ const DatasetSelectWithPopover = ({
   subLabel = "",
   tooltip = "",
   buttonText = "Add Dataset",
+  placeholder = "Add new dataset name or select...",
   intent = "",
   allowedCategories = ["datasets", "plates", "screens"], // default: allow most except projects
 }) => {
@@ -158,7 +159,7 @@ const DatasetSelectWithPopover = ({
       intent={intent}
     >
       <TagInput
-        placeholder="Add new dataset name or select..."
+        placeholder={placeholder}
         values={value || []}
         onChange={handleManualInputChange}
         onKeyDown={handleKeyDown}
