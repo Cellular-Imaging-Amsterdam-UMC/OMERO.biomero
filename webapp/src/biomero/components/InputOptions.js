@@ -262,56 +262,7 @@ const InputOptions = () => {
           </div>
         )}
       </FormGroup>
-      
-      <Divider />
-      
-      {/* ZARR Format Option - Moved to bottom as experimental */}
-      <FormGroup
-        label="Experimental Input Format"
-        helperText={state.formData?.plateMode 
-          ? "ZARR format is automatically enabled for plate processing" 
-          : "⚠️ Advanced users only - can break your workflow if used incorrectly"
-        }
-      >
-        <Switch
-          id="useZarrFormat"
-          checked={state.formData?.useZarrFormat || false}
-          onChange={(e) => handleInputChange('useZarrFormat', e.target.checked)}
-          disabled={state.formData?.plateMode} // Disabled in plate mode
-          label={
-            <Tooltip
-              content={state.formData?.plateMode 
-                ? "ZARR format is required for plate processing and cannot be disabled"
-                : "Skip TIFF conversion and use ZARR format directly. Only use if your workflow explicitly supports ZARR input and you understand the implications."
-              }
-              placement="top"
-              intent={state.formData?.plateMode ? Intent.PRIMARY : Intent.DANGER}
-            >
-              <span>
-                {state.formData?.plateMode 
-                  ? "Use ZARR Format (Required for Plates) 🔒" 
-                  : "Use ZARR Format (Experimental) ⚠️"
-                }
-              </span>
-            </Tooltip>
-          }
-        />
-        
-        {state.formData?.useZarrFormat && !state.formData?.plateMode && (
-          <Callout intent={Intent.DANGER} className="mt-2">
-            <strong>EXPERIMENTAL FEATURE:</strong> You are bypassing standard TIFF conversion. 
-            This may cause workflow failures if your selected workflow doesn't support ZARR input. 
-            Only proceed if you know your workflow explicitly supports ZARR format.
-          </Callout>
-        )}
-        
-        {state.formData?.plateMode && (
-          <Callout intent={Intent.PRIMARY} className="mt-2">
-            <strong>PLATE MODE:</strong> ZARR format is automatically enabled for plate processing. 
-            This is the recommended format for handling large plate datasets efficiently.
-          </Callout>
-        )}
-      </FormGroup>
+
     </form>
   );
 };

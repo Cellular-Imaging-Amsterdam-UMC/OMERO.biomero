@@ -146,7 +146,7 @@ const ModelCard = ({
       {/* Workflow Input Configuration */}
       <FormGroup
         label="Workflow Input Requirements"
-        subLabel="Configure if this workflow requires plate inputs (forces ZARR format)."
+        subLabel="Configure input format requirements for this workflow."
       >
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
@@ -163,6 +163,28 @@ const ModelCard = ({
             onChange={(e) => {
               const isChecked = e.target.checked;
               onChange(index, "isPlateWorkflow", isChecked);
+            }}
+          />
+        </div>
+        
+        <div className="flex items-center justify-between mt-3">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">
+              ZARR Format Required
+            </span>
+            <span className="text-xs text-gray-500">
+              {item.isPlateWorkflow 
+                ? "Automatically enabled when plate workflow is selected"
+                : "Enable for workflows that require ZARR input format (skips TIFF conversion)"
+              }
+            </span>
+          </div>
+          <Switch
+            checked={item.isZarrWorkflow || false}
+            disabled={!editable || item.isPlateWorkflow} // Disable when plate workflow is enabled
+            onChange={(e) => {
+              const isChecked = e.target.checked;
+              onChange(index, "isZarrWorkflow", isChecked);
             }}
           />
         </div>

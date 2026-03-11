@@ -33,13 +33,17 @@ const WorkflowForm = () => {
   // Helper function to check workflow flags from config
   const getWorkflowFlags = (workflowName) => {
     const config = state.config;
-    if (!config || !config.UI) return { isPlateWorkflow: false };
+    if (!config || !config.UI) return { isPlateWorkflow: false, isZarrWorkflow: false };
     
     const plateWorkflows = config.UI.plate_workflows ? 
       JSON.parse(config.UI.plate_workflows || '[]') : [];
     const isPlateWorkflow = plateWorkflows.includes(workflowName);
     
-    return { isPlateWorkflow };
+    const zarrWorkflows = config.UI.zarr_workflows ? 
+      JSON.parse(config.UI.zarr_workflows || '[]') : [];
+    const isZarrWorkflow = zarrWorkflows.includes(workflowName);
+    
+    return { isPlateWorkflow, isZarrWorkflow };
   };
 
   // Initialize selected version
@@ -85,18 +89,18 @@ const WorkflowForm = () => {
     }
   }, [selectedVersion]);
 
-  // Force ZARR format when workflow requires it (plate workflows automatically use ZARR)
+  // Force ZARR format when workflow requires it (plate workflows or admin-configured ZARR workflows)
   useEffect(() => {
     if (workflowName) {
-      const { isPlateWorkflow } = getWorkflowFlags(workflowName);
+      const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflowName);
       
-      if (isPlateWorkflow) {
-        // Force ZARR for plate workflows
+      if (isPlateWorkflow || isZarrWorkflow) {
+        // Force ZARR for plate workflows or admin-configured ZARR workflows
         updateState({
           formData: {
             ...state.formData,
-            Format: "ZARR", // Force zarr format for plate workflows
-            useZarrFormat: true, // Force zarr backend flag for plate workflows
+            Format: "ZARR", // Force zarr format for configured workflows
+            useZarrFormat: true, // Force zarr backend flag for configured workflows
           },
         });
       }
@@ -119,18 +123,19 @@ const WorkflowForm = () => {
         const { id, name, description, type, optional } = input;
         const defaultValue = input["default-value"];
         const isFormatField = id === "Format";
-        const { isPlateWorkflow } = getWorkflowFlags(workflowName);
+        const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflowName);
+        const requiresZarr = isPlateWorkflow || isZarrWorkflow;
 
         switch (type) {
           case "String":
             // Special handling for Format field when workflow requires ZARR
-            if (isFormatField && isPlateWorkflow) {
+            if (isFormatField && requiresZarr) {
               return (
                 <FormGroup
                   key={id}
                   label={name}
                   labelFor={id}
-                  helperText="Format is locked to ZARR for plate workflows"
+                  helperText="Format is locked to ZARR for admin-configured workflows"
                 >
                   <InputGroup
                     id={id}
@@ -139,7 +144,7 @@ const WorkflowForm = () => {
                     disabled={true}
                     intent="primary"
                     rightElement={
-                      <Tooltip content="Plate workflows require ZARR format">
+                      <Tooltip content="This workflow requires ZARR format (admin-configured)">
                         <Icon icon="lock" intent="primary" />
                       </Tooltip>
                     }

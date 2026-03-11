@@ -83,11 +83,17 @@ const SettingsForm = () => {
             JSON.parse(state.config.UI.plate_workflows || '[]') : [];
           const isPlateWorkflow = plateWorkflows.includes(prefix);
           
+          // Check if this workflow is marked as ZARR workflow in UI config
+          const zarrWorkflows = state.config.UI?.zarr_workflows ? 
+            JSON.parse(state.config.UI.zarr_workflows || '[]') : [];
+          const isZarrWorkflow = zarrWorkflows.includes(prefix);
+          
           return {
             name: state.config.MODELS[prefix], // e.g., "cellpose"
             repo: value, // e.g., the repo URL
             job: state.config.MODELS[`${prefix}_job`], // e.g., "jobs/cellpose.sh"
             isPlateWorkflow: isPlateWorkflow, // Boolean flag from UI list
+            isZarrWorkflow: isZarrWorkflow, // Boolean flag from UI list
             extraParams: extractExtraParams(prefix), // Handle the extraParams here
           };
         });
@@ -145,6 +151,12 @@ const SettingsForm = () => {
 
     if (field === "name" && settingsForm.SLURM.slurm_script_repo === "") {
       updatedModels[index]["job"] = `jobs/${value}.sh`;
+    }
+
+    // Special handling for plate/zarr workflow coupling
+    if (field === "isPlateWorkflow" && value === true) {
+      // When enabling plate workflow, also enable ZARR
+      updatedModels[index]["isZarrWorkflow"] = true;
     }
 
     setSettingsForm((prev) => ({ ...prev, MODELS: updatedModels }));
@@ -355,6 +367,11 @@ const SettingsForm = () => {
     const plateWorkflows = settingsForm.MODELS
       .filter(model => model.isPlateWorkflow)
       .map(model => model.name);
+      
+    // Collect ZARR workflows into a JSON list
+    const zarrWorkflows = settingsForm.MODELS
+      .filter(model => model.isZarrWorkflow)
+      .map(model => model.name);
 
     const converters = settingsForm.CONVERTERS.reduce((acc, converter) => {
       acc[converter.key] = converter.value;
@@ -367,7 +384,8 @@ const SettingsForm = () => {
       MODELS: models,
       UI: {
         ...settingsForm.UI,
-        plate_workflows: JSON.stringify(plateWorkflows)
+        plate_workflows: JSON.stringify(plateWorkflows),
+        zarr_workflows: JSON.stringify(zarrWorkflows)
       }
     };
   };

@@ -14,6 +14,7 @@ import {
   Switch,
   Slider,
   TabPanel,
+  Tag,
 } from "@blueprintjs/core";
 import { fetchPlateImages } from "../../apiService";
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover";
@@ -32,7 +33,23 @@ const WorkflowInput = () => {
   const [plateGridData, setPlateGridData] = useState(null);
   
   // Get input mode from formData instead of local state
-  const inputMode = state.formData?.workflowMode || "dataset";
+  const inputMode = state.formData?.workflowMode || "images";
+  
+  // Helper function to check workflow flags from config
+  const getWorkflowFlags = (workflowName) => {
+    const config = state.config;
+    if (!config || !config.UI) return { isPlateWorkflow: false, isZarrWorkflow: false };
+    
+    const plateWorkflows = config.UI.plate_workflows ? 
+      JSON.parse(config.UI.plate_workflows || '[]') : [];
+    const isPlateWorkflow = plateWorkflows.includes(workflowName);
+    
+    const zarrWorkflows = config.UI.zarr_workflows ? 
+      JSON.parse(config.UI.zarr_workflows || '[]') : [];
+    const isZarrWorkflow = zarrWorkflows.includes(workflowName);
+    
+    return { isPlateWorkflow, isZarrWorkflow };
+  };
 
   // Load images when datasets change
   useEffect(() => {
@@ -180,7 +197,10 @@ const WorkflowInput = () => {
 
   // Save selected IDs when proceeding to the next step
   useEffect(() => {
-    if (inputMode === "plate" && selectedPlate) {
+    const workflowName = state.selectedWorkflow?.name;
+    const { isPlateWorkflow, isZarrWorkflow } = workflowName ? getWorkflowFlags(workflowName) : { isPlateWorkflow: false, isZarrWorkflow: false };
+    
+    if (inputMode === "plates" && selectedPlate) {
       // For plate mode, save plate ID and set data type to PLATE
       updateState({
         formData: {
@@ -191,19 +211,20 @@ const WorkflowInput = () => {
           useZarrFormat: true, // Force zarr format for plates
         },
       });
-    } else if (inputMode === "dataset") {
+    } else if (inputMode === "images") {
       // For dataset mode, save image IDs and set data type to IMAGE
+      const shouldUseZarr = isPlateWorkflow || isZarrWorkflow; // Admin-configured ZARR requirement
       updateState({
         formData: {
           ...state.formData,
           IDs: selectedImageIds,
-          Data_Type: "Image", // Backend expects "Image" (case sensitive!)
+          Data_Type: "Image", // Backend expects "Image" (case sensitive)
           plateMode: false,
-          // Don't override useZarrFormat for dataset mode - let users choose
+          useZarrFormat: shouldUseZarr, // Use admin-configured ZARR setting
         },
       });
     }
-  }, [selectedImageIds, selectedPlate, inputMode]);
+  }, [selectedImageIds, selectedPlate, inputMode, state.selectedWorkflow, state.config]);
 
   // Reset selections when input mode changes (controlled from parent)
   useEffect(() => {
@@ -300,11 +321,11 @@ const WorkflowInput = () => {
     <DialogBody className="flex flex-col min-h-[75vh]">
       <div className="w-full">
         <H6 className="mb-2">
-          {inputMode === "plate" ? "Select Input Plate" : "Select Input Data"}
+          {inputMode === "plates" ? "Select Input Plate" : "Select Input Images"}
         </H6>
         
-        {inputMode === "dataset" ? (
-          // Original dataset selection UI
+        {inputMode === "images" ? (
+          // Image/Dataset selection UI
           <DatasetSelectWithPopover
             value={state.inputDatasets.map((dataset) => dataset?.data) || []}
             label="Select datasets"
@@ -340,16 +361,16 @@ const WorkflowInput = () => {
               }
             }}
             multiSelect={true}
-            allowedCategories={["datasets"]}
+            allowedCategories={["datasets", "plates"]}
           />
         ) : (
-          // Plate selection UI (automatically enabled for plate workflows)
+          // Plate selection UI (for plate-specific workflows)
           <DatasetSelectWithPopover
             value={selectedPlate ? [selectedPlate.data] : []} 
             label="Select plate"
             placeholder="Add new plate name or select..."
-            buttonText="Add Plate"
-            tooltip="Select the OMERO plate as workflow input (Zarr format will be used automatically)."
+            buttonText="Select Plate"
+            tooltip="Select the OMERO plate as workflow input."
             onChange={(plates, type) => {
               if (plates.length > 0) {
                 const resolvedPlate =
@@ -372,27 +393,46 @@ const WorkflowInput = () => {
         )}
         
         {/* Plate Preview */}
-        {inputMode === "plate" && selectedPlate && (
-          <Card className="mt-4 p-4">
-            <H6>Plate Preview</H6>
-            <div className="text-sm text-gray-600">
-              <p><strong>Name:</strong> {selectedPlate.data}</p>
-              <p><strong>ID:</strong> {selectedPlate.id}</p>
-              <p><strong>Wells:</strong> {
-                plateWellCount !== null ? plateWellCount : 
-                (selectedPlate.childCount ? selectedPlate.childCount : "Fetching...")
-              }</p>
-              <p className="mt-2 text-blue-600">
-                ⚡ This plate will be processed in <strong>Zarr format</strong> automatically
-              </p>
+        {inputMode === "plates" && selectedPlate && (
+          <Card className="mt-4">
+            <div className="p-4 pb-2">
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-2">
+                  <H6 className="mb-0">
+                    <Icon icon="lab-test" className="mr-2" />
+                    {selectedPlate.data}
+                  </H6>
+                  <Tag
+                    icon="id-number"
+                    intent="none"
+                    minimal={true}
+                    small={true}
+                    className="text-xs"
+                  >
+                    ID: {selectedPlate.id}
+                  </Tag>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-3 mb-3">
+                <Tag
+                  icon="grid-view"
+                  intent="none"
+                  minimal={true}
+                >
+                  {plateWellCount !== null ? plateWellCount : 
+                    (selectedPlate.childCount ? selectedPlate.childCount : "Loading wells...")}
+                </Tag>
+              </div>
             </div>
+            
             {/* Plate Grid Visualization */}
             {renderPlateGrid()}
           </Card>
         )}
         
       </div>
-      {inputMode === "dataset" && state.inputDatasets?.length > 0 && (
+      {inputMode === "images" && state.inputDatasets?.length > 0 && (
         <>
             {/* Filter bar and buttons */}
             <div className="pb-2">
@@ -615,7 +655,7 @@ const WorkflowInput = () => {
             </div>
         </>
       )}
-      {inputMode === "dataset" && state.inputDatasets?.length > 0 && (
+      {inputMode === "images" && state.inputDatasets?.length > 0 && (
         <div className="p-1 h-full overflow-hidden">
           <Tabs
             id="workflow-input-tabs"
