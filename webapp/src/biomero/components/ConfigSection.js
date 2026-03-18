@@ -13,6 +13,8 @@ const ConfigSection = ({
   description, // Helper text description
   errors, // Error states
   validateField, // Validation function
+  versionStatus, // Version check results
+  versionCheckLoading, // Version check loading state
 }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [editableIndex, setEditableIndex] = useState(null);
@@ -70,6 +72,8 @@ const ConfigSection = ({
                 setEditable={setEditable}
                 errors={errors ? errors[index] : null} // Safely handle null errors
                 validateField={validateField} // Pass validation function
+                versionStatus={versionStatus ? versionStatus[index] : null} // Pass version status for this item
+                versionCheckLoading={versionCheckLoading} // Pass loading state
               />
             </Collapse>
           </div>

@@ -22,6 +22,8 @@ const ModelCard = ({
   setEditable,
   errors,
   validateField,
+  versionStatus,
+  versionCheckLoading,
 }) => {
   const [inputValue, setInputValue] = useState("");
   const [showWarning, setShowWarning] = useState(false);
@@ -90,6 +92,41 @@ const ModelCard = ({
             <Tooltip content="Specify the versioned GitHub repository URL for this model. Versions (e.g., /tree/v1.0.0) ensure reproducibility.">
               <Icon icon="help" size={12} />
             </Tooltip>
+            {/* Version Status Indicator */}
+            {versionCheckLoading && (
+              <span className="ml-2">
+                <Spinner size={12} />
+              </span>
+            )}
+            {versionStatus && !versionCheckLoading && (
+              <span className="ml-2">
+                {versionStatus.status === 'up-to-date' && (
+                  <Tooltip content={`Current version ${versionStatus.currentVersion} is up to date`}>
+                    <Icon icon="tick" size={12} intent="success" />
+                  </Tooltip>
+                )}
+                {versionStatus.status === 'outdated' && (
+                  <Tooltip content={`Current version ${versionStatus.currentVersion} is outdated. Latest: ${versionStatus.latestVersion}`}>
+                    <Icon icon="warning-sign" size={12} intent="warning" />
+                  </Tooltip>
+                )}
+                {versionStatus.status === 'ahead' && (
+                  <Tooltip content={`Current version ${versionStatus.currentVersion} is ahead of latest release ${versionStatus.latestVersion}`}>
+                    <Icon icon="info-sign" size={12} intent="primary" />
+                  </Tooltip>
+                )}
+                {versionStatus.status === 'unknown' && versionStatus.error && (
+                  <Tooltip content={`Version check failed: ${versionStatus.error}`}>
+                    <Icon icon="help" size={12} intent="none" />
+                  </Tooltip>
+                )}
+                {versionStatus.status === 'error' && (
+                  <Tooltip content={`Error checking version: ${versionStatus.error}`}>
+                    <Icon icon="error" size={12} intent="danger" />
+                  </Tooltip>
+                )}
+              </span>
+            )}
           </span>
         }
         subLabel="The repository with the descriptor.json file."
@@ -101,24 +138,40 @@ const ModelCard = ({
           onChange={(e) => onChange(index, "repo", e.target.value)}
           rightElement={
             item.repo ? (
-              item.repo.includes("/tree/v") ? (
-                <Button
-                  icon="git-branch"
-                  minimal
-                  intent="primary"
-                  title="Test GitHub URL"
-                  onClick={() =>
-                    window.open(item.repo, "_blank", "noopener,noreferrer")
-                  }
-                />
-              ) : (
-                <Tooltip
-                  content="URL is missing a version (e.g., /tree/v1.0.0)."
-                  intent="warning"
-                >
-                  <Button icon="warning-sign" minimal intent="warning" />
-                </Tooltip>
-              )
+              <div className="flex">
+                {item.repo.includes("/tree/v") ? (
+                  <Button
+                    icon="git-branch"
+                    minimal
+                    intent="primary"
+                    title="Test GitHub URL"
+                    onClick={() =>
+                      window.open(item.repo, "_blank", "noopener,noreferrer")
+                    }
+                  />
+                ) : (
+                  <Tooltip
+                    content="URL is missing a version (e.g., /tree/v1.0.0)."
+                    intent="warning"
+                  >
+                    <Button icon="warning-sign" minimal intent="warning" />
+                  </Tooltip>
+                )}
+                {/* Add latest version link for outdated models */}
+                {versionStatus && versionStatus.status === 'outdated' && versionStatus.latestReleaseUrl && (
+                  <Tooltip content={`View latest version: ${versionStatus.latestVersion}`}>
+                    <Button
+                      icon="updated"
+                      minimal
+                      intent="warning"
+                      title={`Latest version: ${versionStatus.latestVersion}`}
+                      onClick={() =>
+                        window.open(versionStatus.latestReleaseUrl, "_blank", "noopener,noreferrer")
+                      }
+                    />
+                  </Tooltip>
+                )}
+              </div>
             ) : null
           }
         />

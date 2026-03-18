@@ -17,6 +17,7 @@ import CollapsibleSection from "./CollapsibleSection";
 import ConfigSection from "./ConfigSection";
 import ModelCard from "./ModelCard.js";
 import ConverterCard from "./ConverterCard.js";
+import { checkModelVersions } from "../../apiService";
 
 const SettingsForm = () => {
   const { 
@@ -37,6 +38,11 @@ const SettingsForm = () => {
 
   const [converters, setConverters] = useState([]);
   const [errors, setErrors] = useState({});
+  
+  // Version checking state
+  const [versionStatus, setVersionStatus] = useState({});
+  const [versionCheckLoading, setVersionCheckLoading] = useState(false);
+  const [versionCheckCompleted, setVersionCheckCompleted] = useState(false);
   
   // Validation for UI settings
   const validateMaxBatchJobs = (value) => {
@@ -140,6 +146,32 @@ const SettingsForm = () => {
       setIsInitialized(true);
     }
   }, [state.config, isInitialized]); // Only run when config loads and form isn't initialized
+
+  // Trigger version check when admin panel opens for the first time
+  useEffect(() => {
+    if (settingsForm?.MODELS?.length > 0 && !versionCheckCompleted) {
+      performVersionCheck();
+    }
+  }, [settingsForm?.MODELS, versionCheckCompleted]);
+
+  const performVersionCheck = async () => {
+    if (!settingsForm?.MODELS?.length || versionCheckLoading) return;
+    
+    setVersionCheckLoading(true);
+    try {
+      const results = await checkModelVersions(settingsForm.MODELS);
+      const statusMap = {};
+      results.forEach(result => {
+        statusMap[result.index] = result;
+      });
+      setVersionStatus(statusMap);
+      setVersionCheckCompleted(true);
+    } catch (error) {
+      console.error('Error checking model versions:', error);
+    } finally {
+      setVersionCheckLoading(false);
+    }
+  };
 
   const toggleEdit = (field) => {
     setEditMode((prev) => ({ ...prev, [field]: !prev[field] }));
@@ -885,6 +917,8 @@ const SettingsForm = () => {
           ]}
           errors={null} // No error handling for models yet
           validateField={null} // No validation for models yet
+          versionStatus={versionStatus} // Pass version check results
+          versionCheckLoading={versionCheckLoading} // Pass loading state
         />
       </CollapsibleSection>
       <H5>Note on saving BIOMERO settings</H5>

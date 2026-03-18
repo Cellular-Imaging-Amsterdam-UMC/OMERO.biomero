@@ -360,3 +360,110 @@ export const fetchPlateImages = async (plateId) => {
 
   return allImages;
 };
+
+// GitHub API functions for version checking
+export const extractGitHubInfo = (repoUrl) => {
+  if (!repoUrl) return null;
+  
+  // Match GitHub URLs like https://github.com/owner/repo/tree/v1.0.0
+  const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)(?:\/tree\/(.+))?/);
+  if (!match) return null;
+  
+  return {
+    owner: match[1],
+    repo: match[2],
+    currentVersion: match[3] || null
+  };
+};
+
+export const fetchLatestGitHubRelease = async (owner, repo) => {
+  try {
+    const response = await axios.get(`https://api.github.com/repos/${owner}/${repo}/releases/latest`);
+    return {
+      tag_name: response.data.tag_name,
+      name: response.data.name,
+      published_at: response.data.published_at,
+      html_url: response.data.html_url
+    };
+  } catch (error) {
+    // If there's no latest release, try to get the latest tag instead
+    if (error.response?.status === 404) {
+      try {
+        const tagsResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}/tags`);
+        if (tagsResponse.data.length > 0) {
+          const latestTag = tagsResponse.data[0];
+          return {
+            tag_name: latestTag.name,
+            name: latestTag.name,
+            html_url: `https://github.com/${owner}/${repo}/tree/${latestTag.name}`
+          };
+        }
+      } catch (tagError) {
+        console.error(`Error fetching tags for ${owner}/${repo}:`, tagError);
+      }
+    }
+    console.error(`Error fetching latest release for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+
+export const compareVersions = (current, latest) => {
+  if (!current || !latest) return 'unknown';
+  
+  // Remove 'v' prefix if present
+  const cleanCurrent = current.replace(/^v/, '');
+  const cleanLatest = latest.replace(/^v/, '');
+  
+  // Simple comparison - if they're exactly the same, it's up to date
+  if (cleanCurrent === cleanLatest) return 'up-to-date';
+  
+  // Try semantic version comparison
+  try {
+    const currentParts = cleanCurrent.split('.').map(Number);
+    const latestParts = cleanLatest.split('.').map(Number);
+    
+    for (let i = 0; i < Math.max(currentParts.length, latestParts.length); i++) {
+      const currentPart = currentParts[i] || 0;
+      const latestPart = latestParts[i] || 0;
+      
+      if (currentPart < latestPart) return 'outdated';
+      if (currentPart > latestPart) return 'ahead';
+    }
+    
+    return 'up-to-date';
+  } catch (error) {
+    // If semantic version comparison fails, fall back to string comparison
+    return cleanCurrent === cleanLatest ? 'up-to-date' : 'unknown';
+  }
+};
+
+export const checkModelVersions = async (models) => {
+  const versionChecks = await Promise.all(
+    models.map(async (model, index) => {
+      const githubInfo = extractGitHubInfo(model.repo);
+      if (!githubInfo) {
+        return { index, status: 'unknown', error: 'Invalid GitHub URL' };
+      }
+      
+      try {
+        const latestRelease = await fetchLatestGitHubRelease(githubInfo.owner, githubInfo.repo);
+        if (!latestRelease) {
+          return { index, status: 'unknown', error: 'No releases found' };
+        }
+        
+        const status = compareVersions(githubInfo.currentVersion, latestRelease.tag_name);
+        return {
+          index,
+          status,
+          currentVersion: githubInfo.currentVersion,
+          latestVersion: latestRelease.tag_name,
+          latestReleaseUrl: latestRelease.html_url
+        };
+      } catch (error) {
+        return { index, status: 'error', error: error.message };
+      }
+    })
+  );
+  
+  return versionChecks;
+};
