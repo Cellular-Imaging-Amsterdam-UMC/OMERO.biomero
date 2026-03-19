@@ -173,11 +173,51 @@ const SettingsForm = () => {
     }
   };
 
+  // Check version for a specific model
+  const recheckModelVersion = async (modelIndex, updatedModel = null) => {
+    if (!settingsForm?.MODELS?.[modelIndex] && !updatedModel) return;
+    
+    try {
+      const model = updatedModel || settingsForm.MODELS[modelIndex];
+      const results = await checkModelVersions([model]);
+      if (results.length > 0) {
+        const result = { ...results[0], index: modelIndex }; // Fix index to match our array
+        setVersionStatus(prev => ({
+          ...prev,
+          [modelIndex]: result
+        }));
+      }
+    } catch (error) {
+      console.error('Error rechecking model version:', error);
+    }
+  };
+
+  // Calculate version summary for Models Settings
+  const getVersionSummary = () => {
+    if (!settingsForm?.MODELS?.length || !Object.keys(versionStatus).length) {
+      return { upToDate: 0, total: 0, outdated: 0 };
+    }
+    
+    const total = settingsForm.MODELS.length;
+    let upToDate = 0;
+    let outdated = 0;
+    
+    Object.values(versionStatus).forEach(status => {
+      if (status.status === 'up-to-date' || status.justUpdated) {
+        upToDate++;
+      } else if (status.status === 'outdated') {
+        outdated++;
+      }
+    });
+    
+    return { upToDate, total, outdated };
+  };
+
   const toggleEdit = (field) => {
     setEditMode((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
-  const handleModelChange = (index, field, value) => {
+  const handleModelChange = (index, field, value, options = {}) => {
     const updatedModels = structuredClone(settingsForm.MODELS);
     updatedModels[index][field] = value;
 
@@ -192,6 +232,21 @@ const SettingsForm = () => {
     }
 
     setSettingsForm((prev) => ({ ...prev, MODELS: updatedModels }));
+
+    // Recheck version when repo URL changes (unless skipVersionCheck is set)
+    if (field === "repo" && !options.skipVersionCheck) {
+      // Clear the old status first
+      setVersionStatus(prev => {
+        const updated = { ...prev };
+        delete updated[index];
+        return updated;
+      });
+      
+      // Trigger recheck after a short delay with the updated model data
+      setTimeout(() => {
+        recheckModelVersion(index, updatedModels[index]);
+      }, 100);
+    }
   };
 
   // Regex for validation
@@ -872,11 +927,15 @@ const SettingsForm = () => {
           validateField={validateField} // Pass validation function to ConfigSection
         />
       </CollapsibleSection>
-      <CollapsibleSection title="Models Settings">
+      <CollapsibleSection 
+        title="Models Settings" 
+        versionSummary={getVersionSummary()}
+        versionCheckLoading={versionCheckLoading}
+      >
         <ConfigSection
           items={settingsForm.MODELS}
-          onItemChange={(index, field, value) =>
-            handleModelChange(index, field, value)
+          onItemChange={(index, field, value, options = {}) =>
+            handleModelChange(index, field, value, options)
           }
           onAddItem={addModel}
           onAddParam={(index, key, value) => {

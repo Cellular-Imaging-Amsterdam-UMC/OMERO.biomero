@@ -53,8 +53,16 @@ const ConfigSection = ({
               className="flex items-center justify-between cursor-pointer"
               onClick={() => toggleItem(index)}
             >
-              <H4 className="font-semibold">
+              <H4 className={`font-semibold flex items-center ${
+                versionStatus && versionStatus[index] && versionStatus[index].status === 'outdated' && !versionStatus[index].justUpdated
+                  ? 'text-orange-600' 
+                  : ''
+              }`}>
                 {item.name || item.key || `${title} ${index + 1}`}
+                {/* Add warning icon for outdated models */}
+                {versionStatus && versionStatus[index] && versionStatus[index].status === 'outdated' && !versionStatus[index].justUpdated && (
+                  <Icon icon="outdated" size={12} intent="warning" className="ml-2" />
+                )}
               </H4>
               <Icon
                 icon={expandedIndex === index ? "caret-down" : "caret-right"}
@@ -64,7 +72,7 @@ const ConfigSection = ({
               <CardComponent
                 item={item}
                 index={index}
-                onChange={onItemChange}
+                onChange={(idx, field, value, options) => onItemChange(idx, field, value, options)}
                 onAddParam={onAddParam}
                 onDelete={onDeleteItem}
                 onReset={onResetItem}
