@@ -7,9 +7,24 @@ import "@uppy/dashboard/dist/style.min.css";
 import { importUploadedFile } from "../../apiService";
 import { Callout, Intent } from "@blueprintjs/core";
 
+const getUploadedFilename = (file, response, uploadedFilenameMap) => {
+  const uploadUrl = response?.uploadURL;
+  if (uploadUrl && uploadedFilenameMap.has(uploadUrl)) {
+    return uploadedFilenameMap.get(uploadUrl);
+  }
+
+  const responseHeader = response?.xhr?.getResponseHeader?.("Upload-Filename");
+  if (responseHeader) {
+    return responseHeader;
+  }
+
+  return file.name;
+};
+
 const ResumableUploader = ({ datasetId, datasetType, group }) => {
   const dashboardRef = useRef(null);
   const uppyRef = useRef(null);
+  const uploadedFilenameMapRef = useRef(new Map());
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -27,6 +42,13 @@ const ResumableUploader = ({ datasetId, datasetType, group }) => {
       chunkSize: 150 * 1024 * 1024, // 150MB chunks for faster uploads
       retryDelays: [0, 1000, 3000, 5000],
       limit: 5, // Allow up to 5 concurrent file uploads
+      onAfterResponse: (req, res) => {
+        const uploadUrl = req.getURL?.();
+        const uploadedFilename = res.getHeader?.("Upload-Filename");
+        if (uploadUrl && uploadedFilename) {
+          uploadedFilenameMapRef.current.set(uploadUrl, uploadedFilename);
+        }
+      },
     });
 
     uppyRef.current = uppyInstance;
@@ -58,16 +80,38 @@ const ResumableUploader = ({ datasetId, datasetType, group }) => {
         console.warn("No dataset selected, skipping import trigger");
         return;
       }
+
+      const uploadedFilename = getUploadedFilename(
+        file,
+        response,
+        uploadedFilenameMapRef.current
+      );
+
       try {
-        await importUploadedFile(file.name, datasetId, datasetType, group);
-        uppyRef.current.info(`Import queued for ${file.name}`, "success", 3000);
+        await importUploadedFile(
+          uploadedFilename,
+          datasetId,
+          datasetType,
+          group
+        );
+        uppyRef.current.info(
+          `Import queued for ${uploadedFilename}`,
+          "success",
+          3000
+        );
+        if (response?.uploadURL) {
+          uploadedFilenameMapRef.current.delete(response.uploadURL);
+        }
       } catch (error) {
         console.error("Import trigger failed", error);
         uppyRef.current.info(
-          `Import failed for ${file.name}: ${error.message}`,
+          `Import failed for ${uploadedFilename}: ${error.message}`,
           "error",
           5000
         );
+        if (response?.uploadURL) {
+          uploadedFilenameMapRef.current.delete(response.uploadURL);
+        }
       }
     };
 

@@ -143,7 +143,7 @@ class TusUploadView(View):
             "Upload-Offset, Content-Type, X-CSRFToken"
         )
         response["Access-Control-Expose-Headers"] = (
-            "Tus-Resumable, Upload-Offset, Upload-Length, Location"
+            "Tus-Resumable, Upload-Offset, Upload-Length, Location, Upload-Filename"
         )
         return response
 
@@ -288,15 +288,21 @@ class TusUploadView(View):
         meta["offset"] = new_offset
         save_metadata(resource_id, meta)
 
+        final_filename = None
+
         # Check if upload is complete
         if new_offset >= meta["length"]:
-            self._finalize_upload(resource_id, meta)
+            final_filename = self._finalize_upload(resource_id, meta)
 
         response = HttpResponse(status=204)
         response["Upload-Offset"] = str(new_offset)
         response["Tus-Resumable"] = self.TUS_VERSION
+        if final_filename:
+            response["Upload-Filename"] = final_filename
         response["Access-Control-Allow-Origin"] = "*"
-        response["Access-Control-Expose-Headers"] = "Upload-Offset, Tus-Resumable"
+        response["Access-Control-Expose-Headers"] = (
+            "Upload-Offset, Tus-Resumable, Upload-Filename"
+        )
         return response
 
     def delete(self, request, resource_id=None):
@@ -394,3 +400,5 @@ class TusUploadView(View):
 
         # Clean up metadata file
         delete_metadata(resource_id)
+
+        return final_filename

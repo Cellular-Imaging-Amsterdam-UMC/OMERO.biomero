@@ -7,6 +7,11 @@ EXTENSION_TO_FILE_BROWSER = {
     ".xlef": read_leica_file,
 }
 
+UPLOADER_NESTED_FILE_EXTENSIONS = [
+    ".lif",
+    ".xlef",
+]
+
 # FILE_OR_EXTENSION_PATTERNS_EXCLUSIVE defines patterns that, when
 # present in a directory, cause ONLY that matching file to be shown while
 # every other sibling entry (files & folders) is hidden from the UI.

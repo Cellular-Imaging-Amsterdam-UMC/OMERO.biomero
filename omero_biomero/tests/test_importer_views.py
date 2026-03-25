@@ -70,6 +70,129 @@ def _raw(fn):
     return fn
 
 
+class LeicaHelperTests(TestCase):
+    def test_extract_nested_leica_items_flattens_image_nodes(self):
+        from omero_biomero.leica_file_browser import ci_leica_converters_helpers as helpers
+
+        original = helpers.read_leica_file
+
+        def stub_read_leica_file(file_path, include_xmlelement=False, image_uuid=None, folder_uuid=None):
+            return json.dumps(
+                {
+                    "type": "Folder",
+                    "children": [
+                        {"type": "Image", "uuid": "img-1", "name": "Image 1"},
+                        {
+                            "type": "Folder",
+                            "uuid": "folder-1",
+                            "children": [
+                                {"type": "Image", "uuid": "img-2", "name": "Image 2"}
+                            ],
+                        },
+                    ],
+                }
+            )
+
+        helpers.read_leica_file = stub_read_leica_file
+        self.addCleanup(setattr, helpers, "read_leica_file", original)
+
+        items = helpers.extract_nested_leica_items("nested.lif")
+
+        self.assertCountEqual(
+            items,
+            [
+                {"localPath": "nested.lif", "uuid": "img-1", "name": "Image 1"},
+                {"localPath": "nested.lif", "uuid": "img-2", "name": "Image 2"},
+            ],
+        )
+
+    def test_extract_nested_leica_items_loads_nested_lif_folders_by_uuid(self):
+        from omero_biomero.leica_file_browser import ci_leica_converters_helpers as helpers
+
+        original = helpers.read_leica_file
+
+        def stub_read_leica_file(file_path, include_xmlelement=False, image_uuid=None, folder_uuid=None):
+            self.assertEqual(file_path, "nested.lif")
+            self.assertIsNone(image_uuid)
+
+            if folder_uuid == "folder-a":
+                return json.dumps(
+                    {
+                        "type": "Folder",
+                        "uuid": "folder-a",
+                        "children": [
+                            {"type": "Folder", "uuid": "folder-b", "name": "Folder B", "children": []},
+                            {"type": "Image", "uuid": "img-1", "name": "Image 1", "children": []},
+                        ],
+                    }
+                )
+
+            if folder_uuid == "folder-b":
+                return json.dumps(
+                    {
+                        "type": "Folder",
+                        "uuid": "folder-b",
+                        "children": [
+                            {"type": "Image", "uuid": "img-2", "name": "Image 2", "children": []},
+                        ],
+                    }
+                )
+
+            return json.dumps(
+                {
+                    "type": "File",
+                    "children": [
+                        {"type": "Folder", "uuid": "folder-a", "name": "Folder A", "children": []},
+                    ],
+                }
+            )
+
+        helpers.read_leica_file = stub_read_leica_file
+        self.addCleanup(setattr, helpers, "read_leica_file", original)
+
+        items = helpers.extract_nested_leica_items("nested.lif")
+
+        self.assertCountEqual(
+            items,
+            [
+                {"localPath": "nested.lif", "uuid": "img-1", "name": "Image 1"},
+                {"localPath": "nested.lif", "uuid": "img-2", "name": "Image 2"},
+            ],
+        )
+
+    def test_extract_nested_leica_items_accepts_real_lif_image_shape(self):
+        from omero_biomero.leica_file_browser import ci_leica_converters_helpers as helpers
+
+        original = helpers.read_leica_file
+
+        def stub_read_leica_file(file_path, include_xmlelement=False, image_uuid=None, folder_uuid=None):
+            self.assertEqual(file_path, "nested.lif")
+            self.assertIsNone(image_uuid)
+            self.assertIsNone(folder_uuid)
+            return json.dumps(
+                {
+                    "type": "File",
+                    "children": [
+                        {"datatype": "Image", "uuid": "img-1", "name": "Image 1"},
+                        {"datatype": "Image", "uuid": "img-2", "name": "Image 2"},
+                    ],
+                }
+            )
+
+        helpers.read_leica_file = stub_read_leica_file
+        self.addCleanup(setattr, helpers, "read_leica_file", original)
+
+        items = helpers.extract_nested_leica_items("nested.lif")
+
+        self.assertCountEqual(
+            items,
+            [
+                {"localPath": "nested.lif", "uuid": "img-1", "name": "Image 1"},
+                {"localPath": "nested.lif", "uuid": "img-2", "name": "Image 2"},
+            ],
+        )
+
+
 class ImporterViewsTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -86,6 +209,7 @@ class ImporterViewsTests(TestCase):
         setattr(self.mod, "BASE_DIR", self.tmp)  # type: ignore[attr-defined]
         setattr(self.mod, "FILE_OR_EXTENSION_PATTERNS_EXCLUSIVE", ["experiment.db", ".xlef"])  # type: ignore[attr-defined]
         setattr(self.mod, "PREPROCESSING_EXTENSION_MAP", {".lif": "leica_uuid", ".db": "screen_db"})  # type: ignore[attr-defined]
+        setattr(self.mod, "UPLOADER_NESTED_FILE_EXTENSIONS", [".lif", ".xlef"])  # type: ignore[attr-defined]
         setattr(
             self.mod,
             "PREPROCESSING_CONFIG",
@@ -345,6 +469,54 @@ class ImporterViewsTests(TestCase):
         self.assertEqual(len(created), 1)
         self.assertNotIn("extra_params", created[0])
 
+    def test_process_files_expands_single_nested_leica_container(self):
+        created = []
+        setattr(self.mod, "create_upload_order", lambda order: created.append(order))  # type: ignore[attr-defined]
+        setattr(
+            self.mod,
+            "extract_nested_leica_items",
+            lambda path: [
+                {"localPath": path, "uuid": "nested-1"},
+                {"localPath": path, "uuid": "nested-2"},
+            ],
+        )  # type: ignore[attr-defined]
+        open(os.path.join(self.tmp, "nested.lif"), "w").close()
+
+        self.mod.process_files(
+            ["nested.lif"],
+            [("datasets", 11)],
+            "grp1",
+            "alice",
+        )
+
+        self.assertEqual(len(created), 2)
+        self.assertEqual(
+            {order["extra_params"]["image_uuid"] for order in created},
+            {"nested-1", "nested-2"},
+        )
+
+    def test_process_files_does_not_expand_selected_nested_subfile(self):
+        created = []
+        setattr(self.mod, "create_upload_order", lambda order: created.append(order))  # type: ignore[attr-defined]
+        called = []
+        setattr(
+            self.mod,
+            "extract_nested_leica_items",
+            lambda path: called.append(path) or [{"localPath": path, "uuid": "unexpected"}],
+        )  # type: ignore[attr-defined]
+        open(os.path.join(self.tmp, "nested.lif"), "w").close()
+
+        self.mod.process_files(
+            [{"localPath": "nested.lif", "uuid": "already-selected"}],
+            [("datasets", 12)],
+            "grp1",
+            "alice",
+        )
+
+        self.assertEqual(called, [])
+        self.assertEqual(len(created), 1)
+        self.assertEqual(created[0]["extra_params"]["image_uuid"], "already-selected")
+
     def test_import_selected_preprocessing_without_uuid_placeholder(self):
         self.mod.PREPROCESSING_CONFIG["screen_db"]["extra_params"] = {"saveoption": "single"}  # type: ignore[index]
         created = []
@@ -406,15 +578,15 @@ class ImporterViewsTests(TestCase):
 
     # group_mappings
     def test_group_mappings_get_empty(self):
-        cfg = os.path.join(self.tmp, "config.json")
-        setattr(self.mod, "CONFIG_FILE_PATH", cfg)  # type: ignore[attr-defined]
+        cfg = os.path.join(self.tmp, "group-mappings.json")
+        setattr(self.mod, "GROUP_MAPPINGS_FILE_PATH", cfg)  # type: ignore[attr-defined]
         req = self.factory.get("/importer/group_mappings")
         resp = _raw(self.mod.group_mappings)(req, conn=self.conn)
         self.assertEqual(json.loads(resp.content)["mappings"], {})
 
     def test_group_mappings_post_and_get(self):
-        cfg = os.path.join(self.tmp, "config.json")
-        setattr(self.mod, "CONFIG_FILE_PATH", cfg)  # type: ignore[attr-defined]
+        cfg = os.path.join(self.tmp, "group-mappings.json")
+        setattr(self.mod, "GROUP_MAPPINGS_FILE_PATH", cfg)  # type: ignore[attr-defined]
         non_admin = self._fake_conn(["grp1"], admin=False)
         bad = self.factory.post(
             "/importer/group_mappings",
@@ -439,8 +611,8 @@ class ImporterViewsTests(TestCase):
         )
 
     def test_group_mappings_post_invalid_json(self):
-        cfg = os.path.join(self.tmp, "config.json")
-        setattr(self.mod, "CONFIG_FILE_PATH", cfg)  # type: ignore[attr-defined]
+        cfg = os.path.join(self.tmp, "group-mappings.json")
+        setattr(self.mod, "GROUP_MAPPINGS_FILE_PATH", cfg)  # type: ignore[attr-defined]
         bad = self.factory.generic(
             "POST",
             "/importer/group_mappings",

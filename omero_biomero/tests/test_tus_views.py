@@ -572,6 +572,7 @@ class TusUploadFinalizationTests(TusViewsTestCase):
         response = view(request, resource_id=uuid.UUID(resource_id))
 
         self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.get("Upload-Filename"), filename)
 
         # Verify file exists in user-specific directory
         user_dest_dir = os.path.join(self.tmp_dest_dir, f"user_{user_id}")
@@ -667,7 +668,8 @@ class TusUploadFinalizationTests(TusViewsTestCase):
             headers={"HTTP_UPLOAD_OFFSET": "0", "HTTP_TUS_RESUMABLE": "1.0.0"},
             user_id=user_id,
         )
-        view(request2, resource_id=uuid.UUID(resource_id2))
+        response2 = view(request2, resource_id=uuid.UUID(resource_id2))
+        self.assertEqual(response2.get("Upload-Filename"), "duplicate_1.tif")
 
         # Verify both files exist with different names
         user_dir = os.path.join(self.tmp_dest_dir, f"user_{user_id}")

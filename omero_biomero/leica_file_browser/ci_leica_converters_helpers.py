@@ -50,6 +50,7 @@ import numpy as np
 import xml.etree.ElementTree as ET
 import urllib.request
 import math
+import logging
 from typing import Dict, List, Tuple
 
 try:
@@ -75,6 +76,9 @@ dtype_to_format = {
     np.complex64: "complex",
     np.complex128: "dpcomplex",
 }
+
+
+logger = logging.getLogger(__name__)
 
 
 def read_leica_file(file_path, include_xmlelement=False, image_uuid=None, folder_uuid=None):
@@ -120,6 +124,97 @@ def get_image_metadata(folder_metadata, image_uuid):
     image_metadata_dict = next((img for img in folder_metadata_dict["children"] if img["uuid"] == image_uuid), None)
     image_metadata = json.dumps(image_metadata_dict, indent=2)
     return image_metadata
+
+
+def _iter_leica_image_nodes(node: dict):
+    """Yield image nodes from a Leica metadata tree."""
+    if not isinstance(node, dict):
+        return
+
+    node_type = str(node.get("type", "")).lower()
+    node_datatype = str(node.get("datatype", "")).lower()
+    if (node_type == "image" or node_datatype == "image") and node.get("uuid"):
+        yield node
+
+    for child in node.get("children", []):
+        yield from _iter_leica_image_nodes(child)
+
+
+def _load_leica_folder_children(file_path: str, node: dict, visited_folder_uuids: set) -> List[dict]:
+    """Load one folder level for formats that expose folders lazily."""
+    node_type = str(node.get("type", "")).lower()
+    node_datatype = str(node.get("datatype", "")).lower()
+    folder_uuid = node.get("uuid")
+    children = node.get("children") or []
+    file_ext = os.path.splitext(file_path)[1].lower()
+
+    is_folder_node = node_type == "folder" or (
+        not node_type and not node_datatype and bool(folder_uuid)
+    )
+
+    if children or not is_folder_node or not folder_uuid:
+        return children
+
+    if file_ext != ".lif" or folder_uuid in visited_folder_uuids:
+        return children
+
+    visited_folder_uuids.add(folder_uuid)
+
+    try:
+        folder_tree = json.loads(read_leica_file(file_path, folder_uuid=folder_uuid))
+    except Exception:
+        logger.exception(
+            "Failed to load Leica folder %s from %s while expanding nested items",
+            folder_uuid,
+            file_path,
+        )
+        return children
+
+    loaded_children = folder_tree.get("children") or []
+    logger.debug(
+        "Loaded %d Leica children from folder %s in %s",
+        len(loaded_children),
+        folder_uuid,
+        file_path,
+    )
+    return loaded_children
+
+
+def extract_nested_leica_items(file_path: str) -> List[dict]:
+    """
+    Return import-ready entries for all nested Leica images in a container file.
+
+    Each entry has the original file path plus the image UUID needed by the
+    preprocessing pipeline.
+    """
+    tree = json.loads(read_leica_file(file_path))
+    items = []
+    visited_folder_uuids = set()
+    stack = [tree]
+
+    while stack:
+        node = stack.pop()
+        if not isinstance(node, dict):
+            continue
+
+        node_type = str(node.get("type", "")).lower()
+        node_datatype = str(node.get("datatype", "")).lower()
+        node_uuid = node.get("uuid")
+        if (node_type == "image" or node_datatype == "image") and node_uuid:
+            items.append(
+                {
+                    "localPath": file_path,
+                    "uuid": node_uuid,
+                    "name": node.get("name"),
+                }
+            )
+            continue
+
+        children = _load_leica_folder_children(file_path, node, visited_folder_uuids)
+        stack.extend(reversed(children))
+
+    logger.info("Extracted %d nested Leica image UUIDs from %s", len(items), file_path)
+    return items
 
 
 def _as_int_list(value, length: int, default: int) -> List[int]:

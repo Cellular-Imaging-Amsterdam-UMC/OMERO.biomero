@@ -18,20 +18,71 @@ from .settings import (
     EXTENSION_TO_FILE_BROWSER,
     FILE_OR_EXTENSION_PATTERNS_EXCLUSIVE,
     PREPROCESSING_EXTENSION_MAP,
+    UPLOADER_NESTED_FILE_EXTENSIONS,
     FOLDER_EXTENSIONS_NON_BROWSABLE,
     BASE_DIR,
     PREPROCESSING_CONFIG,
-    PREPROCESSING_CONFIG,
-    CONFIG_FILE_PATH,
     GROUP_MAPPINGS_FILE_PATH,
     UPLOADER_DESTINATION_DIR,
 )
 from .utils import build_extra_params
+from .leica_file_browser.ci_leica_converters_helpers import extract_nested_leica_items
 
 logger = logging.getLogger(__name__)
 
 
 _INGEST_INITIALIZED = False
+
+
+def expand_nested_selected_items(selected_items):
+    """Expand a single selected Leica container into per-image items."""
+    if len(selected_items) != 1:
+        return selected_items
+
+    selected_item = selected_items[0]
+    if isinstance(selected_item, dict):
+        local_path = selected_item.get("localPath")
+        existing_uuid = selected_item.get("uuid")
+    else:
+        local_path = selected_item
+        existing_uuid = None
+
+    if not local_path or existing_uuid:
+        return selected_items
+
+    file_ext = os.path.splitext(local_path)[1].lower()
+    if file_ext not in UPLOADER_NESTED_FILE_EXTENSIONS:
+        return selected_items
+
+    absolute_path = os.path.abspath(os.path.join(BASE_DIR, local_path))
+    logger.info(
+        "Attempting nested Leica expansion for %s (resolved path: %s)",
+        local_path,
+        absolute_path,
+    )
+
+    nested_items = extract_nested_leica_items(absolute_path)
+    if not nested_items:
+        logger.warning(
+            "No nested Leica images found in %s (resolved path: %s)",
+            local_path,
+            absolute_path,
+        )
+        return selected_items
+
+    logger.info(
+        "Expanded nested Leica container %s into %d image selections",
+        local_path,
+        len(nested_items),
+    )
+
+    return [
+        {
+            "localPath": local_path,
+            "uuid": nested_item["uuid"],
+        }
+        for nested_item in nested_items
+    ]
 
 
 def initialize_biomero_importer():
@@ -409,6 +460,8 @@ def process_files(selected_items, selected_destinations, group, username):
     Process selected files & destinations to create upload orders with
     appropriate preprocessing.
     """
+    selected_items = expand_nested_selected_items(selected_items)
+
     # Group files by preprocessing config
     files_by_preprocessing = defaultdict(list)
 
