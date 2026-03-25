@@ -25,6 +25,7 @@ import WorkflowForm from "./WorkflowForm";
 import WorkflowOutput from "./WorkflowOutput";
 import WorkflowInput from "./WorkflowInput";
 import InputOptions from "./InputOptions";
+import PlateWorkflowDialog from "./plate/PlateWorkflowDialog";
 
 const RunPanel = ({ onWorkflowError }) => {
   const { state, updateState, toaster, runWorkflowData } = useAppContext();
@@ -479,8 +480,25 @@ const RunPanel = ({ onWorkflowError }) => {
         )}
       </div>
 
-      {/* BlueprintJS Multistep Dialog for Workflow Details */}
-      {state.selectedWorkflow && (
+      {/* Conditional Dialog for Workflow Details */}
+      {state.selectedWorkflow && (() => {
+        const { isPlateWorkflow } = getWorkflowFlags(state.selectedWorkflow.name);
+        
+        // Use PlateWorkflowDialog for plate workflows
+        if (isPlateWorkflow) {
+          return (
+            <PlateWorkflowDialog
+              workflow={state.selectedWorkflow}
+              dialogOpen={dialogOpen}
+              setDialogOpen={setDialogOpen}
+              onWorkflowError={onWorkflowError}
+              onFinalSubmit={handleFinalSubmit}
+            />
+          );
+        }
+        
+        // Use existing MultistepDialog for image workflows
+        return (
         <MultistepDialog
           isOpen={dialogOpen}
           onClose={() => {
@@ -558,7 +576,8 @@ const RunPanel = ({ onWorkflowError }) => {
             }
           />
         </MultistepDialog>
-      )}
+        );
+      })()}
     </div>
   );
 };
