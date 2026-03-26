@@ -1,5 +1,9 @@
 # OMERO.biomero Plugin
 
+> 🚀 **This package is part of BIOMERO 2.0** — For complete deployment and FAIR infrastructure setup, start with the [**NL-BIOMERO Documentation**](https://nl-bioimaging.github.io/NL-BIOMERO/) 📖
+
+
+
 ## Description
 
 The OMERO.biomero plugin adds functionality to the OMERO web client, allowing users to upload images directly from the web client. The uploads are in-place, meaning that the data is not duplicated in OMERO but remains where it is. Users can monitor their uploads using a dashboard.
@@ -11,7 +15,7 @@ Additionally, the plugin provides a user-friendly interface to execute OMERO scr
 - **Image Uploads**: Upload images directly from the OMERO web client without duplicating data.
 - **Upload Monitoring**: Monitor the status and history of uploads using a dashboard.
 - **Script Execution**: Execute OMERO scripts through a user-friendly interface and monitor their execution.
-- **Workflow Execution**: Execute BioMero workflows on SLURM cluster and monitor their execution.
+- **Workflow Execution**: Execute BIOMERO workflows on SLURM cluster and monitor their execution.
 
 ## Technologies Used
 
@@ -21,13 +25,13 @@ Additionally, the plugin provides a user-friendly interface to execute OMERO scr
 ## Development
 
 The following instructions assume Ubuntu OS.
-For development, we use [NL-BIOMERO](https://github.com/Cellular-Imaging-Amsterdam-UMC/NL-BIOMERO) - dockerized OMERO setup.
+For development, we use [NL-BIOMERO](https://github.com/NL-BioImaging/NL-BIOMERO) - dockerized OMERO setup.
 
 ### Setup and development of plugin core/Django files
 
 1. Install Docker.
-2. Clone the [omero-biomero](https://github.com/Cellular-Imaging-Amsterdam-UMC/omero-biomero.git).
-3. Clone the [NL-BIOMERO](https://github.com/Cellular-Imaging-Amsterdam-UMC/NL-BIOMERO) repository and enter it.
+2. Clone the [omero-biomero](https://github.com/NL-BioImaging/OMERO.biomero.git).
+3. Clone the [NL-BIOMERO](https://github.com/NL-BioImaging/NL-BIOMERO) repository and enter it.
 4. **Folders with both repositories must be in the same parent folder**.
 5. Enter `NL-BIOMERO` repository and start OMERO containers: `docker compose --file docker-compose-dev.yml up`. This compose file enables restarting OMERO Webclient server without causing the container to exit. It does **not** automatically start the Webclient server. It also mounts omero-biomero as a volume in the Webclient container. Changes to the plugin code are automatically reflected in the Webclient because pip installs the plugin in editable mode (see below).
 6. In new terminal, enter `omero-biomero` repository and execute `./omero-init.sh`. This will start the OMERO Webclient server **in background mode**. It also installs the plugin in editable mode, so changes to the plugin code are automatically reflected in the Webclient.

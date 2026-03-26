@@ -1,9 +1,11 @@
 import datetime
 import json
 import logging
+from django.core.cache import cache
 
 
 from biomero import SlurmClient
+from biomero.constants import workflow_batched, workflow, transfer
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from omeroweb.webclient.decorators import login_required
@@ -14,9 +16,7 @@ logger = logging.getLogger(__name__)
 
 @login_required()
 @require_http_methods(["POST"])
-def run_workflow_script(
-    request, conn=None, script_name="SLURM_Run_Workflow.py", **kwargs
-):
+def run_workflow_script(request, conn=None, **kwargs):
     """
     Trigger a specific OMERO script to run based on the provided script name and parameters.
     """
@@ -28,6 +28,10 @@ def run_workflow_script(
         if not workflow_name:
             return JsonResponse({"error": "workflow_name is required"}, status=400)
         params = data.get("params", {})
+        
+        # Determine which script to use based on batch processing settings
+        batch_enabled = params.get("batchEnabled", False)
+        script_name = "SLURM_Run_Workflow_Batched.py" if batch_enabled else "SLURM_Run_Workflow.py"
         
         # Extract and use the active group ID if provided from the frontend
         active_group_id = params.pop("active_group_id", None)
@@ -130,21 +134,27 @@ def run_workflow_script(
         import_zp = params.get("importAsZip")
         uploadcsv = params.get("uploadCsv")
         output_ds = params.get("selectedDatasets", [])
-        rename_pt = params.get("renamePattern")
+        rename_enabled = params.get("enableRename", False)
+        rename_pt = params.get("renamePattern", "")
         version = params.get("version")
         # EXPERIMENTAL: ZARR format support
         use_zarr = params.get("useZarrFormat", False)
+        # Batch processing parameters
+        batch_enabled = params.get("batchEnabled", False)
+        batch_count = params.get("batchCount", 1)
+        batch_size = params.get("batchSize", len(input_ids) if input_ids else 1)
 
         # Convert provided params to OMERO rtypes using wrap
         known_params = [
-            "Data_Type",
-            "IDs",
+            transfer.DATA_TYPE,
+            transfer.IDS,
             "receiveEmail",
             "importAsZip",
             "uploadCsv",
             "attachToOriginalImages",
             "selectedDatasets",
             "renamePattern",
+            "enableRename",
             "workflow_name",
             "cytomine_host",
             "cytomine_id_project",
@@ -153,6 +163,9 @@ def run_workflow_script(
             "cytomine_public_key",
             "version",
             "useZarrFormat",  # EXPERIMENTAL: ZARR format support
+            "batchEnabled",   # Frontend flag (not sent to script)
+            "batchCount",     # Frontend calculated (not sent to script)
+            "batchSize",      # Converted to Batch_Size for script
         ]
         inputs = {
             f"{workflow_name}_|_{key}": wrap(value)
@@ -163,23 +176,27 @@ def run_workflow_script(
             {
                 workflow_name: rbool(True),
                 f"{workflow_name}_Version": wrap(version),
-                "IDs": wrap([rlong(i) for i in input_ids]),
-                "Data_Type": wrap(data_type),
-                "E-mail": rbool(out_email),
+                transfer.IDS: wrap([rlong(i) for i in input_ids]),
+                transfer.DATA_TYPE: wrap(data_type),
+                workflow.EMAIL: rbool(out_email),
                 "Use_ZARR_Format": rbool(use_zarr),  # EXPERIMENTAL
-                "Select how to import your results (one or more)": rbool(True),
-                "1) Zip attachment to parent": rbool(import_zp),
-                "2) Attach to original images": rbool(attach_og),
-                "3a) Import into NEW Dataset": (
-                    wrap(output_ds[0]) if output_ds else wrap("--NO THANK YOU--")
+                workflow_batched.BATCH_SIZE: wrap(batch_size) if batch_enabled else None,  # Only for batched script
+                workflow.SELECT_IMPORT: rbool(True),
+                workflow.OUTPUT_PARENT: rbool(import_zp),
+                workflow.OUTPUT_ATTACH: rbool(attach_og),
+                workflow.OUTPUT_NEW_DATASET: (
+                    wrap(output_ds[0]) if output_ds else wrap(workflow.NO)
                 ),
-                "3b) Allow duplicate dataset (name)?": rbool(False),
-                "3c) Rename the imported images": (
-                    wrap(rename_pt) if rename_pt else wrap("--NO THANK YOU--")
+                workflow.OUTPUT_DUPLICATES: rbool(False),
+                workflow.OUTPUT_RENAME: (
+                    wrap(rename_pt) if (rename_enabled and rename_pt) else wrap(workflow.NO)
                 ),
-                "4) Upload result CSVs as OMERO tables": rbool(uploadcsv),
+                workflow.OUTPUT_CSV_TABLE: rbool(uploadcsv),
             }
         )
+        
+        # Remove None values for non-batched workflows
+        inputs = {k: v for k, v in inputs.items() if v is not None}
         logger.debug(inputs)
 
         try:
@@ -282,11 +299,33 @@ def get_workflows(request, conn=None, **kwargs):
                 error_logs.append(f"Script {script_id} not found")
                 continue
 
-            try:
-                params = scriptService.getParams(script_id)
-            except Exception as e:
-                logger.warning(f"Exception for script {script_id}: {str(e)}")
-                params = None
+            # Try to get script parameters with retry logic
+            params = None
+            for attempt in range(3):  # Try up to 3 times
+                try:
+                    params = scriptService.getParams(script_id)
+                    if params is not None:
+                        break  # Success, exit retry loop
+                except Exception as e:
+                    error_msg = str(e)
+                    if attempt == 2:  # Last attempt
+                        # Check if this is a SLURM connection error
+                        if "Can't find params" in error_msg:
+                            logger.warning(f"Script {script_id} ({script.name}) requires SLURM cluster connection which is unavailable")
+                            # Create informative fallback data for SLURM scripts
+                            params = type('MockParams', (), {
+                                'name': script.name.replace('_', ' '),
+                                'description': 'SLURM cluster connection required but unavailable. Please ensure the SLURM cluster is running and accessible.',
+                                'authors': ['BIOMERO'],
+                                'version': 'Unknown (SLURM offline)'
+                            })()
+                        else:
+                            logger.error(f"Failed to get params for script {script_id} ({script.name}) after 3 attempts: {error_msg}")
+                    else:
+                        logger.warning(f"Attempt {attempt + 1} failed for script {script_id}: {error_msg}, retrying...")
+                        # Brief pause before retry
+                        import time
+                        time.sleep(0.1)
 
             if params is None:
                 script_data = {
@@ -297,6 +336,7 @@ def get_workflows(request, conn=None, **kwargs):
                     "version": "Unknown",
                 }
             else:
+                logger.info(f"Fetched params for script {script_id}: {params}")
                 script_data = {
                     "id": script_id,
                     "name": params.name.replace("_", " "),
@@ -385,3 +425,104 @@ def prepare_workflow_parameters(workflow_name, params):
             converted_params[key] = value
 
     return converted_params
+
+
+@login_required()
+def get_slurm_status(request, conn=None, **kwargs):
+    """
+    Check SLURM cluster availability and get workflow version information.
+    """
+    # Use the main workflow script name - same approach as run_workflow_script
+    script_name = "SLURM_Run_Workflow.py"  # Contains all workflow version info
+    
+    try:
+        scriptService = conn.getScriptService()
+        
+        # Find the script by name (same approach as run_workflow_script)
+        scripts = scriptService.getScripts()
+        script = None
+        for s in scripts:
+            if unwrap(s.getName()) == script_name:
+                script = s
+                break
+
+        if not script:
+            return JsonResponse({
+                "status": "offline",
+                "message": f"SLURM script '{script_name}' not found on server",
+                "last_checked": datetime.datetime.now().isoformat(),
+                "icon": "error",
+                "intent": "danger",
+                "workflow_versions": {}
+            })
+        
+        # Get the script ID and fetch params
+        script_id = int(unwrap(script.id))
+        params = scriptService.getParams(script_id)
+        
+        # Extract workflow versions from params
+        workflow_versions = {}
+        
+        # Parse the params inputs to find workflow versions
+        if hasattr(params, 'inputs') and params.inputs:
+            for key, param in params.inputs.items():
+                # Look for version parameters (e.g., "stardist_Version", "cellpose_Version")
+                if key.endswith('_Version') and hasattr(param, 'values') and param.values:
+                    # Extract workflow name (remove "_Version" suffix)
+                    workflow_name = key.replace('_Version', '')
+                    
+                    # Extract available versions from the values list
+                    versions = []
+                    if hasattr(param.values, '_val'):
+                        for version_obj in param.values._val:
+                            if hasattr(version_obj, '_val'):
+                                versions.append(version_obj._val)
+                    
+                    if versions:
+                        workflow_versions[workflow_name] = {
+                            'available_versions': versions,
+                            'latest_version': versions[0] if versions else None  # Assume first is latest
+                        }
+        
+        # Count workflow statuses for better messaging
+        total_workflows = len(workflow_versions)
+        ready_workflows = sum(1 for versions in workflow_versions.values() 
+                            if versions['latest_version'] and versions['latest_version'].strip())
+        unavailable_workflows = total_workflows - ready_workflows
+        
+        if unavailable_workflows == 0:
+            status_message = f"SLURM cluster is available. {ready_workflows} workflows ready."
+        else:
+            status_message = f"SLURM cluster is available. {ready_workflows} ready, {unavailable_workflows} unavailable."
+        
+        status = {
+            "status": "online",
+            "message": status_message,
+            "last_checked": datetime.datetime.now().isoformat(),
+            "icon": "tick-circle",
+            "intent": "success",
+            "workflow_versions": workflow_versions
+        }
+        
+    except Exception as e:
+        error_msg = str(e)
+        if "Can't find params" in error_msg or "NoValidConnectionsError" in error_msg:
+            status = {
+                "status": "offline", 
+                "message": "SLURM cluster is offline or unreachable",
+                "last_checked": datetime.datetime.now().isoformat(),
+                "icon": "error",
+                "intent": "danger",
+                "workflow_versions": {}
+            }
+        else:
+            status = {
+                "status": "unknown",
+                "message": f"SLURM status check failed: {error_msg}",
+                "last_checked": datetime.datetime.now().isoformat(), 
+                "icon": "warning-sign",
+                "intent": "warning",
+                "workflow_versions": {}
+            }
+    
+    return JsonResponse(status)

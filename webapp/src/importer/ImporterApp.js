@@ -65,7 +65,7 @@ const MonitorPanel = ({
   }, [iframeUrl]);
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="max-h-[calc(100vh-225px)] overflow-y-auto">
       <H4>Monitor</H4>
       <div className="bp5-form-group">
         <div className="bp5-form-content">
@@ -80,7 +80,7 @@ const MonitorPanel = ({
           </div>
         </div>
       </div>
-      <div className="p-4 h-full overflow-hidden">
+      <div className="p-4">
         {!metabaseError ? (
           <iframe
             title="Metabase dashboard"
@@ -96,8 +96,8 @@ const MonitorPanel = ({
           </div>
         )}
         {isAdmin && (
-          <div className="bottom-message">
-            <a href={metabaseUrl} target="_blank" rel="noopener noreferrer">
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded">
+            <a href={metabaseUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
               Click here to access the Metabase interface
             </a>
           </div>
@@ -119,6 +119,7 @@ const ImporterApp = () => {
     createNewContainer,
     toaster,
     loadBiomeroConfig,
+    apiLoading,
   } = useAppContext();
 
   const [activeTab, setActiveTab] = useState("Import");
@@ -155,6 +156,12 @@ const ImporterApp = () => {
     setLastSelectedLocalFileTreeNodeMeta,
   ] = useState(null);
   const [lastSelectedIndex, setLastSelectedIndex] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRefresh = async () => {
+    await loadOmeroTreeData();
+    setRefreshKey((prev) => prev + 1);
+  };
 
   const openCreateContainerOverlay = (isOpen, type) => {
     setIsNewContainerOverlayOpen(isOpen);
@@ -748,10 +755,26 @@ const ImporterApp = () => {
                   size={20}
                 />
               </Tooltip>
+              <Tooltip
+                content="Refresh file tree"
+                placement="bottom"
+                usePortal={false}
+                className="text-md"
+              >
+                <Icon
+                  icon="refresh"
+                  onClick={handleRefresh}
+                  disabled={apiLoading}
+                  color="#5c7080"
+                  className={`cursor-pointer ml-3 ${apiLoading ? "opacity-50" : ""}`}
+                  size={20}
+                />
+              </Tooltip>
             </div>
             {state.omeroFileTreeData && (
               <div className="mt-4 max-h-[calc(100vh-450px)] overflow-auto">
                 <OmeroDataBrowser
+                  key={refreshKey}
                   onSelectCallback={(nodeData, coords, e, deselect = false) =>
                     handleFileTreeSelection(
                       nodeData,
@@ -807,7 +830,7 @@ const ImporterApp = () => {
           <div className="w-1/4 overflow-auto pt-2">
             <div className="flex space-x-4 items-center">
               <h1 className="text-base font-bold p-0 m-0 inline-block">
-                3. Upload list
+                3. Import list
               </h1>
               <Button
                 onClick={removeUploadItems}
@@ -857,7 +880,7 @@ const ImporterApp = () => {
           </Card>
           <Icon icon="circle-arrow-right" size={24} color="grey" />
           <Card>
-            <span className="text-base">{`Upload destination: ${
+            <span className="text-base">{`Import destination: ${
               selectedOmeroPath || "None"
             }`}</span>
           </Card>

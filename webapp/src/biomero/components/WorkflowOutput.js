@@ -1,25 +1,28 @@
-import React, { useState, useEffect } from "react";
-import { InputGroup, FormGroup, Switch } from "@blueprintjs/core";
+import React, { useState, useEffect, useRef } from "react";
+import { InputGroup, FormGroup, Switch, Callout } from "@blueprintjs/core";
 import { useAppContext } from "../../AppContext";
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover.js";
 
 const WorkflowOutput = ({ onSelectionChange }) => {
   const { state, updateState } = useAppContext();
-  const [renamePattern, setRenamePattern] = useState("");
+  const [renamePattern, setRenamePattern] = useState("{original_file}_result.{ext}");
   const [hasOutputSelection, setHasOutputSelection] = useState(true);
+  const [renameValidation, setRenameValidation] = useState({ hasError: false, hasWarning: false, message: "" });
+  const renameInputRef = useRef(null);
   const outputOptions = [
     "importAsZip",
-    "uploadCsv",
+    "uploadCsv", 
     "attachToOriginalImages",
     "selectedDatasets",
   ];
   const defaultValues = {
     receiveEmail: true,
-    importAsZip: true,
-    uploadCsv: true,
+    importAsZip: false,
+    uploadCsv: false,
     attachToOriginalImages: false,
     selectedDatasets: [],
-    renamePattern: "",
+    renamePattern: "{original_file}_result.{ext}",
+    enableRename: false,
   };
 
   useEffect(() => {
@@ -28,9 +31,19 @@ const WorkflowOutput = ({ onSelectionChange }) => {
   }, [state.formData]);
 
   useEffect(() => {
-    // Tell the parent
-    onSelectionChange(hasOutputSelection);
-  }, [hasOutputSelection]);
+    // Sync rename fields - if enableRename is false, ensure pattern gets sent as empty or default
+    if (state.formData.enableRename === false) {
+      // When rename is disabled, still keep the pattern but the boolean will control usage
+      setRenamePattern(state.formData.renamePattern || defaultValues.renamePattern);
+    }
+  }, [state.formData.enableRename]);
+
+  useEffect(() => {
+    // Tell the parent about output selection AND rename validation errors
+    const hasValidationError = state.formData.enableRename && renameValidation.hasError;
+    const canProceed = hasOutputSelection && !hasValidationError;
+    onSelectionChange(canProceed);
+  }, [hasOutputSelection, renameValidation, state.formData.enableRename]);
 
   useEffect(() => {
     const inputs = state.inputDatasets || [];
@@ -57,6 +70,37 @@ const WorkflowOutput = ({ onSelectionChange }) => {
     }
   }, [state.inputDatasets]);
 
+  const validateRenamePattern = (pattern) => {
+    
+    if (pattern.trim() === "") {
+      return { hasError: true, hasWarning: false, message: "Pattern cannot be empty" };
+    }
+    
+    // Check for invalid variable names
+    const validVariables = ['original_file', 'original_ext', 'file', 'ext'];
+    const variablePattern = /\{([^}]+)\}/g;
+    const foundVariables = [...pattern.matchAll(variablePattern)].map(match => match[1]);
+    const invalidVariables = foundVariables.filter(v => !validVariables.includes(v));
+    
+    if (invalidVariables.length > 0) {
+      return { 
+        hasError: true, 
+        hasWarning: false, 
+        message: `Invalid variable(s): {${invalidVariables.join('}, {')}}. Use: {original_file}, {original_ext}, {file}, or {ext}` 
+      };
+    }
+    
+    // Check if pattern has any extension: {ext}, {original_ext}, or manual like .csv, .tiff
+    const hasVariableExt = pattern.includes("{ext}") || pattern.includes("{original_ext}");
+    const hasManualExt = /\.[a-zA-Z0-9]+/.test(pattern);
+    
+    if (!hasVariableExt && !hasManualExt) {
+      return { hasError: false, hasWarning: true, message: "Consider adding an extension like .{ext} or .tiff" };
+    }
+    
+    return { hasError: false, hasWarning: false, message: "" };
+  };
+
   const handleInputChange = (key, value) => {
     // Compute new state immediately
     const updatedFormData = {
@@ -78,19 +122,99 @@ const WorkflowOutput = ({ onSelectionChange }) => {
   };
 
   const handleRenamePatternChange = (e) => {
-    setRenamePattern(e.target.value);
-    handleInputChange("renamePattern", e.target.value);
+    const newValue = e.target.value;
+    setRenamePattern(newValue);
+    handleInputChange("renamePattern", newValue);
+    
+    // Validate pattern only if rename is enabled
+    if (state.formData.enableRename) {
+      const validation = validateRenamePattern(newValue);
+      setRenameValidation(validation);
+    }
+    
+    // Auto-enable rename if user edits pattern and it's currently disabled
+    if (!state.formData.enableRename && newValue !== defaultValues.renamePattern) {
+      handleInputChange("enableRename", true);
+      // Validate after enabling
+      const validation = validateRenamePattern(newValue);
+      setRenameValidation(validation);
+    }
+  };
+
+  const handleExampleClick = (pattern) => {
+    setRenamePattern(pattern);
+    handleInputChange("renamePattern", pattern);
+    
+    // Validate pattern
+    const validation = validateRenamePattern(pattern);
+    setRenameValidation(validation);
+    
+    // Auto-enable rename if it's currently disabled
+    if (!state.formData.enableRename) {
+      handleInputChange("enableRename", true);
+    }
+    
+    // Focus the input after clicking example
+    if (renameInputRef.current) {
+      renameInputRef.current.focus();
+    }
+  };
+
+  const handleRenameEnableChange = (checked) => {
+    handleInputChange("enableRename", checked);
+    if (checked) {
+      // When enabling, make sure we have a valid pattern
+      if (!renamePattern || renamePattern === "") {
+        const defaultPattern = defaultValues.renamePattern;
+        setRenamePattern(defaultPattern);
+        handleInputChange("renamePattern", defaultPattern);
+        // Validate the default pattern
+        const validation = validateRenamePattern(defaultPattern);
+        setRenameValidation(validation);
+      } else {
+        // Validate current pattern
+        const validation = validateRenamePattern(renamePattern);
+        setRenameValidation(validation);
+      }
+      // Focus the input field to draw attention
+      setTimeout(() => {
+        if (renameInputRef.current) {
+          renameInputRef.current.focus();
+        }
+      }, 100);
+    } else {
+      // Clear validation when disabled
+      setRenameValidation({ hasError: false, hasWarning: false, message: "" });
+    }
   };
 
   return (
     <form>
       <h2>Output Options</h2>
 
+      {/* Sticky Validation Messages */}
+      <div className="sticky top-0 z-10">
+        {!hasOutputSelection && (
+          <Callout intent="danger" className="mb-2 bg-red-50 border-red-200">
+            <strong>Please select at least one output option below</strong>
+          </Callout>
+        )}
+        
+        {state.formData.enableRename && renameValidation.message && (
+          <Callout 
+            intent={renameValidation.hasError ? "danger" : "warning"} 
+            className={`mb-2 ${renameValidation.hasError ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'}`}
+          >
+            <strong>Rename Pattern:</strong> {renameValidation.message}
+          </Callout>
+        )}
+      </div>
+
       {/* Receive Email Option */}
       <FormGroup
         label="Receive E-mail on Completion?"
         labelFor="email-notification"
-        helperText="Receive an email notification when the workflow finishes."
+        helperText="Receive an email from SLURM when one or more jobs finish (completed or failed)."
       >
         <Switch
           id="email-notification"
@@ -196,19 +320,66 @@ const WorkflowOutput = ({ onSelectionChange }) => {
         {/* Optional Image File Renamer */}
         <FormGroup
           label="Rename result images?"
+          labelFor="image-renaming-switch"
+          helperText="Enable custom naming patterns for imported result images."
+          intent={hasOutputSelection ? "" : "danger"}
+        >
+          <Switch
+            id="image-renaming-switch"
+            checked={state.formData.enableRename ?? defaultValues.enableRename}
+            onChange={(e) => handleRenameEnableChange(e.target.checked)}
+            intent={hasOutputSelection ? "" : "danger"}
+            disabled={
+              !state.formData.selectedDatasets ||
+              state.formData.selectedDatasets.length === 0
+            }
+          />
+        </FormGroup>
+
+        {/* Rename Pattern Input */}
+        <FormGroup
+          label="Rename pattern"
           labelFor="image-renaming-pattern"
           helperText={
             <>
               <div>
-                Use <code>{"{original_file}"}</code> and <code>{"{ext}"}</code>{" "}
-                to create a naming pattern for the new images.
+                <strong>Original input variables:</strong> <code>{"{original_file}"}</code> (filename without extension), <code>{"{original_ext}"}</code> (full extension)
               </div>
               <div>
-                For example, if the original image is <code>sample1.tiff</code>,
-                you can name the result image{" "}
-                <code>sample1_nuclei_mask.tiff</code> by using the pattern{" "}
-                <code>{"{original_file}_nuclei_mask.{ext}"}</code>.
+                <strong>Result file variables:</strong> <code>{"{file}"}</code> (workflow result filename without extension), <code>{"{ext}"}</code> (full extension from result file)
               </div>
+              <div className="mt-2">
+                <strong>Examples:</strong>
+              </div>
+              <ul className="list-disc list-inside mt-1 text-xs ml-4">
+                <li>
+                  <code 
+                    className="cursor-pointer hover:bg-blue-100 px-1 rounded"
+                    onClick={() => handleExampleClick("{original_file}_mask.{ext}")}
+                    title="Click to use this pattern"
+                  >
+                    {"{original_file}_mask.{ext}"}
+                  </code> → Use original name + result extension
+                </li>
+                <li>
+                  <code 
+                    className="cursor-pointer hover:bg-blue-100 px-1 rounded"
+                    onClick={() => handleExampleClick("{file}_processed.{original_ext}")}
+                    title="Click to use this pattern"
+                  >
+                    {"{file}_processed.{original_ext}"}
+                  </code> → Use result name + original extension
+                </li>
+                <li>
+                  <code 
+                    className="cursor-pointer hover:bg-blue-100 px-1 rounded"
+                    onClick={() => handleExampleClick("analysis_{original_file}.tif")}
+                    title="Click to use this pattern"
+                  >
+                    {"analysis_{original_file}.tif"}
+                  </code> → Custom prefix + original name + specific extension
+                </li>
+              </ul>
             </>
           }
           disabled={
@@ -218,7 +389,7 @@ const WorkflowOutput = ({ onSelectionChange }) => {
         >
           <InputGroup
             id="image-renaming-pattern"
-            placeholder="e.g., {original_file}_nuclei_mask.{ext}"
+            inputRef={renameInputRef}
             value={renamePattern}
             onChange={handleRenamePatternChange}
             fill={true}
@@ -226,14 +397,11 @@ const WorkflowOutput = ({ onSelectionChange }) => {
               !state.formData.selectedDatasets ||
               state.formData.selectedDatasets.length === 0
             }
+            intent={renameValidation.hasError ? "danger" : (renameValidation.hasWarning ? "warning" : "none")}
           />
+          {/* Validation now appears in sticky header above */}
         </FormGroup>
       </FormGroup>
-      {!hasOutputSelection && (
-        <div className="text-red-500 text-sm">
-          Please select at least one output option
-        </div>
-      )}
     </form>
   );
 };
