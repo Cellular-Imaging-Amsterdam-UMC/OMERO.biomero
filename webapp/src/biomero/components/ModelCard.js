@@ -19,6 +19,7 @@ const ModelCard = ({
   onAddParam,
   onDelete,
   onReset,
+  onRepoBlur,
   editable,
   setEditable,
   errors,
@@ -128,6 +129,7 @@ const ModelCard = ({
           placeholder="e.g., https://github.com/org/repo/tree/v1.0.0"
           readOnly={!editable}
           onChange={(e) => onChange(index, "repo", e.target.value)}
+          onBlur={() => onRepoBlur && onRepoBlur(index)}
           rightElement={
             item.repo ? (
               <div className="flex">

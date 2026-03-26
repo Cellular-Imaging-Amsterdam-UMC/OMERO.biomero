@@ -18,6 +18,7 @@ import ConfigSection from "./ConfigSection";
 import ModelCard from "./ModelCard.js";
 import ConverterCard from "./ConverterCard.js";
 import { checkModelVersions } from "../../apiService";
+import { clearGitHubCache } from "../../apiService";
 
 const SettingsForm = () => {
   const { 
@@ -154,12 +155,12 @@ const SettingsForm = () => {
     }
   }, [settingsForm?.MODELS, versionCheckCompleted]);
 
-  const performVersionCheck = async () => {
+  const performVersionCheck = async (forceRefresh = false) => {
     if (!settingsForm?.MODELS?.length || versionCheckLoading) return;
     
     setVersionCheckLoading(true);
     try {
-      const results = await checkModelVersions(settingsForm.MODELS);
+      const results = await checkModelVersions(settingsForm.MODELS, forceRefresh);
       const statusMap = {};
       results.forEach(result => {
         statusMap[result.index] = result;
@@ -173,13 +174,19 @@ const SettingsForm = () => {
     }
   };
 
+  // Manual refresh that clears cache and forces fresh API calls
+  const manualRefreshVersions = async () => {
+    await clearGitHubCache(); // Clear the cache first (now async)
+    await performVersionCheck(true); // Force refresh
+  };
+
   // Check version for a specific model
-  const recheckModelVersion = async (modelIndex, updatedModel = null) => {
+  const recheckModelVersion = async (modelIndex, updatedModel = null, forceRefresh = false) => {
     if (!settingsForm?.MODELS?.[modelIndex] && !updatedModel) return;
     
     try {
       const model = updatedModel || settingsForm.MODELS[modelIndex];
-      const results = await checkModelVersions([model]);
+      const results = await checkModelVersions([model], forceRefresh);
       if (results.length > 0) {
         const result = { ...results[0], index: modelIndex }; // Fix index to match our array
         setVersionStatus(prev => ({
@@ -195,22 +202,60 @@ const SettingsForm = () => {
   // Calculate version summary for Models Settings
   const getVersionSummary = () => {
     if (!settingsForm?.MODELS?.length || !Object.keys(versionStatus).length) {
-      return { upToDate: 0, total: 0, outdated: 0 };
+      return { 
+        upToDate: 0, 
+        total: 0, 
+        outdated: 0, 
+        rateLimited: 0, 
+        stale: 0
+      };
     }
     
     const total = settingsForm.MODELS.length;
     let upToDate = 0;
     let outdated = 0;
+    let rateLimited = 0;
+    let stale = 0;
+    let rateLimitResetTime = null;
     
     Object.values(versionStatus).forEach(status => {
-      if (status.status === 'up-to-date' || status.justUpdated) {
+      if (status.status === 'rate-limited') {
+        rateLimited++;
+        // Get the earliest reset time for display
+        if (status.rateLimitInfo?.reset) {
+          const resetTime = parseInt(status.rateLimitInfo.reset) * 1000;
+          if (!rateLimitResetTime || resetTime < rateLimitResetTime) {
+            rateLimitResetTime = resetTime;
+          }
+        }
+      } else if (status.status === 'up-to-date' || status.justUpdated) {
         upToDate++;
       } else if (status.status === 'outdated') {
         outdated++;
+      } else if (status.status === 'up-to-date-stale' || status.status === 'outdated-stale') {
+        stale++;
+        if (status.status === 'up-to-date-stale') upToDate++;
+        if (status.status === 'outdated-stale') outdated++;
       }
+      // Handle 'error' and 'unknown' statuses - these count toward total but no specific category
     });
     
-    return { upToDate, total, outdated };
+    return { 
+      upToDate, 
+      total, 
+      outdated, 
+      rateLimited, 
+      stale, 
+      rateLimitResetTime: rateLimitResetTime ? new Date(rateLimitResetTime) : null
+    };
+  };
+
+  // Handle when user finishes editing repo URL
+  const handleRepoUrlBlur = (modelIndex) => {
+    if (!settingsForm?.MODELS?.[modelIndex]?.repo) return;
+    
+    const model = settingsForm.MODELS[modelIndex];
+    recheckModelVersion(modelIndex, model);
   };
 
   const toggleEdit = (field) => {
@@ -233,19 +278,13 @@ const SettingsForm = () => {
 
     setSettingsForm((prev) => ({ ...prev, MODELS: updatedModels }));
 
-    // Recheck version when repo URL changes (unless skipVersionCheck is set)
+    // Clear version status when repo URL changes - we'll check on blur
     if (field === "repo" && !options.skipVersionCheck) {
-      // Clear the old status first
       setVersionStatus(prev => {
         const updated = { ...prev };
         delete updated[index];
         return updated;
       });
-      
-      // Trigger recheck after a short delay with the updated model data
-      setTimeout(() => {
-        recheckModelVersion(index, updatedModels[index]);
-      }, 100);
     }
   };
 
@@ -931,6 +970,7 @@ const SettingsForm = () => {
         title="Models Settings" 
         versionSummary={getVersionSummary()}
         versionCheckLoading={versionCheckLoading}
+        onRefresh={manualRefreshVersions}
       >
         <ConfigSection
           items={settingsForm.MODELS}
@@ -978,6 +1018,8 @@ const SettingsForm = () => {
           validateField={null} // No validation for models yet
           versionStatus={versionStatus} // Pass version check results
           versionCheckLoading={versionCheckLoading} // Pass loading state
+          config={state.config} // Pass config for workflow type detection
+          onRepoBlur={handleRepoUrlBlur} // Pass repo blur handler
         />
       </CollapsibleSection>
       <H5>Note on saving BIOMERO settings</H5>

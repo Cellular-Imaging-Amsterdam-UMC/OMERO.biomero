@@ -6,6 +6,26 @@ import DatasetSelectWithPopover from "../DatasetSelectWithPopover.js";
 const PlateWorkflowOutput = ({ onSelectionChange }) => {
   const { state, updateState } = useAppContext();
   const [hasOutputSelection, setHasOutputSelection] = useState(true);
+  const [defaultScreenSet, setDefaultScreenSet] = useState(false);
+  
+  // Check if importer is enabled - plate workflows require it
+  const isImporterEnabled = window.WEBCLIENT?.UI?.IMPORTER_ENABLED || false;
+  
+  // Function to find parent screen of a selected plate
+  const findParentScreen = (plateId, omeroFileTreeData) => {
+    if (!plateId || !omeroFileTreeData) return null;
+    
+    const plateKey = `plate-${plateId}`;
+    
+    // Search through all nodes for a screen that contains this plate
+    for (const [key, node] of Object.entries(omeroFileTreeData)) {
+      if (node.category === "screens" && 
+          node.children?.includes(plateKey)) {
+        return node;
+      }
+    }
+    return null;
+  };
   
   const outputOptions = [
     "importAsZip",
@@ -28,6 +48,30 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
     // Tell the parent about output selection
     onSelectionChange(hasOutputSelection);
   }, [hasOutputSelection]);
+
+  // Set default screen when plate is selected in input
+  useEffect(() => {
+    if (state.formData?.IDs?.length > 0 && 
+        state.formData?.plateMode && 
+        state.omeroFileTreeData && 
+        !defaultScreenSet &&
+        (!state.formData.selectedScreens || state.formData.selectedScreens.length === 0)) {
+      
+      const plateId = state.formData.IDs[0];
+      const parentScreen = findParentScreen(plateId, state.omeroFileTreeData);
+      
+      if (parentScreen) {
+        console.log("Setting default screen for plate:", plateId, "->", parentScreen.data);
+        updateState({
+          formData: {
+            ...state.formData,
+            selectedScreens: [parentScreen.data]
+          }
+        });
+        setDefaultScreenSet(true);
+      }
+    }
+  }, [state.formData?.IDs, state.formData?.plateMode, state.omeroFileTreeData, defaultScreenSet]);
 
   // Check output selection state whenever formData changes
   useEffect(() => {
@@ -63,6 +107,16 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
     <DialogBody>
       <form>
         <h2>Output Options</h2>
+
+        {/* Warning if importer is not enabled */}
+        {!isImporterEnabled && (
+          <Callout intent="danger" className="mb-4">
+            <strong>Plate workflows require importer integration</strong>
+            <br />
+            Plate workflows with ZARR outputs are only supported when IMPORTER_ENABLED=true. 
+            Please contact your administrator to enable importer integration.
+          </Callout>
+        )}
 
         {/* Sticky Validation Messages */}
         <div className="sticky top-0 z-10">
