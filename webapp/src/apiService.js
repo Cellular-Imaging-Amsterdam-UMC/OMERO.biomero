@@ -361,6 +361,33 @@ export const fetchPlateImages = async (plateId) => {
   return allImages;
 };
 
+export const fetchPlateGridData = async (plateId) => {
+  try {
+    // Use the same endpoint as OMERO webclient for plate grid data
+    const response = await fetch(
+      `${window.location.origin}/webgateway/plate/${plateId}/0/`
+    );
+    const text = await response.text();
+    
+    // Parse both JSONP and plain JSON responses
+    let plateData;
+    if (text.includes('jQuery') && text.includes('({') && text.includes('})')) {
+      // JSONP format: jQuery123({...})
+      const jsonStart = text.indexOf('({') + 1;
+      const jsonEnd = text.lastIndexOf('})');
+      plateData = JSON.parse(text.substring(jsonStart, jsonEnd));
+    } else {
+      // Plain JSON format
+      plateData = JSON.parse(text);
+    }
+    
+    return plateData;
+  } catch (error) {
+    console.error("Error fetching plate grid data:", error);
+    throw error;
+  }
+};
+
 // GitHub API functions for version checking
 /**
  * Extracts GitHub repository information from a URL

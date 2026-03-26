@@ -11,7 +11,7 @@ import DatasetSelectWithPopover from "../DatasetSelectWithPopover";
 import { useAppContext } from "../../../AppContext";
 
 const PlateWorkflowInput = () => {
-  const { state, updateState } = useAppContext();
+  const { state, updateState, loadPlateGridData } = useAppContext();
   const [selectedPlate, setSelectedPlate] = useState(null);
   const [plateWellCount, setPlateWellCount] = useState(null);
   const [plateGridData, setPlateGridData] = useState(null);
@@ -23,38 +23,14 @@ const PlateWorkflowInput = () => {
         try {
           setPlateWellCount("Fetching...");
           setPlateGridData(null);
-          // Use the same endpoint as OMERO webclient for plate grid data
-          const response = await fetch(
-            `${window.location.origin}/webgateway/plate/${selectedPlate.id}/0/`
-          );
-          const text = await response.text();
           
-          // Parse both JSONP and plain JSON responses
-          let plateData;
-          if (text.includes('jQuery') && text.includes('({') && text.includes('})')) {
-            // JSONP format: jQuery123({...})
-            const jsonStart = text.indexOf('({') + 1;
-            const jsonEnd = text.lastIndexOf('})');
-            plateData = JSON.parse(text.substring(jsonStart, jsonEnd));
-          } else {
-            // Plain JSON format
-            plateData = JSON.parse(text);
-          }
+          const result = await loadPlateGridData(selectedPlate.id);
           
           // Store the complete grid data for visualization
-          setPlateGridData(plateData);
+          setPlateGridData(result.plateData);
           
-          // Calculate well information from grid
-          const totalPositions = plateData.rowlabels.length * plateData.collabels.length;
-          const wellsWithImages = plateData.grid.flat().filter(cell => cell !== null).length;
-          
-          // Format well count info
-          const plateFormat = `${plateData.rowlabels.length}×${plateData.collabels.length}`;
-          if (wellsWithImages === totalPositions) {
-            setPlateWellCount(`${totalPositions} wells (${plateFormat})`);
-          } else {
-            setPlateWellCount(`${wellsWithImages}/${totalPositions} wells (${plateFormat})`);
-          }
+          // Use the formatted well count from AppContext
+          setPlateWellCount(result.wellCount);
         } catch (error) {
           console.error("Error fetching plate details:", error);
           setPlateWellCount("Error loading");
