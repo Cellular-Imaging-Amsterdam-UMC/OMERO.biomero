@@ -5,6 +5,7 @@ import Tus from "@uppy/tus";
 import "@uppy/core/dist/style.min.css";
 import "@uppy/dashboard/dist/style.min.css";
 import { importUploadedFile } from "../../apiService";
+import { getDjangoConstants } from "../../constants";
 import { Callout, Intent } from "@blueprintjs/core";
 
 const getUploadedFilename = (file, response, uploadedFilenameMap) => {
@@ -26,6 +27,8 @@ const ResumableUploader = ({ datasetId, datasetType, group }) => {
   const uppyRef = useRef(null);
   const uploadedFilenameMapRef = useRef(new Map());
   const [isReady, setIsReady] = useState(false);
+  const { ui } = getDjangoConstants();
+  const allowedFileTypes = ui.uploader_allowed_file_extensions;
 
   useEffect(() => {
     // Create Uppy instance
@@ -36,6 +39,7 @@ const ResumableUploader = ({ datasetId, datasetType, group }) => {
       restrictions: {
         maxNumberOfFiles: null,
         minNumberOfFiles: 1,
+        allowedFileTypes,
       },
     }).use(Tus, {
       endpoint: "/omero_biomero/upload/",
@@ -57,7 +61,7 @@ const ResumableUploader = ({ datasetId, datasetType, group }) => {
     return () => {
       uppyInstance.close();
     };
-  }, []);
+  }, [allowedFileTypes]);
 
   useEffect(() => {
     if (!isReady || !dashboardRef.current || !uppyRef.current) return;
@@ -70,7 +74,7 @@ const ResumableUploader = ({ datasetId, datasetType, group }) => {
       height: 500,
       showProgressDetails: true,
       proudlyDisplayPoweredByUppy: false,
-      note: "Drag and drop files here or click to browse",
+      note: "Drag and drop supported files here or click to browse (.xlef requires folder import)",
     });
 
     // Handle upload success

@@ -288,6 +288,10 @@ SUPPORTED_FILE_EXTENSIONS = [
     ".zvi",
 ]
 
+UPLOADER_ALLOWED_FILE_EXTENSIONS = [
+    ext for ext in SUPPORTED_FILE_EXTENSIONS if ext != ".xlef"
+]
+
 # Uploader settings
 # Directory where intermediate chunks are stored
 UPLOADER_CHUNKS_DIR = os.getenv("UPLOADER_CHUNKS_DIR", os.path.join(BASE_DIR, "tus_upload"))
