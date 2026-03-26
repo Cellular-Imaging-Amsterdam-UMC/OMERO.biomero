@@ -35,7 +35,7 @@
         }
     };
     var WEBCLIENT = {};
-    WEBCLIENT.USER = {'id': {{ ome.user.id }}, 'fullName': "{{ ome.user.getFullName }}"};
+    WEBCLIENT.USER = {'id': {{ ome.user.id }}, 'fullName': "{{ ome.user.getFullName }}", 'username': "{{ user_name }}"};
     WEBCLIENT.active_user = {'id': {{ ome.active_user }}, 'fullName': "{{ active_user.getFullName }}"};
     WEBCLIENT.member_of_groups = {{ member_of_groups|json_dumps|safe }};
     WEBCLIENT.isAdmin = {% if ome.user.isAdmin %}true{% else %}false{% endif %};

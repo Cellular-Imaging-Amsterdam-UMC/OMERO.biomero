@@ -73,6 +73,11 @@ class TusViewsTestCase(TestCase):
         """Set up test environment with temporary directories."""
         self.tmp_upload_dir = tempfile.mkdtemp(prefix="tus_test_upload_")
         self.tmp_dest_dir = tempfile.mkdtemp(prefix="tus_test_dest_")
+        self.tmp_base_dir = tempfile.mkdtemp(prefix="tus_test_base_")
+        self.tmp_config_path = os.path.join(self.tmp_base_dir, "importer-config.json")
+        self.tmp_group_mappings_path = os.path.join(
+            self.tmp_base_dir, "group-mappings.json"
+        )
 
         self.factory = RequestFactory()
         self.mod = _import_module()
@@ -80,17 +85,38 @@ class TusViewsTestCase(TestCase):
         # Patch the directories
         self._orig_upload_dir = self.mod.UPLOADER_CHUNKS_DIR
         self._orig_dest_dir = self.mod.UPLOADER_DESTINATION_DIR
+        self._orig_base_dir = self.mod.BASE_DIR
+        self._orig_config_path = self.mod.CONFIG_FILE_PATH
+        self._orig_group_mappings_path = self.mod.GROUP_MAPPINGS_FILE_PATH
         self.mod.UPLOADER_CHUNKS_DIR = self.tmp_upload_dir
         self.mod.UPLOADER_DESTINATION_DIR = self.tmp_dest_dir
+        self.mod.BASE_DIR = self.tmp_base_dir
+        self.mod.CONFIG_FILE_PATH = self.tmp_config_path
+        self.mod.GROUP_MAPPINGS_FILE_PATH = self.tmp_group_mappings_path
 
     def tearDown(self):
         """Clean up temporary directories."""
         shutil.rmtree(self.tmp_upload_dir, ignore_errors=True)
         shutil.rmtree(self.tmp_dest_dir, ignore_errors=True)
+        shutil.rmtree(self.tmp_base_dir, ignore_errors=True)
 
         # Restore original directories
         self.mod.UPLOADER_CHUNKS_DIR = self._orig_upload_dir
         self.mod.UPLOADER_DESTINATION_DIR = self._orig_dest_dir
+        self.mod.BASE_DIR = self._orig_base_dir
+        self.mod.CONFIG_FILE_PATH = self._orig_config_path
+        self.mod.GROUP_MAPPINGS_FILE_PATH = self._orig_group_mappings_path
+
+    def _write_uploader_config(self, upload_to_group_folder=False):
+        with open(self.tmp_config_path, "w", encoding="utf-8") as fh:
+            json.dump(
+                {"UPLOADER": {"upload_to_group_folder": upload_to_group_folder}},
+                fh,
+            )
+
+    def _write_group_mappings(self, mappings):
+        with open(self.tmp_group_mappings_path, "w", encoding="utf-8") as fh:
+            json.dump(mappings, fh)
 
     def _make_request(
         self,
@@ -145,18 +171,26 @@ class TusViewsTestCase(TestCase):
 
         return request
 
-    def _create_upload(self, filename="test.tif", size=1000, user_id=123):
+    def _create_upload(self, filename="test.tif", size=1000, user_id=123, metadata=None):
         """Helper to create an upload and return the resource ID."""
         import base64
 
-        filename_b64 = base64.b64encode(filename.encode()).decode()
+        metadata = metadata or {}
+        encoded_metadata = {
+            "filename": base64.b64encode(filename.encode()).decode(),
+        }
+        for key, value in metadata.items():
+            encoded_metadata[key] = base64.b64encode(str(value).encode()).decode()
+        metadata_header = ",".join(
+            f"{key} {value}" for key, value in encoded_metadata.items()
+        )
 
         request = self._make_request(
             "POST",
             "/upload/",
             headers={
                 "HTTP_UPLOAD_LENGTH": str(size),
-                "HTTP_UPLOAD_METADATA": f"filename {filename_b64}",
+                "HTTP_UPLOAD_METADATA": metadata_header,
                 "HTTP_TUS_RESUMABLE": "1.0.0",
             },
             user_id=user_id,
@@ -274,6 +308,46 @@ class TusOwnershipTests(TusViewsTestCase):
         response = view(request, resource_id=uuid.UUID(resource_id))
 
         self.assertEqual(response.status_code, 403)
+
+
+class TusDestinationTests(TusViewsTestCase):
+    def test_completed_upload_uses_group_folder_when_enabled(self):
+        self._write_uploader_config(upload_to_group_folder=True)
+        self._write_group_mappings({"17": {"folder": "grpA", "groupName": "Group A"}})
+
+        resource_id = self._create_upload(
+            filename="grouped.tif",
+            size=4,
+            user_id=123,
+            metadata={"groupId": "17", "username": "alice"},
+        )
+        self.assertIsNotNone(resource_id)
+
+        request = self._make_request(
+            "PATCH",
+            f"/upload/{resource_id}",
+            data=b"data",
+            headers={
+                "HTTP_UPLOAD_OFFSET": "0",
+                "HTTP_TUS_RESUMABLE": "1.0.0",
+            },
+            user_id=123,
+        )
+        view = self.mod.TusUploadView.as_view()
+        response = view(request, resource_id=uuid.UUID(resource_id))
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.get("Upload-Filename"), "grouped.tif")
+        self.assertTrue(
+            os.path.exists(
+                os.path.join(self.tmp_base_dir, "grpA", "uploads", "alice", "grouped.tif")
+            )
+        )
+        self.assertFalse(
+            os.path.exists(
+                os.path.join(self.tmp_dest_dir, "user_123", "grouped.tif")
+            )
+        )
 
     def test_patch_owner_can_upload(self):
         """Owner should be able to upload chunks."""

@@ -634,6 +634,8 @@ class ImportUploadedFileTests(TestCase):
     def setUp(self):
         self.tmp = os.path.abspath(self._mk_tmp())
         self.tus_dest = os.path.join(self.tmp, "tus_destination")
+        self.config_path = os.path.join(self.tmp, "importer-config.json")
+        self.group_mappings_path = os.path.join(self.tmp, "group-mappings.json")
         os.makedirs(self.tus_dest, exist_ok=True)
 
         _INGEST_LOG.clear()
@@ -643,6 +645,8 @@ class ImportUploadedFileTests(TestCase):
         # Patch TUS destination directory
         setattr(self.mod, "UPLOADER_DESTINATION_DIR", self.tus_dest)
         setattr(self.mod, "BASE_DIR", self.tmp)
+        setattr(self.mod, "CONFIG_FILE_PATH", self.config_path)
+        setattr(self.mod, "GROUP_MAPPINGS_FILE_PATH", self.group_mappings_path)
 
         # Mock process_files to avoid actual import
         self._original_process_files = getattr(self.mod, "process_files", None)
@@ -706,6 +710,27 @@ class ImportUploadedFileTests(TestCase):
             f.write(content)
         return file_path
 
+    def _create_group_folder_upload_file(
+        self, filename, group_folder, username="alice", content=b"test content"
+    ):
+        uploads_dir = os.path.join(self.tmp, group_folder, "uploads", username)
+        os.makedirs(uploads_dir, exist_ok=True)
+        file_path = os.path.join(uploads_dir, filename)
+        with open(file_path, "wb") as f:
+            f.write(content)
+        return file_path
+
+    def _write_uploader_config(self, upload_to_group_folder=False):
+        with open(self.config_path, "w", encoding="utf-8") as fh:
+            json.dump(
+                {"UPLOADER": {"upload_to_group_folder": upload_to_group_folder}},
+                fh,
+            )
+
+    def _write_group_mappings(self, mappings):
+        with open(self.group_mappings_path, "w", encoding="utf-8") as fh:
+            json.dump(mappings, fh)
+
     def _call_import(self, data, conn):
         """Call import_uploaded_file with given data."""
         req = self.factory.post(
@@ -745,6 +770,86 @@ class ImportUploadedFileTests(TestCase):
 
         self.assertEqual(resp.status_code, 404)
         self.assertIn("File not found", resp.content.decode())
+
+    def test_import_uploaded_file_finds_group_folder_upload(self):
+        self._write_uploader_config(upload_to_group_folder=True)
+        conn = self._fake_conn(["grp1"], user_id=5, username="alice")
+        group_id = conn.getGroupsMemberOf.return_value[0].getId.return_value
+        self._write_group_mappings(
+            {str(group_id): {"folder": "grp1-folder", "groupName": "grp1"}}
+        )
+        self._create_group_folder_upload_file(
+            "group-upload.tif", "grp1-folder", username="alice"
+        )
+
+        dataset = MagicMock()
+        dataset.canLink.return_value = True
+        conn.getObject.return_value = dataset
+
+        resp = self._call_import(
+            {
+                "filename": "group-upload.tif",
+                "datasetId": 123,
+                "datasetType": "Dataset",
+                "group": "grp1",
+            },
+            conn,
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(self._process_files_calls), 1)
+        self.assertEqual(
+            self._process_files_calls[0]["items"],
+            [
+                os.path.join(
+                    self.tmp,
+                    "grp1-folder",
+                    "uploads",
+                    "alice",
+                    "group-upload.tif",
+                )
+            ],
+        )
+
+    def test_import_uploaded_file_finds_group_folder_upload_by_group_id(self):
+        self._write_uploader_config(upload_to_group_folder=True)
+        conn = self._fake_conn(["grp1"], user_id=5, username="alice")
+        group_id = conn.getGroupsMemberOf.return_value[0].getId.return_value
+        self._write_group_mappings(
+            {str(group_id): {"folder": "grp1-folder", "groupName": "grp1"}}
+        )
+        self._create_group_folder_upload_file(
+            "group-upload-id.tif", "grp1-folder", username="alice"
+        )
+
+        dataset = MagicMock()
+        dataset.canLink.return_value = True
+        conn.getObject.return_value = dataset
+
+        resp = self._call_import(
+            {
+                "filename": "group-upload-id.tif",
+                "datasetId": 123,
+                "datasetType": "Dataset",
+                "groupId": group_id,
+            },
+            conn,
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(self._process_files_calls), 1)
+        self.assertEqual(
+            self._process_files_calls[0]["items"],
+            [
+                os.path.join(
+                    self.tmp,
+                    "grp1-folder",
+                    "uploads",
+                    "alice",
+                    "group-upload-id.tif",
+                )
+            ],
+        )
 
     def test_invalid_json(self):
         """Should handle invalid JSON gracefully."""

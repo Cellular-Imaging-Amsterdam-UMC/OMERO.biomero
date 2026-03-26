@@ -3,6 +3,7 @@ export const getDjangoConstants = () => {
   const user = {
     USER: WEBCLIENT.USER,
     active_user: WEBCLIENT.active_user,
+    username: WEBCLIENT.USER.username,
     member_of_groups: WEBCLIENT.member_of_groups,
     isAdmin: WEBCLIENT.isAdmin,
     CAN_CREATE: WEBCLIENT.CAN_CREATE,

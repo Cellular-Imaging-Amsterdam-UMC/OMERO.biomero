@@ -582,7 +582,7 @@ const ImporterApp = () => {
       <div className="h-full">
         <div className="mb-4">
           <Callout intent="primary" icon="info-sign">
-            Upload images directly from your current computer.
+            Upload images directly from your computer. Select a destination Dataset or Screen on the left, drop or select files on the right, and click Upload.
           </Callout>
         </div>
         <div className="flex space-x-4">
@@ -667,6 +667,7 @@ const ImporterApp = () => {
             datasetId={datasetId}
             datasetType={datasetType}
             group={groupName}
+            groupId={state.user.active_group_id}
           />
         </div>
         </div>

@@ -14,7 +14,14 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
-from .settings import UPLOADER_CHUNKS_DIR, UPLOADER_DESTINATION_DIR
+from .settings import (
+    BASE_DIR,
+    CONFIG_FILE_PATH,
+    GROUP_MAPPINGS_FILE_PATH,
+    UPLOADER_CHUNKS_DIR,
+    UPLOADER_DESTINATION_DIR,
+)
+from .utils import get_upload_storage_dir
 
 logger = logging.getLogger(__name__)
 
@@ -364,9 +371,19 @@ class TusUploadView(View):
         chunk_path = meta["chunk_path"]
         filename = meta["filename"]
         user_id = meta.get("user_id", "unknown")
+        metadata = meta.get("metadata", {})
+        group_id = metadata.get("groupId")
+        username = metadata.get("username")
 
-        # Create per-user subdirectory to avoid filename conflicts between users
-        user_dest_dir = os.path.join(UPLOADER_DESTINATION_DIR, f"user_{user_id}")
+        user_dest_dir = get_upload_storage_dir(
+            user_id,
+            username=username,
+            group_id=group_id,
+            base_dir=BASE_DIR,
+            config_file_path=CONFIG_FILE_PATH,
+            group_mappings_file_path=GROUP_MAPPINGS_FILE_PATH,
+            uploader_destination_dir=UPLOADER_DESTINATION_DIR,
+        )
         Path(user_dest_dir).mkdir(parents=True, exist_ok=True)
 
         # Ensure unique filename in destination (handle duplicates from same user)

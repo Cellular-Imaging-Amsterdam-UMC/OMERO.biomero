@@ -25145,7 +25145,7 @@ const fetchPlateImages = async plateId => {
   }
   return allImages;
 };
-const importUploadedFile = async (filename, datasetId, datasetType, group) => {
+const importUploadedFile = async (filename, datasetId, datasetType, group, groupId) => {
   const {
     urls
   } = (0,_constants__WEBPACK_IMPORTED_MODULE_0__.getDjangoConstants)();
@@ -25153,13 +25153,15 @@ const importUploadedFile = async (filename, datasetId, datasetType, group) => {
     filename,
     datasetId,
     datasetType,
-    group
+    group,
+    groupId
   });
   return apiRequest(urls.api_import_uploaded_file, "POST", {
     filename,
     datasetId,
     datasetType,
-    group
+    group,
+    groupId
   });
 };
 
@@ -28263,6 +28265,7 @@ const getDjangoConstants = () => {
   const user = {
     USER: WEBCLIENT.USER,
     active_user: WEBCLIENT.active_user,
+    username: WEBCLIENT.USER.username,
     member_of_groups: WEBCLIENT.member_of_groups,
     isAdmin: WEBCLIENT.isAdmin,
     CAN_CREATE: WEBCLIENT.CAN_CREATE,
@@ -28845,7 +28848,7 @@ const ImporterApp = () => {
         children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_14__.Callout, {
           intent: "primary",
           icon: "info-sign",
-          children: "Upload images directly from your current computer."
+          children: "Upload images directly from your computer. Select a destination Dataset or Screen on the left, drop or select files on the right, and click Upload."
         })
       }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsxs)("div", {
         className: "flex space-x-4",
@@ -28920,7 +28923,8 @@ const ImporterApp = () => {
           }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_10__.jsx)(_components_ResumableUploader__WEBPACK_IMPORTED_MODULE_6__["default"], {
             datasetId: datasetId,
             datasetType: datasetType,
-            group: groupName
+            group: groupName,
+            groupId: state.user.active_group_id
           })]
         })]
       })]
@@ -29230,17 +29234,27 @@ const AdminPanel = () => {
   const [selectedGroup, setSelectedGroup] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)("");
   const [selectedFolder, setSelectedFolder] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)("");
   const uploaderEnabled = state.config?.UPLOADER?.enabled === true || state.config?.UPLOADER?.enabled === "True";
-  const handleUploaderToggle = async () => {
+  const uploadToGroupFolderEnabled = state.config?.UPLOADER?.upload_to_group_folder === true || state.config?.UPLOADER?.upload_to_group_folder === "True";
+  const saveUploaderConfig = async updates => {
     const newConfig = {
       ...state.config,
       UPLOADER: {
         ...state.config?.UPLOADER,
-        enabled: !uploaderEnabled
+        ...updates
       }
     };
     await saveConfigData(newConfig);
-    // Reload to ensure state is synced
     loadBiomeroConfig();
+  };
+  const handleUploaderToggle = async () => {
+    await saveUploaderConfig({
+      enabled: !uploaderEnabled
+    });
+  };
+  const handleUploadToGroupFolderToggle = async () => {
+    await saveUploaderConfig({
+      upload_to_group_folder: !uploadToGroupFolderEnabled
+    });
   };
 
   // Create items array for folder select
@@ -29318,9 +29332,18 @@ const AdminPanel = () => {
         label: "Enable Web Uploader",
         onChange: handleUploaderToggle,
         large: true
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_7__.Switch, {
+        checked: uploadToGroupFolderEnabled,
+        label: "Upload to group folder",
+        onChange: handleUploadToGroupFolderToggle,
+        large: true,
+        className: "mt-4"
       }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
         className: "text-gray-500 text-sm mt-2",
         children: "When enabled, the \"Upload images\" tab will be visible to all users."
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+        className: "text-gray-500 text-sm mt-2",
+        children: "When enabled, uploaded files are assembled under the active group's mapped folder in uploads/username instead of the shared uploader destination."
       })]
     }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.Card, {
       elevation: _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.Elevation.TWO,
@@ -29780,14 +29803,16 @@ const ResumableUploader = _ref => {
   let {
     datasetId,
     datasetType,
-    group
+    group,
+    groupId
   } = _ref;
   const dashboardRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
   const uppyRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
   const uploadedFilenameMapRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(new Map());
   const [isReady, setIsReady] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
   const {
-    ui
+    ui,
+    user
   } = (0,_constants__WEBPACK_IMPORTED_MODULE_6__.getDjangoConstants)();
   const allowedFileTypes = ui.uploader_allowed_file_extensions;
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
@@ -29823,6 +29848,13 @@ const ResumableUploader = _ref => {
     };
   }, [allowedFileTypes]);
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    if (!uppyRef.current) return;
+    uppyRef.current.setMeta({
+      groupId: groupId != null ? String(groupId) : "",
+      username: user.username || ""
+    });
+  }, [groupId, user.username]);
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
     if (!isReady || !dashboardRef.current || !uppyRef.current) return;
 
     // Mount Dashboard plugin
@@ -29845,7 +29877,7 @@ const ResumableUploader = _ref => {
       }
       const uploadedFilename = getUploadedFilename(file, response, uploadedFilenameMapRef.current);
       try {
-        await (0,_apiService__WEBPACK_IMPORTED_MODULE_5__.importUploadedFile)(uploadedFilename, datasetId, datasetType, group);
+        await (0,_apiService__WEBPACK_IMPORTED_MODULE_5__.importUploadedFile)(uploadedFilename, datasetId, datasetType, group, groupId);
         uppyRef.current.info(`Import queued for ${uploadedFilename}`, "success", 3000);
         if (response?.uploadURL) {
           uploadedFilenameMapRef.current.delete(response.uploadURL);
@@ -29869,7 +29901,7 @@ const ResumableUploader = _ref => {
         }
       }
     };
-  }, [isReady, datasetId, datasetType, group]);
+  }, [isReady, datasetId, datasetType, group, groupId]);
   if (!datasetId) {
     return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.Callout, {
       intent: _blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__.Intent.WARNING,
@@ -136720,4 +136752,4 @@ window.onload = function () {
 
 /******/ })()
 ;
-//# sourceMappingURL=main.8ea715263ae2814d2387.js.map
+//# sourceMappingURL=main.79be08a14a40c5d5fca0.js.map

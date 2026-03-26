@@ -22,12 +22,12 @@ const getUploadedFilename = (file, response, uploadedFilenameMap) => {
   return file.name;
 };
 
-const ResumableUploader = ({ datasetId, datasetType, group }) => {
+const ResumableUploader = ({ datasetId, datasetType, group, groupId }) => {
   const dashboardRef = useRef(null);
   const uppyRef = useRef(null);
   const uploadedFilenameMapRef = useRef(new Map());
   const [isReady, setIsReady] = useState(false);
-  const { ui } = getDjangoConstants();
+  const { ui, user } = getDjangoConstants();
   const allowedFileTypes = ui.uploader_allowed_file_extensions;
 
   useEffect(() => {
@@ -64,6 +64,15 @@ const ResumableUploader = ({ datasetId, datasetType, group }) => {
   }, [allowedFileTypes]);
 
   useEffect(() => {
+    if (!uppyRef.current) return;
+
+    uppyRef.current.setMeta({
+      groupId: groupId != null ? String(groupId) : "",
+      username: user.username || "",
+    });
+  }, [groupId, user.username]);
+
+  useEffect(() => {
     if (!isReady || !dashboardRef.current || !uppyRef.current) return;
 
     // Mount Dashboard plugin
@@ -96,7 +105,8 @@ const ResumableUploader = ({ datasetId, datasetType, group }) => {
           uploadedFilename,
           datasetId,
           datasetType,
-          group
+          group,
+          groupId
         );
         uppyRef.current.info(
           `Import queued for ${uploadedFilename}`,
@@ -131,7 +141,7 @@ const ResumableUploader = ({ datasetId, datasetType, group }) => {
         }
       }
     };
-  }, [isReady, datasetId, datasetType, group]);
+  }, [isReady, datasetId, datasetType, group, groupId]);
 
   if (!datasetId) {
     return (

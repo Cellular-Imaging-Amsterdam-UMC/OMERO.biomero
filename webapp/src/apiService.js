@@ -371,7 +371,8 @@ export const importUploadedFile = async (
   filename,
   datasetId,
   datasetType,
-  group
+  group,
+  groupId
 ) => {
   const { urls } = getDjangoConstants();
   console.log("importUploadedFile calling:", urls.api_import_uploaded_file, {
@@ -379,11 +380,13 @@ export const importUploadedFile = async (
     datasetId,
     datasetType,
     group,
+    groupId,
   });
   return apiRequest(urls.api_import_uploaded_file, "POST", {
     filename,
     datasetId,
     datasetType,
     group,
+    groupId,
   });
 };

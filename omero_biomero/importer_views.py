@@ -14,22 +14,59 @@ from biomero_importer.utils.ingest_tracker import (
 )
 
 from .settings import (
+    CONFIG_FILE_PATH,
     SUPPORTED_FILE_EXTENSIONS,
     EXTENSION_TO_FILE_BROWSER,
     FILE_OR_EXTENSION_PATTERNS_EXCLUSIVE,
     PREPROCESSING_EXTENSION_MAP,
+    UPLOADER_NESTED_FILE_EXTENSIONS,
     FOLDER_EXTENSIONS_NON_BROWSABLE,
     BASE_DIR,
     PREPROCESSING_CONFIG,
     GROUP_MAPPINGS_FILE_PATH,
     UPLOADER_DESTINATION_DIR,
 )
-from .utils import build_extra_params
+from .utils import build_extra_params, get_uploaded_file_candidates
+from .leica_file_browser.ci_leica_converters_helpers import extract_nested_leica_items
 
 logger = logging.getLogger(__name__)
 
 
 _INGEST_INITIALIZED = False
+
+
+def expand_nested_selected_items(selected_items):
+    """Expand a single selected Leica container into per-image items."""
+    if len(selected_items) != 1:
+        return selected_items
+
+    selected_item = selected_items[0]
+    if isinstance(selected_item, dict):
+        local_path = selected_item.get("localPath")
+        existing_uuid = selected_item.get("uuid")
+    else:
+        local_path = selected_item
+        existing_uuid = None
+
+    if not local_path or existing_uuid:
+        return selected_items
+
+    file_ext = os.path.splitext(local_path)[1].lower()
+    if file_ext not in UPLOADER_NESTED_FILE_EXTENSIONS:
+        return selected_items
+
+    absolute_path = os.path.abspath(os.path.join(BASE_DIR, local_path))
+    nested_items = extract_nested_leica_items(absolute_path)
+    if not nested_items:
+        return selected_items
+
+    return [
+        {
+            "localPath": local_path,
+            "uuid": nested_item["uuid"],
+        }
+        for nested_item in nested_items
+    ]
 
 
 def initialize_biomero_importer():
@@ -407,10 +444,10 @@ def process_files(selected_items, selected_destinations, group, username):
     Process selected files & destinations to create upload orders with
     appropriate preprocessing.
     """
+    selected_items = expand_nested_selected_items(selected_items)
+
     # Group files by preprocessing config
     files_by_preprocessing = defaultdict(list)
-    nested_file_extensions = PREPROCESSING_CONFIG.get("UPLOADER_NESTED_FILE_EXTENSIONS", [])
-
 
     for item in selected_items:
         # Support old string & new object format (backward compatible)
@@ -549,8 +586,9 @@ def import_uploaded_file(request, conn=None, **kwargs):
     """
     Trigger import for a file uploaded via TUS.
 
-    Files are stored in per-user subdirectories under UPLOADER_DESTINATION_DIR:
-    UPLOADER_DESTINATION_DIR/user_{user_id}/{filename}
+    Files are stored either in per-user subdirectories under
+    UPLOADER_DESTINATION_DIR or, when configured, inside the active group's
+    mapped folder under uploads/<username>/.
     """
     initialize_biomero_importer()
 
@@ -560,6 +598,7 @@ def import_uploaded_file(request, conn=None, **kwargs):
         dataset_id = data.get("datasetId")
         dataset_type = data.get("datasetType", "Dataset")
         selected_group = data.get("group")
+        selected_group_id = data.get("groupId")
 
         if not filename:
             return JsonResponse({"error": "No filename provided"}, status=400)
@@ -571,42 +610,67 @@ def import_uploaded_file(request, conn=None, **kwargs):
         user_id = current_user.getId()
         username = current_user.getName()
 
-        # Construct full path to the uploaded file (in user-specific subdirectory)
-        user_dest_dir = os.path.join(UPLOADER_DESTINATION_DIR, f"user_{user_id}")
-        file_path = os.path.join(user_dest_dir, filename)
-
-        if not os.path.exists(file_path):
-            # Try legacy path (without user subdirectory) for backwards compatibility
-            legacy_path = os.path.join(UPLOADER_DESTINATION_DIR, filename)
-            if os.path.exists(legacy_path):
-                file_path = legacy_path
-                logger.warning(
-                    f"Using legacy path for {filename}. "
-                    "Consider migrating to per-user directories."
-                )
-            else:
-                return JsonResponse(
-                    {"error": f"File not found: {filename}"}, status=404
-                )
-
         # Validate group if provided, else use current context
-        if selected_group:
-            available_groups = [g.getName() for g in conn.getGroupsMemberOf()]
+        resolved_group_id = None
+        groups_member_of = list(conn.getGroupsMemberOf())
+
+        if selected_group_id not in (None, ""):
+            try:
+                selected_group_id = int(selected_group_id)
+            except (TypeError, ValueError):
+                return JsonResponse({"error": "Invalid groupId provided"}, status=400)
+
+            group_match = next(
+                (group for group in groups_member_of if group.getId() == selected_group_id),
+                None,
+            )
+            if group_match is None:
+                return JsonResponse(
+                    {"error": f"User is not a member of group ID: {selected_group_id}"},
+                    status=403,
+                )
+            resolved_group_id = group_match.getId()
+            selected_group = group_match.getName()
+            conn.setGroupForSession(resolved_group_id)
+        elif selected_group:
+            available_groups = [g.getName() for g in groups_member_of]
             if selected_group not in available_groups:
                 return JsonResponse(
                     {"error": f"User is not a member of group: {selected_group}"},
                     status=403,
                 )
-            # Switch to the selected group context
-            group_id = None
-            for g in conn.getGroupsMemberOf():
-                if g.getName() == selected_group:
-                    group_id = g.getId()
+            for group in groups_member_of:
+                if group.getName() == selected_group:
+                    resolved_group_id = group.getId()
+                    conn.setGroupForSession(resolved_group_id)
                     break
-            if group_id:
-                conn.setGroupForSession(group_id)
         else:
-            selected_group = conn.getGroupFromContext().getName()
+            current_group = conn.getGroupFromContext()
+            if current_group is not None:
+                selected_group = current_group.getName()
+                resolved_group_id = current_group.getId()
+            if resolved_group_id is None:
+                for group in groups_member_of:
+                    if selected_group and group.getName() == selected_group:
+                        resolved_group_id = group.getId()
+                        break
+
+        candidate_paths = get_uploaded_file_candidates(
+            filename,
+            user_id,
+            username=username,
+            group_id=resolved_group_id,
+            base_dir=BASE_DIR,
+            config_file_path=CONFIG_FILE_PATH,
+            group_mappings_file_path=GROUP_MAPPINGS_FILE_PATH,
+            uploader_destination_dir=UPLOADER_DESTINATION_DIR,
+        )
+        file_path = next((path for path in candidate_paths if os.path.exists(path)), None)
+
+        if file_path is None:
+            return JsonResponse(
+                {"error": f"File not found: {filename}"}, status=404
+            )
 
         # Verify user has write access to the target dataset
         if dataset_type == "Dataset":

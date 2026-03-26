@@ -30,18 +30,30 @@ const AdminPanel = () => {
   const [selectedFolder, setSelectedFolder] = useState("");
 
   const uploaderEnabled = state.config?.UPLOADER?.enabled === true || state.config?.UPLOADER?.enabled === "True";
+  const uploadToGroupFolderEnabled =
+    state.config?.UPLOADER?.upload_to_group_folder === true ||
+    state.config?.UPLOADER?.upload_to_group_folder === "True";
 
-  const handleUploaderToggle = async () => {
+  const saveUploaderConfig = async (updates) => {
     const newConfig = {
       ...state.config,
       UPLOADER: {
         ...state.config?.UPLOADER,
-        enabled: !uploaderEnabled
-      }
+        ...updates,
+      },
     };
     await saveConfigData(newConfig);
-    // Reload to ensure state is synced
     loadBiomeroConfig();
+  };
+
+  const handleUploaderToggle = async () => {
+    await saveUploaderConfig({ enabled: !uploaderEnabled });
+  };
+
+  const handleUploadToGroupFolderToggle = async () => {
+    await saveUploaderConfig({
+      upload_to_group_folder: !uploadToGroupFolderEnabled,
+    });
   };
 
   // Create items array for folder select
@@ -123,8 +135,18 @@ const AdminPanel = () => {
           onChange={handleUploaderToggle}
           large={true}
         />
+        <Switch
+          checked={uploadToGroupFolderEnabled}
+          label="Upload to group folder"
+          onChange={handleUploadToGroupFolderToggle}
+          large={true}
+          className="mt-4"
+        />
         <div className="text-gray-500 text-sm mt-2">
           When enabled, the "Upload images" tab will be visible to all users.
+        </div>
+        <div className="text-gray-500 text-sm mt-2">
+          When enabled, uploaded files are assembled under the active group's mapped folder in uploads/username instead of the shared uploader destination.
         </div>
       </Card>
 
