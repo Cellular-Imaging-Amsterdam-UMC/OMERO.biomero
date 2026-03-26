@@ -17,6 +17,8 @@ import CollapsibleSection from "./CollapsibleSection";
 import ConfigSection from "./ConfigSection";
 import ModelCard from "./ModelCard.js";
 import ConverterCard from "./ConverterCard.js";
+import { checkModelVersions } from "../../apiService";
+import { clearGitHubCache } from "../../apiService";
 
 const SettingsForm = () => {
   const { 
@@ -37,6 +39,11 @@ const SettingsForm = () => {
 
   const [converters, setConverters] = useState([]);
   const [errors, setErrors] = useState({});
+  
+  // Version checking state
+  const [versionStatus, setVersionStatus] = useState({});
+  const [versionCheckLoading, setVersionCheckLoading] = useState(false);
+  const [versionCheckCompleted, setVersionCheckCompleted] = useState(false);
   
   // Validation for UI settings
   const validateMaxBatchJobs = (value) => {
@@ -141,11 +148,121 @@ const SettingsForm = () => {
     }
   }, [state.config, isInitialized]); // Only run when config loads and form isn't initialized
 
+  // Trigger version check when admin panel opens for the first time
+  useEffect(() => {
+    if (settingsForm?.MODELS?.length > 0 && !versionCheckCompleted) {
+      performVersionCheck();
+    }
+  }, [settingsForm?.MODELS, versionCheckCompleted]);
+
+  const performVersionCheck = async (forceRefresh = false) => {
+    if (!settingsForm?.MODELS?.length || versionCheckLoading) return;
+    
+    setVersionCheckLoading(true);
+    try {
+      const results = await checkModelVersions(settingsForm.MODELS, forceRefresh);
+      const statusMap = {};
+      results.forEach(result => {
+        statusMap[result.index] = result;
+      });
+      setVersionStatus(statusMap);
+      setVersionCheckCompleted(true);
+    } catch (error) {
+      console.error('Error checking model versions:', error);
+    } finally {
+      setVersionCheckLoading(false);
+    }
+  };
+
+  // Manual refresh that clears cache and forces fresh API calls
+  const manualRefreshVersions = async () => {
+    await clearGitHubCache(); // Clear the cache first (now async)
+    await performVersionCheck(true); // Force refresh
+  };
+
+  // Check version for a specific model
+  const recheckModelVersion = async (modelIndex, updatedModel = null, forceRefresh = false) => {
+    if (!settingsForm?.MODELS?.[modelIndex] && !updatedModel) return;
+    
+    try {
+      const model = updatedModel || settingsForm.MODELS[modelIndex];
+      const results = await checkModelVersions([model], forceRefresh);
+      if (results.length > 0) {
+        const result = { ...results[0], index: modelIndex }; // Fix index to match our array
+        setVersionStatus(prev => ({
+          ...prev,
+          [modelIndex]: result
+        }));
+      }
+    } catch (error) {
+      console.error('Error rechecking model version:', error);
+    }
+  };
+
+  // Calculate version summary for Models Settings
+  const getVersionSummary = () => {
+    if (!settingsForm?.MODELS?.length || !Object.keys(versionStatus).length) {
+      return { 
+        upToDate: 0, 
+        total: 0, 
+        outdated: 0, 
+        rateLimited: 0, 
+        stale: 0
+      };
+    }
+    
+    const total = settingsForm.MODELS.length;
+    let upToDate = 0;
+    let outdated = 0;
+    let rateLimited = 0;
+    let stale = 0;
+    let rateLimitResetTime = null;
+    
+    Object.values(versionStatus).forEach(status => {
+      if (status.status === 'rate-limited') {
+        rateLimited++;
+        // Get the earliest reset time for display
+        if (status.rateLimitInfo?.reset) {
+          const resetTime = parseInt(status.rateLimitInfo.reset) * 1000;
+          if (!rateLimitResetTime || resetTime < rateLimitResetTime) {
+            rateLimitResetTime = resetTime;
+          }
+        }
+      } else if (status.status === 'up-to-date' || status.justUpdated) {
+        upToDate++;
+      } else if (status.status === 'outdated') {
+        outdated++;
+      } else if (status.status === 'up-to-date-stale' || status.status === 'outdated-stale') {
+        stale++;
+        if (status.status === 'up-to-date-stale') upToDate++;
+        if (status.status === 'outdated-stale') outdated++;
+      }
+      // Handle 'error' and 'unknown' statuses - these count toward total but no specific category
+    });
+    
+    return { 
+      upToDate, 
+      total, 
+      outdated, 
+      rateLimited, 
+      stale, 
+      rateLimitResetTime: rateLimitResetTime ? new Date(rateLimitResetTime) : null
+    };
+  };
+
+  // Handle when user finishes editing repo URL
+  const handleRepoUrlBlur = (modelIndex) => {
+    if (!settingsForm?.MODELS?.[modelIndex]?.repo) return;
+    
+    const model = settingsForm.MODELS[modelIndex];
+    recheckModelVersion(modelIndex, model);
+  };
+
   const toggleEdit = (field) => {
     setEditMode((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
-  const handleModelChange = (index, field, value) => {
+  const handleModelChange = (index, field, value, options = {}) => {
     const updatedModels = structuredClone(settingsForm.MODELS);
     updatedModels[index][field] = value;
 
@@ -160,6 +277,15 @@ const SettingsForm = () => {
     }
 
     setSettingsForm((prev) => ({ ...prev, MODELS: updatedModels }));
+
+    // Clear version status when repo URL changes - we'll check on blur
+    if (field === "repo" && !options.skipVersionCheck) {
+      setVersionStatus(prev => {
+        const updated = { ...prev };
+        delete updated[index];
+        return updated;
+      });
+    }
   };
 
   // Regex for validation
@@ -840,11 +966,16 @@ const SettingsForm = () => {
           validateField={validateField} // Pass validation function to ConfigSection
         />
       </CollapsibleSection>
-      <CollapsibleSection title="Models Settings">
+      <CollapsibleSection 
+        title="Models Settings" 
+        versionSummary={getVersionSummary()}
+        versionCheckLoading={versionCheckLoading}
+        onRefresh={manualRefreshVersions}
+      >
         <ConfigSection
           items={settingsForm.MODELS}
-          onItemChange={(index, field, value) =>
-            handleModelChange(index, field, value)
+          onItemChange={(index, field, value, options = {}) =>
+            handleModelChange(index, field, value, options)
           }
           onAddItem={addModel}
           onAddParam={(index, key, value) => {
@@ -885,6 +1016,10 @@ const SettingsForm = () => {
           ]}
           errors={null} // No error handling for models yet
           validateField={null} // No validation for models yet
+          versionStatus={versionStatus} // Pass version check results
+          versionCheckLoading={versionCheckLoading} // Pass loading state
+          config={state.config} // Pass config for workflow type detection
+          onRepoBlur={handleRepoUrlBlur} // Pass repo blur handler
         />
       </CollapsibleSection>
       <H5>Note on saving BIOMERO settings</H5>

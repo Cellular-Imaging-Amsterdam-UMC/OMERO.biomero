@@ -9,6 +9,7 @@ import {
   H4,
   ButtonGroup,
   Switch,
+  Spinner,
 } from "@blueprintjs/core";
 
 const ModelCard = ({
@@ -18,18 +19,46 @@ const ModelCard = ({
   onAddParam,
   onDelete,
   onReset,
+  onRepoBlur,
   editable,
   setEditable,
   errors,
   validateField,
+  versionStatus,
+  versionCheckLoading,
 }) => {
   const [inputValue, setInputValue] = useState("");
   const [showWarning, setShowWarning] = useState(false);
+
+  // Helper function to update GitHub URL with new version
+  const updateToLatestVersion = () => {
+    if (!versionStatus?.latestVersion || !item.repo) return;
+
+    // Extract the base URL without the version
+    const baseUrl = item.repo.replace(/\/tree\/.*$/, '');
+    const newUrl = `${baseUrl}/tree/${versionStatus.latestVersion}`;
+    
+    // Update the versionStatus first to preserve justUpdated flag
+    if (versionStatus) {
+      versionStatus.justUpdated = true;
+      versionStatus.status = 'up-to-date';
+      versionStatus.currentVersion = versionStatus.latestVersion;
+    }
+    
+    // Use a flag to prevent automatic recheck for this change
+    onChange(index, "repo", newUrl, { skipVersionCheck: true });
+  };
   return (
     <Card className="mb-4 shadow">
       <div className="flex justify-between items-center">
-        <H4 className={`text-lg font-bold ${item.name ? "" : "text-red-500"}`}>
+        <H4 className={`text-lg font-bold ${item.name ? "" : "text-red-500"} flex items-center`}>
           {item.name || `Please fill in a valid name!`}
+          {/* Version status indicator next to model name */}
+          {versionStatus && !versionCheckLoading && versionStatus.status === 'outdated' && !versionStatus.justUpdated && (
+            <Tooltip content={`Update available: ${versionStatus.currentVersion} → ${versionStatus.latestVersion}`}>
+              <Icon icon="outdated" size={14} intent="warning" className="ml-2" />
+            </Tooltip>
+          )}
         </H4>
         <ButtonGroup>
           <Tooltip
@@ -90,6 +119,7 @@ const ModelCard = ({
             <Tooltip content="Specify the versioned GitHub repository URL for this model. Versions (e.g., /tree/v1.0.0) ensure reproducibility.">
               <Icon icon="help" size={12} />
             </Tooltip>
+
           </span>
         }
         subLabel="The repository with the descriptor.json file."
@@ -99,29 +129,85 @@ const ModelCard = ({
           placeholder="e.g., https://github.com/org/repo/tree/v1.0.0"
           readOnly={!editable}
           onChange={(e) => onChange(index, "repo", e.target.value)}
+          onBlur={() => onRepoBlur && onRepoBlur(index)}
           rightElement={
             item.repo ? (
-              item.repo.includes("/tree/v") ? (
-                <Button
-                  icon="git-branch"
-                  minimal
-                  intent="primary"
-                  title="Test GitHub URL"
-                  onClick={() =>
-                    window.open(item.repo, "_blank", "noopener,noreferrer")
-                  }
-                />
-              ) : (
-                <Tooltip
-                  content="URL is missing a version (e.g., /tree/v1.0.0)."
-                  intent="warning"
-                >
-                  <Button icon="warning-sign" minimal intent="warning" />
-                </Tooltip>
-              )
+              <div className="flex">
+                {item.repo.includes("/tree/v") ? (
+                  <Button
+                    icon="git-branch"
+                    minimal
+                    intent="primary"
+                    title="Test GitHub URL"
+                    onClick={() =>
+                      window.open(item.repo, "_blank", "noopener,noreferrer")
+                    }
+                  />
+                ) : (
+                  <Tooltip
+                    content="URL is missing a version (e.g., /tree/v1.0.0)."
+                    intent="warning"
+                  >
+                    <Button icon="warning-sign" minimal intent="warning" />
+                  </Tooltip>
+                )}
+                {/* Add latest version link for outdated models */}
+                {versionStatus && versionStatus.status === 'outdated' && !versionStatus.justUpdated && versionStatus.latestReleaseUrl && (
+                  <Tooltip content={`View latest version: ${versionStatus.latestVersion}`}>
+                    <Button
+                      icon="git-new-branch"
+                      minimal
+                      intent="warning"
+                      title={`Latest version: ${versionStatus.latestVersion}`}
+                      onClick={() =>
+                        window.open(versionStatus.latestReleaseUrl, "_blank", "noopener,noreferrer")
+                      }
+                    />
+                  </Tooltip>
+                )}
+                {/* Accept Update button for outdated models */}
+                {versionStatus && versionStatus.status === 'outdated' && !versionStatus.justUpdated && versionStatus.latestVersion && editable && (
+                  <Tooltip content={`Update to latest version: ${versionStatus.latestVersion}`}>
+                    <Button
+                      icon="updated"
+                      minimal
+                      intent="success"
+                      title={`Accept update to ${versionStatus.latestVersion}`}
+                      onClick={updateToLatestVersion}
+                    />
+                  </Tooltip>
+                )}
+              </div>
             ) : null
           }
         />
+        {/* Version status information */}
+        {versionStatus && !versionCheckLoading && (
+          <div className="mt-2">
+            {versionStatus.justUpdated ? (
+              <div className="bp5-form-helper-text text-green-600">
+                <Icon icon="tick-circle" size={10} className="mr-1" />
+                Updated to version {versionStatus.latestVersion}! Remember to save settings and run Slurm Init after.
+              </div>
+            ) : versionStatus.status === 'outdated' && !versionStatus.justUpdated ? (
+              <div className="bp5-form-helper-text text-orange-600">
+                <Icon icon="outdated" size={10} className="mr-1" />
+                Update available: {versionStatus.currentVersion} → {versionStatus.latestVersion}
+                {editable && " (Click the update button to accept)"}
+              </div>
+            ) : (versionStatus.status === 'up-to-date' || versionStatus.justUpdated) ? (
+              <div className="bp5-form-helper-text text-green-600">
+                <Icon icon="tick" size={10} className="mr-1" />
+                Using latest version: {versionStatus.justUpdated ? versionStatus.latestVersion : versionStatus.currentVersion}
+              </div>
+            ) : versionStatus.status === 'ahead' ? (
+              <div className="bp5-form-helper-text text-blue-600">
+                <Icon icon="info-sign" size={10} className="mr-1" />
+                Using unreleased version: {versionStatus.currentVersion} (latest release: {versionStatus.latestVersion})
+              </div>
+            ) : null}
+          </div>
+        )}
       </FormGroup>
 
       <FormGroup

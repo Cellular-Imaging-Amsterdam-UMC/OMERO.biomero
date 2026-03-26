@@ -25,6 +25,7 @@ import WorkflowForm from "./WorkflowForm";
 import WorkflowOutput from "./WorkflowOutput";
 import WorkflowInput from "./WorkflowInput";
 import InputOptions from "./InputOptions";
+import PlateWorkflowDialog from "./plate/PlateWorkflowDialog";
 
 const RunPanel = ({ onWorkflowError }) => {
   const { state, updateState, toaster, runWorkflowData } = useAppContext();
@@ -37,6 +38,9 @@ const RunPanel = ({ onWorkflowError }) => {
 
   // Get workflow versions from SLURM status
   const workflowVersions = state.workflowVersions || {};
+  
+  // Check if importer is enabled - only show plate features if it is
+  const isImporterEnabled = window.WEBCLIENT?.UI?.IMPORTER_ENABLED || false;
 
   // Helper function to check if a workflow has specific flags from config
   const getWorkflowFlags = (workflowName) => {
@@ -110,26 +114,28 @@ const RunPanel = ({ onWorkflowError }) => {
   }) || [];
 
   // Count workflows for each tab after search filtering
+  // Only show plate workflows if importer is enabled
   const imageWorkflowCount = searchFilteredWorkflows.filter((workflow) => {
     const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflow.name);
-    return !isPlateWorkflow;
+    // Exclude plate workflows always, and also exclude ZARR workflows if importer is disabled
+    return !isPlateWorkflow && (!isZarrWorkflow || isImporterEnabled);
   }).length;
 
-  const plateWorkflowCount = searchFilteredWorkflows.filter((workflow) => {
-    const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflow.name);
+  const plateWorkflowCount = isImporterEnabled ? searchFilteredWorkflows.filter((workflow) => {
+    const { isPlateWorkflow } = getWorkflowFlags(workflow.name);
     return isPlateWorkflow;
-  }).length;
+  }).length : 0;
 
   // Filter workflows based on active tab from the search results
   const filteredWorkflows = searchFilteredWorkflows.filter((workflow) => {
     if (activeWorkflowTab === "plates") {
-      // Check if workflow is marked as plate workflow in config
+      // Check if workflow is marked as plate workflow in config AND importer is enabled
       const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflow.name);
-      return isPlateWorkflow;
+      return isImporterEnabled && isPlateWorkflow;
     } else {
-      // Images tab: exclude workflows marked as plate-only
+      // Images tab: exclude workflows marked as plate-only, and exclude ZARR workflows if importer is disabled
       const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflow.name);
-      return !isPlateWorkflow;
+      return !isPlateWorkflow && (!isZarrWorkflow || isImporterEnabled);
     }
   });
 
@@ -150,6 +156,13 @@ const RunPanel = ({ onWorkflowError }) => {
       setActiveWorkflowTab(activeWorkflowTab === "images" ? "plates" : "images");
     }
   }, [searchTerm, imageWorkflowCount, plateWorkflowCount]); // Only trigger on search term or count changes
+
+  // Ensure plates tab is only accessible when importer is enabled
+  useEffect(() => {
+    if (!isImporterEnabled && activeWorkflowTab === "plates") {
+      setActiveWorkflowTab("images");
+    }
+  }, [isImporterEnabled, activeWorkflowTab]);
 
   // Handle workflow click
   const handleWorkflowClick = (workflow) => {
@@ -260,23 +273,23 @@ const RunPanel = ({ onWorkflowError }) => {
             <Tab
               id="images"
               title="Image Workflows"
-              titleProps={{ className: "text-sm" }}
               tagContent={imageWorkflowCount}
               tagProps={{
                 round: true,
                 intent: imageWorkflowCount === 0 ? "danger" : undefined
               }}
             />
-            <Tab
-              id="plates"
-              title="Plate Workflows"
-              titleProps={{ className: "text-sm" }}
-              tagContent={plateWorkflowCount}
-              tagProps={{
-                round: true,
-                intent: plateWorkflowCount === 0 ? "danger" : undefined
-              }}
-            />
+            {isImporterEnabled && (
+              <Tab
+                id="plates"
+                title="Plate Workflows"
+                tagContent={plateWorkflowCount}
+                tagProps={{
+                  round: true,
+                  intent: plateWorkflowCount === 0 ? "danger" : undefined
+                }}
+              />
+            )}
           </Tabs>
           
           {/* Active Tab Description */}
@@ -286,9 +299,9 @@ const RunPanel = ({ onWorkflowError }) => {
                 For analyzing individual images from datasets or plates
               </p>
             )}
-            {activeWorkflowTab === "plates" && (
+            {activeWorkflowTab === "plates" && isImporterEnabled && (
               <p className="text-sm text-gray-500">
-                For analyzing entire plates as single units
+                For analyzing entire plates as single units (requires importer integration)
               </p>
             )}
           </div>
@@ -479,8 +492,25 @@ const RunPanel = ({ onWorkflowError }) => {
         )}
       </div>
 
-      {/* BlueprintJS Multistep Dialog for Workflow Details */}
-      {state.selectedWorkflow && (
+      {/* Conditional Dialog for Workflow Details */}
+      {state.selectedWorkflow && (() => {
+        const { isPlateWorkflow } = getWorkflowFlags(state.selectedWorkflow.name);
+        
+        // Use PlateWorkflowDialog for plate workflows (only if importer is enabled)
+        if (isPlateWorkflow && isImporterEnabled) {
+          return (
+            <PlateWorkflowDialog
+              workflow={state.selectedWorkflow}
+              dialogOpen={dialogOpen}
+              setDialogOpen={setDialogOpen}
+              onWorkflowError={onWorkflowError}
+              onFinalSubmit={handleFinalSubmit}
+            />
+          );
+        }
+        
+        // Use existing MultistepDialog for image workflows (or plate workflows when importer is disabled)
+        return (
         <MultistepDialog
           isOpen={dialogOpen}
           onClose={() => {
@@ -558,7 +588,8 @@ const RunPanel = ({ onWorkflowError }) => {
             }
           />
         </MultistepDialog>
-      )}
+        );
+      })()}
     </div>
   );
 };

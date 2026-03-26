@@ -360,3 +360,405 @@ export const fetchPlateImages = async (plateId) => {
 
   return allImages;
 };
+
+// GitHub API functions for version checking
+/**
+ * Extracts GitHub repository information from a URL
+ * @param {string} repoUrl - GitHub repository URL
+ * @returns {Object|null} Repository info with owner, repo, and current version
+ */
+export const extractGitHubInfo = (repoUrl) => {
+  if (!repoUrl || typeof repoUrl !== 'string') {
+    return null;
+  }
+  
+  // Match GitHub URLs like https://github.com/owner/repo/tree/v1.0.0
+  const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)(?:\/tree\/(.+))?/);
+  if (!match || !match[1] || !match[2]) {
+    return null;
+  }
+  
+  return {
+    owner: match[1],
+    repo: match[2],
+    currentVersion: match[3] || null
+  };
+};
+
+// GitHub API persistent caching utilities
+const DEFAULT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+const GITHUB_CACHE_PREFIX = 'github_';
+
+/**
+ * Generates a cache key for GitHub repositories
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository name
+ * @returns {string} Cache key
+ */
+const getGitHubCacheKey = (owner, repo) => `${GITHUB_CACHE_PREFIX}${owner}_${repo}`;
+
+/**
+ * Safe localStorage operations utility
+ */
+const localStorageUtils = {
+  getItem: (key) => {
+    try {
+      return localStorage.getItem(key);
+    } catch (error) {
+      console.warn('Error reading from localStorage:', error);
+      return null;
+    }
+  },
+  
+  setItem: (key, value) => {
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch (error) {
+      console.warn('Error writing to localStorage:', error);
+      return false;
+    }
+  },
+  
+  removeItem: (key) => {
+    try {
+      localStorage.removeItem(key);
+      return true;
+    } catch (error) {
+      console.warn('Error removing from localStorage:', error);
+      return false;
+    }
+  },
+  
+  /**
+   * Clears items with specific prefix from localStorage
+   * @param {string} prefix - Prefix to match for removal
+   */
+  clearByPrefix: (prefix) => {
+    try {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(prefix)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      return keysToRemove.length;
+    } catch (error) {
+      console.warn('Error clearing localStorage by prefix:', error);
+      return 0;
+    }
+  }
+};
+
+/**
+ * Retrieves data from persistent cache with TTL validation
+ * @param {string} cacheKey - The cache key
+ * @param {number} ttl - Time to live in milliseconds (optional, uses default)
+ * @returns {Object|null} Cached data or null if expired/not found
+ */
+export const getFromPersistentCache = async (cacheKey, ttl = DEFAULT_CACHE_TTL) => {
+  const cached = localStorageUtils.getItem(cacheKey);
+  
+  if (!cached) {
+    return null;
+  }
+  
+  try {
+    const parsed = JSON.parse(cached);
+    const now = Date.now();
+    
+    // Check if cache is still valid
+    if (parsed.timestamp && (now - parsed.timestamp < ttl)) {
+      return parsed;
+    }
+    
+    // Remove expired cache
+    localStorageUtils.removeItem(cacheKey);
+    return null;
+  } catch (error) {
+    console.warn('Error parsing cached data:', error);
+    localStorageUtils.removeItem(cacheKey); // Remove corrupted cache
+    return null;
+  }
+};
+
+/**
+ * Saves data to persistent cache with automatic cleanup
+ * @param {string} cacheKey - The cache key
+ * @param {any} data - Data to cache
+ * @param {string} cleanupPrefix - Prefix for cleanup on storage full (optional)
+ * @returns {boolean} Success status
+ */
+export const saveToPersistentCache = async (cacheKey, data, cleanupPrefix = null) => {
+  const cacheData = JSON.stringify({
+    ...data,
+    timestamp: Date.now()
+  });
+  
+  // Try to save
+  if (localStorageUtils.setItem(cacheKey, cacheData)) {
+    return true;
+  }
+  
+  // If failed and cleanup prefix is provided, try cleanup and retry
+  if (cleanupPrefix) {
+    const clearedCount = localStorageUtils.clearByPrefix(cleanupPrefix);
+    if (clearedCount > 0) {
+      console.log(`Cleared ${clearedCount} cache entries with prefix ${cleanupPrefix}`);
+      return localStorageUtils.setItem(cacheKey, cacheData);
+    }
+  }
+  
+  return false;
+};
+
+/**
+ * Clears all GitHub-related cache entries
+ * @returns {number} Number of entries cleared
+ */
+export const clearGitHubCache = async () => {
+  const clearedCount = localStorageUtils.clearByPrefix(GITHUB_CACHE_PREFIX);
+  return clearedCount;
+};
+
+/**
+ * Helper function to handle GitHub API errors with proper fallback strategies
+ * @param {Error} error - The error object from axios
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository name
+ * @param {string} cacheKey - Cache key for storing/retrieving data
+ * @returns {Promise<Object|null>} Error response or fallback data
+ */
+const handleGitHubAPIError = async (error, owner, repo, cacheKey) => {
+  // Handle GitHub API rate limiting
+  if (error.response?.status === 403 && error.response?.data?.message?.includes('rate limit exceeded')) {
+    const rateLimitInfo = {
+      limit: error.response.headers['x-ratelimit-limit'],
+      remaining: error.response.headers['x-ratelimit-remaining'],
+      reset: error.response.headers['x-ratelimit-reset']
+    };
+    
+    // Try to return stale cached data if available
+    const staleCache = await getFromPersistentCache(cacheKey);
+    if (staleCache && staleCache.data) {
+      return {
+        ...staleCache.data,
+        _isStale: true,
+        _rateLimitInfo: rateLimitInfo
+      };
+    }
+    
+    return {
+      _rateLimited: true,
+      _rateLimitInfo: rateLimitInfo
+    };
+  }
+  
+  // If there's no latest release, try to get the latest tag instead
+  if (error.response?.status === 404) {
+    try {
+      const tagsResponse = await axios.get(`https://api.github.com/repos/${owner}/${repo}/tags`);
+      if (tagsResponse.data && tagsResponse.data.length > 0) {
+        const latestTag = tagsResponse.data[0];
+        const tagData = {
+          tag_name: latestTag.name,
+          name: latestTag.name,
+          html_url: `https://github.com/${owner}/${repo}/tree/${latestTag.name}`
+        };
+        
+        await saveToPersistentCache(cacheKey, {
+          data: tagData
+        }, GITHUB_CACHE_PREFIX);
+        
+        return tagData;
+      }
+    } catch (tagError) {
+      // Ignore tag fetch errors
+    }
+  }
+  
+  // For other errors, try to return stale cache if available
+  const staleCache = await getFromPersistentCache(cacheKey);
+  if (staleCache && staleCache.data) {
+    return {
+      ...staleCache.data,
+      _isStale: true,
+      _error: error.message
+    };
+  }
+  
+  return null;
+};
+
+/**
+ * Fetches the latest release information from GitHub API with caching
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository name 
+ * @param {boolean} forceRefresh - Whether to bypass cache
+ * @returns {Promise<Object|null>} Release data or null if not found
+ */
+export const fetchLatestGitHubRelease = async (owner, repo, forceRefresh = false) => {
+  if (!owner || !repo) {
+    return null;
+  }
+  
+  const cacheKey = getGitHubCacheKey(owner, repo);
+  
+  // Check persistent cache first (unless force refresh)
+  if (!forceRefresh) {
+    const cached = await getFromPersistentCache(cacheKey);
+    if (cached && cached.data) {
+      return cached.data;
+    }
+  }
+  
+  try {
+    const response = await axios.get(`https://api.github.com/repos/${owner}/${repo}/releases/latest`);
+    
+    const releaseData = {
+      tag_name: response.data.tag_name,
+      name: response.data.name,
+      published_at: response.data.published_at,
+      html_url: response.data.html_url
+    };
+    
+    // Cache the successful result persistently
+    await saveToPersistentCache(cacheKey, {
+      data: releaseData,
+      rateLimitInfo: {
+        limit: response.headers['x-ratelimit-limit'],
+        remaining: response.headers['x-ratelimit-remaining'],
+        reset: response.headers['x-ratelimit-reset']
+      }
+    }, GITHUB_CACHE_PREFIX);
+    
+    return releaseData;
+  } catch (error) {
+    return handleGitHubAPIError(error, owner, repo, cacheKey);
+  }
+};
+
+/**
+ * Compares two version strings following semantic versioning
+ * @param {string} current - Current version string
+ * @param {string} latest - Latest version string
+ * @returns {string} Comparison result: 'up-to-date', 'outdated', 'ahead', or 'unknown'
+ */ 
+export const compareVersions = (current, latest) => {
+  if (!current || !latest || typeof current !== 'string' || typeof latest !== 'string') {
+    return 'unknown';
+  }
+  
+  // Remove 'v' prefix if present and normalize
+  const cleanCurrent = current.replace(/^v/, '').trim();
+  const cleanLatest = latest.replace(/^v/, '').trim();
+  
+  // Simple comparison - if they're exactly the same, it's up to date
+  if (cleanCurrent === cleanLatest) {
+    return 'up-to-date';
+  }
+  
+  // Try semantic version comparison
+  try {
+    const currentParts = cleanCurrent.split('.').map(part => {
+      const num = parseInt(part, 10);
+      return isNaN(num) ? 0 : num;
+    });
+    const latestParts = cleanLatest.split('.').map(part => {
+      const num = parseInt(part, 10);
+      return isNaN(num) ? 0 : num;
+    });
+    
+    const maxLength = Math.max(currentParts.length, latestParts.length);
+    
+    for (let i = 0; i < maxLength; i++) {
+      const currentPart = currentParts[i] || 0;
+      const latestPart = latestParts[i] || 0;
+      
+      if (currentPart < latestPart) {
+        return 'outdated';
+      }
+      if (currentPart > latestPart) {
+        return 'ahead';
+      }
+    }
+    
+    return 'up-to-date';
+  } catch (error) {
+    console.warn('Error comparing versions:', error);
+    // If semantic version comparison fails, fall back to string comparison
+    return cleanCurrent === cleanLatest ? 'up-to-date' : 'unknown';
+  }
+};
+
+/**
+ * Checks version status for multiple models against their GitHub repositories
+ * @param {Array} models - Array of model objects with repo URLs
+ * @param {boolean} forceRefresh - Whether to bypass cache for all checks
+ * @returns {Promise<Array>} Array of version check results
+ */
+export const checkModelVersions = async (models, forceRefresh = false) => {
+  if (!Array.isArray(models) || models.length === 0) {
+    return [];
+  }
+  
+  const versionChecks = await Promise.all(
+    models.map(async (model, index) => {
+      if (!model || !model.repo) {
+        return { index, status: 'error', error: 'Invalid model structure' };
+      }
+      
+      const githubInfo = extractGitHubInfo(model.repo);
+      if (!githubInfo) {
+        return { index, status: 'unknown', error: 'Invalid GitHub URL' };
+      }
+      
+      try {
+        const latestRelease = await fetchLatestGitHubRelease(githubInfo.owner, githubInfo.repo, forceRefresh);
+        if (!latestRelease) {
+          return { index, status: 'unknown', error: 'No releases found' };
+        }
+        
+        // Check for stale data first - if we have cached data, show it as stale
+        if (latestRelease._isStale) {
+          const status = compareVersions(githubInfo.currentVersion, latestRelease.tag_name);
+          return {
+            index,
+            status: `${status}-stale`,
+            currentVersion: githubInfo.currentVersion,
+            latestVersion: latestRelease.tag_name,
+            latestReleaseUrl: latestRelease.html_url,
+            isStale: true,
+            rateLimitInfo: latestRelease._rateLimitInfo,
+            error: latestRelease._error
+          };
+        }
+        
+        // Only show rate-limited if we have NO cached data at all
+        if (latestRelease._rateLimited) {
+          return {
+            index,
+            status: 'rate-limited',
+            rateLimitInfo: latestRelease._rateLimitInfo,
+            error: 'GitHub API rate limit exceeded'
+          };
+        }
+        
+        const status = compareVersions(githubInfo.currentVersion, latestRelease.tag_name);
+        return {
+          index,
+          status,
+          currentVersion: githubInfo.currentVersion,
+          latestVersion: latestRelease.tag_name,
+          latestReleaseUrl: latestRelease.html_url
+        };
+      } catch (error) {
+        return { index, status: 'error', error: error.message };
+      }
+    })
+  );
+  
+  return versionChecks;
+};
