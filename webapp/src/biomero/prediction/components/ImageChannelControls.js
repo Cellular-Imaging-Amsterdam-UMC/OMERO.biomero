@@ -1,8 +1,17 @@
 import React from "react";
-import { Checkbox } from "@blueprintjs/core";
+import { Button, Checkbox, InputGroup } from "@blueprintjs/core";
 
-const ImageChannelControls = ({ channels, visibility, onToggle }) => {
-  if (!channels || channels.length <= 1) return null;
+const ImageChannelControls = ({
+  channels,
+  visibility,
+  onToggle,
+  minPercent,
+  maxPercent,
+  onMinPercentChange,
+  onMaxPercentChange,
+  onAutoScale,
+}) => {
+  if (!channels || channels.length === 0) return null;
 
   return (
     <div>
@@ -28,6 +37,35 @@ const ImageChannelControls = ({ channels, visibility, onToggle }) => {
             </span>
           </Checkbox>
         ))}
+      </div>
+
+      <div className="mt-3 pt-3 border-t flex flex-col gap-2">
+        <div className="text-xs font-bold uppercase text-gray-500">
+          Intensity Scaling
+        </div>
+        <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+          <InputGroup
+            type="number"
+            min={0}
+            max={100}
+            inputMode="decimal"
+            placeholder="Min %"
+            value={minPercent}
+            onChange={(event) => onMinPercentChange(event.target.value)}
+          />
+          <InputGroup
+            type="number"
+            min={0}
+            max={100}
+            inputMode="decimal"
+            placeholder="Max %"
+            value={maxPercent}
+            onChange={(event) => onMaxPercentChange(event.target.value)}
+          />
+          <Button small onClick={onAutoScale}>
+            Auto
+          </Button>
+        </div>
       </div>
     </div>
   );

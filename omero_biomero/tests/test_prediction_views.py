@@ -82,6 +82,7 @@ class PredictionViewsTests(TestCase):
                         "name": "Set A",
                         "description": "first",
                         "datasetId": "12",
+                        "patches": [{"id": "p1", "imageId": "21", "x": 0, "y": 0, "width": 256, "height": 256}],
                         "annotations": [{"id": "a1", "imageId": "21"}],
                     },
                 ),
@@ -92,6 +93,7 @@ class PredictionViewsTests(TestCase):
                         "name": "Set B",
                         "description": "second",
                         "datasetId": "12",
+                        "patches": [{"id": "p2", "imageId": "21", "x": 10, "y": 10, "width": 256, "height": 256}],
                         "annotations": [
                             {"id": "a2", "imageId": "21"},
                             {"id": "a3", "imageId": "22"},
@@ -111,6 +113,7 @@ class PredictionViewsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertEqual([item["id"] for item in data["annotationSets"]], [9, 7])
+        self.assertEqual(data["annotationSets"][0]["patchCount"], 1)
         self.assertEqual(data["annotationSets"][0]["imageCount"], 2)
         self.assertEqual(data["annotationSets"][0]["annotationCount"], 2)
 
@@ -125,9 +128,10 @@ class PredictionViewsTests(TestCase):
                         "name": "Training Set",
                         "description": "main set",
                         "datasetId": "12",
+                        "patches": [{"id": "p-1", "imageId": "31", "x": 4, "y": 8, "width": 256, "height": 256}],
                         "featureTypes": [{"id": "1", "name": "Cell", "color": "#00ff00"}],
                         "annotations": [
-                            {"id": "ann-1", "imageId": "31", "points": [[0, 0], [1, 1]], "typeId": "1"}
+                            {"id": "ann-1", "imageId": "31", "patchId": "p-1", "points": [[0, 0], [1, 1]], "typeId": "1"}
                         ],
                     },
                 )
@@ -145,6 +149,8 @@ class PredictionViewsTests(TestCase):
         data = json.loads(response.content)
         self.assertEqual(data["annotationSetId"], 11)
         self.assertEqual(data["name"], "Training Set")
+        self.assertEqual(data["patches"][0]["id"], "p-1")
+        self.assertEqual(data["annotations"][0]["patchId"], "p-1")
         self.assertEqual(data["annotations"][0]["imageId"], "31")
 
     def test_save_annotations_replaces_existing_dataset_annotation_set(self):
@@ -165,11 +171,15 @@ class PredictionViewsTests(TestCase):
             "data": {
                 "name": "Updated Set",
                 "description": "refined masks",
+                "patches": [
+                    {"id": "patch-1", "imageId": "31", "x": 0, "y": 0, "width": 256, "height": 256}
+                ],
                 "featureTypes": [{"id": "1", "name": "Cell", "color": "#00ff00"}],
                 "annotations": [
                     {
                         "id": "ann-1",
                         "imageId": "31",
+                        "patchId": "patch-1",
                         "points": [[0, 0], [1, 1]],
                         "typeId": "1",
                     }
@@ -192,5 +202,6 @@ class PredictionViewsTests(TestCase):
         data = json.loads(response.content)
         self.assertEqual(data["annotationSetId"], 22)
         self.assertEqual(data["annotationSet"]["name"], "Updated Set")
+        self.assertEqual(data["annotationSet"]["patchCount"], 1)
         dataset.linkAnnotation.assert_called_once_with(created)
         conn.deleteObjects.assert_called_once_with("Annotation", [11])

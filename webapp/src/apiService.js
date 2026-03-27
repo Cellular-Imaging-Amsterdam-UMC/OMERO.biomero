@@ -307,6 +307,17 @@ export const fetchImageChannels = async (imageId) => {
   }
 };
 
+export const fetchImageRenderInfo = async (imageId) => {
+  if (!imageId) return null;
+  try {
+    const endpoint = `/webgateway/imgData/${imageId}/`;
+    return await apiRequest(endpoint, "GET");
+  } catch (error) {
+    console.error("Error fetching image render info:", error);
+    return null;
+  }
+};
+
 export const runPredictionPrediction = async (imageId, modelName, channel = 0, z = 0, t = 0) => {
   try {
     const csrfToken = window.csrftoken;

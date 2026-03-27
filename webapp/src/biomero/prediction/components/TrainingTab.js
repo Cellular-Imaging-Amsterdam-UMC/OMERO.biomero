@@ -5,6 +5,13 @@ import TrainingForm from "./TrainingForm";
 import { useAppContext } from "../../../AppContext";
 import { runPredictionTraining } from "../../../apiService";
 
+const sanitizeDatasetSelection = (selection = []) => {
+    if (!Array.isArray(selection) || selection.length === 0) {
+        return [];
+    }
+    return [selection[0]];
+};
+
 const TrainingTab = () => {
   const [selectedDatasets, setSelectedDatasets] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -56,18 +63,16 @@ const TrainingTab = () => {
 
   return (
     <div className="p-4 flex flex-col gap-4 h-full overflow-y-auto">
-      <H4>Train New Model</H4>
-      
       <div className="flex gap-4">
         <div className="w-1/3">
              <Card>
                 <DatasetSelectWithPopover 
                     label="Select Training Dataset"
                     value={selectedDatasets}
-                    onChange={setSelectedDatasets}
+                    onChange={(selection) => setSelectedDatasets(sanitizeDatasetSelection(selection))}
                     multiSelect={false}
                     allowedCategories={["datasets"]}
-                    buttonText={selectedDatasets.length ? `${selectedDatasets.length} selected` : "Select Dataset"}
+                    buttonText={selectedDatasets.length ? "1 selected" : "Select Dataset"}
                 />
              </Card>
         </div>

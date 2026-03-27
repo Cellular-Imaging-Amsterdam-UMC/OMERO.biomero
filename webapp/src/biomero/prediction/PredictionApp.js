@@ -8,10 +8,16 @@ import { useAppContext } from "../../AppContext";
 import GroupSelect from "../../shared/components/GroupSelect";
 import SlurmStatusIndicator from "../../shared/components/SlurmStatusIndicator";
 
+const sanitizeDatasetSelection = (selection = []) => {
+  if (!Array.isArray(selection) || selection.length === 0) {
+    return [];
+  }
+  return [selection[0]];
+};
+
 const StardistApp = () => {
   const {
     state,
-    updateState,
     loadOmeroTreeData,
     loadFolderData,
     loadGroups,
@@ -21,7 +27,8 @@ const StardistApp = () => {
   
   const [activeTab, setActiveTab] = useState("preview");
   const [loadingOmero, setLoadingOmero] = useState(false);
-  const [workflowError, setWorkflowError] = useState(false);
+  const [workflowError] = useState(false);
+  const [previewSelectedDatasets, setPreviewSelectedDatasets] = useState([]);
 
   useEffect(() => {
     if (!loadingOmero) {
@@ -44,10 +51,6 @@ const StardistApp = () => {
 
   const handleTabChange = (newTabId) => {
     setActiveTab(newTabId);
-  };
-  
-  const handleWorkflowError = () => {
-    setWorkflowError(prev => !prev);
   };
 
   return (
@@ -81,13 +84,18 @@ const StardistApp = () => {
             id="preview"
             title="Preview"
             icon="eye-open"
-            panel={<PreviewTab />}
+            panel={
+              <PreviewTab
+                selectedDatasets={previewSelectedDatasets}
+                onSelectedDatasetsChange={(selection) => setPreviewSelectedDatasets(sanitizeDatasetSelection(selection))}
+              />
+            }
             />
             <Tab
             id="annotation"
             title="Annotation"
             icon="edit"
-            panel={<AnnotationTab />}
+            panel={<AnnotationTab preferredSelectedDatasets={previewSelectedDatasets} />}
             />
             <Tab
             id="training"

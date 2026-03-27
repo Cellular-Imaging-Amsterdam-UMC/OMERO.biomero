@@ -45,11 +45,20 @@ def _read_annotation_payload(file_ann):
 
 def _normalize_annotation_payload(annotation_data, dataset_id):
     feature_types = annotation_data.get("featureTypes") or []
+    patches = []
+    for patch in annotation_data.get("patches") or []:
+        normalized_patch = dict(patch)
+        if normalized_patch.get("imageId") is not None:
+            normalized_patch["imageId"] = str(normalized_patch["imageId"])
+        patches.append(normalized_patch)
+
     annotations = []
     for ann in annotation_data.get("annotations") or []:
         normalized = dict(ann)
         if normalized.get("imageId") is not None:
             normalized["imageId"] = str(normalized["imageId"])
+        if normalized.get("patchId") is not None:
+            normalized["patchId"] = str(normalized["patchId"])
         annotations.append(normalized)
 
     return {
@@ -57,6 +66,7 @@ def _normalize_annotation_payload(annotation_data, dataset_id):
         "name": annotation_data.get("name") or DEFAULT_ANNOTATION_SET_NAME,
         "description": annotation_data.get("description") or "",
         "datasetId": str(dataset_id),
+        "patches": patches,
         "featureTypes": feature_types,
         "annotations": annotations,
     }
@@ -73,6 +83,7 @@ def _build_annotation_set_summary(file_ann, payload):
         "name": payload.get("name") or file_ann.getFile().getName(),
         "description": payload.get("description") or file_ann.getDescription() or "",
         "datasetId": payload.get("datasetId"),
+        "patchCount": len(payload.get("patches") or []),
         "annotationCount": len(payload.get("annotations") or []),
         "imageCount": len(image_ids),
     }
@@ -143,6 +154,8 @@ def get_image_channels(request, conn=None, **kwargs):
             "sizeC": image.getSizeC(),
             "sizeZ": image.getSizeZ(),
             "sizeT": image.getSizeT(),
+            "sizeX": image.getSizeX(),
+            "sizeY": image.getSizeY(),
         })
 
     except Exception as e:

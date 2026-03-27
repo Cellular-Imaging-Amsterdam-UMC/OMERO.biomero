@@ -20,11 +20,11 @@ module.exports = (env, argv) => {
   if (!isProd && !isCI) {
     plugins.push(
       new WebpackShellPluginNext({
-        onAfterDone: {
-          scripts: ["bash ../omero-update.sh"], // Local dev convenience
-          blocking: false,
-          parallel: false,
-        },
+        // onAfterDone: {
+        //   scripts: ["bash ../omero-update.sh"], // Local dev convenience
+        //   blocking: false,
+        //   parallel: false,
+        // },
         onBeforeCompile: {
           scripts: [
             "rimraf ../omero_biomero/static/omero_biomero/assets",

@@ -1,11 +1,22 @@
-import React, { useRef, useEffect, useState, useMemo } from "react";
-import { Button, Slider, ButtonGroup, Icon, Popover, Menu, MenuItem, InputGroup, Checkbox } from "@blueprintjs/core";
+import React, { useRef, useEffect, useState, useMemo, useCallback } from "react";
+import { Button, Slider, ButtonGroup, Icon, InputGroup, Checkbox, Tag } from "@blueprintjs/core";
 import ImageChannelControls from "./ImageChannelControls";
-import { traceContours, subtractAnnotations, eraseFromAnnotations } from "../utils/GeometryUtils";
+import { traceContours, subtractAnnotations, eraseFromAnnotations, appendToAnnotations } from "../utils/GeometryUtils";
+import { fetchImageRenderInfo } from "../../../apiService";
 
-const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = [], imageMeta = { sizeZ: 1, sizeT: 1 }, featureTypes, onFeatureTypesChange }) => {
+const clampPercent = (value, fallback) => {
+    const parsed = Number.parseFloat(value);
+    if (!Number.isFinite(parsed)) {
+        return fallback;
+    }
+    return Math.min(100, Math.max(0, parsed));
+};
+
+const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = [], imageMeta = { sizeZ: 1, sizeT: 1 }, featureTypes, onFeatureTypesChange, patch = null }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+    const patchViewportRef = useRef(null);
+    const imageRef = useRef(null);
   
   // View State
   const [zoom, setZoom] = useState(1);
@@ -17,13 +28,14 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
   const [tool, setTool] = useState("brush"); 
   const [brushSize, setBrushSize] = useState(20);
   const [collisionDetection, setCollisionDetection] = useState(false);
-  const [mode, setMode] = useState("add"); // 'add' or 'subtract'
+    const [mode, setMode] = useState("new");
   
   // Feature Types State
   const [activeFeatureType, setActiveFeatureType] = useState(featureTypes[0]?.id || "1");
   const [newFeatureName, setNewFeatureName] = useState("");
   const [newFeatureColor, setNewFeatureColor] = useState("#ff0000");
   const [editingFeatureId, setEditingFeatureId] = useState(null);
+    const [imageLoaded, setImageLoaded] = useState(false);
 
   // Interaction State
   const [currentPoints, setCurrentPoints] = useState([]); // For polygon tool
@@ -34,6 +46,11 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
   
   // Channel Visibility
   const [channelVisibility, setChannelVisibility] = useState({});
+        const [renderChannels, setRenderChannels] = useState([]);
+        const [imagePixelRange, setImagePixelRange] = useState({ min: 0, max: 255 });
+        const [projectionMode, setProjectionMode] = useState("normal");
+    const [intensityMinPercent, setIntensityMinPercent] = useState("0");
+    const [intensityMaxPercent, setIntensityMaxPercent] = useState("100");
 
   useEffect(() => {
     if (channels.length > 0) {
@@ -54,27 +71,97 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
   
   const [z, setZ] = useState(0);
   const [t, setT] = useState(0);
+    const activePatch = patch && String(patch.imageId) === String(image?.id) ? patch : null;
+    const patchOffsetX = activePatch ? Number(activePatch.x || 0) : 0;
+    const patchOffsetY = activePatch ? Number(activePatch.y || 0) : 0;
+    const patchWidth = activePatch ? Number(activePatch.width) || 256 : null;
+    const patchHeight = activePatch ? Number(activePatch.height) || 256 : null;
 
   useEffect(() => {
     setZ(0);
     setT(0);
   }, [image]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        if (!image?.id) {
+            setRenderChannels([]);
+            setImagePixelRange({ min: 0, max: 255 });
+            setProjectionMode("normal");
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        const loadRenderInfo = async () => {
+            const renderInfo = await fetchImageRenderInfo(image.id);
+            if (cancelled || !renderInfo) {
+                return;
+            }
+
+            const pixelMin = Number(renderInfo?.pixel_range?.[0]);
+            const pixelMax = Number(renderInfo?.pixel_range?.[1]);
+
+            if (!cancelled) {
+                setRenderChannels(renderInfo.channels || []);
+                if (Number.isFinite(pixelMin) && Number.isFinite(pixelMax) && pixelMax > pixelMin) {
+                    setImagePixelRange({ min: pixelMin, max: pixelMax });
+                }
+                setProjectionMode(renderInfo?.rdefs?.projection || "normal");
+            }
+        };
+
+        loadRenderInfo();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [image?.id]);
   
   const imageUrl = useMemo(() => {
     if (!image) return null;
     const base = `/webgateway/render_image/${image.id}/${z}/${t}/`;
-    
-    if (channels.length <= 1) return base;
 
-    // Build channel string
-    const channelParam = channels.map(ch => {
-      const chNum = ch.index + 1; // OMERO uses 1-indexed
-      const visible = channelVisibility[ch.index] !== false; // default true
-      return visible ? `${chNum}` : `-${chNum}`;
-    }).join(",");
+                if (!channels.length) return base;
 
-    return `${base}?c=${channelParam}`;
-  }, [image, channels, channelVisibility, z, t]);
+        const effectiveMinPercent = clampPercent(intensityMinPercent, 0);
+        const effectiveMaxPercent = Math.max(effectiveMinPercent, clampPercent(intensityMaxPercent, 100));
+        const pixelMin = Number.isFinite(imagePixelRange.min) ? imagePixelRange.min : 0;
+        const pixelMax = Number.isFinite(imagePixelRange.max) ? imagePixelRange.max : 255;
+        const pixelSpan = Math.max(1, pixelMax - pixelMin);
+
+        const channelParam = channels.map((ch) => {
+            const chNum = ch.index + 1;
+            const visible = channelVisibility[ch.index] !== false;
+            const channelPrefix = visible ? `${chNum}` : `-${chNum}`;
+            const rawColor = String(renderChannels[ch.index]?.color || ch.color || "FF0000")
+                .replace(/^#/, "")
+                .replace(/^\$/, "")
+                .toUpperCase();
+            const color = `$${rawColor}`;
+            const windowStart = Math.round(pixelMin + (pixelSpan * effectiveMinPercent) / 100);
+            const windowEnd = Math.round(pixelMin + (pixelSpan * effectiveMaxPercent) / 100);
+
+            return `${channelPrefix}|${windowStart}:${Math.max(windowStart + 1, windowEnd)}${color}`;
+        }).join(",");
+
+        const params = new URLSearchParams();
+        params.set("c", channelParam);
+        params.set("m", "c");
+        params.set("p", projectionMode);
+        params.set("q", "0.9");
+        params.set("_render", `${effectiveMinPercent}-${effectiveMaxPercent}-${Object.keys(channelVisibility)
+            .sort()
+            .map((key) => `${key}:${channelVisibility[key] !== false ? 1 : 0}`)
+            .join("-")}`);
+
+        return `${base}?${params.toString()}`;
+    }, [image, channels, channelVisibility, imagePixelRange, intensityMinPercent, intensityMaxPercent, projectionMode, renderChannels, z, t]);
+
+    useEffect(() => {
+        setImageLoaded(false);
+    }, [imageUrl]);
 
   useEffect(() => {
       // Sync active feature if list changes or empty
@@ -89,37 +176,97 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
 
   // --- Drawing Helpers ---
 
+  const toLocalPoints = useCallback((points) => {
+      if (!activePatch) {
+          return points;
+      }
+      return points.map(([x, y]) => [x - patchOffsetX, y - patchOffsetY]);
+  }, [activePatch, patchOffsetX, patchOffsetY]);
+
+  const toGlobalPoints = useCallback((points) => {
+      if (!activePatch) {
+          return points;
+      }
+      return points.map(([x, y]) => [x + patchOffsetX, y + patchOffsetY]);
+  }, [activePatch, patchOffsetX, patchOffsetY]);
+
+  const fitToViewport = useCallback(() => {
+      const container = containerRef.current;
+      const img = imageRef.current;
+      if (!container || !img) {
+          return;
+      }
+
+      const containerRect = container.getBoundingClientRect();
+      const contentWidth = activePatch ? patchWidth : img.naturalWidth;
+      const contentHeight = activePatch ? patchHeight : img.naturalHeight;
+      if (!contentWidth || !contentHeight || !containerRect.width || !containerRect.height) {
+          return;
+      }
+
+      const nextZoom = Math.min(
+          containerRect.width / contentWidth,
+          containerRect.height / contentHeight,
+          1
+      );
+      const nextPanX = (containerRect.width - (contentWidth * nextZoom)) / 2;
+      const nextPanY = (containerRect.height - (contentHeight * nextZoom)) / 2;
+
+      setZoom(nextZoom);
+      setPan({ x: nextPanX, y: nextPanY });
+  }, [activePatch, patchHeight, patchWidth]);
+
+  const syncCanvasDimensions = useCallback(() => {
+      const canvas = canvasRef.current;
+      const img = imageRef.current;
+      if (!canvas || !img) {
+          return;
+      }
+
+      canvas.width = activePatch ? patchWidth : img.naturalWidth;
+      canvas.height = activePatch ? patchHeight : img.naturalHeight;
+  }, [activePatch, patchWidth, patchHeight]);
+
   const getCanvasPoint = (e) => {
       if (!canvasRef.current) return { x: 0, y: 0 };
+      if (activePatch && patchViewportRef.current) {
+          const rect = patchViewportRef.current.getBoundingClientRect();
+          const scaleX = canvasRef.current.width / rect.width;
+          const scaleY = canvasRef.current.height / rect.height;
+          const x = (e.clientX - rect.left) * scaleX;
+          const y = (e.clientY - rect.top) * scaleY;
+
+          return { x, y };
+      }
+
       const rect = canvasRef.current.getBoundingClientRect();
       const canvas = canvasRef.current;
-      
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
-      
       const x = (e.clientX - rect.left) * scaleX;
       const y = (e.clientY - rect.top) * scaleY;
       
       return { x, y };
   };
 
-  const draw = () => {
+    const draw = useCallback(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 1. Draw existing annotations for current plane
+            // 1. Draw existing annotations for current plane
       annotations
         .filter(ann => (ann.z ?? 0) === z && (ann.t ?? 0) === t)
-        .forEach((ann, idx) => {
+                .forEach((ann) => {
           if (!ann.points || ann.points.length < 2) return;
           const type = featureTypes.find(t => t.id === ann.typeId) || { color: "yellow" };
+                    const points = toLocalPoints(ann.points);
           
           ctx.beginPath();
-          ctx.moveTo(ann.points[0][0], ann.points[0][1]);
-          for (let i = 1; i < ann.points.length; i++) {
-              ctx.lineTo(ann.points[i][0], ann.points[i][1]);
+                    ctx.moveTo(points[0][0], points[0][1]);
+                    for (let i = 1; i < points.length; i++) {
+                            ctx.lineTo(points[i][0], points[i][1]);
           }
           ctx.closePath();
           
@@ -132,7 +279,7 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
 
       // 2. Draw current interaction
       if (tool === "polygon" && currentPoints.length > 0) {
-          ctx.strokeStyle = mode === "subtract" ? "red" : "lime";
+          ctx.strokeStyle = mode === "subtract" ? "red" : mode === "append" ? "orange" : "lime";
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.moveTo(currentPoints[0][0], currentPoints[0][1]);
@@ -142,7 +289,7 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
           ctx.stroke();
           
           // Draw points
-          ctx.fillStyle = mode === "subtract" ? "red" : "lime";
+          ctx.fillStyle = mode === "subtract" ? "red" : mode === "append" ? "orange" : "lime";
           const ptSize = 3; 
           currentPoints.forEach(p => {
               ctx.beginPath();
@@ -150,11 +297,16 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
               ctx.fill();
           });
       }
-  };
+        }, [annotations, currentPoints, featureTypes, mode, toLocalPoints, tool, z, t]);
   
   useEffect(() => {
      requestAnimationFrame(draw);
-  }, [annotations, currentPoints, zoom, pan, featureTypes, mode]); 
+    }, [draw, zoom, pan]); 
+
+    useEffect(() => {
+            syncCanvasDimensions();
+            requestAnimationFrame(draw);
+    }, [activePatch, draw, syncCanvasDimensions]);
 
   // --- Handlers ---
 
@@ -167,7 +319,7 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
       }
       
       // Block adding if no features
-      if (mode === "add" && (!featureTypes.length || !activeFeatureType)) {
+      if ((mode === "new" || mode === "append") && (!featureTypes.length || !activeFeatureType)) {
           return;
       }
       
@@ -217,7 +369,7 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
           
           const ctx = canvasRef.current.getContext("2d");
           const type = featureTypes.find(t => t.id === activeFeatureType);
-          const color = mode === "subtract" ? "#ff0000" : (type?.color || "yellow");
+          const color = mode === "subtract" ? "#ff0000" : mode === "append" ? "#f59e0b" : (type?.color || "yellow");
           ctx.fillStyle = color + "80"; 
           ctx.beginPath();
           ctx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
@@ -253,18 +405,28 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
   const processNewPolygons = (newPolys) => {
       const width = canvasRef.current.width;
       const height = canvasRef.current.height;
+      const currentPlaneAnnotations = annotations.filter(a => (a.z ?? 0) === z && (a.t ?? 0) === t);
       
       if (mode === "subtract") {
-          let currentAnns = annotations.filter(a => (a.z ?? 0) === z && (a.t ?? 0) === t);
-          let otherAnns = annotations.filter(a => (a.z ?? 0) !== z || (a.t ?? 0) !== t);
+          let currentAnns = currentPlaneAnnotations.map((annotation) => ({
+              ...annotation,
+              points: toLocalPoints(annotation.points || []),
+          }));
+          const otherAnns = annotations.filter(a => (a.z ?? 0) !== z || (a.t ?? 0) !== t);
           newPolys.forEach(erasePoly => {
                currentAnns = eraseFromAnnotations(erasePoly, currentAnns, width, height);
           });
-          onAnnotationsChange([...otherAnns, ...currentAnns]);
+          const nextAnnotations = currentAnns.map((annotation) => ({
+              ...annotation,
+              points: toGlobalPoints(annotation.points || []),
+          }));
+          onAnnotationsChange([...otherAnns, ...nextAnnotations]);
+      } else if (mode === "append") {
+          handleAppendToExisting(newPolys);
       } else {
           const newAnns = newPolys.map(pts => ({
               id: crypto.randomUUID(),
-              points: pts,
+              points: toGlobalPoints(pts),
               typeId: activeFeatureType,
               generated: true,
               z, t
@@ -277,14 +439,47 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
           }
       }
   };
+
+  const handleAppendToExisting = (newPolys) => {
+      const width = canvasRef.current.width;
+      const height = canvasRef.current.height;
+      const currentPlaneAnnotations = annotations
+          .filter(a => (a.z ?? 0) === z && (a.t ?? 0) === t)
+          .map((annotation) => ({
+              ...annotation,
+              points: toLocalPoints(annotation.points || []),
+          }));
+      const otherPlaneAnnotations = annotations.filter(a => (a.z ?? 0) !== z || (a.t ?? 0) !== t);
+      const differentFeatureAnnotations = currentPlaneAnnotations.filter((annotation) => annotation.typeId !== activeFeatureType);
+      let sameFeatureAnnotations = currentPlaneAnnotations.filter((annotation) => annotation.typeId === activeFeatureType);
+
+      newPolys.forEach((points) => {
+          const nextAnnotations = appendToAnnotations(points, sameFeatureAnnotations, width, height);
+          if (nextAnnotations) {
+              sameFeatureAnnotations = nextAnnotations;
+          }
+      });
+
+      const nextPlaneAnnotations = [...differentFeatureAnnotations, ...sameFeatureAnnotations].map((annotation) => ({
+          ...annotation,
+          points: toGlobalPoints(annotation.points || []),
+      }));
+      onAnnotationsChange([...otherPlaneAnnotations, ...nextPlaneAnnotations]);
+  };
   
   const handleCollisionAndAdd = (newPolys) => {
       const width = canvasRef.current.width;
       const height = canvasRef.current.height;
-      let currentAnns = annotations.filter(a => (a.z ?? 0) === z && (a.t ?? 0) === t);
-      let otherAnns = annotations.filter(a => (a.z ?? 0) !== z || (a.t ?? 0) !== t);
+      let currentAnns = annotations
+          .filter(a => (a.z ?? 0) === z && (a.t ?? 0) === t)
+          .map((annotation) => ({
+              ...annotation,
+              points: toLocalPoints(annotation.points || []),
+          }));
+      const otherAnns = annotations.filter(a => (a.z ?? 0) !== z || (a.t ?? 0) !== t);
       newPolys.forEach(newPoly => {
-           const resultPolys = subtractAnnotations(newPoly.points, currentAnns, width, height);
+           const localPoints = toLocalPoints(newPoly.points);
+           const resultPolys = subtractAnnotations(localPoints, currentAnns, width, height);
            resultPolys.forEach(pts => {
                currentAnns.push({
                    id: crypto.randomUUID(),
@@ -295,7 +490,11 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
                });
            });
       });
-      onAnnotationsChange([...otherAnns, ...currentAnns]);
+      const nextAnnotations = currentAnns.map((annotation) => ({
+          ...annotation,
+          points: toGlobalPoints(annotation.points || []),
+      }));
+      onAnnotationsChange([...otherAnns, ...nextAnnotations]);
   };
   
   const handleContextMenu = (e) => {
@@ -366,26 +565,53 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
   };
   
   const handleImageLoad = (e) => {
+       setImageLoaded(true);
        if (canvasRef.current) {
-           canvasRef.current.width = e.target.naturalWidth;
-           canvasRef.current.height = e.target.naturalHeight;
+           syncCanvasDimensions();
+           fitToViewport();
            draw();
        }
   };
 
+  const patchViewportStyle = activePatch ? {
+      width: patchWidth,
+      height: patchHeight,
+      overflow: "hidden",
+  } : undefined;
+
+  const patchImageOffsetStyle = activePatch ? {
+      transform: `translate(${-patchOffsetX}px, ${-patchOffsetY}px)`,
+  } : undefined;
+
+  const imageStyle = activePatch
+      ? {
+          transform: patchImageOffsetStyle.transform,
+          maxWidth: "none",
+          opacity: imageLoaded ? 1 : 0,
+      }
+      : { opacity: imageLoaded ? 1 : 0 };
+
   if (!image) return <div className="p-4 text-gray-400">Select an image</div>;
 
   return (
-    <div className="flex h-full gap-0">
+        <div className="flex h-full min-h-0 gap-0 overflow-hidden">
        {/* Toolbar / Sidebar */}
-       <div className="w-64 flex flex-col gap-4 p-2 border-r bg-gray-50 overflow-y-auto shrink-0">
+             <div className="w-64 flex flex-col gap-4 p-2 border-r bg-gray-50 overflow-hidden shrink-0 min-h-0">
            {/* Image Channels */}
-           {channels.length > 1 && (
+           {channels.length > 0 && (
                <div className="border-b pb-2">
                    <ImageChannelControls 
                         channels={channels}
                         visibility={channelVisibility}
                         onToggle={toggleChannelVisibility}
+                        minPercent={intensityMinPercent}
+                        maxPercent={intensityMaxPercent}
+                        onMinPercentChange={setIntensityMinPercent}
+                        onMaxPercentChange={setIntensityMaxPercent}
+                        onAutoScale={() => {
+                            setIntensityMinPercent("0");
+                            setIntensityMaxPercent("99");
+                        }}
                    />
                </div>
            )}
@@ -395,8 +621,8 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
                <h5>Tools</h5>
                <ButtonGroup fill>
                    <Button icon="hand" active={tool === "pan"} onClick={() => setTool("pan")} title="Pan/Zoom (Ctrl+Scroll)" />
-                   <Button icon="polygon-filter" active={tool === "polygon"} onClick={() => setTool("polygon")} title="Polygon (Right Click to Finish)" disabled={mode === "add" && featureTypes.length === 0} />
-                   <Button icon="draw" active={tool === "brush"} onClick={() => setTool("brush")} title="Brush" disabled={mode === "add" && featureTypes.length === 0} />
+                   <Button icon="polygon-filter" active={tool === "polygon"} onClick={() => setTool("polygon")} title="Polygon (Right Click to Finish)" disabled={(mode === "new" || mode === "append") && featureTypes.length === 0} />
+                   <Button icon="draw" active={tool === "brush"} onClick={() => setTool("brush")} title="Brush" disabled={(mode === "new" || mode === "append") && featureTypes.length === 0} />
                </ButtonGroup>
                
                <div className="flex gap-2 items-center mt-2 px-1">
@@ -404,10 +630,16 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
                    <ButtonGroup>
                        <Button 
                            small 
-                           active={mode === "add"} 
-                           onClick={() => setMode("add")} 
-                           intent={mode === "add" ? "primary" : "none"}
-                       >Add</Button>
+                           active={mode === "new"} 
+                           onClick={() => setMode("new")} 
+                           intent={mode === "new" ? "primary" : "none"}
+                       >New</Button>
+                       <Button 
+                           small 
+                           active={mode === "append"} 
+                           onClick={() => setMode("append")}
+                           intent={mode === "append" ? "warning" : "none"}
+                       >Append</Button>
                        <Button 
                            small 
                            active={mode === "subtract"} 
@@ -417,7 +649,7 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
                    </ButtonGroup>
                </div>
                
-               {mode === "add" && (
+               {mode === "new" && (
                    <div className="mt-2 px-1">
                        <Checkbox 
                             checked={collisionDetection} 
@@ -441,8 +673,8 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
                )}
            </div>
            
-           <div className="border-t pt-2">
-               <h5>Features</h5>
+           <div className="border-t pt-2 shrink-0">
+               <h5 className="pd-2">Features</h5>
                <div className="flex flex-col gap-2 mb-2">
                    {featureTypes.map(ft => (
                        <div 
@@ -498,9 +730,12 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
                </div>
            </div>
            
-           <div className="border-t pt-2 flex-1 overflow-auto min-h-[100px]">
-               <h5>Annotations ({annotations.length})</h5>
-               <div className="flex flex-col gap-1">
+           <div className="border-t pt-2 flex-1 min-h-0 flex flex-col overflow-hidden">
+               <div className="flex items-center justify-between gap-2">
+                   <h5>Annotations ({annotations.length})</h5>
+                   {activePatch && <Tag minimal>{`Patch ${activePatch.width}x${activePatch.height}`}</Tag>}
+               </div>
+               <div className="flex flex-col gap-1 flex-1 min-h-0 overflow-y-auto pr-1">
                    {annotations.map((ann, i) => {
                        const ft = featureTypes.find(t => t.id === ann.typeId);
                        return (
@@ -545,23 +780,28 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
                        transformOrigin: "0 0",
                        transition: isPanning ? "none" : "transform 0.1s"
                    }}
-                   className="inline-block origin-top-left relative"
+                   className="absolute left-0 top-0 origin-top-left"
                >
-                   <img 
-                       src={imageUrl} 
-                       alt="work" 
-                       className="block pointer-events-none select-none max-w-none" 
-                       onLoad={handleImageLoad}
-                   />
-                   <canvas 
-                       ref={canvasRef}
-                       className="absolute top-0 left-0 w-full h-full" 
-                       onMouseDown={handleMouseDown}
-                       onMouseMove={handleMouseMove}
-                       onMouseUp={handleMouseUp}
-                       onMouseLeave={handleMouseUp}
-                       onContextMenu={handleContextMenu}
-                   />
+                   <div ref={patchViewportRef} className="relative inline-block" style={patchViewportStyle}>
+                       <img 
+                           key={imageUrl}
+                           ref={imageRef}
+                           src={imageUrl} 
+                           alt="work" 
+                           className="block pointer-events-none select-none max-w-none" 
+                           style={imageStyle}
+                           onLoad={handleImageLoad}
+                       />
+                       <canvas 
+                           ref={canvasRef}
+                           className="absolute top-0 left-0 w-full h-full" 
+                           onMouseDown={handleMouseDown}
+                           onMouseMove={handleMouseMove}
+                           onMouseUp={handleMouseUp}
+                           onMouseLeave={handleMouseUp}
+                           onContextMenu={handleContextMenu}
+                       />
+                   </div>
                </div>
                
                {/* Zoom Controls Overlay */}
@@ -569,7 +809,7 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
                    <Button icon="minus" onClick={() => setZoom(prev => Math.max(0.1, prev * 0.8))} />
                    <Button text={`${Math.round(zoom * 100)}%`} disabled />
                    <Button icon="plus" onClick={() => setZoom(prev => Math.min(10, prev * 1.2))} />
-                   <Button icon="reset" onClick={() => { setZoom(1); setPan({x:0,y:0}); }} />
+                   <Button icon="reset" onClick={fitToViewport} />
                </div>
            </div>
 

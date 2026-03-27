@@ -7,14 +7,23 @@ import ChannelSelector from "./ChannelSelector";
 import PreviewViewer from "./PreviewViewer";
 import { fetchImageChannels } from "../../../apiService";
 
-const PreviewTab = () => {
-  const [selectedDatasets, setSelectedDatasets] = useState([]);
+const sanitizeDatasetSelection = (selection = []) => {
+    if (!Array.isArray(selection) || selection.length === 0) {
+        return [];
+    }
+    return [selection[0]];
+};
+
+const PreviewTab = ({ selectedDatasets: externalSelectedDatasets = [], onSelectedDatasetsChange }) => {
+    const [localSelectedDatasets, setLocalSelectedDatasets] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedModel, setSelectedModel] = useState("2D_versatile_fluo");
   const [channels, setChannels] = useState([]);
   const [selectedChannel, setSelectedChannel] = useState(0);
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [imageMeta, setImageMeta] = useState({ sizeZ: 1, sizeT: 1 });
+
+    const selectedDatasets = onSelectedDatasetsChange ? externalSelectedDatasets : localSelectedDatasets;
 
   // Helper to extract ID from string like "dataset-123"
   const getDatasetId = (selection) => {
@@ -29,7 +38,12 @@ const PreviewTab = () => {
   const datasetId = getDatasetId(selectedDatasets);
 
   const handleDatasetChange = (newSelection) => {
-      setSelectedDatasets(newSelection);
+      const nextSelection = sanitizeDatasetSelection(newSelection);
+      if (onSelectedDatasetsChange) {
+          onSelectedDatasetsChange(nextSelection);
+      } else {
+          setLocalSelectedDatasets(nextSelection);
+      }
       setSelectedImage(null);
       setChannels([]);
       setSelectedChannel(0);
@@ -82,7 +96,7 @@ const PreviewTab = () => {
                     onChange={handleDatasetChange}
                     multiSelect={false}
                     allowedCategories={["datasets"]}
-                    buttonText={selectedDatasets.length ? `${selectedDatasets.length} selected` : "Select Dataset"}
+                    buttonText={selectedDatasets.length ? "1 selected" : "Select Dataset"}
                 />
              </Card>
              
