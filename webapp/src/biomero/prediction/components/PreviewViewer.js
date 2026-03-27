@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { Button, Spinner, Callout, Checkbox, Divider, Tag, Slider } from "@blueprintjs/core";
-import { runStardistPrediction } from "../../../apiService";
+import { runPredictionPrediction } from "../../../apiService";
 import ImageChannelControls from "./ImageChannelControls";
 
 /**
@@ -182,7 +182,7 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
     setLoading(true);
     setError(null);
     try {
-      const result = await runStardistPrediction(image.id, model, channel, z, t);
+      const result = await runPredictionPrediction(image.id, model, channel, z, t);
 
       if (result.error) {
         setError(result.error);
@@ -354,7 +354,7 @@ const PreviewViewer = ({ image, model, channel = 0, channels = [], imageMeta = {
               <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center rounded" style={{ zIndex: 10 }}>
                 <div className="bg-white rounded-lg p-4 flex items-center gap-3 shadow-lg">
                   <Spinner size={24} />
-                  <span className="text-sm font-medium">Running StarDist on Ch {channel}...</span>
+                  <span className="text-sm font-medium">Running Prediction on Ch {channel}...</span>
                 </div>
               </div>
             )}

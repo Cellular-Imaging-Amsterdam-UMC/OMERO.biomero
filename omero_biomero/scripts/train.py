@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-OMERO script for Stardist Training.
-This script submits a SLURM job to train a Stardist model.
+OMERO script for Model Training.
+This script submits a SLURM job to train a model.
 """
 
 import omero.scripts as scripts
@@ -63,7 +63,7 @@ def run(conn, params):
     
     # SBATCH content
     sbatch_content = f"""#!/bin/bash
-#SBATCH --job-name=stardist_{model_name}
+#SBATCH --job-name=prediction_{model_name}
 #SBATCH --output=slurm_%j.out
 #SBATCH --error=slurm_%j.err
 #SBATCH --ntasks=1
@@ -72,10 +72,10 @@ def run(conn, params):
 #SBATCH --gres=gpu:1
 #SBATCH --time=04:00:00
 
-echo "Starting Stardist Training..."
+echo "Starting Training..."
 # Activate environment if needed
 # source /opt/conda/etc/profile.d/conda.sh
-# conda activate stardist_env
+# conda activate prediction_env
 
 {cmd_str}
 """
@@ -101,8 +101,8 @@ echo "Starting Stardist Training..."
 
 def main():
     client = scripts.client(
-        "Stardist_Training",
-        "Train a Stardist model on OMERO dataset",
+        "Prediction_Training",
+        "Train a model on OMERO dataset",
         scripts.Long("Dataset_ID", optional=False),
         scripts.Int("Epochs", default=100),
         scripts.Int("Batch_Size", default=4),

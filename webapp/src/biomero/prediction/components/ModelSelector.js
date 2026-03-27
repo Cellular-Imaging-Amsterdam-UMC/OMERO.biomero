@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { HTMLSelect, FormGroup, Spinner, Button, Tag } from "@blueprintjs/core";
-import { fetchStardistModels } from "../../../apiService";
+import { fetchPredictionModels } from "../../../apiService";
 
 const ModelSelector = ({ selectedModel, onSelect }) => {
   const [models, setModels] = useState([]);
@@ -11,7 +11,7 @@ const ModelSelector = ({ selectedModel, onSelect }) => {
     setLoading(true);
     setError(null);
     try {
-      const fetched = await fetchStardistModels();
+      const fetched = await fetchPredictionModels();
       setModels(fetched);
 
       // If current selection is not in the list, select the first one

@@ -3,7 +3,7 @@ import { H4, Card } from "@blueprintjs/core";
 import DatasetSelectWithPopover from "../../components/DatasetSelectWithPopover";
 import TrainingForm from "./TrainingForm";
 import { useAppContext } from "../../../AppContext";
-import { runStardistTraining } from "../../../apiService";
+import { runPredictionTraining } from "../../../apiService";
 
 const TrainingTab = () => {
   const [selectedDatasets, setSelectedDatasets] = useState([]);
@@ -39,8 +39,8 @@ const TrainingTab = () => {
           };
 
           // Call backend to start workflow
-          // Workflow name 'stardist_train' must exist in backend/Slurm
-          await runStardistTraining(params);
+          // Workflow name 'train' must exist in backend/Slurm
+          await runPredictionTraining(params);
           
           toaster.show({ 
               message: "Training job submitted successfully! Check Status tab.", 

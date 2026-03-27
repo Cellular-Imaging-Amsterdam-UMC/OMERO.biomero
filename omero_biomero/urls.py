@@ -1,6 +1,6 @@
 from django.urls import path
 from .tus_views import TusUploadView
-from . import biomero_views, importer_views, admin_views, analyzer_views, stardist_views
+from . import biomero_views, importer_views, admin_views, analyzer_views, prediction_views
 
 urlpatterns = [
     # Importer URLs
@@ -59,36 +59,41 @@ urlpatterns = [
         analyzer_views.get_slurm_status,  # GET: SLURM cluster status
         name="analyzer_slurm_status",
     ),
-    # Stardist URLs
+    # Prediction URLs
     path(
-        "api/stardist/models/",
-        stardist_views.list_models,
-        name="stardist_list_models",
+        "api/prediction/models/",
+        prediction_views.list_models,
+        name="prediction_list_models",
     ),
     path(
-        "api/stardist/channels/",
-        stardist_views.get_image_channels,
-        name="stardist_image_channels",
+        "api/prediction/channels/",
+        prediction_views.get_image_channels,
+        name="prediction_image_channels",
     ),
     path(
-        "api/stardist/save_annotations/",
-        stardist_views.save_annotations,
-        name="stardist_save_annotations",
+        "api/prediction/save_annotations/",
+        prediction_views.save_annotations,
+        name="prediction_save_annotations",
     ),
     path(
-        "api/stardist/train/",
-        stardist_views.run_training,
-        name="stardist_run_training",
+        "api/prediction/annotation_sets/",
+        prediction_views.list_annotation_sets,
+        name="prediction_list_annotation_sets",
     ),
     path(
-        "api/stardist/fetch_annotations/",
-        stardist_views.fetch_annotations,
-        name="stardist_fetch_annotations",
+        "api/prediction/train/",
+        prediction_views.run_training,
+        name="prediction_run_training",
     ),
     path(
-        "api/stardist/predict/",
-        stardist_views.run_prediction,
-        name="stardist_predict",
+        "api/prediction/fetch_annotations/",
+        prediction_views.fetch_annotations,
+        name="prediction_fetch_annotations",
+    ),
+    path(
+        "api/prediction/predict/",
+        prediction_views.run_prediction,
+        name="prediction_predict",
     ),
     # Main Biomero URL
     path(

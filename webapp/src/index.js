@@ -12,7 +12,7 @@ import "./tailwind.css";
 import { AppProvider } from "./AppContext";
 import BiomeroApp from "./biomero/BiomeroApp";
 import ImporterApp from "./importer/ImporterApp";
-import StardistApp from "./biomero/stardist/StardistApp";
+import PredictionApp from "./biomero/prediction/PredictionApp";
 import {
   Navbar,
   NavbarGroup,
@@ -109,14 +109,14 @@ const AppRouter = () => {
                 />
                 <Button
                   className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
-                    appName === "stardist"
+                    appName === "prediction"
                       ? "bp5-intent-primary font-bold shadow-md"
                       : ""
                   }`}
                   icon="learning"
                   text="Train"
-                  onClick={() => navigate("?tab=stardist")}
-                  outlined={appName === "stardist"}
+                  onClick={() => navigate("?tab=prediction")}
+                  outlined={appName === "prediction"}
                 />
               </>
             )}
@@ -125,8 +125,8 @@ const AppRouter = () => {
         <div className="pt-[50px]">
           {appName === "biomero" ? (
             <BiomeroApp />
-          ) : appName === "stardist" ? (
-            <StardistApp />
+          ) : appName === "prediction" ? (
+            <PredictionApp />
           ) : (
             <ImporterApp />
           )}

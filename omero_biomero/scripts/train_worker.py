@@ -38,7 +38,7 @@ def main():
             return
 
         # Prepare directories
-        base_dir = "stardist_data"
+        base_dir = "prediction_data"
         if os.path.exists(base_dir):
             shutil.rmtree(base_dir)
         os.makedirs(f"{base_dir}/images")
@@ -52,32 +52,36 @@ def main():
         
         # 2. Download Data
         print("Downloading images and annotations...")
+        annotation_payload = None
+        latest_annotation_file = None
+        for ann in dataset.listAnnotations():
+            if not isinstance(ann, omero.gateway.FileAnnotationWrapper):
+                continue
+            if ann.getNs() != "biomero.prediction.annotations":
+                continue
+            if latest_annotation_file is None or ann.getId() > latest_annotation_file.getId():
+                latest_annotation_file = ann
+
+        if latest_annotation_file:
+            try:
+                content = b""
+                for chunk in latest_annotation_file.getFileInChunks():
+                    content += chunk
+                annotation_payload = json.loads(content)
+            except Exception as e:
+                print(f"Failed to load dataset annotation set {latest_annotation_file.getId()}: {e}")
+
         for image in dataset.listChildren():
-            
-            # Fetch annotations from FileAnnotation
             found_polys = []
-            FILENAME = "stardist_data.json"
-            
-            annotation_file = None
-            for ann in image.listAnnotations():
-                if isinstance(ann, omero.gateway.FileAnnotationWrapper):
-                    if ann.getFile().getName() == FILENAME:
-                        annotation_file = ann
-                        break
-            
-            if annotation_file:
-                try:
-                    content = b""
-                    for chunk in annotation_file.getFileInChunks():
-                        content += chunk
-                    payload = json.loads(content)
-                    if "annotations" in payload:
-                        found_polys = payload["annotations"]
-                except Exception as e:
-                    print(f"Failed to load JSON file for image {image.getId()}: {e}")
+            if annotation_payload and "annotations" in annotation_payload:
+                found_polys = [
+                    ann
+                    for ann in annotation_payload["annotations"]
+                    if str(ann.get("imageId")) == str(image.getId())
+                ]
 
             if not found_polys:
-                print(f"Skipping image {image.getId()} (no annotations in {FILENAME})")
+                print(f"Skipping image {image.getId()} (no dataset-level annotations)")
                 continue
                 
             # Download Image
