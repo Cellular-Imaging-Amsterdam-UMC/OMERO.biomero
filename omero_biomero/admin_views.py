@@ -47,7 +47,7 @@ def admin_config(request, conn=None, **kwargs):
                 section: dict(configs.items(section)) for section in configs.sections()
             }
 
-            # Load the JSON configuration file (importer-config.json)
+            # Load the JSON configuration file (uploader-settings.json)
             json_config = {}
             if os.path.exists(CONFIG_FILE_PATH):
                 try:

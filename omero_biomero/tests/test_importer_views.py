@@ -634,7 +634,7 @@ class ImportUploadedFileTests(TestCase):
     def setUp(self):
         self.tmp = os.path.abspath(self._mk_tmp())
         self.tus_dest = os.path.join(self.tmp, "tus_destination")
-        self.config_path = os.path.join(self.tmp, "importer-config.json")
+        self.config_path = os.path.join(self.tmp, "uploader-settings.json")
         self.group_mappings_path = os.path.join(self.tmp, "group-mappings.json")
         os.makedirs(self.tus_dest, exist_ok=True)
 

@@ -74,7 +74,7 @@ class TusViewsTestCase(TestCase):
         self.tmp_upload_dir = tempfile.mkdtemp(prefix="tus_test_upload_")
         self.tmp_dest_dir = tempfile.mkdtemp(prefix="tus_test_dest_")
         self.tmp_base_dir = tempfile.mkdtemp(prefix="tus_test_base_")
-        self.tmp_config_path = os.path.join(self.tmp_base_dir, "importer-config.json")
+        self.tmp_config_path = os.path.join(self.tmp_base_dir, "uploader-settings.json")
         self.tmp_group_mappings_path = os.path.join(
             self.tmp_base_dir, "group-mappings.json"
         )
