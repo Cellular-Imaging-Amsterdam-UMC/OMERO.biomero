@@ -3,7 +3,7 @@ import { FormGroup, InputGroup, NumericInput, Switch, HTMLSelect, Intent, Tag, C
 import { useAppContext } from "../../AppContext";
 
 const WorkflowForm = () => {
-  const { state, updateState } = useAppContext();
+  const { state, updateState, loadWorkflowModels } = useAppContext();
   const [selectedVersion, setSelectedVersion] = useState("");
 
   const ghURL = state.selectedWorkflow?.githubUrl;
@@ -15,6 +15,14 @@ const WorkflowForm = () => {
   const availableVersions = workflowVersions?.available_versions || [];
   const latestVersion = workflowVersions?.latest_version;
   const slurmOnline = state.slurmStatus === "online";
+  const availableModels = state.workflowModels?.[workflowName] || [];
+
+  // Load available models when workflow changes
+  useEffect(() => {
+    if (workflowName && slurmOnline) {
+      loadWorkflowModels(workflowName);
+    }
+  }, [workflowName, slurmOnline]);
 
   // Determine version status
   const getVersionStatus = (version) => {
@@ -256,8 +264,28 @@ const WorkflowForm = () => {
         </FormGroup>
       )}
       
+      {/* Custom model selector - only shown when models are available on SLURM */}
+      {availableModels.length > 0 && (
+        <FormGroup
+          label="Custom Model"
+          labelInfo="(optional)"
+          helperText="Select a custom-trained model from the SLURM cluster"
+        >
+          <HTMLSelect
+            value={state.formData?.custom_model || ""}
+            onChange={(e) => handleInputChange("custom_model", e.target.value)}
+            fill
+          >
+            <option value="">Use default model</option>
+            {availableModels.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </HTMLSelect>
+        </FormGroup>
+      )}
+
       <Divider />
-      
+
       {renderFormFields()}
     </form>
   );
