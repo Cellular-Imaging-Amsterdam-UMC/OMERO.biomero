@@ -166,6 +166,7 @@ def run_workflow_script(request, conn=None, **kwargs):
             "batchEnabled",   # Frontend flag (not sent to script)
             "batchCount",     # Frontend calculated (not sent to script)
             "batchSize",      # Converted to Batch_Size for script
+            "custom_model",   # Handled separately below
         ]
         inputs = {
             f"{workflow_name}_|_{key}": wrap(value)
@@ -195,6 +196,11 @@ def run_workflow_script(request, conn=None, **kwargs):
             }
         )
         
+        # Add custom model selection if provided
+        custom_model = params.get("custom_model")
+        if custom_model:
+            inputs[f"{workflow_name}_|_custom_model"] = wrap(custom_model)
+
         # Remove None values for non-batched workflows
         inputs = {k: v for k, v in inputs.items() if v is not None}
         logger.debug(inputs)
@@ -425,6 +431,29 @@ def prepare_workflow_parameters(workflow_name, params):
             converted_params[key] = value
 
     return converted_params
+
+
+@login_required()
+@require_http_methods(["GET"])
+def list_workflow_models(request, conn=None, **kwargs):
+    """
+    List custom model files available for a workflow on the SLURM cluster.
+    """
+    workflow_name = kwargs.get("name")
+    if not workflow_name:
+        return JsonResponse(
+            {"error": "Workflow name is required"}, status=400
+        )
+
+    try:
+        with SlurmClient.from_config() as sc:
+            models = sc.get_available_models(workflow_name)
+        return JsonResponse({"models": models})
+    except Exception as e:
+        logger.error(
+            f"Error listing models for workflow {workflow_name}: {str(e)}"
+        )
+        return JsonResponse({"models": [], "error": str(e)})
 
 
 @login_required()

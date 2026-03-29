@@ -9,6 +9,7 @@ import {
   fetchWorkflows,
   fetchConfig,
   fetchWorkflowMetadata,
+  fetchWorkflowModels,
   runWorkflow,
   postConfig,
   postUpload,
@@ -387,6 +388,20 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const loadWorkflowModels = async (workflow) => {
+    try {
+      const response = await fetchWorkflowModels(workflow);
+      updateState({
+        workflowModels: {
+          ...state.workflowModels,
+          [workflow]: response.models || [],
+        },
+      });
+    } catch (err) {
+      console.error(`Failed to load models for ${workflow}:`, err);
+    }
+  };
+
   const loadBiomeroConfig = async () => {
     setLoading(true);
     setError(null);
@@ -687,6 +702,7 @@ export const AppProvider = ({ children }) => {
         openImportScriptWindow,
         loadWorkflows,
         loadWorkflowMetadata,
+        loadWorkflowModels,
         loadBiomeroConfig,
         runWorkflowData,
         saveConfigData,
