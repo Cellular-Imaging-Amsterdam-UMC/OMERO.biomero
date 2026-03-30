@@ -704,3 +704,27 @@ export const importUploadedFile = async (
     groupId,
   });
 };
+
+// --- Training (biomero) ---
+
+export const startTraining = async (params) => {
+  try {
+    const csrfToken = window.csrftoken;
+    const endpoint = "/omero_biomero/api/analyzer/training/start";
+    const response = await apiRequest(endpoint, "POST", params, {
+      headers: {
+        "X-CSRFToken": csrfToken,
+        "Content-Type": "application/json",
+      },
+    });
+    return response;
+  } catch (error) {
+    console.error("Error starting training:", error);
+    throw error;
+  }
+};
+
+export const listTrainedModels = async (datasetId) => {
+  const endpoint = `/omero_biomero/api/analyzer/training/models?dataset=${datasetId}`;
+  return apiRequest(endpoint, "GET");
+};
