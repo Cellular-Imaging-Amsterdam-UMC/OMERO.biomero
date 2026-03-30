@@ -3,7 +3,7 @@ import { FormGroup, InputGroup, NumericInput, Switch, HTMLSelect, Intent, Tag, C
 import { useAppContext } from "../../AppContext";
 
 const WorkflowForm = () => {
-  const { state, updateState, loadWorkflowModels } = useAppContext();
+  const { state, updateState } = useAppContext();
   const [selectedVersion, setSelectedVersion] = useState("");
 
   const ghURL = state.selectedWorkflow?.githubUrl;
@@ -16,13 +16,6 @@ const WorkflowForm = () => {
   const latestVersion = workflowVersions?.latest_version;
   const slurmOnline = state.slurmStatus === "online";
   const availableModels = state.workflowModels?.[workflowName] || [];
-
-  // Load available models when workflow changes
-  useEffect(() => {
-    if (workflowName && slurmOnline) {
-      loadWorkflowModels(workflowName);
-    }
-  }, [workflowName, slurmOnline]);
 
   // Determine version status
   const getVersionStatus = (version) => {

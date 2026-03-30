@@ -36,9 +36,10 @@ const SlurmStatusIndicator = ({ onTabChange, onWorkflowError }) => {
       
       // Store workflow version data in app state for use by RunPanel
       if (result.workflow_versions) {
-        updateState({ 
+        updateState({
           workflowVersions: result.workflow_versions,
-          slurmStatus: result.status 
+          workflowModels: result.workflow_models || {},
+          slurmStatus: result.status
         });
       } else {
         updateState({ slurmStatus: result.status });
