@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 
 import omero
 from django.http import JsonResponse
@@ -27,6 +28,14 @@ def start_training(request, conn=None, **kwargs):
         dataset_ids = data.get("dataset_ids", [])
         if not dataset_ids:
             return JsonResponse({"error": "dataset_ids is required"}, status=400)
+
+        # Validate model_name to prevent path traversal
+        model_name = data.get("model_name", "my_model")
+        if not re.match(r'^[a-zA-Z0-9_\-]+$', model_name):
+            return JsonResponse(
+                {"error": "model_name must contain only letters, numbers, underscores, and hyphens"},
+                status=400,
+            )
 
         # Switch group if requested
         active_group_id = data.get("active_group_id")
@@ -64,7 +73,7 @@ def start_training(request, conn=None, **kwargs):
             "Mask_Suffix": wrap(data.get("mask_suffix", "_label")),
             "Val_Split": rfloat(float(data.get("val_split", 0.2))),
             "Test_Split": rfloat(float(data.get("test_split", 0.0))),
-            "Model_Name": wrap(data.get("model_name", "my_model")),
+            "Model_Name": wrap(model_name),
             "N_Epochs": rint(int(data.get("n_epochs", 100))),
             "Learning_Rate": rfloat(float(data.get("learning_rate", 0.00001))),
             "Weight_Decay": rfloat(float(data.get("weight_decay", 0.1))),
@@ -97,6 +106,11 @@ def list_trained_models(request, conn=None, **kwargs):
         if not dataset_id:
             return JsonResponse({"error": "dataset parameter required"}, status=400)
 
+        try:
+            dataset_id = int(dataset_id)
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "dataset must be an integer"}, status=400)
+
         dataset = conn.getObject("Dataset", dataset_id)
         if not dataset:
             return JsonResponse({"error": "Dataset not found"}, status=404)
@@ -105,26 +119,23 @@ def list_trained_models(request, conn=None, **kwargs):
         group_id = dataset.getDetails().getGroup().getId()
         conn.SERVICE_OPTS.setOmeroGroup(group_id)
 
-        # Collect MapAnnotations with results first for fast lookup
+        # Single pass over annotations
         results_map = {}
+        file_anns = []
         for ann in dataset.listAnnotations():
-            if not isinstance(ann, omero.gateway.MapAnnotationWrapper):
-                continue
-            if ann.getNs() != TRAINING_RESULTS_NS:
-                continue
-            kv = dict(ann.getValue())
-            model_id = kv.get("model_id", "")
-            if model_id:
-                results_map[model_id] = kv
+            if isinstance(ann, omero.gateway.MapAnnotationWrapper):
+                if ann.getNs() == TRAINING_RESULTS_NS:
+                    kv = dict(ann.getValue())
+                    model_id = kv.get("model_id", "")
+                    if model_id:
+                        results_map[model_id] = kv
+            elif isinstance(ann, omero.gateway.FileAnnotationWrapper):
+                if ann.getNs() == TRAINING_MODEL_NS:
+                    file_anns.append(ann)
 
-        # Find FileAnnotations with training model namespace
+        # Build models list
         models = []
-        for ann in dataset.listAnnotations():
-            if not isinstance(ann, omero.gateway.FileAnnotationWrapper):
-                continue
-            if ann.getNs() != TRAINING_MODEL_NS:
-                continue
-
+        for ann in file_anns:
             filename = ann.getFile().getName()
             model_info = {
                 "file_annotation_id": ann.getId(),
