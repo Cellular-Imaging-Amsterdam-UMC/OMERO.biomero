@@ -37,9 +37,9 @@
   },
   "scripts": {
     "clear-assets": "rimraf ../omero_biomero/static/omero_biomero/assets",
-    "watch": "yarn clear-assets && webpack --mode=development --color --progress -w",
+    "watch": "webpack --mode=development --color --progress -w",
     "start": "react-scripts start",
-    "build": "yarn clear-assets && webpack --mode=production --color --progress",
+    "build": "webpack --mode=production --color --progress",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

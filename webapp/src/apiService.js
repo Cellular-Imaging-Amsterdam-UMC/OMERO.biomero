@@ -318,6 +318,17 @@ export const fetchImageRenderInfo = async (imageId) => {
   }
 };
 
+export const fetchChannelPlaneData = async (imageId, channel, z = 0, t = 0) => {
+  if (!imageId || channel == null) return null;
+  try {
+    const endpoint = `/omero_biomero/api/prediction/channel_plane/?image=${imageId}&channel=${channel}&z=${z}&t=${t}`;
+    return await apiRequest(endpoint, "GET");
+  } catch (error) {
+    console.error("Error fetching channel plane data:", error);
+    return null;
+  }
+};
+
 export const runPredictionPrediction = async (imageId, modelName, channel = 0, z = 0, t = 0) => {
   try {
     const csrfToken = window.csrftoken;

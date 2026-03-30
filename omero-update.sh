@@ -12,6 +12,7 @@ COMMAND3="/opt/omero/web/venv3/bin/omero web stop || true; rm -f /opt/omero/web/
 
 COMMAND4="/opt/omero/web/OMERO.biomero/startup.sh"
 
+docker exec --user root "$CONTAINER_NAME" sh -c "$COMMAND0"
 docker exec --user root "$CONTAINER_NAME" sh -c "$COMMAND2"
 docker exec --user omero-web "$CONTAINER_NAME" sh -c "$COMMAND3"
 docker exec --user omero-web "$CONTAINER_NAME" sh -c "$COMMAND4"

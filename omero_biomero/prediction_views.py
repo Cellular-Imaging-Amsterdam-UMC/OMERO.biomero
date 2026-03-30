@@ -1,6 +1,7 @@
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
 from omeroweb.webclient.decorators import login_required
+import base64
 import json
 import logging
 import os
@@ -45,6 +46,62 @@ def _read_annotation_payload(file_ann):
 
 def _normalize_annotation_payload(annotation_data, dataset_id):
     feature_types = annotation_data.get("featureTypes") or []
+    image_scalings = []
+    for entry in annotation_data.get("imageScalings") or []:
+        if not isinstance(entry, dict):
+            continue
+
+        selected_channel = entry.get("selectedChannel")
+        if selected_channel is not None:
+            selected_channel = str(selected_channel)
+
+        channel_visibility = {}
+        for key, value in (entry.get("channelVisibility") or {}).items():
+            channel_visibility[str(key)] = bool(value)
+
+        channel_scales = {}
+        for key, value in (entry.get("channelScales") or {}).items():
+            if not isinstance(value, dict):
+                continue
+            channel_scales[str(key)] = {
+                "min": value.get("min", 0),
+                "max": value.get("max", 100),
+            }
+
+        image_scalings.append({
+            "imageId": str(entry.get("imageId")) if entry.get("imageId") is not None else None,
+            "selectedChannel": selected_channel,
+            "channelVisibility": channel_visibility,
+            "channelScales": channel_scales,
+            "patchIds": [str(patch_id) for patch_id in (entry.get("patchIds") or []) if patch_id is not None],
+        })
+
+    if not image_scalings:
+        selected_channel = annotation_data.get("selectedChannel")
+        if selected_channel is not None:
+            selected_channel = str(selected_channel)
+
+        channel_visibility = {}
+        for key, value in (annotation_data.get("channelVisibility") or {}).items():
+            channel_visibility[str(key)] = bool(value)
+
+        channel_scales = {}
+        for key, value in (annotation_data.get("channelScales") or {}).items():
+            if not isinstance(value, dict):
+                continue
+            channel_scales[str(key)] = {
+                "min": value.get("min", 0),
+                "max": value.get("max", 100),
+            }
+
+        image_scalings = [{
+            "imageId": None,
+            "selectedChannel": selected_channel,
+            "channelVisibility": channel_visibility,
+            "channelScales": channel_scales,
+            "patchIds": [],
+        }]
+
     patches = []
     for patch in annotation_data.get("patches") or []:
         normalized_patch = dict(patch)
@@ -66,6 +123,7 @@ def _normalize_annotation_payload(annotation_data, dataset_id):
         "name": annotation_data.get("name") or DEFAULT_ANNOTATION_SET_NAME,
         "description": annotation_data.get("description") or "",
         "datasetId": str(dataset_id),
+        "imageScalings": image_scalings,
         "patches": patches,
         "featureTypes": feature_types,
         "annotations": annotations,
@@ -160,6 +218,56 @@ def get_image_channels(request, conn=None, **kwargs):
 
     except Exception as e:
         logger.error("Error fetching image channels", exc_info=True)
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@login_required()
+@require_GET
+def get_channel_plane_data(request, conn=None, **kwargs):
+    """
+    Return raw plane data for a specific image channel so the frontend can
+    compute channel normalization bounds locally.
+    Expects ?image=ID&channel=INDEX&z=Z&t=T
+    """
+    try:
+        image_id = request.GET.get("image")
+        channel = request.GET.get("channel")
+        z = int(request.GET.get("z", 0))
+        t = int(request.GET.get("t", 0))
+
+        if image_id is None or channel is None:
+            return JsonResponse({"error": "Missing image ID or channel index"}, status=400)
+
+        channel = int(channel)
+        image = conn.getObject("Image", image_id)
+        if not image:
+            return JsonResponse({"error": "Image not found"}, status=404)
+
+        if channel < 0 or channel >= image.getSizeC():
+            return JsonResponse({"error": f"Channel {channel} out of range (0-{image.getSizeC()-1})"}, status=400)
+        if z < 0 or z >= image.getSizeZ():
+            return JsonResponse({"error": f"Z index {z} out of range (0-{image.getSizeZ()-1})"}, status=400)
+        if t < 0 or t >= image.getSizeT():
+            return JsonResponse({"error": f"T index {t} out of range (0-{image.getSizeT()-1})"}, status=400)
+
+        import numpy as np
+
+        plane = image.getPrimaryPixels().getPlane(z, channel, t)
+        plane_float = np.asarray(plane, dtype=np.float32, order="C")
+        plane_bytes = base64.b64encode(plane_float.tobytes()).decode("ascii")
+
+        return JsonResponse({
+            "imageId": str(image_id),
+            "channel": channel,
+            "z": z,
+            "t": t,
+            "shape": [int(dim) for dim in plane_float.shape],
+            "dtype": "float32",
+            "data": plane_bytes,
+        })
+
+    except Exception as e:
+        logger.error("Error fetching channel plane data", exc_info=True)
         return JsonResponse({"error": str(e)}, status=500)
 
 

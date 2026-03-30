@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { H4, Card, Button, Spinner, HTMLSelect, InputGroup, ButtonGroup } from "@blueprintjs/core";
+import { Card, Button, Spinner, HTMLSelect, InputGroup, ButtonGroup, NumericInput, ControlGroup } from "@blueprintjs/core";
 import DatasetSelectWithPopover from "../../components/DatasetSelectWithPopover";
 import ImageSelector from "./ImageSelector";
 import PatchSelector from "./PatchSelector";
@@ -40,6 +40,55 @@ const sanitizeDatasetSelection = (selection = []) => {
     return [selection[0]];
 };
 
+const clampPercent = (value, fallback) => {
+    const parsed = Number.parseFloat(value);
+    if (!Number.isFinite(parsed)) {
+        return fallback;
+    }
+    return Math.min(100, Math.max(0, parsed));
+};
+
+const sanitizeChannelScale = (scale = {}) => {
+    const min = clampPercent(scale.min, 0);
+    const max = Math.max(min, clampPercent(scale.max, 100));
+    return { min, max };
+};
+
+const normalizeImageScalingEntry = (entry = {}, channels = []) => {
+    const selectedChannel = entry?.selectedChannel != null ? String(entry.selectedChannel) : "";
+    const patchIds = Array.isArray(entry?.patchIds) ? entry.patchIds.map(String) : [];
+
+    const defaultVisibility = Object.fromEntries(
+        (channels || []).map((channel) => [String(channel.index), channel.active !== false])
+    );
+    const channelVisibility = {
+        ...defaultVisibility,
+        ...Object.fromEntries(
+            Object.entries(entry?.channelVisibility || {}).map(([key, value]) => [String(key), Boolean(value)])
+        ),
+    };
+    if (selectedChannel !== "") {
+        channelVisibility[selectedChannel] = true;
+    }
+
+    const channelScales = Object.fromEntries(
+        Object.entries(entry?.channelScales || {}).map(([key, value]) => [String(key), sanitizeChannelScale(value)])
+    );
+    (channels || []).forEach((channel) => {
+        const key = String(channel.index);
+        if (!channelScales[key]) {
+            channelScales[key] = { min: 0, max: 100 };
+        }
+    });
+
+    return {
+        selectedChannel,
+        channelVisibility,
+        channelScales,
+        patchIds,
+    };
+};
+
 const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
         const [selectedDatasets, setSelectedDatasets] = useState([]);
         const [selectedImage, setSelectedImage] = useState(null);
@@ -59,9 +108,10 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
     const [featureTypes, setFeatureTypes] = useState(getDefaultFeatureTypes());
         const [loadingAnns, setLoadingAnns] = useState(false);
     const [loadingAnnotationSets, setLoadingAnnotationSets] = useState(false);
-        const [channels, setChannels] = useState([]);
-        const [imageMeta, setImageMeta] = useState({ sizeZ: 1, sizeT: 1, sizeX: null, sizeY: null });
-        const [saving, setSaving] = useState(false);
+    const [channels, setChannels] = useState([]);
+    const [imageScalingsByImageId, setImageScalingsByImageId] = useState({});
+    const [imageMeta, setImageMeta] = useState({ sizeZ: 1, sizeT: 1, sizeX: null, sizeY: null });
+    const [saving, setSaving] = useState(false);
 
   const { toaster } = useAppContext();
 
@@ -117,6 +167,7 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
         setFeatureTypes(getDefaultFeatureTypes());
         setSelectedImage(null);
         setChannels([]);
+        setImageScalingsByImageId({});
         setImageMeta({ sizeZ: 1, sizeT: 1, sizeX: null, sizeY: null });
         setViewMode(VIEW_MODE_IMAGES);
     };
@@ -149,6 +200,7 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
                 setSelectedPatchId("");
                 setDatasetAnnotations([]);
                 setFeatureTypes(getDefaultFeatureTypes());
+                setImageScalingsByImageId({});
             }
         } catch (e) {
             console.error("Error loading annotation sets", e);
@@ -157,15 +209,6 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
             setLoadingAnnotationSets(false);
         }
     }, [toaster]);
-
-    useEffect(() => {
-        if (selectedImage) {
-            loadChannels(selectedImage.id);
-        } else {
-            setChannels([]);
-            setImageMeta({ sizeZ: 1, sizeT: 1, sizeX: null, sizeY: null });
-        }
-    }, [selectedImage]);
 
     useEffect(() => {
         if (!datasetId) {
@@ -269,6 +312,7 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
             setSelectedPatchId("");
             setDatasetAnnotations([]);
             setFeatureTypes(getDefaultFeatureTypes());
+            setImageScalingsByImageId({});
             return;
         }
 
@@ -294,6 +338,33 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
                 setPatches(data.patches || []);
                 setDatasetAnnotations(data.annotations || []);
                 setFeatureTypes(data.featureTypes?.length ? data.featureTypes : getDefaultFeatureTypes());
+                const savedPatches = data.patches || [];
+                const relevantImageIds = savedPatches.length
+                    ? Array.from(new Set(savedPatches.map((patch) => patch.imageId).filter(Boolean).map(String)))
+                    : Array.from(new Set((data.annotations || []).map((annotation) => annotation.imageId).filter(Boolean).map(String)));
+                const fallbackScaling = normalizeImageScalingEntry({
+                    selectedChannel: data.selectedChannel,
+                    channelVisibility: data.channelVisibility,
+                    channelScales: data.channelScales,
+                    patchIds: [],
+                });
+                const nextImageScalings = Object.fromEntries(
+                    ((data.imageScalings || []).map((entry) => [
+                        String(entry.imageId),
+                        normalizeImageScalingEntry(entry),
+                    ]))
+                );
+                if (!data.imageScalings?.length && relevantImageIds.length) {
+                    relevantImageIds.forEach((imageId) => {
+                        nextImageScalings[String(imageId)] = {
+                            ...fallbackScaling,
+                            patchIds: savedPatches
+                                .filter((patch) => String(patch.imageId) === String(imageId))
+                                .map((patch) => String(patch.id)),
+                        };
+                    });
+                }
+                setImageScalingsByImageId(nextImageScalings);
             } catch (e) {
                 if (!cancelled) {
                     console.error("Error loading annotations", e);
@@ -312,6 +383,32 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
             cancelled = true;
         };
     }, [annotationSets, datasetId, selectedAnnotationSetId, toaster]);
+
+    const currentScalingImageId = useMemo(() => {
+        if (viewerPatch?.imageId != null) {
+            return String(viewerPatch.imageId);
+        }
+        if (selectedImage?.id != null) {
+            return String(selectedImage.id);
+        }
+        return null;
+    }, [selectedImage, viewerPatch]);
+
+    const updateImageScalingEntry = useCallback((imageId, updater) => {
+        if (imageId == null) {
+            return;
+        }
+
+        setImageScalingsByImageId((currentEntries) => {
+            const key = String(imageId);
+            const baseEntry = normalizeImageScalingEntry(currentEntries[key], channels);
+            const nextEntry = typeof updater === "function" ? updater(baseEntry) : updater;
+            return {
+                ...currentEntries,
+                [key]: normalizeImageScalingEntry(nextEntry, channels),
+            };
+        });
+    }, [channels]);
 
     useEffect(() => {
         if (!datasetImages.length) {
@@ -359,10 +456,14 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
         }
     }, [viewMode, patches, selectedPatchId, imagesById]);
 
-    const loadChannels = async (imageId) => {
+    const loadChannels = useCallback(async (imageId) => {
         try {
             const data = await fetchImageChannels(imageId);
             setChannels(data.channels || []);
+            setImageScalingsByImageId((currentEntries) => ({
+                ...currentEntries,
+                [String(imageId)]: normalizeImageScalingEntry(currentEntries[String(imageId)], data.channels || []),
+            }));
             setImageMeta({
                 sizeZ: data.sizeZ || 1,
                 sizeT: data.sizeT || 1,
@@ -378,7 +479,16 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
             console.error("Error loading channels", e);
             setImageMeta({ sizeZ: 1, sizeT: 1, sizeX: null, sizeY: null });
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        if (selectedImage) {
+            loadChannels(selectedImage.id);
+        } else {
+            setChannels([]);
+            setImageMeta({ sizeZ: 1, sizeT: 1, sizeX: null, sizeY: null });
+        }
+    }, [loadChannels, selectedImage]);
 
     const currentImageAnnotations = selectedImage
         ? datasetAnnotations.filter((annotation) => String(annotation.imageId) === String(selectedImage.id))
@@ -396,6 +506,103 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
     const selectedAnnotationSummary = annotationSets.find(
         (annotationSet) => String(annotationSet.id) === String(selectedAnnotationSetId)
     );
+    const annotationSetChannelOptions = channels.map((channel) => ({
+        value: String(channel.index),
+        label: channel.name || `Channel ${channel.index}`,
+    }));
+    const currentImageScaling = useMemo(
+        () => normalizeImageScalingEntry(
+            currentScalingImageId ? imageScalingsByImageId[currentScalingImageId] : {},
+            channels
+        ),
+        [channels, currentScalingImageId, imageScalingsByImageId]
+    );
+    const selectedAnnotationChannel = currentImageScaling.selectedChannel;
+    const channelVisibility = currentImageScaling.channelVisibility;
+    const channelScales = currentImageScaling.channelScales;
+    const selectedAnnotationChannelScale = sanitizeChannelScale(channelScales[selectedAnnotationChannel]);
+
+    const handleAnnotationSetChannelScaleChange = useCallback((channelIndex, field, value) => {
+        if (currentScalingImageId == null) {
+            return;
+        }
+
+        updateImageScalingEntry(currentScalingImageId, (currentEntry) => {
+            const key = String(channelIndex);
+            const previous = sanitizeChannelScale(currentEntry.channelScales[key]);
+            let nextChannelScale;
+
+            if (field === "range" && Array.isArray(value)) {
+                nextChannelScale = sanitizeChannelScale({ min: value[0], max: value[1] });
+            } else {
+                const nextValue = Number.isFinite(value) ? value : (field === "min" ? previous.min : previous.max);
+                nextChannelScale = field === "min"
+                    ? sanitizeChannelScale({ min: nextValue, max: previous.max })
+                    : sanitizeChannelScale({ min: previous.min, max: nextValue });
+            }
+
+            return {
+                ...currentEntry,
+                channelScales: {
+                    ...currentEntry.channelScales,
+                    [key]: nextChannelScale,
+                },
+            };
+        });
+    }, [currentScalingImageId, updateImageScalingEntry]);
+
+    const handleSelectedAnnotationChannelChange = useCallback((value) => {
+        if (currentScalingImageId == null) {
+            return;
+        }
+
+        updateImageScalingEntry(currentScalingImageId, (currentEntry) => ({
+            ...currentEntry,
+            selectedChannel: value,
+            channelVisibility: value === ""
+                ? currentEntry.channelVisibility
+                : {
+                    ...currentEntry.channelVisibility,
+                    [String(value)]: true,
+                },
+        }));
+    }, [currentScalingImageId, updateImageScalingEntry]);
+
+    const handleCurrentImageChannelVisibilityChange = useCallback((nextVisibility) => {
+        if (currentScalingImageId == null) {
+            return;
+        }
+
+        updateImageScalingEntry(currentScalingImageId, (currentEntry) => ({
+            ...currentEntry,
+            channelVisibility: nextVisibility,
+        }));
+    }, [currentScalingImageId, updateImageScalingEntry]);
+
+    const handleCurrentImageChannelScalesChange = useCallback((nextScales) => {
+        if (currentScalingImageId == null) {
+            return;
+        }
+
+        updateImageScalingEntry(currentScalingImageId, (currentEntry) => ({
+            ...currentEntry,
+            channelScales: nextScales,
+        }));
+    }, [currentScalingImageId, updateImageScalingEntry]);
+
+    useEffect(() => {
+        if (!channels.length || selectedAnnotationChannel === "") {
+            return;
+        }
+
+        updateImageScalingEntry(currentScalingImageId, (currentEntry) => ({
+            ...currentEntry,
+            channelVisibility: {
+                ...currentEntry.channelVisibility,
+                [String(selectedAnnotationChannel)]: true,
+            },
+        }));
+    }, [channels, currentScalingImageId, selectedAnnotationChannel, updateImageScalingEntry]);
 
     const handleImageAnnotationsChange = (nextAnnotations) => {
         if (!selectedImage) {
@@ -501,11 +708,31 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
 
         setSaving(true);
         try {
+            const imagesWithPatches = Array.from(new Set(patches.map((patch) => String(patch.imageId)).filter(Boolean)));
+            const relevantScalingImageIds = imagesWithPatches.length
+                ? imagesWithPatches
+                : Array.from(new Set(datasetImages.map((image) => String(image.id)).filter(Boolean)));
             const payload = {
                 version: "2.0",
                 name: annotationSetName,
                 description: annotationSetDescription,
                 datasetId: String(datasetId),
+                imageScalings: relevantScalingImageIds.map((imageId) => {
+                    const entry = normalizeImageScalingEntry(imageScalingsByImageId[String(imageId)], channels);
+                    return {
+                        imageId: String(imageId),
+                        selectedChannel: entry.selectedChannel !== "" ? String(entry.selectedChannel) : null,
+                        channelVisibility: Object.fromEntries(
+                            Object.entries(entry.channelVisibility).map(([key, value]) => [String(key), Boolean(value)])
+                        ),
+                        channelScales: Object.fromEntries(
+                            Object.entries(entry.channelScales).map(([key, value]) => [String(key), sanitizeChannelScale(value)])
+                        ),
+                        patchIds: patches
+                            .filter((patch) => String(patch.imageId) === String(imageId))
+                            .map((patch) => String(patch.id)),
+                    };
+                }),
                 patches: patches.map((patch) => ({
                     ...patch,
                     imageId: String(patch.imageId),
@@ -536,7 +763,7 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
     return (
         <div className="p-4 flex flex-col gap-4 h-full overflow-hidden">
             <div className="flex gap-4 flex-1 min-h-0">
-                <div className="w-[24rem] flex flex-col gap-4 overflow-y-auto min-h-0 pr-1 shrink-0 max-h-[calc(100vh-260px)]">
+                <div className="w-[24rem] flex flex-col gap-4 overflow-y-auto min-h-0 pr-1 shrink-0 h-full max-h-[calc(100vh-260px)]">
                     <Card>
                         <DatasetSelectWithPopover
                             label="Select Dataset"
@@ -546,60 +773,7 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
                             allowedCategories={["datasets"]}
                             buttonText={selectedDatasets.length ? "1 selected" : "Select Dataset"}
                         />
-                    </Card>
-
-                    <Card>
-                        <h5 className="bp5-heading mb-3">Annotation Sets</h5>
-                        <div className="flex flex-col gap-3">
-                            <div className="flex gap-2 items-center">
-                                <HTMLSelect
-                                    fill
-                                    value={selectedAnnotationSetId}
-                                    onChange={(event) => setSelectedAnnotationSetId(event.target.value)}
-                                    disabled={!datasetId || loadingAnnotationSets}
-                                >
-                                    <option value="">New annotation set</option>
-                                    {annotationSets.map((annotationSet) => (
-                                        <option key={annotationSet.id} value={annotationSet.id}>
-                                            {annotationSet.name || `Annotation set ${annotationSet.id}`}
-                                        </option>
-                                    ))}
-                                </HTMLSelect>
-                                {loadingAnnotationSets && <Spinner size={18} />}
-                            </div>
-
-                            <InputGroup
-                                placeholder="Annotation set name"
-                                value={annotationSetName}
-                                onChange={(event) => setAnnotationSetName(event.target.value)}
-                                disabled={!datasetId || loadingAnns}
-                            />
-
-                            <textarea
-                                className="bp5-input min-h-[88px] resize-y"
-                                placeholder="Description"
-                                value={annotationSetDescription}
-                                onChange={(event) => setAnnotationSetDescription(event.target.value)}
-                                disabled={!datasetId || loadingAnns}
-                            />
-
-                            <div className="text-xs text-gray-500">
-                                {selectedAnnotationSummary
-                                    ? `${selectedAnnotationSummary.patchCount || 0} patches, ${selectedAnnotationSummary.annotationCount} annotations across ${selectedAnnotationSummary.imageCount} images in the saved set.`
-                                    : `${patches.length} patches, ${datasetAnnotations.length} annotations across ${annotatedImageCount} images in the current draft.`}
-                            </div>
-
-                            <Button
-                                intent="primary"
-                                icon="floppy-disk"
-                                onClick={handleSave}
-                                loading={saving}
-                                disabled={!datasetId || loadingAnns || loadingAnnotationSets}
-                            >
-                                Save to OMERO
-                            </Button>
-                        </div>
-                    </Card>
+                    </Card>                    
 
                     <Card className="flex-1 min-h-[300px] flex flex-col">
                         <div className="flex items-center justify-between gap-2 mb-2">
@@ -628,24 +802,78 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
 
                         {viewMode === VIEW_MODE_PATCHES && (
                             <div className="grid grid-cols-2 gap-2 mb-3">
-                                <InputGroup
-                                    type="number"
+                                <NumericInput
                                     min={1}
-                                    inputMode="numeric"
+                                    minorStepSize={1}
+                                    majorStepSize={32}
                                     placeholder="Width"
-                                    value={String(patchWidth)}
-                                    onChange={(event) => setPatchWidth(event.target.value)}
+                                    value={patchWidth}
+                                    onValueChange={(valueAsNumber) => setPatchWidth(valueAsNumber || DEFAULT_PATCH_SIZE)}
                                     disabled={!datasetId || loadingImages}
+                                    className="numeric-input"
                                 />
-                                <InputGroup
-                                    type="number"
+                                <NumericInput
                                     min={1}
-                                    inputMode="numeric"
+                                    minorStepSize={1}
+                                    majorStepSize={32}
                                     placeholder="Height"
-                                    value={String(patchHeight)}
-                                    onChange={(event) => setPatchHeight(event.target.value)}
+                                    value={patchHeight}
+                                    onValueChange={(valueAsNumber) => setPatchHeight(valueAsNumber || DEFAULT_PATCH_SIZE)}
                                     disabled={!datasetId || loadingImages}
+                                    className="numeric-input"
                                 />
+                            </div>
+                        )}
+
+                        {channels.length > 0 && currentScalingImageId && (
+                            <div className="flex flex-col gap-3 mb-3">
+                                <HTMLSelect
+                                    fill
+                                    value={selectedAnnotationChannel}
+                                    onChange={(event) => handleSelectedAnnotationChannelChange(event.target.value)}
+                                    disabled={!channels.length}
+                                >
+                                    <option value="">Select annotation channel</option>
+                                    {annotationSetChannelOptions.map((channel) => (
+                                        <option key={channel.value} value={channel.value}>
+                                            {channel.label}
+                                        </option>
+                                    ))}
+                                </HTMLSelect>
+
+                                {selectedAnnotationChannel !== "" && (
+                                    <div className="rounded border bg-white p-2.5 min-w-0">
+                                        <div className="text-xs font-bold uppercase text-gray-500 mb-2">
+                                            Image Normalization
+                                        </div>
+                                        <ControlGroup fill={true} vertical={false} className="gap-3 items-center">
+                                            <div className="flex items-center gap-2">
+                                                <span className="normalization-input-label">Min</span>
+                                                <NumericInput
+                                                    min={0}
+                                                    max={100}
+                                                    stepSize={0.1}
+                                                    majorStepSize={0.5}
+                                                    value={selectedAnnotationChannelScale.min}
+                                                    onValueChange={(valueAsNumber) => handleAnnotationSetChannelScaleChange(selectedAnnotationChannel, "min", valueAsNumber)}
+                                                    className="normalization-input"
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="normalization-input-label">Max</span>
+                                                <NumericInput
+                                                    min={0}
+                                                    max={100}
+                                                    stepSize={0.1}
+                                                    majorStepSize={0.5}
+                                                    value={selectedAnnotationChannelScale.max}
+                                                    onValueChange={(valueAsNumber) => handleAnnotationSetChannelScaleChange(selectedAnnotationChannel, "max", valueAsNumber)}
+                                                    className="normalization-input"
+                                                />
+                                            </div>
+                                        </ControlGroup>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -677,16 +905,61 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
                         )}
                     </Card>
 
-                    {viewMode === VIEW_MODE_PATCHES && selectedPatch && (
-                        <Card>
-                            <div className="text-xs text-gray-600">{`Patch ${selectedPatch.width}x${selectedPatch.height} on ${selectedPatch.imageName || selectedImage?.name || `Image ${selectedPatch.imageId}`}`}</div>
-                            <div className="text-xs text-gray-500">{`Coords: x=${selectedPatch.x}, y=${selectedPatch.y}`}</div>
-                            <div className="text-xs text-gray-500">{`${patchAnnotationCounts[String(selectedPatch.id)] || 0} annotations in this patch`}</div>
-                        </Card>
-                    )}
+                    <Card>
+                        <h5 className="bp5-heading mb-3">Annotation Sets</h5>
+                        <div className="flex flex-col gap-3">
+                            <div className="flex gap-2 items-center">
+                                <HTMLSelect
+                                    fill
+                                    value={selectedAnnotationSetId}
+                                    onChange={(event) => setSelectedAnnotationSetId(event.target.value)}
+                                    disabled={!datasetId || loadingAnnotationSets}
+                                >
+                                    <option value="">New annotation set</option>
+                                    {annotationSets.map((annotationSet) => (
+                                        <option key={annotationSet.id} value={annotationSet.id}>
+                                            {annotationSet.name || `Annotation set ${annotationSet.id}`}
+                                        </option>
+                                    ))}
+                                </HTMLSelect>
+                                {loadingAnnotationSets && <Spinner size={18} />}
+                            </div>
+
+                            <InputGroup
+                                placeholder="Annotation set name"
+                                value={annotationSetName}
+                                onChange={(event) => setAnnotationSetName(event.target.value)}
+                                disabled={!datasetId || loadingAnns}
+                            />
+
+                            <textarea
+                                className="bp5-input min-h-[44px] resize-y"
+                                placeholder="Description"
+                                value={annotationSetDescription}
+                                onChange={(event) => setAnnotationSetDescription(event.target.value)}
+                                disabled={!datasetId || loadingAnns}
+                            />
+
+                            <div className="text-xs text-gray-500">
+                                {selectedAnnotationSummary
+                                    ? `${selectedAnnotationSummary.patchCount || 0} patches, ${selectedAnnotationSummary.annotationCount} annotations across ${selectedAnnotationSummary.imageCount} images in the saved set.`
+                                    : `${patches.length} patches, ${datasetAnnotations.length} annotations across ${annotatedImageCount} images in the current draft.`}
+                            </div>
+
+                            <Button
+                                intent="primary"
+                                icon="floppy-disk"
+                                onClick={handleSave}
+                                loading={saving}
+                                disabled={!datasetId || loadingAnns || loadingAnnotationSets}
+                            >
+                                Save to OMERO
+                            </Button>
+                        </div>
+                    </Card>
                 </div>
 
-                <div className="w-3/4 flex flex-col min-w-0 max-h-[calc(100vh-260px)]">
+                <div className="w-3/4 flex flex-grow flex-col min-w-0 max-h-[calc(100vh-260px)]">
                     <Card className="flex-1 flex flex-col p-0 overflow-hidden min-h-0 shadow-none border">
                         {loadingAnns ? (
                             <div className="flex justify-center items-center h-full">
@@ -702,6 +975,11 @@ const AnnotationTab = ({ preferredSelectedDatasets = [] }) => {
                                 featureTypes={featureTypes}
                                 onFeatureTypesChange={setFeatureTypes}
                                 patch={viewerPatch}
+                                channelVisibility={channelVisibility}
+                                onChannelVisibilityChange={handleCurrentImageChannelVisibilityChange}
+                                channelScales={channelScales}
+                                onChannelScalesChange={handleCurrentImageChannelScalesChange}
+                                lockedChannelIndex={selectedAnnotationChannel !== "" ? selectedAnnotationChannel : null}
                             />
                         )}
                     </Card>

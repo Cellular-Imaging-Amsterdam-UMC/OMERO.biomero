@@ -57,6 +57,7 @@ export const getDjangoConstants = () => {
   const ui = {
     importer_enabled: WEBCLIENT.UI.IMPORTER_ENABLED,
     analyzer_enabled: WEBCLIENT.UI.ANALYZER_ENABLED,
+    trainer_enabled: WEBCLIENT.UI.TRAINER_ENABLED,
     uploader_allowed_file_extensions:
       WEBCLIENT.UI.UPLOADER_ALLOWED_FILE_EXTENSIONS || [],
   };

@@ -67,7 +67,7 @@ c-64 60 -112 93 -271 188 -375 222 -525 400 -604 719 -18 72 -22 117 -22 257
 const AppRouter = () => {
   const [searchParams] = useSearchParams();
   const WEBCLIENT = window.WEBCLIENT;
-  const { IMPORTER_ENABLED, ANALYZER_ENABLED } = WEBCLIENT.UI;
+  const { IMPORTER_ENABLED, ANALYZER_ENABLED, TRAINER_ENABLED } = WEBCLIENT.UI;
   const navigate = useNavigate();
   const appName =
     searchParams.get("tab") || (IMPORTER_ENABLED ? "import" : "biomero");
@@ -95,31 +95,31 @@ const AppRouter = () => {
               />
             )}
             {ANALYZER_ENABLED && (
-              <>
-                <Button
-                  className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
-                    appName === "biomero"
-                      ? "bp5-intent-primary font-bold shadow-md"
-                      : ""
-                  }`}
-                  icon="data-sync"
-                  text="Analyze"
-                  onClick={() => navigate("?tab=biomero")}
-                  outlined={appName === "biomero"}
-                />
-                <Button
-                  className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
-                    appName === "prediction"
-                      ? "bp5-intent-primary font-bold shadow-md"
-                      : ""
-                  }`}
-                  icon="learning"
-                  text="Train"
-                  onClick={() => navigate("?tab=prediction")}
-                  outlined={appName === "prediction"}
-                />
-              </>
+              <Button
+                className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
+                  appName === "biomero"
+                    ? "bp5-intent-primary font-bold shadow-md"
+                    : ""
+                }`}
+                icon="data-sync"
+                text="Analyze"
+                onClick={() => navigate("?tab=biomero")}
+                outlined={appName === "biomero"}
+              />
             )}
+            {/* {TRAINER_ENABLED && (  */}
+              <Button
+                className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
+                  appName === "prediction"
+                    ? "bp5-intent-primary font-bold shadow-md"
+                    : ""
+                }`}
+                icon="learning"
+                text="Train"
+                onClick={() => navigate("?tab=prediction")}
+                outlined={appName === "prediction"}
+              />
+            {/* )} */}
           </NavbarGroup>
         </Navbar>
         <div className="pt-[50px]">

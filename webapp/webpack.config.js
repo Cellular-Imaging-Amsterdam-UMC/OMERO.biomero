@@ -1,11 +1,11 @@
 const path = require("path");
 const { WebpackManifestPlugin } = require("webpack-manifest-plugin");
-const WebpackShellPluginNext = require("webpack-shell-plugin-next");
 
 module.exports = (env, argv) => {
-  const isProd = argv && argv.mode === "production";
-  const isCI = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
-
+  const outputPath = path.resolve(
+    __dirname,
+    "../omero_biomero/static/omero_biomero/assets/"
+  );
   const plugins = [
     new WebpackManifestPlugin({
       fileName: path.resolve(
@@ -16,37 +16,38 @@ module.exports = (env, argv) => {
     }),
   ];
 
-  // Only run shell hooks in local dev/watch. Skip in production/CI builds.
-  if (!isProd && !isCI) {
-    plugins.push(
-      new WebpackShellPluginNext({
-        // onAfterDone: {
-        //   scripts: ["bash ../omero-update.sh"], // Local dev convenience
-        //   blocking: false,
-        //   parallel: false,
-        // },
-        onBeforeCompile: {
-          scripts: [
-            "rimraf ../omero_biomero/static/omero_biomero/assets",
-            "echo 'Cleaning up'",
-          ],
-        },
-      })
-    );
-  }
-
   return {
     devtool: "source-map",
     entry: "./src/index.js",
     output: {
-      path: path.resolve(
-        __dirname,
-        "../omero_biomero/static/omero_biomero/assets/"
-      ),
-      filename: "main.[contenthash].js",
+      path: outputPath,
+      filename: "main.js",
+      chunkFilename: "[name].js",
+      publicPath: "auto",
     },
     mode: (argv && argv.mode) || "development",
     plugins,
+    devServer: {
+      host: "0.0.0.0",
+      port: 8081,
+      allowedHosts: "all",
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+      hot: false,
+      liveReload: true,
+      devMiddleware: {
+        writeToDisk: false,
+      },
+      static: {
+        directory: outputPath,
+        publicPath: "/",
+        watch: false,
+      },
+      client: {
+        overlay: true,
+      },
+    },
     module: {
     rules: [
       {

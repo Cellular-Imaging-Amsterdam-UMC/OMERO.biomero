@@ -1,8 +1,10 @@
 import json
+import base64
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
+import numpy as np
 
 
 def _raw(func_name):
@@ -128,6 +130,15 @@ class PredictionViewsTests(TestCase):
                         "name": "Training Set",
                         "description": "main set",
                         "datasetId": "12",
+                        "imageScalings": [
+                            {
+                                "imageId": "31",
+                                "selectedChannel": "1",
+                                "channelVisibility": {"0": True, "1": True},
+                                "channelScales": {"0": {"min": 0, "max": 100}, "1": {"min": 0, "max": 99}},
+                                "patchIds": ["p-1"],
+                            }
+                        ],
                         "patches": [{"id": "p-1", "imageId": "31", "x": 4, "y": 8, "width": 256, "height": 256}],
                         "featureTypes": [{"id": "1", "name": "Cell", "color": "#00ff00"}],
                         "annotations": [
@@ -149,6 +160,10 @@ class PredictionViewsTests(TestCase):
         data = json.loads(response.content)
         self.assertEqual(data["annotationSetId"], 11)
         self.assertEqual(data["name"], "Training Set")
+        self.assertEqual(data["imageScalings"][0]["imageId"], "31")
+        self.assertEqual(data["imageScalings"][0]["selectedChannel"], "1")
+        self.assertEqual(data["imageScalings"][0]["channelScales"]["1"]["max"], 99)
+        self.assertEqual(data["imageScalings"][0]["patchIds"], ["p-1"])
         self.assertEqual(data["patches"][0]["id"], "p-1")
         self.assertEqual(data["annotations"][0]["patchId"], "p-1")
         self.assertEqual(data["annotations"][0]["imageId"], "31")
@@ -171,6 +186,15 @@ class PredictionViewsTests(TestCase):
             "data": {
                 "name": "Updated Set",
                 "description": "refined masks",
+                "imageScalings": [
+                    {
+                        "imageId": "31",
+                        "selectedChannel": "2",
+                        "channelVisibility": {"0": True, "2": True},
+                        "channelScales": {"2": {"min": 0, "max": 95}},
+                        "patchIds": ["patch-1"],
+                    }
+                ],
                 "patches": [
                     {"id": "patch-1", "imageId": "31", "x": 0, "y": 0, "width": 256, "height": 256}
                 ],
@@ -205,3 +229,32 @@ class PredictionViewsTests(TestCase):
         self.assertEqual(data["annotationSet"]["patchCount"], 1)
         dataset.linkAnnotation.assert_called_once_with(created)
         conn.deleteObjects.assert_called_once_with("Annotation", [11])
+
+    def test_get_channel_plane_data_returns_raw_plane_payload(self):
+        view = _raw("get_channel_plane_data")
+        plane = np.array([[0, 10], [20, 30]], dtype=np.uint16)
+
+        pixels = MagicMock()
+        pixels.getPlane.return_value = plane
+
+        image = MagicMock()
+        image.getSizeC.return_value = 2
+        image.getSizeZ.return_value = 1
+        image.getSizeT.return_value = 1
+        image.getPrimaryPixels.return_value = pixels
+
+        conn = MagicMock()
+        conn.getObject.return_value = image
+
+        request = SimpleNamespace(method="GET", GET={"image": "31", "channel": "1", "z": "0", "t": "0"})
+
+        response = view(request, conn=conn)
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data["imageId"], "31")
+        self.assertEqual(data["channel"], 1)
+        self.assertEqual(data["dtype"], "float32")
+        decoded = base64.b64decode(data["data"])
+        values = np.frombuffer(decoded, dtype=np.float32).reshape(data["shape"])
+        self.assertEqual(values.tolist(), [[0.0, 10.0], [20.0, 30.0]])

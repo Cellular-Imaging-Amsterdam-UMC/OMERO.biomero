@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+from urllib.parse import urlparse
 
 from .settings import (
     BASE_DIR,
@@ -10,6 +11,10 @@ from .settings import (
 )
 
 logger = logging.getLogger(__name__)
+
+DEV_SERVER_URL_FILE_PATH = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "webapp", ".dev-server-url")
+)
 
 
 def parse_bool_env(env_var, default=True):
@@ -65,6 +70,38 @@ def get_react_build_file(logical_name):
         return path[1:]
     except FileNotFoundError:
         return logical_name
+
+
+def get_webapp_dev_server_url():
+    """Return the external dev-server base URL when local frontend development is enabled."""
+    raw_url = os.environ.get("BIOMERO_WEBAPP_DEV_SERVER_URL", "").strip()
+    if not raw_url:
+        try:
+            with open(DEV_SERVER_URL_FILE_PATH, "r", encoding="utf-8") as dev_server_file:
+                raw_url = dev_server_file.read().strip()
+        except FileNotFoundError:
+            raw_url = ""
+        except OSError:
+            logger.warning("Failed reading webapp dev server URL from %s", DEV_SERVER_URL_FILE_PATH, exc_info=True)
+            raw_url = ""
+
+    if not raw_url:
+        return None
+
+    parsed = urlparse(raw_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        logger.warning("Ignoring invalid BIOMERO webapp dev server URL: %s", raw_url)
+        return None
+
+    return raw_url.rstrip("/")
+
+
+def get_react_dev_server_asset_url(logical_name):
+    """Return an absolute asset URL when the external frontend dev server is enabled."""
+    dev_server_url = get_webapp_dev_server_url()
+    if not dev_server_url:
+        return None
+    return f"{dev_server_url}/{logical_name.lstrip('/')}"
 
 
 def check_directory_permissions(path):

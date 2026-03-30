@@ -18,7 +18,11 @@
 {% block script %}
   {{ block.super }}
   <script src="{% static 'webclient/javascript/jquery.infieldlabel-0.1.js' %}" type="text/javascript"></script>
-  <script src="{% static main_js %}"></script>
+  {% if main_js_dev_url %}
+    <script src="{{ main_js_dev_url }}"></script>
+  {% else %}
+    <script src="{% static main_js %}"></script>
+  {% endif %}
   <script src="http://metabase.example.com/app/iframeResizer.js"></script>
   <script>
     // JavaScript variables and constants from the first page

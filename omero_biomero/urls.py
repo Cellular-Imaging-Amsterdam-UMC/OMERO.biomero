@@ -71,6 +71,11 @@ urlpatterns = [
         name="prediction_image_channels",
     ),
     path(
+        "api/prediction/channel_plane/",
+        prediction_views.get_channel_plane_data,
+        name="prediction_channel_plane",
+    ),
+    path(
         "api/prediction/save_annotations/",
         prediction_views.save_annotations,
         name="prediction_save_annotations",

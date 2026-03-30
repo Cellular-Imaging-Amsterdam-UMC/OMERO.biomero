@@ -21,6 +21,8 @@ bash /startup/98-cleanprevious.sh
 rm -f /opt/omero/web/OMERO.web/var/django.pid || true
 
 cd /opt/omero/web
+echo "Synchronizing OMERO.web static assets"
+"$omero" web syncmedia
 echo "Starting OMERO.web in the background"
 # Call CLI directly
 exec "$omero" web start

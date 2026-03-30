@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useMemo, useCallback } from "react"
 import { Button, Slider, ButtonGroup, Icon, InputGroup, Checkbox, Tag } from "@blueprintjs/core";
 import ImageChannelControls from "./ImageChannelControls";
 import { traceContours, subtractAnnotations, eraseFromAnnotations, appendToAnnotations } from "../utils/GeometryUtils";
-import { fetchImageRenderInfo } from "../../../apiService";
+import { fetchImageRenderInfo, fetchChannelPlaneData } from "../../../apiService";
 
 const clampPercent = (value, fallback) => {
     const parsed = Number.parseFloat(value);
@@ -12,7 +12,55 @@ const clampPercent = (value, fallback) => {
     return Math.min(100, Math.max(0, parsed));
 };
 
-const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = [], imageMeta = { sizeZ: 1, sizeT: 1 }, featureTypes, onFeatureTypesChange, patch = null }) => {
+const sanitizeChannelScale = (scale = {}) => {
+    const min = clampPercent(scale.min, 0);
+    const max = Math.max(min, clampPercent(scale.max, 100));
+    return { min, max };
+};
+
+const areChannelScalesEqual = (left = {}, right = {}) => {
+    const keys = Array.from(new Set([...Object.keys(left || {}), ...Object.keys(right || {})]));
+    return keys.every((key) => {
+        const leftScale = sanitizeChannelScale(left[key]);
+        const rightScale = sanitizeChannelScale(right[key]);
+        return leftScale.min === rightScale.min && leftScale.max === rightScale.max;
+    });
+};
+
+const decodeBase64ToUint8Array = (base64) => {
+    const binary = window.atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
+    }
+    return bytes;
+};
+
+const calculatePlaneMinMax = (buffer) => {
+    if (!buffer?.length) {
+        return { min: 0, max: 255 };
+    }
+
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (let index = 0; index < buffer.length; index += 1) {
+        const value = buffer[index];
+        if (value < min) {
+            min = value;
+        }
+        if (value > max) {
+            max = value;
+        }
+    }
+
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+        return { min: 0, max: 255 };
+    }
+
+    return { min, max };
+};
+
+const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = [], imageMeta = { sizeZ: 1, sizeT: 1 }, featureTypes, onFeatureTypesChange, patch = null, channelVisibility: externalChannelVisibility = null, onChannelVisibilityChange = null, channelScales: externalChannelScales = null, onChannelScalesChange = null, lockedChannelIndex = null }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
     const patchViewportRef = useRef(null);
@@ -46,11 +94,22 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
   
   // Channel Visibility
   const [channelVisibility, setChannelVisibility] = useState({});
-        const [renderChannels, setRenderChannels] = useState([]);
-        const [imagePixelRange, setImagePixelRange] = useState({ min: 0, max: 255 });
-        const [projectionMode, setProjectionMode] = useState("normal");
-    const [intensityMinPercent, setIntensityMinPercent] = useState("0");
-    const [intensityMaxPercent, setIntensityMaxPercent] = useState("100");
+    const [renderChannels, setRenderChannels] = useState([]);
+    const [channelScales, setChannelScales] = useState({});
+    const [imagePixelRange, setImagePixelRange] = useState({ min: 0, max: 255 });
+        const [channelBounds, setChannelBounds] = useState({});
+    const [projectionMode, setProjectionMode] = useState("normal");
+        const channelBoundsRequestRef = useRef({});
+    const externalChannelScalesRef = useRef(externalChannelScales);
+    const onChannelScalesChangeRef = useRef(onChannelScalesChange);
+
+    const effectiveChannelVisibility = externalChannelVisibility ?? channelVisibility;
+    const effectiveChannelScales = externalChannelScales ?? channelScales;
+
+    useEffect(() => {
+        externalChannelScalesRef.current = externalChannelScales;
+        onChannelScalesChangeRef.current = onChannelScalesChange;
+    }, [externalChannelScales, onChannelScalesChange]);
 
   useEffect(() => {
     if (channels.length > 0) {
@@ -58,12 +117,37 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
       channels.forEach(ch => {
         vis[ch.index] = ch.active !== false;
       });
-      setChannelVisibility(vis);
+            if (!externalChannelVisibility) {
+                setChannelVisibility(vis);
+            }
+            if (!externalChannelScales) {
+                setChannelScales((current) => {
+                    const nextScales = {};
+                    channels.forEach((ch) => {
+                        nextScales[ch.index] = sanitizeChannelScale(current[ch.index]);
+                    });
+                    return nextScales;
+                });
+            }
     }
-  }, [channels]);
+        }, [channels, externalChannelScales, externalChannelVisibility]);
 
   const toggleChannelVisibility = (idx) => {
-    setChannelVisibility(prev => ({
+        if (lockedChannelIndex !== null && String(lockedChannelIndex) === String(idx)) {
+            return;
+        }
+
+        const nextVisibility = {
+            ...(effectiveChannelVisibility || {}),
+            [idx]: !(effectiveChannelVisibility?.[idx] !== false),
+        };
+
+        if (onChannelVisibilityChange) {
+            onChannelVisibilityChange(nextVisibility);
+            return;
+        }
+
+        setChannelVisibility(prev => ({
       ...prev,
       [idx]: !prev[idx]
     }));
@@ -87,7 +171,11 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
 
         if (!image?.id) {
             setRenderChannels([]);
+            if (!externalChannelScalesRef.current) {
+                setChannelScales({});
+            }
             setImagePixelRange({ min: 0, max: 255 });
+            setChannelBounds({});
             setProjectionMode("normal");
             return () => {
                 cancelled = true;
@@ -105,6 +193,23 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
 
             if (!cancelled) {
                 setRenderChannels(renderInfo.channels || []);
+                const seedScales = (current) => (
+                    (renderInfo.channels || []).reduce((acc, channel, index) => {
+                        acc[index] = sanitizeChannelScale(current[index]);
+                        return acc;
+                    }, {})
+                );
+                const nextScales = seedScales(externalChannelScalesRef.current || {});
+                if (onChannelScalesChangeRef.current) {
+                    if (!areChannelScalesEqual(externalChannelScalesRef.current || {}, nextScales)) {
+                        onChannelScalesChangeRef.current(nextScales);
+                    }
+                } else {
+                    setChannelScales((current) => {
+                        const normalizedCurrent = seedScales(current || {});
+                        return areChannelScalesEqual(normalizedCurrent, nextScales) ? current : nextScales;
+                    });
+                }
                 if (Number.isFinite(pixelMin) && Number.isFinite(pixelMax) && pixelMax > pixelMin) {
                     setImagePixelRange({ min: pixelMin, max: pixelMax });
                 }
@@ -118,46 +223,144 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
             cancelled = true;
         };
     }, [image?.id]);
+
+  const ensureChannelBounds = useCallback(async (channelIndex) => {
+      if (!image?.id || channelIndex == null) {
+          return null;
+      }
+
+      const cacheKey = `${image.id}:${channelIndex}:${z}:${t}`;
+      if (channelBounds[cacheKey]) {
+          return channelBounds[cacheKey];
+      }
+      if (channelBoundsRequestRef.current[cacheKey]) {
+          return channelBoundsRequestRef.current[cacheKey];
+      }
+
+      const request = (async () => {
+          const planePayload = await fetchChannelPlaneData(image.id, channelIndex, z, t);
+          if (!planePayload?.data || planePayload.dtype !== "float32") {
+              return null;
+          }
+
+          const bytes = decodeBase64ToUint8Array(planePayload.data);
+          const values = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / Float32Array.BYTES_PER_ELEMENT);
+          const nextBounds = calculatePlaneMinMax(values);
+          setChannelBounds((current) => ({
+              ...current,
+              [cacheKey]: nextBounds,
+          }));
+          return nextBounds;
+      })();
+
+      channelBoundsRequestRef.current[cacheKey] = request;
+      try {
+          return await request;
+      } finally {
+          delete channelBoundsRequestRef.current[cacheKey];
+      }
+  }, [channelBounds, image?.id, t, z]);
+
+  useEffect(() => {
+      if (lockedChannelIndex == null) {
+          return;
+      }
+      ensureChannelBounds(Number(lockedChannelIndex));
+  }, [ensureChannelBounds, lockedChannelIndex]);
   
   const imageUrl = useMemo(() => {
     if (!image) return null;
     const base = `/webgateway/render_image/${image.id}/${z}/${t}/`;
 
-                if (!channels.length) return base;
+    if (!channels.length) return base;
 
-        const effectiveMinPercent = clampPercent(intensityMinPercent, 0);
-        const effectiveMaxPercent = Math.max(effectiveMinPercent, clampPercent(intensityMaxPercent, 100));
-        const pixelMin = Number.isFinite(imagePixelRange.min) ? imagePixelRange.min : 0;
-        const pixelMax = Number.isFinite(imagePixelRange.max) ? imagePixelRange.max : 255;
-        const pixelSpan = Math.max(1, pixelMax - pixelMin);
+    const pixelMin = Number.isFinite(imagePixelRange.min) ? imagePixelRange.min : 0;
+    const pixelMax = Number.isFinite(imagePixelRange.max) ? imagePixelRange.max : 255;
 
-        const channelParam = channels.map((ch) => {
-            const chNum = ch.index + 1;
-            const visible = channelVisibility[ch.index] !== false;
-            const channelPrefix = visible ? `${chNum}` : `-${chNum}`;
-            const rawColor = String(renderChannels[ch.index]?.color || ch.color || "FF0000")
-                .replace(/^#/, "")
-                .replace(/^\$/, "")
-                .toUpperCase();
-            const color = `$${rawColor}`;
-            const windowStart = Math.round(pixelMin + (pixelSpan * effectiveMinPercent) / 100);
-            const windowEnd = Math.round(pixelMin + (pixelSpan * effectiveMaxPercent) / 100);
+    const channelParam = channels.map((ch) => {
+        const chNum = ch.index + 1;
+        const visible = effectiveChannelVisibility[ch.index] !== false;
+        const channelPrefix = visible ? `${chNum}` : `-${chNum}`;
+        const rawColor = String(renderChannels[ch.index]?.color || ch.color || "FF0000")
+            .replace(/^#/, "")
+            .replace(/^\$/, "")
+            .toUpperCase();
+        const color = `$${rawColor}`;
+        const scale = sanitizeChannelScale(effectiveChannelScales[ch.index]);
+        const channelRangeKey = `${image.id}:${ch.index}:${z}:${t}`;
+        const bounds = channelBounds[channelRangeKey];
+        const channelMin = Number.isFinite(bounds?.min) ? bounds.min : pixelMin;
+        const channelMax = Number.isFinite(bounds?.max) ? bounds.max : pixelMax;
+        const channelSpan = Math.max(1, channelMax - channelMin);
+        const windowStart = Math.round(channelMin + (channelSpan * scale.min) / 100);
+        const windowEnd = Math.round(channelMin + (channelSpan * scale.max) / 100);
 
-            return `${channelPrefix}|${windowStart}:${Math.max(windowStart + 1, windowEnd)}${color}`;
-        }).join(",");
+        return `${channelPrefix}|${windowStart}:${Math.max(windowStart + 1, windowEnd)}${color}`;
+    }).join(",");
 
-        const params = new URLSearchParams();
-        params.set("c", channelParam);
-        params.set("m", "c");
-        params.set("p", projectionMode);
-        params.set("q", "0.9");
-        params.set("_render", `${effectiveMinPercent}-${effectiveMaxPercent}-${Object.keys(channelVisibility)
+    const params = new URLSearchParams();
+    params.set("c", channelParam);
+    params.set("m", "c");
+    params.set("p", projectionMode);
+    params.set("q", "0.9");
+    params.set("_render", `${Object.keys(effectiveChannelScales)
             .sort()
-            .map((key) => `${key}:${channelVisibility[key] !== false ? 1 : 0}`)
+            .map((key) => {
+                const scale = sanitizeChannelScale(effectiveChannelScales[key]);
+                return `${key}:${scale.min}-${scale.max}`;
+            })
+            .join("|")}-${Object.keys(effectiveChannelVisibility)
+            .sort()
+            .map((key) => `${key}:${effectiveChannelVisibility[key] !== false ? 1 : 0}`)
             .join("-")}`);
 
-        return `${base}?${params.toString()}`;
-    }, [image, channels, channelVisibility, imagePixelRange, intensityMinPercent, intensityMaxPercent, projectionMode, renderChannels, z, t]);
+    return `${base}?${params.toString()}`;
+  }, [channelBounds, image, channels, effectiveChannelScales, effectiveChannelVisibility, imagePixelRange, projectionMode, renderChannels, z, t]);
+
+  const handleChannelScaleChange = useCallback((channelIndex, field, value) => {
+      ensureChannelBounds(Number(channelIndex));
+      const updateScales = (current) => {
+          const previous = sanitizeChannelScale((current || {})[channelIndex]);
+
+          if (field === "range" && Array.isArray(value)) {
+              const nextScale = sanitizeChannelScale({ min: value[0], max: value[1] });
+              return {
+                  ...(current || {}),
+                  [channelIndex]: nextScale,
+              };
+          }
+
+          const nextValue = Number.isFinite(value) ? value : (field === "min" ? previous.min : previous.max);
+          const nextScale = field === "min"
+              ? sanitizeChannelScale({ min: nextValue, max: previous.max })
+              : sanitizeChannelScale({ min: previous.min, max: nextValue });
+
+          return {
+              ...(current || {}),
+              [channelIndex]: nextScale,
+          };
+      };
+
+      if (onChannelScalesChange) {
+          onChannelScalesChange(updateScales(effectiveChannelScales));
+          return;
+      }
+
+      setChannelScales(updateScales);
+  }, [effectiveChannelScales, ensureChannelBounds, onChannelScalesChange]);
+
+  const handleChannelAutoScale = useCallback((channelIndex) => {
+      ensureChannelBounds(Number(channelIndex));
+      const nextScales = {
+          ...(effectiveChannelScales || {}),
+          [channelIndex]: { min: 0, max: 100 },
+      };
+      if (onChannelScalesChange) {
+          onChannelScalesChange(nextScales);
+          return;
+      }
+      setChannelScales(nextScales);
+  }, [effectiveChannelScales, ensureChannelBounds, onChannelScalesChange]);
 
     useEffect(() => {
         setImageLoaded(false);
@@ -596,29 +799,28 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
   return (
         <div className="flex h-full min-h-0 gap-0 overflow-hidden">
        {/* Toolbar / Sidebar */}
-             <div className="w-64 flex flex-col gap-4 p-2 border-r bg-gray-50 overflow-hidden shrink-0 min-h-0">
+             <div className="flex flex-col w-[300px] gap-4 p-2 border-r bg-gray-50 overflow-hidden shrink-0 min-h-0">
            {/* Image Channels */}
            {channels.length > 0 && (
                <div className="border-b pb-2">
                    <ImageChannelControls 
                         channels={channels}
-                        visibility={channelVisibility}
+                        visibility={effectiveChannelVisibility}
                         onToggle={toggleChannelVisibility}
-                        minPercent={intensityMinPercent}
-                        maxPercent={intensityMaxPercent}
-                        onMinPercentChange={setIntensityMinPercent}
-                        onMaxPercentChange={setIntensityMaxPercent}
-                        onAutoScale={() => {
-                            setIntensityMinPercent("0");
-                            setIntensityMaxPercent("99");
-                        }}
+                        channelScales={effectiveChannelScales}
+                        onChannelScaleChange={handleChannelScaleChange}
+                        onChannelAutoScale={handleChannelAutoScale}
+                        normalizationLabel="Normalization"
+                        lockedChannelIndex={lockedChannelIndex}
                    />
                </div>
            )}
 
            {/* Tools */}
            <div className="flex flex-col gap-2">
-               <h5>Tools</h5>
+                <div className="text-xs font-bold uppercase text-gray-500 mb-2">
+                    Tools
+                </div>
                <ButtonGroup fill>
                    <Button icon="hand" active={tool === "pan"} onClick={() => setTool("pan")} title="Pan/Zoom (Ctrl+Scroll)" />
                    <Button icon="polygon-filter" active={tool === "polygon"} onClick={() => setTool("polygon")} title="Polygon (Right Click to Finish)" disabled={(mode === "new" || mode === "append") && featureTypes.length === 0} />
