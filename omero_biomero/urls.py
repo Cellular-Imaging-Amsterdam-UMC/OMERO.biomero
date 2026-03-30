@@ -8,6 +8,7 @@ from . import (
     importer_views,
     prediction_views,
     sam_views,
+    training_views,
 )
 
 urlpatterns = [
@@ -164,6 +165,17 @@ urlpatterns = [
         "api/annotate/progress/",
         annotate_ai_views.get_progress,
         name="annotate_progress",
+    ),
+    # Training URLs
+    path(
+        "api/analyzer/training/start",
+        training_views.start_training,
+        name="training_start",
+    ),
+    path(
+        "api/analyzer/training/models",
+        training_views.list_trained_models,
+        name="training_list_models",
     ),
     # Main Biomero URL
     path(
