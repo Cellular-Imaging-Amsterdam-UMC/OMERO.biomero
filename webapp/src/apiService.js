@@ -110,13 +110,6 @@ export const fetchWorkflowMetadata = async (workflow) => {
   return apiRequest(workflowMetadataUrl, "GET");
 };
 
-// Fetch available custom models for a specific workflow
-export const fetchWorkflowModels = async (workflow) => {
-  const { urls } = getDjangoConstants();
-  const workflowModelsUrl = `${urls.workflows}${workflow}/models/`;
-  return apiRequest(workflowModelsUrl, "GET");
-};
-
 // GitHub URL is included in fetchWorkflowMetadata().githubUrl
 
 // Fetch thumbnails for imageids

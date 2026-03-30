@@ -36,11 +36,6 @@ urlpatterns = [
         name="analyzer_workflow_detail",
     ),
     path(
-        "api/analyzer/workflows/<str:name>/models/",
-        analyzer_views.list_workflow_models,  # GET: list custom models
-        name="analyzer_workflow_models",
-    ),
-    path(
         "api/analyzer/workflows/<str:name>/jobs/",
         analyzer_views.run_workflow_script,  # POST: create job for <name>
         name="analyzer_jobs_create",

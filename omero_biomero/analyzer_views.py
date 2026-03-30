@@ -433,28 +433,6 @@ def prepare_workflow_parameters(workflow_name, params):
     return converted_params
 
 
-@login_required()
-@require_http_methods(["GET"])
-def list_workflow_models(request, conn=None, **kwargs):
-    """
-    List custom model files available for a workflow on the SLURM cluster.
-    """
-    workflow_name = kwargs.get("name")
-    if not workflow_name:
-        return JsonResponse(
-            {"error": "Workflow name is required"}, status=400
-        )
-
-    try:
-        with SlurmClient.from_config() as sc:
-            models = sc.get_available_models(workflow_name)
-        return JsonResponse({"models": models})
-    except Exception as e:
-        logger.error(
-            f"Error listing models for workflow {workflow_name}: {str(e)}"
-        )
-        return JsonResponse({"models": [], "error": str(e)})
-
 
 @login_required()
 def get_slurm_status(request, conn=None, **kwargs):
@@ -491,27 +469,39 @@ def get_slurm_status(request, conn=None, **kwargs):
         
         # Extract workflow versions from params
         workflow_versions = {}
-        
-        # Parse the params inputs to find workflow versions
+        workflow_models = {}
+
+        # Parse the params inputs to find workflow versions and models
         if hasattr(params, 'inputs') and params.inputs:
             for key, param in params.inputs.items():
                 # Look for version parameters (e.g., "stardist_Version", "cellpose_Version")
                 if key.endswith('_Version') and hasattr(param, 'values') and param.values:
                     # Extract workflow name (remove "_Version" suffix)
                     workflow_name = key.replace('_Version', '')
-                    
+
                     # Extract available versions from the values list
                     versions = []
                     if hasattr(param.values, '_val'):
                         for version_obj in param.values._val:
                             if hasattr(version_obj, '_val'):
                                 versions.append(version_obj._val)
-                    
+
                     if versions:
                         workflow_versions[workflow_name] = {
                             'available_versions': versions,
                             'latest_version': versions[0] if versions else None  # Assume first is latest
                         }
+
+                # Look for model parameters (e.g., "cellpose_Models")
+                elif key.endswith('_Models') and hasattr(param, 'values') and param.values:
+                    workflow_name = key.replace('_Models', '')
+                    models = []
+                    if hasattr(param.values, '_val'):
+                        for model_obj in param.values._val:
+                            if hasattr(model_obj, '_val'):
+                                models.append(model_obj._val)
+                    if models:
+                        workflow_models[workflow_name] = models
         
         # Count workflow statuses for better messaging
         total_workflows = len(workflow_versions)
@@ -530,7 +520,8 @@ def get_slurm_status(request, conn=None, **kwargs):
             "last_checked": datetime.datetime.now().isoformat(),
             "icon": "tick-circle",
             "intent": "success",
-            "workflow_versions": workflow_versions
+            "workflow_versions": workflow_versions,
+            "workflow_models": workflow_models
         }
         
     except Exception as e:
