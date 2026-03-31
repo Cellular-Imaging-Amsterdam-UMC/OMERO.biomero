@@ -535,6 +535,17 @@ const AnnotateViewer = ({
     }
   };
 
+  // Re-size canvas when patch changes (same image, different sub-region)
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    if (patchWidth !== null && patchHeight !== null) {
+      canvasRef.current.width = patchWidth;
+      canvasRef.current.height = patchHeight;
+    }
+    draw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patch?.patch_x, patch?.patch_y, patch?.patch_width, patch?.patch_height]);
+
   // Expose image dimensions for the save flow
   useEffect(() => {
     if (imageDims.width > 0 && imageDims.height > 0 && image) {

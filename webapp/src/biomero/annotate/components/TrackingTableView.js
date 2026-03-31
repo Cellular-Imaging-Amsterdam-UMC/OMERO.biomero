@@ -89,7 +89,16 @@ const TrackingTableView = ({
                     className="text-xs truncate max-w-[120px]"
                     title={unit.image_name}
                   >
-                    {unit.image_name}
+                    {unit.is_patch ? (
+                      <span>
+                        <span style={{ color: "#888", marginRight: 4 }}>↳</span>
+                        <span style={{ color: "#666", fontSize: 10 }}>
+                          Patch ({unit.patch_x},{unit.patch_y})
+                        </span>
+                      </span>
+                    ) : (
+                      unit.image_name
+                    )}
                   </td>
                   <td>
                     <Tag
