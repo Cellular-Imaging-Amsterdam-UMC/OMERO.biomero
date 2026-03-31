@@ -640,6 +640,12 @@ export const getAnnotateProgress = async (tableId) => {
   );
 };
 
+export const validateTrainingReadiness = async (tableId) => {
+  const endpoint = `/omero_biomero/api/annotate/validate_training/?table_id=${tableId}`;
+  const response = await apiRequest(endpoint, "GET");
+  return response;
+};
+
 // ---------------------------------------------------------------------------
 
 export const fetchPlateImages = async (plateId) => {
