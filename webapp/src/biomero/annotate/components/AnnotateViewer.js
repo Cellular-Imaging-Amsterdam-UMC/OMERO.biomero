@@ -80,7 +80,7 @@ const AnnotateViewer = ({
   // Tool State
   const [tool, setTool] = useState("brush");
   const [brushSize, setBrushSize] = useState(20);
-  const [collisionDetection, setCollisionDetection] = useState(false);
+  const [collisionDetection, setCollisionDetection] = useState(true);
   const [mode, setMode] = useState("add");
 
   // Feature Types State
