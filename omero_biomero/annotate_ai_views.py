@@ -1103,3 +1103,160 @@ def get_progress(request, conn=None, **kwargs):
     except Exception as e:
         logger.error("Error fetching progress", exc_info=True)
         return JsonResponse({"error": str(e)}, status=500)
+
+
+# ---------------------------------------------------------------------------
+# Training readiness validation
+# ---------------------------------------------------------------------------
+
+MIN_TRAIN_IMAGES = 5
+
+
+@login_required()
+@require_GET
+def validate_training_readiness(request, conn=None, **kwargs):
+    """Check whether an annotation set has enough annotated images per split.
+
+    Query params:
+        table_id – tracking table FileAnnotation id
+
+    Returns JSON:
+        {
+            "ready": bool,
+            "checks": [{"check": str, "level": "blocker|warning|pass", "message": str}],
+            "summary": {
+                "train_total": int, "train_done": int,
+                "val_total": int, "val_done": int,
+                "test_total": int, "test_done": int,
+            }
+        }
+    """
+    table_id = request.GET.get("table_id")
+    if not table_id:
+        return JsonResponse({"error": "Missing table_id"}, status=400)
+
+    try:
+        import ezomero
+
+        table_data = ezomero.get_table(conn, int(table_id))
+        if table_data is None:
+            return JsonResponse({"error": "Table not found"}, status=404)
+
+        # Split rows by role
+        train_mask = table_data["train"] == True  # noqa: E712
+        val_mask = table_data["validate"] == True  # noqa: E712
+        test_mask = ~train_mask & ~val_mask
+
+        train_rows = table_data[train_mask]
+        val_rows = table_data[val_mask]
+        test_rows = table_data[test_mask]
+
+        train_total = len(train_rows)
+        val_total = len(val_rows)
+        test_total = len(test_rows)
+
+        def _done(df):
+            if "processed" not in df.columns or len(df) == 0:
+                return 0
+            return int(df["processed"].sum())
+
+        train_done = _done(train_rows)
+        val_done = _done(val_rows)
+        test_done = _done(test_rows)
+
+        checks = []
+
+        # Training annotations check
+        if train_total == 0 or train_done == 0:
+            checks.append(
+                {
+                    "check": "train_annotations",
+                    "level": "blocker",
+                    "message": "No training images have been annotated.",
+                }
+            )
+        else:
+            checks.append(
+                {
+                    "check": "train_annotations",
+                    "level": "pass",
+                    "message": f"{train_done} training image(s) annotated.",
+                }
+            )
+
+        # Training count warning (< MIN_TRAIN_IMAGES)
+        if train_done > 0 and train_done < MIN_TRAIN_IMAGES:
+            checks.append(
+                {
+                    "check": "train_count",
+                    "level": "warning",
+                    "message": (
+                        f"Only {train_done} training image(s) annotated; "
+                        f"at least {MIN_TRAIN_IMAGES} recommended."
+                    ),
+                }
+            )
+        elif train_done >= MIN_TRAIN_IMAGES:
+            checks.append(
+                {
+                    "check": "train_count",
+                    "level": "pass",
+                    "message": f"{train_done} training image(s) meet the minimum threshold.",
+                }
+            )
+
+        # Validation annotations check
+        if val_total > 0 and val_done == 0:
+            checks.append(
+                {
+                    "check": "val_annotations",
+                    "level": "blocker",
+                    "message": "Validation images exist but none have been annotated.",
+                }
+            )
+        elif val_total > 0:
+            checks.append(
+                {
+                    "check": "val_annotations",
+                    "level": "pass",
+                    "message": f"{val_done} validation image(s) annotated.",
+                }
+            )
+
+        # Test annotations check (warning only)
+        if test_total > 0 and test_done == 0:
+            checks.append(
+                {
+                    "check": "test_annotations",
+                    "level": "warning",
+                    "message": "Test images exist but none have been annotated.",
+                }
+            )
+        elif test_total > 0:
+            checks.append(
+                {
+                    "check": "test_annotations",
+                    "level": "pass",
+                    "message": f"{test_done} test image(s) annotated.",
+                }
+            )
+
+        ready = not any(c["level"] == "blocker" for c in checks)
+
+        return JsonResponse(
+            {
+                "ready": ready,
+                "checks": checks,
+                "summary": {
+                    "train_total": train_total,
+                    "train_done": train_done,
+                    "val_total": val_total,
+                    "val_done": val_done,
+                    "test_total": test_total,
+                    "test_done": test_done,
+                },
+            }
+        )
+    except Exception as e:
+        logger.error("Error validating training readiness", exc_info=True)
+        return JsonResponse({"error": str(e)}, status=500)

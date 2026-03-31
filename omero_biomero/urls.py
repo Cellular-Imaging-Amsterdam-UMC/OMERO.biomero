@@ -166,6 +166,11 @@ urlpatterns = [
         annotate_ai_views.get_progress,
         name="annotate_progress",
     ),
+    path(
+        "api/annotate/validate_training/",
+        annotate_ai_views.validate_training_readiness,
+        name="annotate_validate_training",
+    ),
     # Training URLs
     path(
         "api/analyzer/training/start/",
