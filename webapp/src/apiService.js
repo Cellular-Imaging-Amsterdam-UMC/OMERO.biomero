@@ -710,7 +710,7 @@ export const importUploadedFile = async (
 export const startTraining = async (params) => {
   try {
     const csrfToken = window.csrftoken;
-    const endpoint = "/omero_biomero/api/analyzer/training/start";
+    const endpoint = "/omero_biomero/api/analyzer/training/start/";
     const response = await apiRequest(endpoint, "POST", params, {
       headers: {
         "X-CSRFToken": csrfToken,
@@ -725,6 +725,6 @@ export const startTraining = async (params) => {
 };
 
 export const listTrainedModels = async (datasetId) => {
-  const endpoint = `/omero_biomero/api/analyzer/training/models?dataset=${datasetId}`;
+  const endpoint = `/omero_biomero/api/analyzer/training/models/?dataset=${datasetId}`;
   return apiRequest(endpoint, "GET");
 };

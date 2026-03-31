@@ -165,10 +165,11 @@ const TrainingBiomeroTab = () => {
         active_group_id: state?.currentGroup?.id,
       };
 
-      await startTraining(params);
+      const result = await startTraining(params);
       toaster?.show({
-        message: "Training job submitted successfully!",
+        message: `Training job submitted (Job ID: ${result.job_id})`,
         intent: "success",
+        timeout: 0,
       });
     } catch (error) {
       console.error("Training submission failed:", error);

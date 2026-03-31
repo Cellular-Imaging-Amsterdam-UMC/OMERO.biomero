@@ -6,7 +6,7 @@ CONTAINER_NAME="nl-biomero-omeroweb-1"
 
 # Command to execute inside the container
 # COMMAND1="/usr/local/bin/entrypoint.sh"
-COMMAND0="chmod a+w /opt/omero/web/OMERO.web/var/static && chmod a+rw /opt/omero/web/OMERO.web/var/slurm-config.ini"
+COMMAND0="chmod a+w /opt/omero/web/OMERO.web/var/static && chmod a+rw /opt/omero/web/OMERO.web/var/slurm-config.ini && touch /opt/omero/web/OMERO.web/var/importer-config.json && chmod a+rw /opt/omero/web/OMERO.web/var/importer-config.json"
 
 # Mark volume-mounted repos as safe for git (needed by setuptools_scm)
 COMMAND_GIT="git config --global --add safe.directory /opt/omero/web/OMERO.biomero && git config --global --add safe.directory /opt/omero/web/omero_annotate_ai && git config --global --add safe.directory /opt/omero/web/OMERO.forms"

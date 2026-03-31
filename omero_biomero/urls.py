@@ -168,12 +168,12 @@ urlpatterns = [
     ),
     # Training URLs
     path(
-        "api/analyzer/training/start",
+        "api/analyzer/training/start/",
         training_views.start_training,
         name="training_start",
     ),
     path(
-        "api/analyzer/training/models",
+        "api/analyzer/training/models/",
         training_views.list_trained_models,
         name="training_list_models",
     ),
