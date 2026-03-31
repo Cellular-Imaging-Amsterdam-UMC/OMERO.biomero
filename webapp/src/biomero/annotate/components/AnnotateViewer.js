@@ -41,6 +41,8 @@ import {
   InputGroup,
   Checkbox,
   Spinner,
+  Tag,
+  Intent,
 } from "@blueprintjs/core";
 import {
   traceContours,
@@ -786,67 +788,87 @@ const AnnotateViewer = ({
         </div>
 
         <div className="border-t pt-2">
-          <h5>Features</h5>
-          <div className="flex flex-col gap-2 mb-2">
-            {featureTypes.map((ft) => (
-              <div
-                key={ft.id}
-                className={`p-1 border rounded cursor-pointer flex items-center gap-2 ${
-                  activeFeatureType === ft.id
-                    ? "ring-2 ring-blue-500 bg-blue-50"
-                    : "bg-white"
-                }`}
-                onClick={() => setActiveFeatureType(ft.id)}
-              >
+          {/* Classes section */}
+          <div style={{ marginTop: 12 }}>
+            <h6 style={{ marginBottom: 8 }}>Classes</h6>
+            {featureTypes.map((ft) => {
+              const count = annotations.filter((a) => a.typeId === ft.id).length;
+              return (
                 <div
-                  className="w-4 h-4 rounded-full border"
-                  style={{ background: ft.color }}
-                />
-                {editingFeatureId === ft.id ? (
-                  <input
-                    className="flex-1 min-w-0 text-sm border rounded px-1"
-                    value={ft.name}
-                    autoFocus
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => updateFeatureName(ft.id, e.target.value)}
-                    onBlur={() => setEditingFeatureId(null)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") setEditingFeatureId(null);
+                  key={ft.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "6px 8px",
+                    marginBottom: 4,
+                    borderRadius: 4,
+                    borderLeft: `3px solid ${ft.color}`,
+                    background:
+                      activeFeatureType === ft.id
+                        ? "rgba(45, 114, 210, 0.15)"
+                        : "transparent",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setActiveFeatureType(ft.id)}
+                >
+                  <div
+                    style={{
+                      width: 14,
+                      height: 14,
+                      background: ft.color,
+                      borderRadius: 2,
                     }}
                   />
-                ) : (
-                  <span
-                    className="text-sm flex-1 truncate"
+                  {editingFeatureId === ft.id ? (
+                    <input
+                      className="bp5-input"
+                      style={{ flex: 1, fontSize: 12 }}
+                      value={ft.name}
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => updateFeatureName(ft.id, e.target.value)}
+                      onBlur={() => setEditingFeatureId(null)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") setEditingFeatureId(null);
+                      }}
+                    />
+                  ) : (
+                    <span
+                      style={{ flex: 1, fontSize: 13 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveFeatureType(ft.id);
+                        setEditingFeatureId(ft.id);
+                      }}
+                    >
+                      {ft.name || "Default"}
+                    </span>
+                  )}
+                  <Tag minimal round>{count}</Tag>
+                  <Icon
+                    icon="cross"
+                    size={12}
+                    className="text-gray-400 hover:text-red-500"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setActiveFeatureType(ft.id);
-                      setEditingFeatureId(ft.id);
+                      deleteFeatureType(ft.id);
                     }}
-                  >
-                    {ft.name}
-                  </span>
-                )}
-                <Icon
-                  icon="cross"
-                  size={12}
-                  className="text-gray-400 hover:text-red-500"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteFeatureType(ft.id);
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-
-          <div className="flex gap-1 flex-col mt-2 p-2 bg-white rounded border">
-            <InputGroup
-              placeholder="Name"
-              value={newFeatureName}
-              onChange={(e) => setNewFeatureName(e.target.value)}
-              small
-            />
-            <div className="flex gap-1">
+                  />
+                </div>
+              );
+            })}
+            <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+              <input
+                className="bp5-input"
+                placeholder="Add class..."
+                value={newFeatureName}
+                onChange={(e) => setNewFeatureName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addFeatureType();
+                }}
+                style={{ flex: 1, fontSize: 12 }}
+              />
               <input
                 type="color"
                 value={newFeatureColor}
@@ -854,46 +876,44 @@ const AnnotateViewer = ({
                 className="h-6 w-8 p-0 border-0 cursor-pointer"
               />
               <Button
-                icon="add"
                 small
+                icon="plus"
                 onClick={addFeatureType}
-                disabled={!newFeatureName}
-                fill
-              >
-                Add
-              </Button>
+                disabled={!newFeatureName.trim()}
+              />
             </div>
           </div>
         </div>
 
         <div className="border-t pt-2 flex-1 overflow-auto min-h-[100px]">
-          <h5>Annotations ({annotations.length})</h5>
-          <div className="flex flex-col gap-1">
-            {annotations.map((ann, i) => {
-              const ft = featureTypes.find((t) => t.id === ann.typeId);
-              return (
-                <div
-                  key={ann.id}
-                  className="flex justify-between items-center text-xs p-1 bg-white border hover:bg-gray-100"
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-2 h-2 rounded-full"
-                      style={{ background: ft?.color || "gray" }}
-                    />
-                    <span>
-                      {ft?.name || "Unknown"} #{i + 1}
-                    </span>
-                  </div>
-                  <Button
-                    icon="trash"
-                    minimal
-                    small
-                    onClick={() => deleteAnnotation(ann.id)}
-                  />
-                </div>
-              );
-            })}
+          {/* Object count summary */}
+          <div style={{ marginTop: 16 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <h6 style={{ margin: 0 }}>
+                {annotations.length} object
+                {annotations.length !== 1 ? "s" : ""}
+              </h6>
+              {annotations.length > 0 && (
+                <Button
+                  small
+                  minimal
+                  intent={Intent.DANGER}
+                  icon="trash"
+                  text="Clear all"
+                  onClick={() => onAnnotationsChange([])}
+                />
+              )}
+            </div>
+            <p style={{ fontSize: 11, color: "#888", marginTop: 4 }}>
+              Click an object on the canvas to select it. Press Delete to
+              remove.
+            </p>
           </div>
         </div>
       </div>
