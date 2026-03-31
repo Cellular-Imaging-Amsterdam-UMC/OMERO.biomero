@@ -237,6 +237,25 @@ const AnnotateTab = ({
     if (next >= 0) {
       setSelectedUnitIndex(next);
       setAnnotations([]);
+      toaster?.show({
+        message: "Image skipped — annotations not saved",
+        intent: "warning",
+        icon: "arrow-right",
+        timeout: 2000,
+      });
+    } else {
+      // Check if there are any pending before current position
+      const anyPending = units.findIndex((u) => !u.processed);
+      if (anyPending >= 0) {
+        setSelectedUnitIndex(anyPending);
+        setAnnotations([]);
+      } else {
+        toaster?.show({
+          message: "All images have been processed!",
+          intent: "success",
+          icon: "tick-circle",
+        });
+      }
     }
   };
 
