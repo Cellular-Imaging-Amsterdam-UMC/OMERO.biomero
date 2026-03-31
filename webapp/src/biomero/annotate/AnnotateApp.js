@@ -29,6 +29,7 @@ const AnnotateApp = () => {
   const [tableId, setTableId] = useState(null);
   const [units, setUnits] = useState([]);
   const [progress, setProgress] = useState(null);
+  const [activeSetName, setActiveSetName] = useState(null);
 
   useEffect(() => {
     if (!loadingOmero) {
@@ -62,6 +63,7 @@ const AnnotateApp = () => {
     setTableId(newTableId);
     setUnits(newUnits);
     setProgress(newProgress);
+    setActiveSetName(newConfig?.name || `Set #${newTableId}`);
     setActiveTab("annotate");
   };
 
@@ -101,6 +103,27 @@ const AnnotateApp = () => {
             </div>
             )}
         </div>
+
+        {activeSetName && tableId && (activeTab === "annotate" || activeTab === "training") && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: "8px 16px",
+              background: "#e8f0fe",
+              borderBottom: "1px solid #c4d4e8",
+              fontSize: 13,
+            }}
+          >
+            <span style={{ fontWeight: 600 }}>{activeSetName}</span>
+            {progress && (
+              <span style={{ color: "#555" }}>
+                — {progress.completed_units || 0}/{progress.total_units || 0} images annotated
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="p-4 h-full overflow-hidden">
         <Tabs
