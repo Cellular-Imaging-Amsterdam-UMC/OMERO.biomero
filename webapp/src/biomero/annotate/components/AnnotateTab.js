@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { H4, Card, Button, Spinner, Callout } from "@blueprintjs/core";
+import { H4, Card, Button, Spinner, Callout, NumericInput, ButtonGroup } from "@blueprintjs/core";
 import TrackingTableView from "./TrackingTableView";
 import AnnotateViewer from "./AnnotateViewer";
+import PatchSelector from "./PatchSelector";
 import { useAppContext } from "../../../AppContext";
 import {
   getTrackingTableDetail,
@@ -10,6 +11,7 @@ import {
   getAnnotateProgress,
   getAnnotateImageChannels,
   markUnitProcessed,
+  addPatchToTrackingTable,
 } from "../../../apiService";
 
 const AnnotateTab = ({
@@ -33,6 +35,10 @@ const AnnotateTab = ({
     { id: "1", name: "Object", color: "#00ff00" },
   ]);
   const [channelInfo, setChannelInfo] = useState(null);
+
+  // Patch state
+  const [patchWidth, setPatchWidth] = useState(256);
+  const [patchHeight, setPatchHeight] = useState(256);
 
   // Load table detail when tableId changes or on mount
   useEffect(() => {
@@ -97,6 +103,15 @@ const AnnotateTab = ({
 
   const selectedUnit =
     selectedUnitIndex !== null ? units[selectedUnitIndex] : null;
+
+  // Get all patch units for the currently selected image
+  const currentImageId = selectedUnit?.image_id;
+  const patchesForImage = units
+    .map((u, i) => ({ ...u, _unitIndex: i }))
+    .filter((u) => u.is_patch && u.image_id === currentImageId);
+
+  // Build the patch prop for AnnotateViewer when selected unit is a patch
+  const viewerPatch = selectedUnit?.is_patch ? selectedUnit : null;
 
   // Build an image object compatible with the AnnotationViewer
   const currentImage = selectedUnit
@@ -291,6 +306,55 @@ const AnnotateTab = ({
     }
   };
 
+  const handleAddPatch = async () => {
+    if (!selectedUnit || !tableId) return;
+    try {
+      // Random position within image bounds
+      // We need image dimensions — use a reasonable default or get from channel info
+      const imgWidth = channelInfo?.width || 1024;
+      const imgHeight = channelInfo?.height || 1024;
+      const maxX = Math.max(0, imgWidth - patchWidth);
+      const maxY = Math.max(0, imgHeight - patchHeight);
+      const px = Math.floor(Math.random() * maxX);
+      const py = Math.floor(Math.random() * maxY);
+
+      const result = await addPatchToTrackingTable(
+        tableId,
+        selectedUnit.image_id,
+        selectedUnit.image_name,
+        px,
+        py,
+        patchWidth,
+        patchHeight,
+        selectedUnit.category || "training",
+      );
+
+      if (result.success) {
+        // Update table ID if it changed
+        if (result.table_id && result.table_id !== tableId) {
+          onTableIdUpdate?.(result.table_id);
+        }
+        // Reload the tracking table to get the new unit
+        const detail = await getTrackingTableDetail(result.table_id || tableId);
+        setUnits(detail.units || []);
+        onUnitsUpdate?.(detail.units || []);
+        // Select the newly added patch
+        if (result.unit_index !== undefined) {
+          setSelectedUnitIndex(result.unit_index);
+          setAnnotations([]);
+        }
+        toaster?.show({
+          message: "Patch added",
+          intent: "success",
+          timeout: 2000,
+        });
+      }
+    } catch (e) {
+      console.error("Error adding patch:", e);
+      toaster?.show({ message: `Failed to add patch: ${e.message}`, intent: "danger" });
+    }
+  };
+
   const handleSkipForLater = () => {
     // Move to next unit without saving — image stays as pending
     const next = units.findIndex(
@@ -388,6 +452,56 @@ const AnnotateTab = ({
             filterStatus={filterStatus}
             onFilterChange={setFilterStatus}
           />
+
+          {/* Patch section — shown when an image is selected */}
+          {selectedUnit && (
+            <div style={{ borderTop: "1px solid #ddd", padding: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>Patches</span>
+              </div>
+
+              {/* Patch size inputs */}
+              <div style={{ display: "flex", gap: 4, marginBottom: 8, fontSize: 11 }}>
+                <div>
+                  <label style={{ fontSize: 10, color: "#888" }}>Width</label>
+                  <NumericInput
+                    value={patchWidth}
+                    onValueChange={(v) => setPatchWidth(v)}
+                    min={32}
+                    max={2048}
+                    stepSize={32}
+                    style={{ width: 70 }}
+                    small
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, color: "#888" }}>Height</label>
+                  <NumericInput
+                    value={patchHeight}
+                    onValueChange={(v) => setPatchHeight(v)}
+                    min={32}
+                    max={2048}
+                    stepSize={32}
+                    style={{ width: 70 }}
+                    small
+                  />
+                </div>
+              </div>
+
+              <PatchSelector
+                patches={patchesForImage}
+                selectedPatchIndex={selectedUnitIndex}
+                imageId={currentImageId}
+                imageWidth={channelInfo?.width || 1024}
+                imageHeight={channelInfo?.height || 1024}
+                onSelectPatch={(idx) => {
+                  setSelectedUnitIndex(idx);
+                  setAnnotations([]);
+                }}
+                onAddPatch={handleAddPatch}
+              />
+            </div>
+          )}
         </Card>
 
         {/* Annotation canvas */}
@@ -400,6 +514,7 @@ const AnnotateTab = ({
               featureTypes={featureTypes}
               onFeatureTypesChange={setFeatureTypes}
               channelInfo={channelInfo}
+              patch={viewerPatch}
             />
           ) : (
             <div className="flex justify-center items-center h-full text-gray-400">
