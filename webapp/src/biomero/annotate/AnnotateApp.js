@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Tabs, Tab } from "@blueprintjs/core";
 import PreviewTab from "./components/PreviewTab";
-import TrainingTab from "./components/TrainingTab";
 import TrainingBiomeroTab from "./components/TrainingBiomeroTab";
 import ConfigureTab from "./components/ConfigureTab";
 import AnnotateTab from "./components/AnnotateTab";
@@ -150,12 +149,6 @@ const AnnotateApp = () => {
             <Tab
             id="training"
             title="Training"
-            icon="learning"
-            panel={<TrainingTab />}
-            />
-            <Tab
-            id="training-biomero"
-            title="Training (biomero)"
             icon="rocket-slant"
             panel={<TrainingBiomeroTab />}
             />

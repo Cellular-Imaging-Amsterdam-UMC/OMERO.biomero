@@ -16,10 +16,14 @@ import {
   Tag,
 } from "@blueprintjs/core";
 import DatasetSelectWithPopover from "../../components/DatasetSelectWithPopover";
+import AnnotationSetPicker from "./AnnotationSetPicker";
+import TrainingValidation from "./TrainingValidation";
 import { useAppContext } from "../../../AppContext";
 import {
   startTraining,
   listTrainedModels,
+  listTrackingTables,
+  validateTrainingReadiness,
 } from "../../../apiService";
 
 const TrainingBiomeroTab = () => {
@@ -46,6 +50,12 @@ const TrainingBiomeroTab = () => {
   const [batchSize, setBatchSize] = useState(1);
   const [channels, setChannels] = useState("0,0");
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // --- Annotation set validation ---
+  const [annotationSets, setAnnotationSets] = useState([]);
+  const [selectedAnnotationSet, setSelectedAnnotationSet] = useState(null);
+  const [validation, setValidation] = useState(null);
+  const [validationLoading, setValidationLoading] = useState(false);
 
   // --- State ---
   const [submitting, setSubmitting] = useState(false);
@@ -106,6 +116,31 @@ const TrainingBiomeroTab = () => {
     };
     loadVersions();
   }, [selectedWorkflow]);
+
+  // Load annotation sets when dataset changes
+  useEffect(() => {
+    const dsId = getDatasetId(selectedDatasets);
+    if (!dsId) {
+      setAnnotationSets([]);
+      return;
+    }
+    listTrackingTables("dataset", dsId).then((resp) => {
+      setAnnotationSets(resp.tables || []);
+    }).catch(() => setAnnotationSets([]));
+  }, [selectedDatasets, getDatasetId]);
+
+  // Validate when annotation set is selected
+  useEffect(() => {
+    if (!selectedAnnotationSet) {
+      setValidation(null);
+      return;
+    }
+    setValidationLoading(true);
+    validateTrainingReadiness(selectedAnnotationSet.id)
+      .then((resp) => setValidation(resp))
+      .catch(() => setValidation(null))
+      .finally(() => setValidationLoading(false));
+  }, [selectedAnnotationSet]);
 
   // Load trained models when dataset changes
   useEffect(() => {
@@ -184,7 +219,7 @@ const TrainingBiomeroTab = () => {
 
   return (
     <div className="p-4 flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-200px)]">
-      <H4>Training (biomero)</H4>
+      <H4>Training</H4>
 
       <div className="grid grid-cols-2 gap-4">
         {/* Left column: Workflow + Data source */}
@@ -270,6 +305,26 @@ const TrainingBiomeroTab = () => {
               </div>
             )}
           </Card>
+
+          {/* Annotation set picker when data mode is "annotate" */}
+          {dataMode === "annotate" && (
+            <Card style={{ marginBottom: 16 }}>
+              <H4>Annotation Set</H4>
+              <AnnotationSetPicker
+                tables={annotationSets}
+                selectedTableId={selectedAnnotationSet?.id}
+                onSelectTable={(table) => setSelectedAnnotationSet(table)}
+                onCreateNew={() => {}}
+                loading={false}
+              />
+              {(selectedAnnotationSet || validationLoading) && (
+                <TrainingValidation
+                  validation={validation}
+                  loading={validationLoading}
+                />
+              )}
+            </Card>
+          )}
         </div>
 
         {/* Right column: Training params */}
@@ -350,7 +405,7 @@ const TrainingBiomeroTab = () => {
               text="Start Training"
               onClick={handleSubmit}
               loading={submitting}
-              disabled={!selectedWorkflow || !selectedVersion}
+              disabled={submitting || !selectedWorkflow || !selectedVersion || (dataMode === "annotate" && !validation?.ready)}
               large
               className="mt-4"
               fill
