@@ -9,6 +9,7 @@ import {
   fetchAnnotateAnnotation,
   getAnnotateProgress,
   getAnnotateImageChannels,
+  markUnitProcessed,
 } from "../../../apiService";
 
 const AnnotateTab = ({
@@ -229,8 +230,69 @@ const AnnotateTab = ({
     }
   };
 
-  const handleSkip = () => {
-    // Move to next unit without saving
+  const handleMarkEmpty = async () => {
+    if (!selectedUnit || !tableId) return;
+    try {
+      setSaving(true);
+      const result = await markUnitProcessed(tableId, selectedUnitIndex);
+      if (result.success) {
+        // Update table ID if it changed
+        const currentTableId = result.table_id ?? tableId;
+        if (result.table_id && result.table_id !== tableId) {
+          onTableIdUpdate?.(result.table_id);
+        }
+
+        toaster?.show({
+          message: "Marked as done — no objects to label",
+          intent: "success",
+          icon: "tick",
+          timeout: 2000,
+        });
+
+        // Mark unit as processed locally
+        const updatedUnits = [...units];
+        updatedUnits[selectedUnitIndex] = {
+          ...updatedUnits[selectedUnitIndex],
+          processed: true,
+        };
+        setUnits(updatedUnits);
+        onUnitsUpdate?.(updatedUnits);
+
+        // Update progress
+        const progressResult = await getAnnotateProgress(currentTableId);
+        onProgressUpdate?.(progressResult);
+
+        // Move to next pending unit
+        const nextPending = updatedUnits.findIndex(
+          (u, i) => !u.processed && i > selectedUnitIndex,
+        );
+        if (nextPending >= 0) {
+          setSelectedUnitIndex(nextPending);
+          setAnnotations([]);
+        } else {
+          const anyPending = updatedUnits.findIndex((u) => !u.processed);
+          if (anyPending >= 0) {
+            setSelectedUnitIndex(anyPending);
+            setAnnotations([]);
+          } else {
+            toaster?.show({
+              message: "All images have been reviewed!",
+              intent: "success",
+              icon: "tick-circle",
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error marking empty:", e);
+      toaster?.show({ message: `Failed: ${e.message}`, intent: "danger" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSkipForLater = () => {
+    // Move to next unit without saving — image stays as pending
     const next = units.findIndex(
       (u, i) => !u.processed && i > (selectedUnitIndex ?? -1),
     );
@@ -238,20 +300,19 @@ const AnnotateTab = ({
       setSelectedUnitIndex(next);
       setAnnotations([]);
       toaster?.show({
-        message: "Image skipped — annotations not saved",
+        message: "Skipped — will come back later",
         intent: "warning",
         icon: "arrow-right",
         timeout: 2000,
       });
     } else {
-      // Check if there are any pending before current position
       const anyPending = units.findIndex((u) => !u.processed);
       if (anyPending >= 0) {
         setSelectedUnitIndex(anyPending);
         setAnnotations([]);
       } else {
         toaster?.show({
-          message: "All images have been processed!",
+          message: "All images have been reviewed!",
           intent: "success",
           icon: "tick-circle",
         });
@@ -291,9 +352,16 @@ const AnnotateTab = ({
         </H4>
         <div className="flex gap-2">
           <Button
+            icon="tick"
+            text="Done (empty)"
+            onClick={handleMarkEmpty}
+            disabled={!selectedUnit || saving}
+          />
+          <Button
+            minimal
             icon="arrow-right"
             text="Skip"
-            onClick={handleSkip}
+            onClick={handleSkipForLater}
             disabled={!selectedUnit || saving}
           />
           <Button
@@ -301,8 +369,8 @@ const AnnotateTab = ({
             icon="floppy-disk"
             text="Save & Next"
             onClick={handleSaveAndNext}
+            disabled={!selectedUnit || saving || annotations.length === 0}
             loading={saving}
-            disabled={!selectedUnit || annotations.length === 0}
           />
         </div>
       </div>
