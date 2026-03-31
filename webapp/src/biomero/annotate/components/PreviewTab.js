@@ -5,7 +5,7 @@ import ImageSelector from "./ImageSelector";
 import ModelSelector from "./ModelSelector";
 import ChannelSelector from "./ChannelSelector";
 import PreviewViewer from "./PreviewViewer";
-import { fetchImageChannels } from "../../../apiService";
+import { fetchImageChannels, listTrackingTables } from "../../../apiService";
 
 const PreviewTab = () => {
   const [selectedDatasets, setSelectedDatasets] = useState([]);
@@ -15,6 +15,8 @@ const PreviewTab = () => {
   const [selectedChannel, setSelectedChannel] = useState(0);
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [imageMeta, setImageMeta] = useState({ sizeZ: 1, sizeT: 1 });
+  const [annotationSets, setAnnotationSets] = useState([]);
+  const [setsLoading, setSetsLoading] = useState(false);
 
   // Helper to extract ID from string like "dataset-123"
   const getDatasetId = (selection) => {
@@ -40,6 +42,19 @@ const PreviewTab = () => {
       setSelectedImage(img);
       setSelectedChannel(0);
   };
+
+  // Fetch annotation sets when dataset changes
+  useEffect(() => {
+    if (!datasetId) {
+      setAnnotationSets([]);
+      return;
+    }
+    setSetsLoading(true);
+    listTrackingTables("dataset", datasetId)
+      .then((resp) => setAnnotationSets(resp.tables || []))
+      .catch(() => setAnnotationSets([]))
+      .finally(() => setSetsLoading(false));
+  }, [datasetId]);
 
   // Fetch channels when image changes
   useEffect(() => {
@@ -87,11 +102,41 @@ const PreviewTab = () => {
              </Card>
              
              <Card>
-                 <ModelSelector 
+                 <ModelSelector
                     selectedModel={selectedModel}
                     onSelect={setSelectedModel}
                  />
              </Card>
+
+             {(setsLoading || annotationSets.length > 0) && (
+               <Card>
+                 {setsLoading ? (
+                   <p className="bp5-text-muted" style={{ fontSize: 13 }}>Loading annotation sets…</p>
+                 ) : (
+                   <div>
+                     <h6 style={{ margin: "0 0 8px 0" }}>Annotation Sets</h6>
+                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                       {annotationSets.map((s) => (
+                         <div
+                           key={s.id}
+                           style={{
+                             display: "flex",
+                             justifyContent: "space-between",
+                             alignItems: "center",
+                             padding: "8px 12px",
+                             background: "#f5f5f5",
+                             borderRadius: 4,
+                             fontSize: 13,
+                           }}
+                         >
+                           <span>{s.name || `Set #${s.id}`}</span>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+               </Card>
+             )}
 
              {channels.length > 1 && (
                  <Card>
