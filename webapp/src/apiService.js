@@ -591,6 +591,11 @@ export const fetchAllImageAnnotations = async (imageId) => {
   );
 };
 
+export const markUnitProcessed = async (tableId, unitIndex) => {
+  const payload = { table_id: tableId, unit_index: unitIndex };
+  return await apiRequest("/omero_biomero/api/annotate/mark_processed/", "POST", payload);
+};
+
 // ---------------------------------------------------------------------------
 // SAM endpoints
 // ---------------------------------------------------------------------------

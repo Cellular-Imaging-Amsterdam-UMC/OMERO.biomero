@@ -171,6 +171,11 @@ urlpatterns = [
         annotate_ai_views.validate_training_readiness,
         name="annotate_validate_training",
     ),
+    path(
+        "api/annotate/mark_processed/",
+        annotate_ai_views.mark_unit_processed,
+        name="annotate_mark_processed",
+    ),
     # Training URLs
     path(
         "api/analyzer/training/start/",

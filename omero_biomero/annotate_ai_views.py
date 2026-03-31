@@ -804,6 +804,49 @@ def save_annotation(request, conn=None, **kwargs):
         return JsonResponse({"error": str(e)}, status=500)
 
 
+@login_required()
+@require_POST
+def mark_unit_processed(request, conn=None, **kwargs):
+    """Mark a tracking table unit as processed without annotations.
+
+    Used when user reviews an image and finds nothing to label.
+
+    POST JSON body:
+        table_id: int — tracking table ID
+        unit_index: int — row index in tracking table
+
+    Returns JSON:
+        success: bool
+        table_id: int — new table ID (may change due to delete+recreate)
+    """
+    lib = _get_omero_annotate_ai()
+    if not lib:
+        err = _get_omero_annotate_ai._last_error or "unknown"
+        return JsonResponse(
+            {"error": f"omero_annotate_ai not available: {err}"}, status=500
+        )
+
+    try:
+        data = json.loads(request.body)
+        table_id = data.get("table_id")
+        unit_index = data.get("unit_index")
+
+        if table_id is None or unit_index is None:
+            return JsonResponse(
+                {"error": "Missing required fields: table_id and unit_index"},
+                status=400,
+            )
+
+        new_table_id = _update_tracking_table_row(
+            conn, lib, int(table_id), int(unit_index), "", ""
+        )
+
+        return JsonResponse({"success": True, "table_id": new_table_id})
+    except Exception as e:
+        logger.error("Error marking unit processed", exc_info=True)
+        return JsonResponse({"error": str(e)}, status=500)
+
+
 def _save_geojson_file_ann(conn, image_id, geojson, namespace):
     """Persist a GeoJSON FeatureCollection as a namespaced FileAnnotation on an image.
 
