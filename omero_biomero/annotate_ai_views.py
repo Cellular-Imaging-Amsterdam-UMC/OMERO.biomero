@@ -80,6 +80,11 @@ def _get_omero_annotate_ai():
 _get_omero_annotate_ai._last_error = None
 
 
+def _geojson_namespace(table_id):
+    """Return the OMERO namespace for GeoJSON annotations tied to a tracking table."""
+    return f"omero.biomero.annotations.{table_id}"
+
+
 def _annotations_from_geojson(data):
     """Normalise annotation input to a list of ``{points: [[x, y], ...]}`` dicts.
 
@@ -769,7 +774,11 @@ def save_annotation(request, conn=None, **kwargs):
 
         # Persist GeoJSON as a namespaced FileAnnotation so that fetch_annotation
         # can retrieve annotations per-workflow without scanning all ROIs.
-        namespace = f"omero.biomero.annotations.{config_name}"
+        # Use table_id for namespace to ensure set isolation.
+        if table_id is not None:
+            namespace = _geojson_namespace(int(table_id))
+        else:
+            namespace = f"omero.biomero.annotations.{config_name}"
         _save_geojson_file_ann(conn, image_id, data["annotations"], namespace)
 
         # Update tracking table if provided
@@ -956,9 +965,11 @@ def fetch_annotation(request, conn=None, **kwargs):
 
     Query params:
         image      – image id (required)
-        table_id   – tracking table FileAnnotation id; used to derive the
-                     workflow namespace when ``config_name`` is not given
-        config_name – explicit workflow name / namespace suffix (optional)
+        table_id   – tracking table FileAnnotation id; used as the primary
+                     namespace key (``omero.biomero.annotations.{table_id}``)
+                     for set isolation
+        config_name – fallback workflow name / namespace suffix when
+                     ``table_id`` is not given (legacy support)
     """
     image_id = request.GET.get("image")
     if not image_id:
@@ -975,11 +986,16 @@ def fetch_annotation(request, conn=None, **kwargs):
         # ----------------------------------------------------------------
         # 1. Namespace-aware path: look for a GeoJSON FileAnnotation
         # ----------------------------------------------------------------
-        if not config_name and table_id:
-            config_name = _config_name_from_table_id(conn, table_id)
-
-        if config_name:
+        # Prefer table_id-based namespace for set isolation; fall back to
+        # config_name for backwards compatibility with older annotations.
+        if table_id:
+            namespace = _geojson_namespace(int(table_id))
+        elif config_name:
             namespace = f"omero.biomero.annotations.{config_name}"
+        else:
+            namespace = None
+
+        if namespace:
             for ann in image.listAnnotations():
                 if (
                     isinstance(ann, omero.gateway.FileAnnotationWrapper)

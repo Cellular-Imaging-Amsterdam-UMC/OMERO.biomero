@@ -205,3 +205,18 @@ class ValidateTrainingReadinessTests(TestCase):
             response = self.view(request, conn=_make_conn())
 
         self.assertEqual(response.status_code, 404)
+
+
+class TestGeoJsonNamespace(TestCase):
+    """Verify GeoJSON annotations are namespaced by table_id."""
+
+    def test_geojson_namespace_uses_table_id(self):
+        from omero_biomero.annotate_ai_views import _geojson_namespace
+        ns = _geojson_namespace(42)
+        self.assertEqual(ns, "omero.biomero.annotations.42")
+
+    def test_geojson_namespace_different_tables(self):
+        from omero_biomero.annotate_ai_views import _geojson_namespace
+        ns1 = _geojson_namespace(42)
+        ns2 = _geojson_namespace(99)
+        self.assertNotEqual(ns1, ns2)
