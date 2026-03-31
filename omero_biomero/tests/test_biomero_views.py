@@ -79,6 +79,8 @@ class BiomeroViewTests(TestCase):
         self.assertFalse(ctx["analyzer_enabled"])  # false parsed
         self.assertEqual(ctx["main_js"], "hashed-main.js")
         self.assertEqual(ctx["main_css"], "hashed-main.css")
+        self.assertIn(".lif", ctx["uploader_allowed_file_extensions"])
+        self.assertNotIn(".xlef", ctx["uploader_allowed_file_extensions"])
         self.assertIsInstance(ctx["metabase_token_monitor_workflows"], str)
         self.assertIsInstance(ctx["metabase_token_imports"], str)
         decoded = jwt.decode(
@@ -107,6 +109,25 @@ class BiomeroViewTests(TestCase):
         self.assertEqual(ctx["main_js"], "fallback.js")
         self.assertTrue(ctx["importer_enabled"])  # default True
         self.assertTrue(ctx["analyzer_enabled"])  # default True
+        self.assertIsNone(ctx["main_js_dev_url"])
+
+    def test_biomero_dev_server_url_from_env(self):
+        with patch.dict(
+            os.environ,
+            {
+                "METABASE_SECRET_KEY": "k",
+                "METABASE_WORKFLOWS_DB_PAGE_DASHBOARD_ID": "1",
+                "METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID": "2",
+                "BIOMERO_WEBAPP_DEV_SERVER_URL": "http://localhost:8081/",
+            },
+            clear=True,
+        ), patch(
+            "omero_biomero.biomero_views.get_react_build_file",
+            return_value="fallback.js",
+        ):
+            ctx = _raw_biomero()(None, conn=self._fake_conn())
+
+        self.assertEqual(ctx["main_js_dev_url"], "http://localhost:8081/main.js")
 
     def test_biomero_build_file_fallback(self):
         with patch.dict(

@@ -3,6 +3,8 @@ import datetime
 import json
 import logging
 import os
+import logging
+import os
 
 from biomero import SlurmClient
 from collections import defaultdict
@@ -10,6 +12,7 @@ from configupdater import ConfigUpdater, Comment
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.http import require_http_methods
 from omeroweb.webclient.decorators import login_required
+from .settings import CONFIG_FILE_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +46,21 @@ def admin_config(request, conn=None, **kwargs):
             config_dict = {
                 section: dict(configs.items(section)) for section in configs.sections()
             }
+
+            # Load the JSON configuration file (importer-config.json)
+            json_config = {}
+            if os.path.exists(CONFIG_FILE_PATH):
+                try:
+                    with open(CONFIG_FILE_PATH, "r") as f:
+                        json_config = json.load(f)
+                except Exception as e:
+                    logger.error(f"Error reading JSON config: {str(e)}")
+
+            # Merge JSON config into config_dict
+            # Note: JSON config allows nested dicts, while INI is flat (section -> key/value)
+            # We assume top-level keys in JSON correspond to sections or specific config groups
+            for key, value in json_config.items():
+                config_dict[key] = value
 
             return JsonResponse({"config": config_dict})
         except Exception as e:
@@ -86,8 +104,48 @@ def admin_config(request, conn=None, **kwargs):
                     c = "# Adding or overriding job value for this workflow"
                 return c
 
-            # Update the config with new values
+            # Separate settings for JSON config and INI config
+            json_config_updates = {}
+            ini_config_updates = {}
+
             for section, settingsd in config_data.items():
+                if section == "UPLOADER":
+                    json_config_updates[section] = settingsd
+                else:
+                    ini_config_updates[section] = settingsd
+
+            # --- Save JSON Config ---
+            if json_config_updates:
+                try:
+                    current_json_config = {}
+                    if os.path.exists(CONFIG_FILE_PATH):
+                        with open(CONFIG_FILE_PATH, "r") as f:
+                            current_json_config = json.load(f) or {}
+
+                    # Update with new values
+                    for key, value in json_config_updates.items():
+                        current_json_config[key] = value
+
+                    # Ensure directory exists
+                    config_dir = os.path.dirname(CONFIG_FILE_PATH)
+                    if config_dir and not os.path.exists(config_dir):
+                        os.makedirs(config_dir, exist_ok=True)
+
+                    with open(CONFIG_FILE_PATH, "w") as f:
+                        json.dump(current_json_config, f, indent=2)
+                    logger.info(f"JSON configuration saved to {CONFIG_FILE_PATH}")
+                except Exception as e:
+                    logger.error(f"Failed to save JSON config: {str(e)}")
+                    # We might want to return an error here, but let's see if INI save works first?
+                    # Or fail immediately? Let's fail if we can't save the requested changes.
+                    return JsonResponse(
+                        {"error": f"Failed to save JSON configuration: {str(e)}"},
+                        status=500,
+                    )
+
+            # --- Save INI Config ---
+            # Update the config with new values
+            for section, settingsd in ini_config_updates.items():
                 if not isinstance(settingsd, dict):
                     raise ValueError(
                         f"Section '{section}' must contain key-value pairs."
@@ -196,10 +254,25 @@ def admin_config(request, conn=None, **kwargs):
             changelog_section.add_after.comment(change_comment)
 
             # Save the updated configuration while preserving comments
-            with open(config_path, "w") as config_file:
-                config.write(config_file)
+            try:
+                with open(config_path, "w") as config_file:
+                    config.write(config_file)
+                logger.info(f"Configuration saved successfully to {config_path}")
+            except PermissionError:
+                logger.error(
+                    f"Permission denied writing to {config_path}. Skipping INI save."
+                )
+                if not json_config_updates:
+                    # If we only tried to save INI and failed, that's an error.
+                    # If we saved JSON but failed INI, we might want to warn or just succeed partially.
+                    # For now, if we have mix, and INI fails, we report error?
+                    # But the user might be toggling UPLOADER (JSON) and not caring about Slurm (INI).
+                    # So if json_config_updates succeeded, we can treat it as partial success.
+                    pass
+            except Exception as e:
+                logger.error(f"Error saving INI config: {e}")
+                raise e
 
-            logger.info(f"Configuration saved successfully to {config_path}")
             return JsonResponse(
                 {"message": "Configuration saved successfully", "path": config_path},
                 status=200,

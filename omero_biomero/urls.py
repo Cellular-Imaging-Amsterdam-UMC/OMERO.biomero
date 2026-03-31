@@ -1,13 +1,13 @@
 from django.urls import path
-
+from .tus_views import TusUploadView
 from . import (
     admin_views,
     analyzer_views,
     annotate_ai_views,
     biomero_views,
     importer_views,
+    prediction_views,
     sam_views,
-    stardist_views,
 )
 
 urlpatterns = [
@@ -16,6 +16,11 @@ urlpatterns = [
         "api/importer/import_selected/",
         importer_views.import_selected,
         name="import_selected",
+    ),
+    path(
+        "api/importer/import_uploaded_file/",
+        importer_views.import_uploaded_file,
+        name="import_uploaded_file",
     ),
     path(
         "api/importer/group_mappings/",
@@ -27,6 +32,9 @@ urlpatterns = [
         importer_views.get_folder_contents,
         name="get_folder_contents",
     ),
+    # TUS Upload URLs (custom implementation)
+    path("upload/", TusUploadView.as_view(), name="tus_upload"),
+    path("upload/<uuid:resource_id>", TusUploadView.as_view(), name="tus_upload_chunks"),
     # Admin URLs
     path(
         "api/biomero/admin/config/",
@@ -59,36 +67,46 @@ urlpatterns = [
         analyzer_views.get_slurm_status,  # GET: SLURM cluster status
         name="analyzer_slurm_status",
     ),
-    # Stardist URLs
+    # Prediction URLs (renamed from stardist)
     path(
-        "api/stardist/models/",
-        stardist_views.list_models,
-        name="stardist_list_models",
+        "api/prediction/models/",
+        prediction_views.list_models,
+        name="prediction_list_models",
     ),
     path(
-        "api/stardist/channels/",
-        stardist_views.get_image_channels,
-        name="stardist_image_channels",
+        "api/prediction/channels/",
+        prediction_views.get_image_channels,
+        name="prediction_image_channels",
     ),
     path(
-        "api/stardist/save_annotations/",
-        stardist_views.save_annotations,
-        name="stardist_save_annotations",
+        "api/prediction/channel_plane/",
+        prediction_views.get_channel_plane_data,
+        name="prediction_channel_plane",
     ),
     path(
-        "api/stardist/train/",
-        stardist_views.run_training,
-        name="stardist_run_training",
+        "api/prediction/save_annotations/",
+        prediction_views.save_annotations,
+        name="prediction_save_annotations",
     ),
     path(
-        "api/stardist/fetch_annotations/",
-        stardist_views.fetch_annotations,
-        name="stardist_fetch_annotations",
+        "api/prediction/annotation_sets/",
+        prediction_views.list_annotation_sets,
+        name="prediction_list_annotation_sets",
     ),
     path(
-        "api/stardist/predict/",
-        stardist_views.run_prediction,
-        name="stardist_predict",
+        "api/prediction/train/",
+        prediction_views.run_training,
+        name="prediction_run_training",
+    ),
+    path(
+        "api/prediction/fetch_annotations/",
+        prediction_views.fetch_annotations,
+        name="prediction_fetch_annotations",
+    ),
+    path(
+        "api/prediction/predict/",
+        prediction_views.run_prediction,
+        name="prediction_predict",
     ),
     # SAM URLs
     path(

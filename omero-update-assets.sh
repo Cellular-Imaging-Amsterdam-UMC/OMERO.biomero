@@ -11,20 +11,23 @@ DEST_DIR="/opt/omero/web/OMERO.web/var/static/omero_biomero/assets"
 # Wait a moment for files to sync
 sleep 1
 
-# Execute the Docker command to copy files
-# Use `.` glob to handle empty directory and allow hidden files, but safer than `*` failure
-docker exec "$CONTAINER_NAME" bash -c "mkdir -p ${DEST_DIR} && cp -r ${SRC_DIR}/. ${DEST_DIR}/"
+# Ensure the collected static directory is writable before syncing
+docker exec --user root "$CONTAINER_NAME" sh -c "chmod a+w /opt/omero/web/OMERO.web/var/static"
+
+# Refresh collected static files using OMERO.web's built-in sync step.
+docker exec "$CONTAINER_NAME" bash -lc "/opt/omero/web/venv3/bin/omero web syncmedia"
 
 # Check if the command was successful
 if [ $? -eq 0 ]; then
-  echo "Files successfully copied from $SRC_DIR to $DEST_DIR in container $CONTAINER_NAME."
-  
+  echo "Static assets synchronized from $SRC_DIR to $DEST_DIR in container $CONTAINER_NAME."
+
+  # WhiteNoise caches static file metadata by path, so fixed bundle names
+  # require an OMERO.web restart after in-place updates.
+  echo "Restarting OMERO.web to refresh cached static metadata..."
+  docker exec "$CONTAINER_NAME" bash -lc "/opt/omero/web/venv3/bin/omero web restart"
+
   # Ensure readable permissions
   docker exec "$CONTAINER_NAME" bash -c "chmod -R a+rX ${DEST_DIR}"
-  
-  # Restart omero-web to pick up template changes and new asset manifest
-  echo "Restarting OMERO.web (Django)..."
-  docker exec "$CONTAINER_NAME" bash -c "/opt/omero/web/venv3/bin/omero web restart" || echo "OMERO.web restart failed. Is it running?"
 
   # List files for verification
   docker exec "$CONTAINER_NAME" ls -la "${DEST_DIR}/" | head -n 20

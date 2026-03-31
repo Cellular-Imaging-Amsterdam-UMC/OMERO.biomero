@@ -7,10 +7,12 @@ from omeroweb.webclient.decorators import login_required, render_response
 
 from .utils import (
     get_react_build_file,
+    get_react_dev_server_asset_url,
     parse_bool_env,
 )
 from .settings import (
     BASE_DIR,
+    UPLOADER_ALLOWED_FILE_EXTENSIONS,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,6 +53,7 @@ def biomero(request, conn=None, **kwargs):
 
     importer_enabled = parse_bool_env(os.environ.get("IMPORTER_ENABLED"), default=True)
     analyzer_enabled = parse_bool_env(os.environ.get("ANALYZER_ENABLED"), default=True)
+    trainer_enabled = parse_bool_env(os.environ.get("TRAINER_ENABLED"), default=True)
 
     current_user = conn.getUser()
     username = current_user.getName()
@@ -87,5 +90,8 @@ def biomero(request, conn=None, **kwargs):
         "app_name": "biomero",
         "importer_enabled": importer_enabled,
         "analyzer_enabled": analyzer_enabled,
+        "trainer_enabled": trainer_enabled,
+        "uploader_allowed_file_extensions": UPLOADER_ALLOWED_FILE_EXTENSIONS,
     }
+    context["main_js_dev_url"] = get_react_dev_server_asset_url("main.js")
     return context

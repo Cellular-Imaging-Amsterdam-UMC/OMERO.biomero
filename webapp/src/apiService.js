@@ -9,10 +9,21 @@ export const apiRequest = async (
   options = {},
 ) => {
   try {
+    // Include CSRF token for methods that modify data
+    const csrfToken = window.csrftoken;
+    const headers = options.headers || {};
+    if (
+      ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase()) &&
+      csrfToken
+    ) {
+      headers["X-CSRFToken"] = csrfToken;
+    }
+
     const response = await axios({
       url: `${window.location.origin}${endpoint}`,
       method,
       data,
+      headers,
       ...options,
     });
     return response.data;
@@ -246,10 +257,10 @@ export const postUpload = async (upload) => {
   }
 };
 
-export const runStardistTraining = async (params) => {
+export const runPredictionTraining = async (params) => {
   try {
     const csrfToken = window.csrftoken;
-    const endpoint = "/omero_biomero/api/stardist/train/";
+    const endpoint = "/omero_biomero/api/prediction/train/";
 
     const response = await apiRequest(endpoint, "POST", params, {
       headers: {
@@ -258,30 +269,22 @@ export const runStardistTraining = async (params) => {
     });
     return response;
   } catch (error) {
-    console.error("Error running stardist training:", error);
+    console.error("Error running prediction training:", error);
     throw error;
   }
 };
 
-export const fetchStardistModels = async () => {
+export const fetchPredictionModels = async () => {
   try {
-    const endpoint = "/omero_biomero/api/stardist/models/";
+    const endpoint = "/omero_biomero/api/prediction/models/";
     const response = await apiRequest(endpoint, "GET");
     return response.models || [];
   } catch (error) {
-    console.error("Error fetching stardist models:", error);
+    console.error("Error fetching prediction models:", error);
     // Return built-in defaults as fallback
     return [
-      {
-        value: "2D_versatile_fluo",
-        label: "2D_versatile_fluo (Built-in)",
-        type: "builtin",
-      },
-      {
-        value: "2D_versatile_he",
-        label: "2D_versatile_he (Built-in)",
-        type: "builtin",
-      },
+      { value: "2D_versatile_fluo", label: "2D_versatile_fluo (Built-in)", type: "builtin" },
+      { value: "2D_versatile_he", label: "2D_versatile_he (Built-in)", type: "builtin" },
       { value: "2D_demo", label: "2D_demo (Built-in)", type: "builtin" },
     ];
   }
@@ -290,7 +293,7 @@ export const fetchStardistModels = async () => {
 export const fetchImageChannels = async (imageId) => {
   if (!imageId) return { channels: [], sizeC: 0 };
   try {
-    const endpoint = `/omero_biomero/api/stardist/channels/?image=${imageId}`;
+    const endpoint = `/omero_biomero/api/prediction/channels/?image=${imageId}`;
     const response = await apiRequest(endpoint, "GET");
     return response;
   } catch (error) {
@@ -299,16 +302,32 @@ export const fetchImageChannels = async (imageId) => {
   }
 };
 
-export const runStardistPrediction = async (
-  imageId,
-  modelName,
-  channel = 0,
-  z = 0,
-  t = 0,
-) => {
+export const fetchImageRenderInfo = async (imageId) => {
+  if (!imageId) return null;
+  try {
+    const endpoint = `/webgateway/imgData/${imageId}/`;
+    return await apiRequest(endpoint, "GET");
+  } catch (error) {
+    console.error("Error fetching image render info:", error);
+    return null;
+  }
+};
+
+export const fetchChannelPlaneData = async (imageId, channel, z = 0, t = 0) => {
+  if (!imageId || channel == null) return null;
+  try {
+    const endpoint = `/omero_biomero/api/prediction/channel_plane/?image=${imageId}&channel=${channel}&z=${z}&t=${t}`;
+    return await apiRequest(endpoint, "GET");
+  } catch (error) {
+    console.error("Error fetching channel plane data:", error);
+    return null;
+  }
+};
+
+export const runPredictionPrediction = async (imageId, modelName, channel = 0, z = 0, t = 0) => {
   try {
     const csrfToken = window.csrftoken;
-    const endpoint = "/omero_biomero/api/stardist/predict/";
+    const endpoint = "/omero_biomero/api/prediction/predict/";
 
     const response = await apiRequest(
       endpoint,
@@ -322,40 +341,45 @@ export const runStardistPrediction = async (
     );
     return response;
   } catch (error) {
-    console.error("Error running stardist prediction:", error);
+    console.error("Error running prediction:", error);
     throw error;
   }
 };
 
-export const fetchMapAnnotations = async (imageId) => {
-  if (!imageId) return [];
-  // Use our custom endpoint that reads FileAnnotation
+export const fetchAnnotationSets = async (datasetId) => {
+  if (!datasetId) return { annotationSets: [] };
   try {
-    const endpoint = `/omero_biomero/api/stardist/fetch_annotations/?image=${imageId}`;
+    const endpoint = `/omero_biomero/api/prediction/annotation_sets/?dataset=${datasetId}`;
     const response = await apiRequest(endpoint, "GET");
-
-    // Response is just the data object { annotations: [], featureTypes: [] }
-    // We wrap it in a structure compatible with existing "fetch" return if needed?
-    // But let's just return the raw data and update AnnotationTab to handle it.
     return response;
   } catch (error) {
-    console.error("Error fetching annotations:", error);
-    return { annotations: [], featureTypes: [] };
+    console.error("Error fetching annotation sets:", error);
+    return { annotationSets: [] };
   }
 };
 
-export const saveMapAnnotation = async (
-  imageId,
-  annotationData,
-  annotationId = null,
-) => {
-  // New Implementation: Save as FileAnnotation via custom view
-  const endpoint = "/omero_biomero/api/stardist/save_annotations/";
+export const fetchMapAnnotations = async (datasetId, annotationSetId) => {
+  if (!datasetId || !annotationSetId) {
+    return { annotations: [], featureTypes: [], name: "", description: "" };
+  }
+  try {
+    const endpoint = `/omero_biomero/api/prediction/fetch_annotations/?dataset=${datasetId}&annotation=${annotationSetId}`;
+    const response = await apiRequest(endpoint, "GET");
+    return response;
+  } catch (error) {
+    console.error("Error fetching annotations:", error);
+    return { annotations: [], featureTypes: [], name: "", description: "" };
+  }
+};
+
+export const saveMapAnnotation = async (datasetId, annotationData, annotationId = null) => {
+  const endpoint = "/omero_biomero/api/prediction/save_annotations/";
   const csrfToken = window.csrftoken;
 
   try {
     const payload = {
-      imageId: imageId,
+      datasetId: datasetId,
+      annotationId: annotationId,
       data: annotationData,
     };
 
@@ -371,6 +395,7 @@ export const saveMapAnnotation = async (
     throw error;
   }
 };
+
 
 export const createContainer = async (
   type,
@@ -654,4 +679,28 @@ export const fetchPlateImages = async (plateId) => {
   }
 
   return allImages;
+};
+
+export const importUploadedFile = async (
+  filename,
+  datasetId,
+  datasetType,
+  group,
+  groupId
+) => {
+  const { urls } = getDjangoConstants();
+  console.log("importUploadedFile calling:", urls.api_import_uploaded_file, {
+    filename,
+    datasetId,
+    datasetType,
+    group,
+    groupId,
+  });
+  return apiRequest(urls.api_import_uploaded_file, "POST", {
+    filename,
+    datasetId,
+    datasetType,
+    group,
+    groupId,
+  });
 };

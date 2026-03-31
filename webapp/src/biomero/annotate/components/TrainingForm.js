@@ -7,7 +7,7 @@ const TrainingForm = ({ onTrain, loading }) => {
       batchSize: 4,
       valSplit: 0.15,
       patchSize: 256,
-      name: "my_stardist_model"
+      name: "my_prediction_model"
   });
 
   const handleChange = (key, value) => {

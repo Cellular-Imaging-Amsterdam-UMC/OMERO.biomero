@@ -15,7 +15,7 @@ import {
   Slider,
 } from "@blueprintjs/core";
 import {
-  runStardistPrediction,
+  runPredictionPrediction,
   saveAnnotateAnnotation,
   fetchAllImageAnnotations,
 } from "../../../apiService";
@@ -249,7 +249,7 @@ const PreviewViewer = ({
     setLoading(true);
     setError(null);
     try {
-      const result = await runStardistPrediction(
+      const result = await runPredictionPrediction(
         image.id,
         model,
         channel,
@@ -361,7 +361,7 @@ const PreviewViewer = ({
           t, // timepoint
           chIdx, // channel
           null, // patchOffset
-          "stardist_preview", // configName
+          "prediction_preview", // configName
         );
         saved++;
       }
