@@ -17,6 +17,7 @@ import {
   Icon,
 } from "@blueprintjs/core";
 import DatasetSelectWithPopover from "../../components/DatasetSelectWithPopover";
+import AnnotationSetPicker from "./AnnotationSetPicker";
 import { useAppContext } from "../../../AppContext";
 import {
   createAnnotateConfig,
@@ -74,6 +75,10 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
   const [wellFilterValues, setWellFilterValues] = useState("");
   const [wellFilters, setWellFilters] = useState({});
   const [wellFilterMode, setWellFilterMode] = useState("include");
+
+  // --- Set picker ---
+  const [isNewSet, setIsNewSet] = useState(false);
+  const [selectedTable, setSelectedTable] = useState(null);
 
   // --- State ---
   const [saving, setSaving] = useState(false);
@@ -173,7 +178,12 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
   const checkExistingTables = async (containerId) => {
     try {
       const result = await listTrackingTables(containerType, containerId);
-      setExistingTables(result.tables || []);
+      const tables = result.tables || [];
+      setExistingTables(tables);
+      if (tables.length === 0) {
+        setIsNewSet(true);
+        setSelectedTable(null);
+      }
     } catch (e) {
       console.error("Error checking existing tables:", e);
     }
@@ -510,6 +520,33 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
         )}
       </Card>
 
+      {/* Annotation Set Picker — shown when a container is selected */}
+      {containerIds.length > 0 && (
+        <Card>
+          <h5 className="bp5-heading mb-3">Annotation Set</h5>
+          <AnnotationSetPicker
+            tables={existingTables}
+            selectedTableId={selectedTable?.id || null}
+            onSelectTable={(table) => {
+              setSelectedTable(table);
+              setIsNewSet(false);
+              if (table) {
+                handleLoadExistingTable(table);
+              }
+            }}
+            onCreateNew={() => {
+              setSelectedTable(null);
+              setIsNewSet(true);
+              // Clear form for new set
+              setName("");
+              setStudyTitle("");
+              setStudyDescription("");
+            }}
+            loading={initializing}
+          />
+        </Card>
+      )}
+
       {/* Saved annotation configs */}
       {savedConfigs.length > 0 && (
         <Callout
@@ -584,6 +621,7 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
         </p>
       </Alert>
 
+      {(isNewSet || selectedTable) && (
       <div className="grid grid-cols-2 gap-4">
         {/* Left column: Workflow metadata + Annotation methodology */}
         <div className="flex flex-col gap-4">
@@ -981,6 +1019,7 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 };
