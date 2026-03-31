@@ -66,6 +66,7 @@ const AnnotateViewer = ({
   featureTypes,
   onFeatureTypesChange,
   channelInfo,
+  patch,
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -121,6 +122,12 @@ const AnnotateViewer = ({
       setContrastWindow({ start: 0, end: 255 });
     }
   }, [channelInfo, image?.id]);
+
+  // Patch viewport clipping
+  const patchOffsetX = patch ? Number(patch.patch_x || 0) : 0;
+  const patchOffsetY = patch ? Number(patch.patch_y || 0) : 0;
+  const patchWidth = patch ? Number(patch.patch_width) : null;
+  const patchHeight = patch ? Number(patch.patch_height) : null;
 
   // Build image URL with z/t/c support
   const Z = image?.z ?? 0;
@@ -515,11 +522,14 @@ const AnnotateViewer = ({
 
   const handleImageLoad = (e) => {
     if (canvasRef.current) {
-      canvasRef.current.width = e.target.naturalWidth;
-      canvasRef.current.height = e.target.naturalHeight;
+      const naturalW = e.target.naturalWidth;
+      const naturalH = e.target.naturalHeight;
+      // In patch mode, canvas covers only the patch sub-region
+      canvasRef.current.width = patchWidth !== null ? patchWidth : naturalW;
+      canvasRef.current.height = patchHeight !== null ? patchHeight : naturalH;
       setImageDims({
-        width: e.target.naturalWidth,
-        height: e.target.naturalHeight,
+        width: naturalW,
+        height: naturalH,
       });
       draw();
     }
@@ -932,21 +942,64 @@ const AnnotateViewer = ({
           }}
           className="inline-block origin-top-left relative"
         >
-          <img
-            src={imageUrl}
-            alt="work"
-            className="block pointer-events-none select-none max-w-none"
-            onLoad={handleImageLoad}
-          />
-          <canvas
-            ref={canvasRef}
-            className="absolute top-0 left-0 w-full h-full"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onContextMenu={handleContextMenu}
-          />
+          {patch ? (
+            // Patch mode: clip container to patch dimensions, shift full image underneath
+            <div
+              style={{
+                width: patchWidth,
+                height: patchHeight,
+                overflow: "hidden",
+                position: "relative",
+              }}
+            >
+              <img
+                src={imageUrl}
+                alt="work"
+                style={{
+                  transform: `translate(-${patchOffsetX}px, -${patchOffsetY}px)`,
+                  display: "block",
+                  pointerEvents: "none",
+                  userSelect: "none",
+                  maxWidth: "none",
+                }}
+                onLoad={handleImageLoad}
+              />
+              <canvas
+                ref={canvasRef}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onContextMenu={handleContextMenu}
+              />
+            </div>
+          ) : (
+            // Normal mode: full image
+            <>
+              <img
+                src={imageUrl}
+                alt="work"
+                className="block pointer-events-none select-none max-w-none"
+                onLoad={handleImageLoad}
+              />
+              <canvas
+                ref={canvasRef}
+                className="absolute top-0 left-0 w-full h-full"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onContextMenu={handleContextMenu}
+              />
+            </>
+          )}
         </div>
 
         {/* Zoom Controls */}
