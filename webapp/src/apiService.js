@@ -596,6 +596,11 @@ export const markUnitProcessed = async (tableId, unitIndex) => {
   return await apiRequest("/omero_biomero/api/annotate/mark_processed/", "POST", payload);
 };
 
+export const addPatchToTrackingTable = async (tableId, imageId, imageName, patchX, patchY, patchWidth, patchHeight, category = "training") => {
+  const payload = { table_id: tableId, image_id: imageId, image_name: imageName, patch_x: patchX, patch_y: patchY, patch_width: patchWidth, patch_height: patchHeight, category };
+  return await apiRequest("/omero_biomero/api/annotate/add_patch/", "POST", payload);
+};
+
 // ---------------------------------------------------------------------------
 // SAM endpoints
 // ---------------------------------------------------------------------------

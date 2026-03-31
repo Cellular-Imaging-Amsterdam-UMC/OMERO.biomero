@@ -997,6 +997,146 @@ def _update_tracking_table_row(conn, lib, table_id, unit_index, roi_id, label_id
 
 
 @login_required()
+@require_POST
+def add_patch(request, conn=None, **kwargs):
+    """Add a patch (sub-region) to the tracking table for an image.
+
+    POST JSON body:
+        table_id: int — tracking table ID
+        image_id: int — source image ID
+        image_name: str — source image name
+        patch_x: int — X offset of patch
+        patch_y: int — Y offset of patch
+        patch_width: int — width of patch
+        patch_height: int — height of patch
+        category: str — "training", "validation", or "test" (optional, defaults to "training")
+
+    Returns JSON:
+        success: bool
+        table_id: int — new table ID (may change)
+        unit_index: int — index of the new row
+    """
+    lib = _get_omero_annotate_ai()
+    if not lib:
+        err = _get_omero_annotate_ai._last_error or "unknown"
+        return JsonResponse(
+            {"error": f"omero_annotate_ai not available: {err}"}, status=500
+        )
+
+    try:
+        import ezomero
+        import pandas as pd
+
+        data = json.loads(request.body)
+
+        # Validate required fields
+        required = ["table_id", "image_id", "image_name", "patch_x", "patch_y", "patch_width", "patch_height"]
+        missing = [f for f in required if data.get(f) is None]
+        if missing:
+            return JsonResponse(
+                {"error": f"Missing required fields: {', '.join(missing)}"},
+                status=400,
+            )
+
+        table_id = int(data["table_id"])
+        image_id = int(data["image_id"])
+        image_name = str(data["image_name"])
+        patch_x = int(data["patch_x"])
+        patch_y = int(data["patch_y"])
+        patch_width = int(data["patch_width"])
+        patch_height = int(data["patch_height"])
+        category = str(data.get("category", "training"))
+
+        # Load existing tracking table
+        table_data = ezomero.get_table(conn, table_id)
+        if table_data is None:
+            return JsonResponse({"error": "Table not found"}, status=404)
+
+        # Determine train/validate flags from category
+        is_train = category in ("training",)
+        is_validate = category == "validation"
+
+        # Build a new row matching the tracking table schema.
+        # Use existing columns as a template, filling defaults for unknown columns.
+        new_row = {}
+        for col in table_data.columns:
+            new_row[col] = None
+
+        new_row["image_id"] = image_id
+        new_row["image_name"] = image_name
+        new_row["is_patch"] = True
+        new_row["patch_x"] = patch_x
+        new_row["patch_y"] = patch_y
+        new_row["patch_width"] = patch_width
+        new_row["patch_height"] = patch_height
+        new_row["processed"] = False
+        new_row["train"] = is_train
+        new_row["validate"] = is_validate
+        new_row["roi_id"] = ""
+        new_row["label_id"] = ""
+        new_row["annotation_created_at"] = ""
+        new_row["annotation_updated_at"] = ""
+
+        # Fill remaining None values with sensible defaults based on dtype
+        for col in table_data.columns:
+            if new_row.get(col) is None:
+                dtype = table_data[col].dtype
+                if pd.api.types.is_bool_dtype(dtype):
+                    new_row[col] = False
+                elif pd.api.types.is_integer_dtype(dtype):
+                    new_row[col] = 0
+                elif pd.api.types.is_float_dtype(dtype):
+                    new_row[col] = 0.0
+                else:
+                    new_row[col] = ""
+
+        # Append the new row
+        new_row_df = pd.DataFrame([new_row])
+        updated_table = pd.concat([table_data, new_row_df], ignore_index=True)
+        unit_index = len(updated_table) - 1
+
+        # Find the container linked to this FileAnnotation
+        file_ann = conn.getObject("FileAnnotation", table_id)
+        if not file_ann:
+            return JsonResponse({"error": "Tracking table FileAnnotation not found"}, status=404)
+
+        links = list(conn.getAnnotationLinks("Dataset", ann_ids=[table_id]))
+        container_type = "dataset"
+        if not links:
+            links = list(conn.getAnnotationLinks("Plate", ann_ids=[table_id]))
+            container_type = "plate"
+
+        if not links:
+            logger.warning("No container links found for table %d", table_id)
+            return JsonResponse({"error": "No container linked to tracking table"}, status=500)
+
+        container_id = links[0].getParent().getId()
+        table_title = file_ann.getFileName() or "annotate_ai_table"
+
+        new_table_id = lib["create_or_replace_tracking_table"](
+            conn,
+            config_df=updated_table,
+            table_title=table_title,
+            container_type=container_type,
+            container_id=container_id,
+            existing_table_id=table_id,
+        )
+
+        return JsonResponse(
+            {
+                "success": True,
+                "table_id": new_table_id,
+                "unit_index": unit_index,
+            }
+        )
+    except KeyError as e:
+        return JsonResponse({"error": f"Missing required field: {e}"}, status=400)
+    except Exception as e:
+        logger.error("Error adding patch to tracking table", exc_info=True)
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@login_required()
 @require_GET
 def fetch_annotation(request, conn=None, **kwargs):
     """Fetch existing annotations for an image from OMERO.
