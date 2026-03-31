@@ -50,6 +50,9 @@ def _get_omero_annotate_ai():
             upload_annotation_config_to_omero,
             upload_rois_and_labels,
         )
+        from omero_annotate_ai.omero.omero_utils import (
+            list_annotations_by_namespace,
+        )
 
         return {
             "AnnotationConfig": AnnotationConfig,
@@ -69,6 +72,7 @@ def _get_omero_annotate_ai():
             "sync_omero_table_to_config": sync_omero_table_to_config,
             "upload_annotation_config_to_omero": upload_annotation_config_to_omero,
             "upload_rois_and_labels": upload_rois_and_labels,
+            "list_annotations_by_namespace": list_annotations_by_namespace,
         }
     except Exception as e:
         logger.error("omero_annotate_ai import failed: %s", e, exc_info=True)
@@ -78,6 +82,35 @@ def _get_omero_annotate_ai():
 
 
 _get_omero_annotate_ai._last_error = None
+
+
+CONFIG_NS = "openmicroscopy.org/omero/annotate/config"
+
+
+def _upload_config_yaml(conn, lib, config, container_type, container_id):
+    """Save config as YAML FileAnnotation, replacing any previous config attachments."""
+    # Delete existing config YAML FileAnnotations to avoid accumulating temp files
+    try:
+        existing = lib["list_annotations_by_namespace"](
+            conn, container_type.capitalize(), container_id, CONFIG_NS
+        )
+        if existing:
+            ann_ids = [a["id"] for a in existing]
+            conn.deleteObjects("FileAnnotation", ann_ids, wait=True)
+    except Exception:
+        logger.debug("Could not clean up old config annotations", exc_info=True)
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
+        config.save_yaml(tmp.name)
+        tmp_path = tmp.name
+    try:
+        ann_id = lib["upload_annotation_config_to_omero"](
+            conn, container_type, container_id, tmp_path
+        )
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+    return ann_id
 
 
 def _geojson_namespace(table_id):
@@ -342,18 +375,8 @@ def _save_config(request, conn):
                 group_id = container.getDetails().getGroup().getId()
                 conn.SERVICE_OPTS.setOmeroGroup(group_id)
 
-        # Save YAML as FileAnnotation on container
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
-            config.save_yaml(tmp.name)
-            tmp_path = tmp.name
-
-        try:
-            ann_id = lib["upload_annotation_config_to_omero"](
-                conn, container_type, primary_id, tmp_path
-            )
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+        # Save YAML as FileAnnotation on container (replaces previous)
+        ann_id = _upload_config_yaml(conn, lib, config, container_type, primary_id)
 
         return JsonResponse(
             {
@@ -470,17 +493,8 @@ def _create_tracking_table(request, conn):
 
         config.omero.table_id = table_id
 
-        # Also save config YAML
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
-            config.save_yaml(tmp.name)
-            tmp_path = tmp.name
-        try:
-            lib["upload_annotation_config_to_omero"](
-                conn, container_type, primary_id, tmp_path
-            )
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+        # Save config YAML (replaces previous)
+        _upload_config_yaml(conn, lib, config, container_type, primary_id)
 
         # Build response with processing units summary
         units = []
