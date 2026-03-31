@@ -18,6 +18,7 @@ const AnnotateTab = ({
   progress: initialProgress,
   onProgressUpdate,
   onUnitsUpdate,
+  onTableIdUpdate,
 }) => {
   const { toaster } = useAppContext();
 
@@ -168,6 +169,14 @@ const AnnotateTab = ({
       );
 
       if (result.success) {
+        // The backend recreates the tracking table (delete + create) so the
+        // table ID may change.  Update parent state so subsequent calls use
+        // the new ID.
+        const currentTableId = result.table_id ?? tableId;
+        if (result.table_id && result.table_id !== tableId) {
+          onTableIdUpdate?.(result.table_id);
+        }
+
         toaster?.show({
           message: `Annotation saved (ROI: ${result.roi_id}, Label: ${result.label_id})`,
           intent: "success",
@@ -185,8 +194,8 @@ const AnnotateTab = ({
         setUnits(updatedUnits);
         onUnitsUpdate?.(updatedUnits);
 
-        // Update progress
-        const progressResult = await getAnnotateProgress(tableId);
+        // Update progress using the (possibly new) table ID
+        const progressResult = await getAnnotateProgress(currentTableId);
         onProgressUpdate?.(progressResult);
 
         // Move to next pending unit

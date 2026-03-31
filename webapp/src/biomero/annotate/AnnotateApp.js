@@ -143,6 +143,7 @@ const AnnotateApp = () => {
                 progress={progress}
                 onProgressUpdate={handleProgressUpdate}
                 onUnitsUpdate={handleUnitsUpdate}
+                onTableIdUpdate={setTableId}
               />
             }
             />

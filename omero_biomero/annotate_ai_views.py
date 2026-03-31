@@ -773,8 +773,9 @@ def save_annotation(request, conn=None, **kwargs):
         _save_geojson_file_ann(conn, image_id, data["annotations"], namespace)
 
         # Update tracking table if provided
+        new_table_id = int(table_id) if table_id is not None else None
         if table_id is not None and unit_index is not None:
-            _update_tracking_table_row(
+            new_table_id = _update_tracking_table_row(
                 conn, lib, int(table_id), int(unit_index), roi_id, label_id
             )
 
@@ -784,6 +785,7 @@ def save_annotation(request, conn=None, **kwargs):
                 "label_id": label_id,
                 "roi_id": roi_id,
                 "namespace": namespace,
+                "table_id": new_table_id,
             }
         )
     except KeyError as e:
@@ -882,6 +884,11 @@ def _update_tracking_table_row(conn, lib, table_id, unit_index, roi_id, label_id
         unit_index: row index in the table to update
         roi_id: OMERO ROI ID created for the annotation
         label_id: OMERO FileAnnotation ID for the label file
+
+    Returns:
+        The new table ID (may differ from *table_id* because
+        ``create_or_replace_tracking_table`` deletes and recreates the table),
+        or *table_id* unchanged if the update could not be performed.
     """
     try:
         from datetime import datetime
@@ -892,7 +899,7 @@ def _update_tracking_table_row(conn, lib, table_id, unit_index, roi_id, label_id
         table_data = ezomero.get_table(conn, table_id)
         if table_data is None or unit_index >= len(table_data):
             logger.warning("Could not update tracking table row %d", unit_index)
-            return
+            return table_id
 
         table_data.at[unit_index, "processed"] = True
         table_data.at[unit_index, "roi_id"] = str(roi_id) if roi_id else "None"
@@ -907,7 +914,7 @@ def _update_tracking_table_row(conn, lib, table_id, unit_index, roi_id, label_id
         file_ann = conn.getObject("FileAnnotation", table_id)
         if not file_ann:
             logger.warning("FileAnnotation %d not found for tracking table", table_id)
-            return
+            return table_id
 
         # Look up container from annotation links
         links = list(conn.getAnnotationLinks("Dataset", ann_ids=[table_id]))
@@ -918,12 +925,12 @@ def _update_tracking_table_row(conn, lib, table_id, unit_index, roi_id, label_id
 
         if not links:
             logger.warning("No container links found for table %d", table_id)
-            return
+            return table_id
 
         container_id = links[0].getParent().getId()
         table_title = file_ann.getFileName() or "annotate_ai_table"
 
-        lib["create_or_replace_tracking_table"](
+        new_table_id = lib["create_or_replace_tracking_table"](
             conn,
             config_df=table_data,
             table_title=table_title,
@@ -931,8 +938,10 @@ def _update_tracking_table_row(conn, lib, table_id, unit_index, roi_id, label_id
             container_id=container_id,
             existing_table_id=table_id,
         )
+        return new_table_id
     except Exception as e:
         logger.error("Error updating tracking table row: %s", e, exc_info=True)
+        return table_id
 
 
 @login_required()
