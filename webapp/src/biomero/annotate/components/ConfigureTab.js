@@ -17,16 +17,14 @@ import {
   Icon,
 } from "@blueprintjs/core";
 import DatasetSelectWithPopover from "../../components/DatasetSelectWithPopover";
-import AnnotationSetPicker from "./AnnotationSetPicker";
 import { useAppContext } from "../../../AppContext";
 import {
-  createAnnotateConfig,
-  createTrackingTable,
-  listTrackingTables,
-  loadAnnotateConfig,
+  saveManifest,
+  listManifests,
+  loadManifest,
+  deleteManifest,
   getAnnotateImageChannels,
   getContainerImages,
-  deleteTrackingTable,
 } from "../../../apiService";
 
 const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
@@ -78,18 +76,18 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
 
   // --- Set picker ---
   const [isNewSet, setIsNewSet] = useState(false);
-  const [selectedTable, setSelectedTable] = useState(null);
+  const [selectedManifest, setSelectedManifest] = useState(null);
 
   // --- State ---
   const [saving, setSaving] = useState(false);
   const [initializing, setInitializing] = useState(false);
-  const [existingTables, setExistingTables] = useState([]);
+  const [existingManifests, setExistingManifests] = useState([]);
   const [savedConfigs, setSavedConfigs] = useState([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showMethodology, setShowMethodology] = useState(false);
   const [imageChannelInfo, setImageChannelInfo] = useState(null);
   const [containerImages, setContainerImages] = useState([]);
-  const [tableToDelete, setTableToDelete] = useState(null);
+  const [manifestToDelete, setManifestToDelete] = useState(null);
 
   // Parse container IDs from selection
   useEffect(() => {
@@ -103,11 +101,8 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
 
     // Check for existing tables and saved configs when container changes
     if (ids.length > 0) {
-      checkExistingTables(ids[0]);
+      checkExistingManifests(ids[0]);
       loadContainerImages(ids[0]);
-      loadAnnotateConfig(containerType, ids[0])
-        .then((result) => setSavedConfigs(result.configs || []))
-        .catch(() => setSavedConfigs([]));
     } else {
       setSavedConfigs([]);
     }
@@ -175,17 +170,17 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingConfig]);
 
-  const checkExistingTables = async (containerId) => {
+  const checkExistingManifests = async (containerId) => {
     try {
-      const result = await listTrackingTables(containerType, containerId);
-      const tables = result.tables || [];
-      setExistingTables(tables);
-      if (tables.length === 0) {
+      const result = await listManifests(containerType, containerId);
+      const sets = result.manifests || [];
+      setExistingManifests(sets);
+      if (sets.length === 0) {
         setIsNewSet(true);
-        setSelectedTable(null);
+        setSelectedManifest(null);
       }
     } catch (e) {
-      console.error("Error checking existing tables:", e);
+      console.error("Error checking existing manifests:", e);
     }
   };
 
@@ -320,7 +315,8 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
     setSaving(true);
     try {
       const configData = buildConfigData();
-      await createAnnotateConfig(configData);
+      // Validate by attempting a dry save (config is validated by pydantic on the backend)
+      await saveManifest(containerType, containerIds[0], configData);
       const warningNote = warnings.length > 0 ? ` (warning: ${warnings[0]})` : "";
       toaster?.show({
         message: `Configuration valid and saved${warningNote}`,
@@ -338,15 +334,15 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
     }
   };
 
-  const handleDeleteTable = async (table) => {
+  const handleDeleteManifest = async (manifest) => {
     try {
-      await deleteTrackingTable(table.id);
-      setExistingTables((prev) => prev.filter((t) => t.id !== table.id));
-      toaster?.show({ message: `Deleted table: ${table.name}`, intent: "success" });
+      await deleteManifest(containerType, containerIds[0], manifest.set_id);
+      setExistingManifests((prev) => prev.filter((m) => m.set_id !== manifest.set_id));
+      toaster?.show({ message: `Deleted: ${manifest.name}`, intent: "success" });
     } catch (e) {
       toaster?.show({ message: `Failed to delete: ${e.message}`, intent: "danger" });
     } finally {
-      setTableToDelete(null);
+      setManifestToDelete(null);
     }
   };
 
@@ -361,18 +357,13 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
     setInitializing(true);
     try {
       const configData = buildConfigData();
-      const result = await createTrackingTable(configData);
+      const result = await saveManifest(containerType, containerIds[0], configData);
       if (result.success) {
         toaster?.show({
-          message: `Tracking table created with ${result.units.length} processing units`,
+          message: `Annotation set created`,
           intent: "success",
         });
-        onConfigCreated(
-          configData,
-          result.table_id,
-          result.units,
-          result.progress,
-        );
+        onConfigCreated(configData, result.set_id);
       }
     } catch (e) {
       console.error("Error initializing:", e);
@@ -384,22 +375,6 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
     } finally {
       setInitializing(false);
     }
-  };
-
-  const handleLoadExistingTable = async (table) => {
-    // Load existing table and switch to annotate tab
-    toaster?.show({
-      message: `Resuming from table: ${table.name}`,
-      intent: "primary",
-    });
-    // We pass a minimal config and the existing table
-    const configData = buildConfigData();
-    onConfigCreated(configData, table.id, [], {
-      total_units: 0,
-      completed_units: 0,
-      pending_units: 0,
-      progress_percent: 0,
-    });
   };
 
   return (
@@ -520,30 +495,38 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
         )}
       </Card>
 
-      {/* Annotation Set Picker — shown when a container is selected */}
-      {containerIds.length > 0 && (
+      {/* Annotation Set List — shown when a container is selected */}
+      {containerIds.length > 0 && existingManifests.length > 0 && (
         <Card>
-          <h5 className="bp5-heading mb-3">Annotation Set</h5>
-          <AnnotationSetPicker
-            tables={existingTables}
-            selectedTableId={selectedTable?.id || null}
-            onSelectTable={(table) => {
-              setSelectedTable(table);
-              setIsNewSet(false);
-              if (table) {
-                handleLoadExistingTable(table);
-              }
-            }}
-            onCreateNew={() => {
-              setSelectedTable(null);
-              setIsNewSet(true);
-              // Clear form for new set
-              setName("");
-              setStudyTitle("");
-              setStudyDescription("");
-            }}
-            loading={initializing}
-          />
+          <h5 className="bp5-heading mb-3">Existing Annotation Sets</h5>
+          <div className="flex flex-col gap-2">
+            {existingManifests.map((m) => (
+              <div key={m.set_id} className="flex items-center justify-between p-2 border rounded">
+                <div>
+                  <div className="font-medium text-sm">{m.name}</div>
+                  <div className="text-xs text-gray-500">
+                    {m.progress?.completed || 0}/{m.progress?.total || 0} units
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    small
+                    intent="primary"
+                    onClick={() => onConfigCreated(null, m.set_id)}
+                  >
+                    Resume
+                  </Button>
+                  <Button
+                    small
+                    intent="danger"
+                    minimal
+                    icon="trash"
+                    onClick={() => setManifestToDelete(m)}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </Card>
       )}
 
@@ -574,54 +557,22 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
       )}
 
       {/* Existing tables notice */}
-      {existingTables.length > 0 && (
-        <Callout
-          intent="primary"
-          icon="info-sign"
-          title="Existing annotation tables found"
-        >
-          <p>
-            Found {existingTables.length} existing table(s) on this container.
-            Resume one or delete it to start fresh:
-          </p>
-          <div className="flex flex-col gap-2 mt-2">
-            {existingTables.map((table) => (
-              <div key={table.id} className="flex items-center gap-2">
-                <Button
-                  small
-                  outlined
-                  icon="repeat"
-                  text={table.name}
-                  onClick={() => handleLoadExistingTable(table)}
-                />
-                <Button
-                  small
-                  minimal
-                  icon="trash"
-                  intent="danger"
-                  onClick={() => setTableToDelete(table)}
-                />
-              </div>
-            ))}
-          </div>
-        </Callout>
-      )}
       <Alert
-        isOpen={tableToDelete !== null}
-        onCancel={() => setTableToDelete(null)}
-        onConfirm={() => handleDeleteTable(tableToDelete)}
+        isOpen={manifestToDelete !== null}
+        onCancel={() => setManifestToDelete(null)}
+        onConfirm={() => handleDeleteManifest(manifestToDelete)}
         intent="danger"
         icon="trash"
         cancelButtonText="Cancel"
         confirmButtonText="Delete"
       >
         <p>
-          Delete tracking table <strong>{tableToDelete?.name}</strong>? This
+          Delete tracking table <strong>{manifestToDelete?.name}</strong>? This
           cannot be undone.
         </p>
       </Alert>
 
-      {(isNewSet || selectedTable) && (
+      {(isNewSet || selectedManifest) && (
       <div className="grid grid-cols-2 gap-4">
         {/* Left column: Workflow metadata + Annotation methodology */}
         <div className="flex flex-col gap-4">
