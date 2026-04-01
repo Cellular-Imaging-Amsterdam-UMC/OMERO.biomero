@@ -48,19 +48,24 @@ const AnnotateApp = () => {
   // Called by ConfigureTab when a new set is created or an existing one is resumed
   const handleConfigCreated = useCallback(async (configData, newSetId) => {
     setSetId(newSetId);
-    if (configData) {
+    // If configData has annotations populated, use it directly (new set from server response)
+    if (configData?.annotations?.length > 0) {
       setManifest(configData);
-    } else if (newSetId) {
-      // Resume — load full manifest from server
-      try {
-        const containerType = configData?.omero?.container_type || "dataset";
-        const containerId = configData?.omero?.container_id || configData?.omero?.container_ids?.[0];
-        if (containerId) {
+    } else {
+      // Resume or new set without units — load full manifest from server
+      const containerType = configData?.omero?.container_type || "dataset";
+      const containerId = configData?.omero?.container_id || configData?.omero?.container_ids?.[0];
+      if (containerId && newSetId) {
+        try {
           const result = await loadManifest(containerType, containerId, newSetId);
           setManifest(result.config);
+        } catch (e) {
+          console.error("Failed to load manifest:", e);
+          // Fall back to whatever we have
+          if (configData) setManifest(configData);
         }
-      } catch (e) {
-        console.error("Failed to load manifest:", e);
+      } else if (configData) {
+        setManifest(configData);
       }
     }
     setActiveTab("annotate");

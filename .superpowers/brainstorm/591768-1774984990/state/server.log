@@ -1,0 +1,2 @@
+{"type":"server-started","port":51237,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:51237","screen_dir":"/var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero/.superpowers/brainstorm/591768-1774984990/content","state_dir":"/var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero/.superpowers/brainstorm/591768-1774984990/state"}
+{"type":"server-stopped","reason":"idle timeout"}

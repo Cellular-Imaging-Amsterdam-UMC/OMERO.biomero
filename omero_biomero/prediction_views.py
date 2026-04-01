@@ -225,6 +225,12 @@ def get_image_channels(request, conn=None, **kwargs):
                 "name": ch.getLabel(),
                 "color": color.getHtml() if color else "#ffffff",
                 "active": ch.isActive(),
+                "window": {
+                    "start": ch.getWindowStart(),
+                    "end": ch.getWindowEnd(),
+                    "min": ch.getWindowMin(),
+                    "max": ch.getWindowMax(),
+                },
             })
 
         return JsonResponse({

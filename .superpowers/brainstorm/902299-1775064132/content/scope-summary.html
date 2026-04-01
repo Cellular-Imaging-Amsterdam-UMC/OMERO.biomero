@@ -1,0 +1,57 @@
+<h2>Full Scope Summary</h2>
+<p class="subtitle">Clean slate — no backward compatibility, no legacy code paths</p>
+
+<div class="section">
+  <h3>1. omero_annotate_ai Package</h3>
+  <table style="width:100%; border-collapse:collapse; font-size:14px;">
+    <tr style="background:#f0f0f0;"><th style="text-align:left;padding:8px;">Change</th><th style="text-align:left;padding:8px;">Details</th></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Add ChannelPresentation model</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">channel_index, visible, contrast_start, contrast_end, color — nested in ImageAnnotation</td></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Add to_json() / from_json()</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">Primary serialization for AnnotationConfig. JSON FileAnnotation on dataset.</td></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Add OMERO persistence</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">save_manifest_to_omero() / load_manifest_from_omero() — JSON FileAnnotation with meaningful filename</td></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Add GeoJSON helpers</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">save_geojson_to_omero() / load_geojson_from_omero() — per-image, accumulates patches</td></tr>
+    <tr><td style="padding:8px;">Tests for all new models and methods</td><td style="padding:8px;">In tests/test_config.py per CLAUDE.md guidelines</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <h3>2. OMERO.biomero Backend</h3>
+  <table style="width:100%; border-collapse:collapse; font-size:14px;">
+    <tr style="background:#f0f0f0;"><th style="text-align:left;padding:8px;">Change</th><th style="text-align:left;padding:8px;">Details</th></tr>
+    <tr style="background:#e8f5e9;"><td style="padding:8px;border-bottom:1px solid #eee;"><strong>New: save_manifest</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">POST — serialize AnnotationConfig to JSON FileAnnotation</td></tr>
+    <tr style="background:#e8f5e9;"><td style="padding:8px;border-bottom:1px solid #eee;"><strong>New: load_manifest</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">GET — load by set_id from dataset</td></tr>
+    <tr style="background:#e8f5e9;"><td style="padding:8px;border-bottom:1px solid #eee;"><strong>New: list_manifests</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">GET — list annotation sets for a dataset</td></tr>
+    <tr style="background:#e8f5e9;"><td style="padding:8px;border-bottom:1px solid #eee;"><strong>New: delete_manifest</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">POST — delete manifest + GeoJSON files</td></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Simplify: save_annotation</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">GeoJSON only. No ROI, no label TIFF, no table update. Accumulates patches.</td></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Simplify: fetch_annotation</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">GeoJSON by namespace only. No ROI fallback.</td></tr>
+    <tr style="background:#ffebee;"><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Remove: manage_config</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">YAML upload/download — replaced by manifest</td></tr>
+    <tr style="background:#ffebee;"><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Remove: create_tracking_table</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">OMERO table creation — replaced by manifest</td></tr>
+    <tr style="background:#ffebee;"><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Remove: fetchAllImageAnnotations</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">The leaky no-namespace ROI loader</td></tr>
+    <tr style="background:#ffebee;"><td style="padding:8px;"><strong>Remove: save_annotations (prediction)</strong></td><td style="padding:8px;">MapAnnotation save — prediction app untouched for now</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <h3>3. OMERO.biomero Frontend</h3>
+  <table style="width:100%; border-collapse:collapse; font-size:14px;">
+    <tr style="background:#f0f0f0;"><th style="text-align:left;padding:8px;">Change</th><th style="text-align:left;padding:8px;">Details</th></tr>
+    <tr style="background:#e8f5e9;"><td style="padding:8px;border-bottom:1px solid #eee;"><strong>New: shared/ directory</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">7 deduplicated components: GeometryUtils, ChannelSelector, ImageSelector, ModelSelector, PatchSelector, TrainingForm, ImageChannelControls</td></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Upgrade: ImageChannelControls</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">Use prediction's version: 0-100% scales, auto-scale, numeric inputs, channel locking, RangeSlider</td></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Upgrade: AnnotateViewer</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">Add append mode + appendToAnnotations() from prediction</td></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Simplify: AnnotateTab</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">Uses manifest API. Simple unit list sidebar (no TrackingTableView). "Add Patch" updates manifest.</td></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Simplify: ConfigureTab</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">Creates manifest. No tracking table. Read-only for active sets.</td></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Simplify: PreviewViewer</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">Remove fetchAllImageAnnotations. GeoJSON overlay by namespace only.</td></tr>
+    <tr style="background:#ffebee;"><td style="padding:8px;border-bottom:1px solid #eee;"><strong>Remove: TrackingTableView</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">Replaced by simpler unit list reading from manifest</td></tr>
+    <tr style="background:#ffebee;"><td style="padding:8px;"><strong>Remove: AnnotationSetPicker</strong></td><td style="padding:8px;">Replaced by manifest list in ConfigureTab</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <h3>4. What We Don't Touch</h3>
+  <table style="width:100%; border-collapse:collapse; font-size:14px;">
+    <tr style="background:#f0f0f0;"><th style="text-align:left;padding:8px;">Item</th><th style="text-align:left;padding:8px;">Reason</th></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;">Prediction app</td><td style="padding:8px;border-bottom:1px solid #eee;">Stays as-is, clean up later</td></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;">TrainingBiomeroTab</td><td style="padding:8px;border-bottom:1px solid #eee;">Reads from manifest instead of table — minimal change</td></tr>
+    <tr><td style="padding:8px;border-bottom:1px solid #eee;">SAM integration</td><td style="padding:8px;border-bottom:1px solid #eee;">Already in AnnotateViewer, untouched</td></tr>
+    <tr><td style="padding:8px;">Z/T navigation</td><td style="padding:8px;">Already works in both PreviewViewers, AnnotateViewer locked to unit</td></tr>
+  </table>
+</div>

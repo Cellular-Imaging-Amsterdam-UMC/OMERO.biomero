@@ -1,0 +1,53 @@
+<h2>Annotation Tab Redesign</h2>
+<p class="subtitle">Issues #1, #2, #3 — Patch listing, Skip/Done flow, ROI cleanup</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Current: Flat List + 3 Buttons</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 13px; padding: 16px;">
+      <div style="display:flex; gap:8px; margin-bottom:16px;">
+        <button class="mock-button" style="font-size:11px;">Done (empty)</button>
+        <button class="mock-button" style="font-size:11px; background:#2563eb; color:white;">Save & Next</button>
+        <button class="mock-button" style="font-size:11px;">Skip</button>
+      </div>
+      <div style="border:1px solid #444; border-radius:6px; padding:8px;">
+        <div style="font-weight:bold; margin-bottom:8px; color:#aaa;">Units</div>
+        <div style="padding:6px 8px; background:#333; border-radius:4px; margin-bottom:4px; color:#eee;">Image_001.tif</div>
+        <div style="padding:6px 8px; background:#1e3a5f; border-radius:4px; margin-bottom:4px; color:#eee; border-left: 3px solid #3b82f6;">↳ Patch (0, 0) ✓</div>
+        <div style="padding:6px 8px; background:#333; border-radius:4px; margin-bottom:4px; color:#eee;">↳ Patch (512, 0)</div>
+        <div style="padding:6px 8px; background:#333; border-radius:4px; margin-bottom:4px; color:#eee;">Image_002.tif</div>
+        <div style="padding:6px 8px; background:#333; border-radius:4px; margin-bottom:4px; color:#eee;">↳ Patch (0, 0)</div>
+        <div style="padding:6px 8px; background:#333; border-radius:4px; margin-bottom:4px; color:#eee;">↳ Patch (256, 256)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">Proposed: Grouped List + 2 Buttons + Popover</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 13px; padding: 16px;">
+      <div style="display:flex; gap:8px; margin-bottom:16px;">
+        <button class="mock-button" style="font-size:11px; background:#2563eb; color:white;">Save & Next</button>
+        <button class="mock-button" style="font-size:11px;">Skip ▾</button>
+      </div>
+      <!-- Popover -->
+      <div style="position:relative; display:inline-block; margin-bottom:16px; margin-left:100px;">
+        <div style="background:#1e293b; border:1px solid #475569; border-radius:8px; padding:8px; width: 180px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+          <div style="padding:8px; border-radius:4px; color:#eee; cursor:pointer; font-size:12px;">⏭ Skip for now</div>
+          <div style="padding:8px; border-radius:4px; color:#eee; cursor:pointer; font-size:12px; background:#334155;">🚫 No labels (done)</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #444; border-radius:6px; padding:8px;">
+        <div style="font-weight:bold; margin-bottom:8px; color:#aaa;">Units</div>
+        <div style="padding:4px 8px; color:#94a3b8; font-size:11px; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer;">Image_001.tif</div>
+        <div style="padding:6px 8px 6px 24px; background:#1e3a5f; border-radius:4px; margin-bottom:2px; color:#eee; border-left: 3px solid #3b82f6; font-size:12px;">Patch (0, 0) <span style="color:#4ade80;">✓</span></div>
+        <div style="padding:6px 8px 6px 24px; background:#333; border-radius:4px; margin-bottom:2px; color:#eee; font-size:12px;">Patch (512, 0)</div>
+        <div style="padding:4px 8px; color:#94a3b8; font-size:11px; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px; margin-top:8px; cursor:pointer;">Image_002.tif</div>
+        <div style="padding:6px 8px 6px 24px; background:#333; border-radius:4px; margin-bottom:2px; color:#eee; font-size:12px;">Patch (0, 0)</div>
+        <div style="padding:6px 8px 6px 24px; background:#333; border-radius:4px; margin-bottom:2px; color:#eee; font-size:12px;">Patch (256, 256)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top:24px; color:#94a3b8; font-size:14px;"><strong>Changes:</strong> (1) Image names are group headers, patches indented below. (2) "Done (empty)" removed — "Skip" button opens popover with "Skip for now" / "No labels (done)". (3) After all units completed, Save & Next is disabled to prevent duplicate ROI creation.</p>

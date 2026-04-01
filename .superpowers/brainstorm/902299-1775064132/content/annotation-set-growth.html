@@ -1,0 +1,77 @@
+<h2>How should annotation sets grow over time?</h2>
+<p class="subtitle">Currently: ConfigureTab creates units upfront, AnnotateTab has a separate "Add Patch" button. Two mechanisms, confusing.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Configure Once, Extend From Annotate</h3>
+      <p>ConfigureTab creates the initial set. AnnotateTab gets an <strong>"Extend Set"</strong> panel (replaces the current "Add Patch" button) that can:</p>
+      <ul>
+        <li>Add more patches to the current image</li>
+        <li>Add new images from the dataset</li>
+        <li>Add more random patches across all images</li>
+      </ul>
+      <p>All additions go through the same manifest update path. The ConfigureTab becomes read-only for active sets — you extend from where the work happens.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Single place to grow the set (AnnotateTab)</li>
+          <li>Context-aware — you're looking at the image when you decide to add more</li>
+          <li>ConfigureTab stays simple (initial setup only)</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>AnnotateTab gets more responsibility</li>
+          <li>Batch additions (e.g. "add 5 patches to every image") need UI in AnnotateTab</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>ConfigureTab Can Reopen for Active Sets</h3>
+      <p>ConfigureTab shows active sets and lets you <strong>modify</strong> them — add images, change patch count, extend scope. AnnotateTab only annotates, never modifies the set structure.</p>
+      <ul>
+        <li>ConfigureTab: "Edit Set" mode shows current units + lets you add more</li>
+        <li>AnnotateTab: pure annotation, no set management</li>
+        <li>Clear separation: configure = structure, annotate = content</li>
+      </ul>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Clean separation of concerns</li>
+          <li>ConfigureTab already has the dataset browser and patch settings</li>
+          <li>AnnotateTab stays focused on drawing</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Context switch: see a problem in Annotate → go back to Configure → return to Annotate</li>
+          <li>ConfigureTab needs an "edit existing set" mode</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Hybrid: Quick Add in Annotate, Batch in Configure</h3>
+      <p>Split by <strong>scope of change</strong>:</p>
+      <ul>
+        <li><strong>AnnotateTab</strong>: "Add patch here" — quick, contextual, single-image additions while you're annotating</li>
+        <li><strong>ConfigureTab</strong>: "Extend set" — batch operations (add images, add N patches per image, change train/val split)</li>
+      </ul>
+      <p>Both update the same manifest. The distinction is: <em>small targeted additions</em> vs <em>structural changes</em>.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Best of both: quick additions stay contextual, batch stays organized</li>
+          <li>Natural mental model: "I need one more patch" vs "I need to restructure"</li>
+          <li>Closest to how people actually work</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Two places that modify the set (but with clear scope distinction)</li>
+          <li>Need clear UI signals about what each tab can do</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>

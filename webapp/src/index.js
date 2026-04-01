@@ -13,6 +13,7 @@ import { AppProvider } from "./AppContext";
 import BiomeroApp from "./biomero/BiomeroApp";
 import ImporterApp from "./importer/ImporterApp";
 import AnnotateApp from "./biomero/annotate/AnnotateApp";
+import PredictionApp from "./biomero/prediction/PredictionApp";
 import {
   Navbar,
   NavbarGroup,
@@ -118,6 +119,17 @@ const AppRouter = () => {
                   onClick={() => navigate("?tab=prediction")}
                   outlined={appName === "prediction"}
                 />
+                <Button
+                  className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
+                    appName === "predict"
+                      ? "bp5-intent-primary font-bold shadow-md"
+                      : ""
+                  }`}
+                  icon="predictive-analysis"
+                  text="Predict (old)"
+                  onClick={() => navigate("?tab=predict")}
+                  outlined={appName === "predict"}
+                />
               </>
             )}
           </NavbarGroup>
@@ -127,6 +139,8 @@ const AppRouter = () => {
             <BiomeroApp />
           ) : appName === "prediction" ? (
             <AnnotateApp />
+          ) : appName === "predict" ? (
+            <PredictionApp />
           ) : (
             <ImporterApp />
           )}

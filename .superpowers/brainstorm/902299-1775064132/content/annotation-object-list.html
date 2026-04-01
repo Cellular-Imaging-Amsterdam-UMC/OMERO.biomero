@@ -1,0 +1,124 @@
+<h2>How to manage individual annotation objects?</h2>
+<p class="subtitle">Current annotate app: Classes with count badges but no per-object list. Prediction app: flat list with trash buttons (unwieldy at scale).</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Collapsible list grouped by class</h3>
+      <p>Each feature type is a collapsible header showing count. Expand to see individual objects with delete button. Hover an object to highlight it on canvas.</p>
+      <div class="mockup">
+        <div class="mockup-header">Annotations Panel</div>
+        <div class="mockup-body" style="font-size:13px; padding:8px;">
+          <div style="padding:6px 8px; background:#f0f7ff; border-left:3px solid #ef4444; cursor:pointer; display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+            <span><strong>&#9654; cell</strong></span>
+            <span style="background:#e0e0e0; border-radius:10px; padding:1px 8px; font-size:11px;">42</span>
+          </div>
+          <div style="padding:6px 8px; background:#fff; border-left:3px solid #22c55e; cursor:pointer; display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+            <span><strong>&#9660; nucleus</strong></span>
+            <span style="background:#e0e0e0; border-radius:10px; padding:1px 8px; font-size:11px;">18</span>
+          </div>
+          <div style="padding:2px 8px 2px 24px; font-size:12px; display:flex; justify-content:space-between; border-bottom:1px solid #f0f0f0;">
+            <span style="color:#666;">&#9679; nucleus #1</span><span style="color:#999; cursor:pointer;">&#x1D5EB;</span>
+          </div>
+          <div style="padding:2px 8px 2px 24px; font-size:12px; display:flex; justify-content:space-between; border-bottom:1px solid #f0f0f0; background:#ffffcc;">
+            <span style="color:#666;">&#9679; nucleus #2 (hovered)</span><span style="color:#999; cursor:pointer;">&#x1D5EB;</span>
+          </div>
+          <div style="padding:2px 8px 2px 24px; font-size:12px; display:flex; justify-content:space-between;">
+            <span style="color:#666;">&#9679; nucleus #3</span><span style="color:#999; cursor:pointer;">&#x1D5EB;</span>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Compact by default (collapsed)</li>
+          <li>Expand only the class you care about</li>
+          <li>Hover-to-highlight finds the object on canvas</li>
+          <li>Per-object delete without switching to eraser tool</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>42 items expanded is still a long list</li>
+          <li>Needs hover-highlight implementation</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Click-to-select on canvas + delete key</h3>
+      <p>No object list panel. Click an annotation on the canvas to select it (highlighted outline). Press Delete/Backspace to remove. Classes panel shows counts only.</p>
+      <div class="mockup">
+        <div class="mockup-header">Annotations Panel</div>
+        <div class="mockup-body" style="font-size:13px; padding:8px;">
+          <div style="padding:6px 8px; border-left:3px solid #ef4444; display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; background:#fff5f5;">
+            <span><strong>cell</strong></span>
+            <span style="background:#e0e0e0; border-radius:10px; padding:1px 8px; font-size:11px;">42</span>
+          </div>
+          <div style="padding:6px 8px; border-left:3px solid #22c55e; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span><strong>nucleus</strong></span>
+            <span style="background:#e0e0e0; border-radius:10px; padding:1px 8px; font-size:11px;">18</span>
+          </div>
+          <div style="padding:8px; background:#ffffcc; border-radius:4px; font-size:12px; text-align:center;">
+            <em>Selected: nucleus #2</em><br>
+            <span style="font-size:11px; color:#888;">Press Delete to remove</span>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Cleanest UI — no list at all</li>
+          <li>Spatial selection (click where you see the problem)</li>
+          <li>Panel stays compact always</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Hard to select overlapping objects</li>
+          <li>No overview of all objects</li>
+          <li>More complex canvas interaction (click to select vs click to draw)</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Collapsible list + click-to-select (combined)</h3>
+      <p>Collapsible class groups in the panel. Click an object in the list OR on the canvas to select it. Selected object is highlighted in both places. Delete via button or keyboard.</p>
+      <div class="mockup">
+        <div class="mockup-header">Annotations Panel</div>
+        <div class="mockup-body" style="font-size:13px; padding:8px;">
+          <div style="padding:6px 8px; background:#f0f7ff; border-left:3px solid #ef4444; cursor:pointer; display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+            <span><strong>&#9654; cell</strong></span>
+            <span style="background:#e0e0e0; border-radius:10px; padding:1px 8px; font-size:11px;">42</span>
+          </div>
+          <div style="padding:6px 8px; background:#fff; border-left:3px solid #22c55e; cursor:pointer; display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+            <span><strong>&#9660; nucleus</strong></span>
+            <span style="background:#e0e0e0; border-radius:10px; padding:1px 8px; font-size:11px;">18</span>
+          </div>
+          <div style="padding:2px 8px 2px 24px; font-size:12px; display:flex; justify-content:space-between; border-bottom:1px solid #f0f0f0;">
+            <span style="color:#666;">&#9679; nucleus #1</span><span style="color:#999; cursor:pointer;">&#x1D5EB;</span>
+          </div>
+          <div style="padding:2px 8px 2px 24px; font-size:12px; display:flex; justify-content:space-between; border-bottom:1px solid #f0f0f0; background:#d4edff; border:1px solid #4a9eed;">
+            <span style="color:#333;"><strong>&#9679; nucleus #2 (selected)</strong></span><span style="color:#ef4444; cursor:pointer;">&#x1D5EB;</span>
+          </div>
+          <div style="padding:2px 8px 2px 24px; font-size:12px; display:flex; justify-content:space-between;">
+            <span style="color:#666;">&#9679; nucleus #3</span><span style="color:#999; cursor:pointer;">&#x1D5EB;</span>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Two ways to find and select objects</li>
+          <li>Bidirectional: list highlights canvas, canvas highlights list</li>
+          <li>Most complete interaction model</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Most complex to implement</li>
+          <li>Scope creep risk — can defer canvas-click-to-select to later</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>

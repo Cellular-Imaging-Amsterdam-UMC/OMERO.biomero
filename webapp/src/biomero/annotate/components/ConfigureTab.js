@@ -75,8 +75,7 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
   const [wellFilterMode, setWellFilterMode] = useState("include");
 
   // --- Set picker ---
-  const [isNewSet, setIsNewSet] = useState(false);
-  const [selectedManifest, setSelectedManifest] = useState(null);
+  // isNewSet removed — form always shows when container selected
 
   // --- State ---
   const [saving, setSaving] = useState(false);
@@ -175,10 +174,6 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
       const result = await listManifests(containerType, containerId);
       const sets = result.manifests || [];
       setExistingManifests(sets);
-      if (sets.length === 0) {
-        setIsNewSet(true);
-        setSelectedManifest(null);
-      }
     } catch (e) {
       console.error("Error checking existing manifests:", e);
     }
@@ -360,10 +355,12 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
       const result = await saveManifest(containerType, containerIds[0], configData);
       if (result.success) {
         toaster?.show({
-          message: `Annotation set created`,
+          message: `Annotation set created with ${result.units?.length || 0} units`,
           intent: "success",
         });
-        onConfigCreated(configData, result.set_id);
+        // Pass config with units populated from server response
+        const manifestWithUnits = { ...configData, annotations: result.units || [] };
+        onConfigCreated(manifestWithUnits, result.set_id);
       }
     } catch (e) {
       console.error("Error initializing:", e);
@@ -512,7 +509,10 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
                   <Button
                     small
                     intent="primary"
-                    onClick={() => onConfigCreated(null, m.set_id)}
+                    onClick={() => onConfigCreated(
+                      { omero: { container_type: containerType, container_id: containerIds[0] } },
+                      m.set_id,
+                    )}
                   >
                     Resume
                   </Button>
@@ -572,7 +572,7 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
         </p>
       </Alert>
 
-      {(isNewSet || selectedManifest) && (
+      {containerIds.length > 0 && (
       <div className="grid grid-cols-2 gap-4">
         {/* Left column: Workflow metadata + Annotation methodology */}
         <div className="flex flex-col gap-4">

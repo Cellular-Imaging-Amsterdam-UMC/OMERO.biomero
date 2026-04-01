@@ -111,6 +111,16 @@ _get_omero_annotate_ai._last_error = None
 CONFIG_NS = "openmicroscopy.org/omero/annotate/config"
 
 
+def _set_group_from_container(conn, container_type, container_id, group_id=None):
+    """Set the OMERO group context from a container, or explicit group_id."""
+    if group_id:
+        conn.setGroupForSession(int(group_id))
+    else:
+        container = conn.getObject(container_type.capitalize(), container_id)
+        if container:
+            conn.SERVICE_OPTS.setOmeroGroup(container.getDetails().getGroup().getId())
+
+
 def _upload_config_yaml(conn, lib, config, container_type, container_id):
     """Save config as YAML FileAnnotation, replacing any previous config attachments."""
     # Delete existing config YAML FileAnnotations to avoid accumulating temp files
@@ -204,12 +214,36 @@ def save_manifest(request, conn=None, **kwargs):
 
         config = lib["AnnotationConfig"].from_json(data["config"])
 
-        group_id = data.get("group_id")
-        if group_id:
-            conn.setGroupForSession(int(group_id))
+        _set_group_from_container(conn, container_type, container_id, data.get("group_id"))
+
+        # Generate processing units if annotations list is empty (new set)
+        if not config.annotations:
+            image_ids = _get_image_ids_from_container(conn, config)
+            if not image_ids:
+                return JsonResponse(
+                    {"error": "No images found in the specified container(s)"},
+                    status=400,
+                )
+            images_list = []
+            for img_id in image_ids:
+                img = conn.getObject("Image", img_id)
+                if img:
+                    images_list.append({"id": img_id, "name": img.getName()})
+            _prepare_processing_units(config, images_list)
+            if not config.annotations:
+                return JsonResponse(
+                    {"error": "No processing units generated from configuration"},
+                    status=400,
+                )
 
         ann_id = lib["save_manifest_to_omero"](conn, config, container_type, container_id, set_id)
-        return JsonResponse({"success": True, "set_id": set_id, "annotation_id": ann_id})
+        return JsonResponse({
+            "success": True,
+            "set_id": set_id,
+            "annotation_id": ann_id,
+            "units": [a.model_dump(mode="json") for a in config.annotations],
+            "progress": config.get_progress_summary(),
+        })
     except Exception as e:
         logger.exception("save_manifest failed")
         return JsonResponse({"error": str(e)}, status=500)
@@ -228,9 +262,7 @@ def load_manifest(request, conn=None, **kwargs):
         container_id = int(request.GET["container_id"])
         set_id = request.GET["set_id"]
 
-        group_id = request.GET.get("group_id")
-        if group_id:
-            conn.setGroupForSession(int(group_id))
+        _set_group_from_container(conn, container_type, container_id, request.GET.get("group_id"))
 
         config = lib["load_manifest_from_omero"](conn, container_type, container_id, set_id)
         if config is None:
@@ -253,9 +285,7 @@ def list_manifests(request, conn=None, **kwargs):
         container_type = request.GET.get("container_type", "dataset")
         container_id = int(request.GET["container_id"])
 
-        group_id = request.GET.get("group_id")
-        if group_id:
-            conn.setGroupForSession(int(group_id))
+        _set_group_from_container(conn, container_type, container_id, request.GET.get("group_id"))
 
         manifests = lib["list_manifests_from_omero"](conn, container_type, container_id)
         return JsonResponse({"manifests": manifests})
@@ -278,9 +308,7 @@ def delete_manifest(request, conn=None, **kwargs):
         container_id = int(data["container_id"])
         set_id = data["set_id"]
 
-        group_id = data.get("group_id")
-        if group_id:
-            conn.setGroupForSession(int(group_id))
+        _set_group_from_container(conn, container_type, container_id, data.get("group_id"))
 
         success = lib["delete_manifest_from_omero"](conn, container_type, container_id, set_id)
         return JsonResponse({"success": success})
@@ -866,9 +894,10 @@ def save_annotation(request, conn=None, **kwargs):
         unit_index = data.get("unit_index")
         channel_presentation = data.get("channel_presentation")
 
-        group_id = data.get("group_id")
-        if group_id:
-            conn.setGroupForSession(int(group_id))
+        # Set group context from the image
+        image = conn.getObject("Image", image_id)
+        if image:
+            conn.SERVICE_OPTS.setOmeroGroup(image.getDetails().getGroup().getId())
 
         # Save GeoJSON (accumulates patches automatically)
         ann_id = lib["save_geojson_to_omero"](conn, image_id, geojson, set_id)
@@ -936,9 +965,7 @@ def add_patch(request, conn=None, **kwargs):
         image_width = int(data["image_width"])
         image_height = int(data["image_height"])
 
-        group_id = data.get("group_id")
-        if group_id:
-            conn.setGroupForSession(int(group_id))
+        _set_group_from_container(conn, container_type, container_id, data.get("group_id"))
 
         config = lib["load_manifest_from_omero"](conn, container_type, container_id, set_id)
         if not config:
@@ -1340,9 +1367,10 @@ def fetch_annotation(request, conn=None, **kwargs):
         image_id = int(request.GET["image"])
         set_id = request.GET.get("set_id")
 
-        group_id = request.GET.get("group_id")
-        if group_id:
-            conn.setGroupForSession(int(group_id))
+        # Set group context from the image
+        image = conn.getObject("Image", image_id)
+        if image:
+            conn.SERVICE_OPTS.setOmeroGroup(image.getDetails().getGroup().getId())
 
         if not set_id:
             return JsonResponse({"type": "FeatureCollection", "features": []})
