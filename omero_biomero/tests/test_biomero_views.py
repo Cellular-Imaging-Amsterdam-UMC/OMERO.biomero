@@ -104,6 +104,9 @@ class BiomeroViewTests(TestCase):
         ), patch(
             "omero_biomero.biomero_views.get_react_build_file",
             return_value="fallback.js",
+        ), patch(
+            "omero_biomero.biomero_views.get_react_dev_server_asset_url",
+            return_value=None,
         ):
             ctx = _raw_biomero()(None, conn=self._fake_conn())
         self.assertEqual(ctx["main_js"], "fallback.js")

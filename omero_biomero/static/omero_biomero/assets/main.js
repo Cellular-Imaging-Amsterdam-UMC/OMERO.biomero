@@ -8137,6 +8137,81 @@ function getSortedHandleProps(_a, predicate) {
 
 /***/ }),
 
+/***/ "./node_modules/@blueprintjs/core/lib/esm/components/slider/rangeSlider.js":
+/*!*********************************************************************************!*\
+  !*** ./node_modules/@blueprintjs/core/lib/esm/components/slider/rangeSlider.js ***!
+  \*********************************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   RangeSlider: () => (/* binding */ RangeSlider)
+/* harmony export */ });
+/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! tslib */ "./node_modules/@blueprintjs/core/node_modules/tslib/tslib.es6.mjs");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _common__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../common */ "./node_modules/@blueprintjs/core/lib/esm/common/intent.js");
+/* harmony import */ var _common__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../common */ "./node_modules/@blueprintjs/core/lib/esm/common/props.js");
+/* harmony import */ var _common__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../../common */ "./node_modules/@blueprintjs/core/lib/esm/common/abstractPureComponent.js");
+/* harmony import */ var _common_errors__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../common/errors */ "./node_modules/@blueprintjs/core/lib/esm/common/errors.js");
+/* harmony import */ var _multiSlider__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./multiSlider */ "./node_modules/@blueprintjs/core/lib/esm/components/slider/multiSlider.js");
+/*
+ * Copyright 2016 Palantir Technologies, Inc. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+
+
+
+var RangeIndex;
+(function (RangeIndex) {
+    RangeIndex[RangeIndex["START"] = 0] = "START";
+    RangeIndex[RangeIndex["END"] = 1] = "END";
+})(RangeIndex || (RangeIndex = {}));
+/**
+ * Range slider component.
+ *
+ * @see https://blueprintjs.com/docs/#core/components/sliders.range-slider
+ */
+var RangeSlider = /** @class */ (function (_super) {
+    (0,tslib__WEBPACK_IMPORTED_MODULE_1__.__extends)(RangeSlider, _super);
+    function RangeSlider() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    RangeSlider.prototype.render = function () {
+        var _a = this.props, value = _a.value, handleHtmlProps = _a.handleHtmlProps, props = (0,tslib__WEBPACK_IMPORTED_MODULE_1__.__rest)(_a, ["value", "handleHtmlProps"]);
+        return (react__WEBPACK_IMPORTED_MODULE_0__.createElement(_multiSlider__WEBPACK_IMPORTED_MODULE_2__.MultiSlider, (0,tslib__WEBPACK_IMPORTED_MODULE_1__.__assign)({}, props),
+            react__WEBPACK_IMPORTED_MODULE_0__.createElement(_multiSlider__WEBPACK_IMPORTED_MODULE_2__.MultiSlider.Handle, { value: value[RangeIndex.START], type: "start", intentAfter: props.intent, htmlProps: handleHtmlProps === null || handleHtmlProps === void 0 ? void 0 : handleHtmlProps.start }),
+            react__WEBPACK_IMPORTED_MODULE_0__.createElement(_multiSlider__WEBPACK_IMPORTED_MODULE_2__.MultiSlider.Handle, { value: value[RangeIndex.END], type: "end", htmlProps: handleHtmlProps === null || handleHtmlProps === void 0 ? void 0 : handleHtmlProps.end })));
+    };
+    RangeSlider.prototype.validateProps = function (props) {
+        var value = props.value;
+        if (value == null || value[RangeIndex.START] == null || value[RangeIndex.END] == null) {
+            throw new Error(_common_errors__WEBPACK_IMPORTED_MODULE_3__.RANGESLIDER_NULL_VALUE);
+        }
+    };
+    RangeSlider.defaultProps = (0,tslib__WEBPACK_IMPORTED_MODULE_1__.__assign)((0,tslib__WEBPACK_IMPORTED_MODULE_1__.__assign)({}, _multiSlider__WEBPACK_IMPORTED_MODULE_2__.MultiSlider.defaultSliderProps), { intent: _common__WEBPACK_IMPORTED_MODULE_4__.Intent.PRIMARY, value: [0, 10] });
+    RangeSlider.displayName = "".concat(_common__WEBPACK_IMPORTED_MODULE_5__.DISPLAYNAME_PREFIX, ".RangeSlider");
+    return RangeSlider;
+}(_common__WEBPACK_IMPORTED_MODULE_6__.AbstractPureComponent));
+
+//# sourceMappingURL=rangeSlider.js.map
+
+/***/ }),
+
 /***/ "./node_modules/@blueprintjs/core/lib/esm/components/slider/slider.js":
 /*!****************************************************************************!*\
   !*** ./node_modules/@blueprintjs/core/lib/esm/components/slider/slider.js ***!
@@ -29896,17 +29971,55 @@ const normalizeImageScalingEntry = function () {
       };
     }
   });
+  const channelBounds = Object.fromEntries(Object.entries(entry?.channelBounds || {}).flatMap(_ref3 => {
+    let [key, value] = _ref3;
+    if (!value || typeof value !== "object") {
+      return [];
+    }
+    const min = Number(value.min);
+    const max = Number(value.max);
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return [];
+    }
+    return [[String(key), {
+      min,
+      max
+    }]];
+  }));
   return {
     selectedChannel,
     channelVisibility,
     channelScales,
+    channelBounds,
     patchIds
   };
 };
-const AnnotationTab = _ref3 => {
+const normalizeDatasetNormalization = function () {
+  let entry = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  let channels = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+  const selectedChannel = entry?.selectedChannel != null ? String(entry.selectedChannel) : "";
+  const channelScales = Object.fromEntries(Object.entries(entry?.channelScales || {}).map(_ref4 => {
+    let [key, value] = _ref4;
+    return [String(key), sanitizeChannelScale(value)];
+  }));
+  (channels || []).forEach(channel => {
+    const key = String(channel.index);
+    if (!channelScales[key]) {
+      channelScales[key] = {
+        min: 0,
+        max: 100
+      };
+    }
+  });
+  return {
+    selectedChannel,
+    channelScales
+  };
+};
+const AnnotationTab = _ref5 => {
   let {
     preferredSelectedDatasets = []
-  } = _ref3;
+  } = _ref5;
   const [selectedDatasets, setSelectedDatasets] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
   const [selectedImage, setSelectedImage] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
   const [datasetImages, setDatasetImages] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
@@ -29920,13 +30033,17 @@ const AnnotationTab = _ref3 => {
   const [selectedPatchId, setSelectedPatchId] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)("");
   const [patchWidth, setPatchWidth] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(DEFAULT_PATCH_SIZE);
   const [patchHeight, setPatchHeight] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(DEFAULT_PATCH_SIZE);
-  const [viewMode, setViewMode] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(VIEW_MODE_IMAGES);
+  const [viewMode, setViewMode] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(VIEW_MODE_PATCHES);
   const [datasetAnnotations, setDatasetAnnotations] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
   const [featureTypes, setFeatureTypes] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(getDefaultFeatureTypes());
   const [loadingAnns, setLoadingAnns] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
   const [loadingAnnotationSets, setLoadingAnnotationSets] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
   const [channels, setChannels] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]);
   const [imageScalingsByImageId, setImageScalingsByImageId] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({});
+  const [datasetNormalization, setDatasetNormalization] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
+    selectedChannel: "",
+    channelScales: {}
+  });
   const [imageMeta, setImageMeta] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
     sizeZ: 1,
     sizeT: 1,
@@ -29937,6 +30054,10 @@ const AnnotationTab = _ref3 => {
   const {
     toaster
   } = (0,_AppContext__WEBPACK_IMPORTED_MODULE_5__.useAppContext)();
+  const channelsRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(channels);
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    channelsRef.current = channels;
+  }, [channels]);
   const getDatasetId = selection => {
     if (!selection || selection.length === 0) return null;
     const str = selection[0];
@@ -29981,6 +30102,10 @@ const AnnotationTab = _ref3 => {
     setSelectedImage(null);
     setChannels([]);
     setImageScalingsByImageId({});
+    setDatasetNormalization({
+      selectedChannel: "",
+      channelScales: {}
+    });
     setImageMeta({
       sizeZ: 1,
       sizeT: 1,
@@ -30012,6 +30137,10 @@ const AnnotationTab = _ref3 => {
         setDatasetAnnotations([]);
         setFeatureTypes(getDefaultFeatureTypes());
         setImageScalingsByImageId({});
+        setDatasetNormalization({
+          selectedChannel: "",
+          channelScales: {}
+        });
       }
     } catch (e) {
       console.error("Error loading annotation sets", e);
@@ -30114,6 +30243,10 @@ const AnnotationTab = _ref3 => {
       setDatasetAnnotations([]);
       setFeatureTypes(getDefaultFeatureTypes());
       setImageScalingsByImageId({});
+      setDatasetNormalization({
+        selectedChannel: "",
+        channelScales: {}
+      });
       return;
     }
     let cancelled = false;
@@ -30135,6 +30268,13 @@ const AnnotationTab = _ref3 => {
         setFeatureTypes(data.featureTypes?.length ? data.featureTypes : getDefaultFeatureTypes());
         const savedPatches = data.patches || [];
         const relevantImageIds = savedPatches.length ? Array.from(new Set(savedPatches.map(patch => patch.imageId).filter(Boolean).map(String))) : Array.from(new Set((data.annotations || []).map(annotation => annotation.imageId).filter(Boolean).map(String)));
+        const nextDatasetNormalization = normalizeDatasetNormalization(data.selectedChannel != null || data.channelScales ? {
+          selectedChannel: data.selectedChannel,
+          channelScales: data.channelScales
+        } : {
+          selectedChannel: data.imageScalings?.[0]?.selectedChannel,
+          channelScales: data.imageScalings?.[0]?.channelScales
+        }, channelsRef.current);
         const fallbackScaling = normalizeImageScalingEntry({
           selectedChannel: data.selectedChannel,
           channelVisibility: data.channelVisibility,
@@ -30151,6 +30291,7 @@ const AnnotationTab = _ref3 => {
           });
         }
         setImageScalingsByImageId(nextImageScalings);
+        setDatasetNormalization(nextDatasetNormalization);
       } catch (e) {
         if (!cancelled) {
           console.error("Error loading annotations", e);
@@ -30279,22 +30420,33 @@ const AnnotationTab = _ref3 => {
   const currentViewerAnnotations = viewMode === VIEW_MODE_PATCHES ? currentPatchAnnotations : currentImageAnnotations;
   const annotatedImageCount = new Set(datasetAnnotations.map(annotation => annotation.imageId).filter(imageId => imageId !== undefined && imageId !== null).map(String)).size;
   const selectedAnnotationSummary = annotationSets.find(annotationSet => String(annotationSet.id) === String(selectedAnnotationSetId));
-  const annotationSetChannelOptions = channels.map(channel => ({
-    value: String(channel.index),
-    label: channel.name || `Channel ${channel.index}`
-  }));
+  const currentDatasetNormalization = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(() => normalizeDatasetNormalization({
+    selectedChannel: datasetNormalization.selectedChannel || selectedAnnotationSummary?.selectedChannel,
+    channelScales: Object.keys(datasetNormalization.channelScales || {}).length ? datasetNormalization.channelScales : selectedAnnotationSummary?.channelScales || {}
+  }, channels), [channels, datasetNormalization, selectedAnnotationSummary]);
+  const annotationSetChannelOptions = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(() => {
+    if (channels.length) {
+      return channels.map(channel => ({
+        value: String(channel.index),
+        label: channel.name || `Channel ${channel.index}`
+      }));
+    }
+    return Object.keys(currentDatasetNormalization.channelScales || {}).sort((left, right) => Number(left) - Number(right)).map(channelIndex => ({
+      value: String(channelIndex),
+      label: `Channel ${channelIndex}`
+    }));
+  }, [channels, currentDatasetNormalization.channelScales]);
   const currentImageScaling = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(() => normalizeImageScalingEntry(currentScalingImageId ? imageScalingsByImageId[currentScalingImageId] : {}, channels), [channels, currentScalingImageId, imageScalingsByImageId]);
-  const selectedAnnotationChannel = currentImageScaling.selectedChannel;
+  const selectedAnnotationChannel = currentDatasetNormalization.selectedChannel;
   const channelVisibility = currentImageScaling.channelVisibility;
   const channelScales = currentImageScaling.channelScales;
-  const selectedAnnotationChannelScale = sanitizeChannelScale(channelScales[selectedAnnotationChannel]);
+  const channelBounds = currentImageScaling.channelBounds;
+  const selectedAnnotationChannelScale = sanitizeChannelScale(currentDatasetNormalization.channelScales[selectedAnnotationChannel]);
   const handleAnnotationSetChannelScaleChange = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)((channelIndex, field, value) => {
-    if (currentScalingImageId == null) {
-      return;
-    }
-    updateImageScalingEntry(currentScalingImageId, currentEntry => {
+    setDatasetNormalization(currentNormalization => {
+      const normalizedCurrent = normalizeDatasetNormalization(currentNormalization, channels);
       const key = String(channelIndex);
-      const previous = sanitizeChannelScale(currentEntry.channelScales[key]);
+      const previous = sanitizeChannelScale(normalizedCurrent.channelScales[key]);
       let nextChannelScale;
       if (field === "range" && Array.isArray(value)) {
         nextChannelScale = sanitizeChannelScale({
@@ -30312,27 +30464,23 @@ const AnnotationTab = _ref3 => {
         });
       }
       return {
-        ...currentEntry,
+        ...normalizedCurrent,
         channelScales: {
-          ...currentEntry.channelScales,
+          ...normalizedCurrent.channelScales,
           [key]: nextChannelScale
         }
       };
     });
-  }, [currentScalingImageId, updateImageScalingEntry]);
+  }, [channels]);
   const handleSelectedAnnotationChannelChange = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(value => {
-    if (currentScalingImageId == null) {
-      return;
-    }
-    updateImageScalingEntry(currentScalingImageId, currentEntry => ({
-      ...currentEntry,
-      selectedChannel: value,
-      channelVisibility: value === "" ? currentEntry.channelVisibility : {
-        ...currentEntry.channelVisibility,
-        [String(value)]: true
-      }
-    }));
-  }, [currentScalingImageId, updateImageScalingEntry]);
+    setDatasetNormalization(currentNormalization => {
+      const normalizedCurrent = normalizeDatasetNormalization(currentNormalization, channels);
+      return {
+        ...normalizedCurrent,
+        selectedChannel: value
+      };
+    });
+  }, [channels]);
   const handleCurrentImageChannelVisibilityChange = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(nextVisibility => {
     if (currentScalingImageId == null) {
       return;
@@ -30351,18 +30499,15 @@ const AnnotationTab = _ref3 => {
       channelScales: nextScales
     }));
   }, [currentScalingImageId, updateImageScalingEntry]);
-  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
-    if (!channels.length || selectedAnnotationChannel === "") {
+  const handleCurrentImageChannelBoundsChange = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(nextChannelBounds => {
+    if (currentScalingImageId == null) {
       return;
     }
     updateImageScalingEntry(currentScalingImageId, currentEntry => ({
       ...currentEntry,
-      channelVisibility: {
-        ...currentEntry.channelVisibility,
-        [String(selectedAnnotationChannel)]: true
-      }
+      channelBounds: nextChannelBounds
     }));
-  }, [channels, currentScalingImageId, selectedAnnotationChannel, updateImageScalingEntry]);
+  }, [currentScalingImageId, updateImageScalingEntry]);
   const handleImageAnnotationsChange = nextAnnotations => {
     if (!selectedImage) {
       return;
@@ -30414,11 +30559,11 @@ const AnnotationTab = _ref3 => {
         image,
         ...dimensions
       };
-    }).filter(_ref4 => {
+    }).filter(_ref6 => {
       let {
         width,
         height
-      } = _ref4;
+      } = _ref6;
       return width && height && width >= nextPatchWidth && height >= nextPatchHeight;
     });
     if (!candidates.length) {
@@ -30428,16 +30573,16 @@ const AnnotationTab = _ref3 => {
       });
       return;
     }
-    const minPatchCount = Math.min(...candidates.map(_ref5 => {
+    const minPatchCount = Math.min(...candidates.map(_ref7 => {
       let {
         image
-      } = _ref5;
+      } = _ref7;
       return imagePatchCounts[String(image.id)] || 0;
     }));
-    const preferredImages = candidates.filter(_ref6 => {
+    const preferredImages = candidates.filter(_ref8 => {
       let {
         image
-      } = _ref6;
+      } = _ref8;
       return (imagePatchCounts[String(image.id)] || 0) === minPatchCount;
     });
     const target = preferredImages[Math.floor(Math.random() * preferredImages.length)];
@@ -30467,6 +30612,7 @@ const AnnotationTab = _ref3 => {
     }
     setSaving(true);
     try {
+      const previousAnnotationSetId = selectedAnnotationSetId ? String(selectedAnnotationSetId) : null;
       const imagesWithPatches = Array.from(new Set(patches.map(patch => String(patch.imageId)).filter(Boolean)));
       const relevantScalingImageIds = imagesWithPatches.length ? imagesWithPatches : Array.from(new Set(datasetImages.map(image => String(image.id)).filter(Boolean)));
       const payload = {
@@ -30474,18 +30620,30 @@ const AnnotationTab = _ref3 => {
         name: annotationSetName,
         description: annotationSetDescription,
         datasetId: String(datasetId),
+        selectedChannel: selectedAnnotationChannel !== "" ? String(selectedAnnotationChannel) : null,
+        channelScales: Object.fromEntries(Object.entries(currentDatasetNormalization.channelScales).map(_ref9 => {
+          let [key, value] = _ref9;
+          return [String(key), sanitizeChannelScale(value)];
+        })),
         imageScalings: relevantScalingImageIds.map(imageId => {
           const entry = normalizeImageScalingEntry(imageScalingsByImageId[String(imageId)], channels);
           return {
             imageId: String(imageId),
             selectedChannel: entry.selectedChannel !== "" ? String(entry.selectedChannel) : null,
-            channelVisibility: Object.fromEntries(Object.entries(entry.channelVisibility).map(_ref7 => {
-              let [key, value] = _ref7;
+            channelVisibility: Object.fromEntries(Object.entries(entry.channelVisibility).map(_ref10 => {
+              let [key, value] = _ref10;
               return [String(key), Boolean(value)];
             })),
-            channelScales: Object.fromEntries(Object.entries(entry.channelScales).map(_ref8 => {
-              let [key, value] = _ref8;
+            channelScales: Object.fromEntries(Object.entries(entry.channelScales).map(_ref11 => {
+              let [key, value] = _ref11;
               return [String(key), sanitizeChannelScale(value)];
+            })),
+            channelBounds: Object.fromEntries(Object.entries(entry.channelBounds || {}).map(_ref12 => {
+              let [key, value] = _ref12;
+              return [String(key), {
+                min: Number(value.min),
+                max: Number(value.max)
+              }];
             })),
             patchIds: patches.filter(patch => String(patch.imageId) === String(imageId)).map(patch => String(patch.id))
           };
@@ -30502,7 +30660,24 @@ const AnnotationTab = _ref3 => {
         featureTypes
       };
       const response = await (0,_apiService__WEBPACK_IMPORTED_MODULE_6__.saveMapAnnotation)(datasetId, payload, selectedAnnotationSetId || null);
-      await loadAnnotationSets(datasetId, response.annotationSetId);
+      const nextAnnotationSetId = String(response.annotationSetId);
+      const nextSummary = response.annotationSet || {
+        id: nextAnnotationSetId,
+        name: annotationSetName || "Untitled annotation set",
+        description: annotationSetDescription || "",
+        datasetId: String(datasetId),
+        patchCount: patches.length,
+        annotationCount: datasetAnnotations.length,
+        imageCount: annotatedImageCount
+      };
+      setSelectedAnnotationSetId(nextAnnotationSetId);
+      setAnnotationSets(currentAnnotationSets => {
+        const filteredSets = currentAnnotationSets.filter(annotationSet => {
+          const annotationSetId = String(annotationSet.id);
+          return annotationSetId !== nextAnnotationSetId && annotationSetId !== previousAnnotationSetId;
+        });
+        return [nextSummary, ...filteredSets];
+      });
       toaster.show({
         message: selectedAnnotationSetId ? "Annotation set updated" : "Annotation set saved",
         intent: "success"
@@ -30534,27 +30709,21 @@ const AnnotationTab = _ref3 => {
           })
         }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_8__.Card, {
           className: "flex-1 min-h-[300px] flex flex-col",
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("div", {
             className: "flex items-center justify-between gap-2 mb-2",
-            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.ButtonGroup, {
+            children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_9__.ButtonGroup, {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__.Button, {
-                small: true,
-                active: viewMode === VIEW_MODE_IMAGES,
-                onClick: () => setViewMode(VIEW_MODE_IMAGES),
-                children: "Images"
-              }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__.Button, {
                 small: true,
                 active: viewMode === VIEW_MODE_PATCHES,
                 onClick: () => setViewMode(VIEW_MODE_PATCHES),
                 children: "Patches"
+              }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__.Button, {
+                small: true,
+                active: viewMode === VIEW_MODE_IMAGES,
+                onClick: () => setViewMode(VIEW_MODE_IMAGES),
+                children: "Images"
               })]
-            }), viewMode === VIEW_MODE_PATCHES && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_10__.Button, {
-              small: true,
-              icon: "add",
-              onClick: handleAddPatch,
-              disabled: !datasetId || loadingImages,
-              children: "Add Patch"
-            })]
+            })
           }), viewMode === VIEW_MODE_PATCHES && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
             className: "grid grid-cols-2 gap-2 mb-3",
             children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_11__.NumericInput, {
@@ -30576,13 +30745,13 @@ const AnnotationTab = _ref3 => {
               disabled: !datasetId || loadingImages,
               className: "numeric-input"
             })]
-          }), channels.length > 0 && currentScalingImageId && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
+          }), (annotationSetChannelOptions.length > 0 || selectedAnnotationChannel !== "") && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
             className: "flex flex-col gap-3 mb-3",
             children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_12__.HTMLSelect, {
               fill: true,
               value: selectedAnnotationChannel,
               onChange: event => handleSelectedAnnotationChannelChange(event.target.value),
-              disabled: !channels.length,
+              disabled: !annotationSetChannelOptions.length,
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("option", {
                 value: "",
                 children: "Select annotation channel"
@@ -30594,7 +30763,7 @@ const AnnotationTab = _ref3 => {
               className: "rounded border bg-white p-2.5 min-w-0",
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("div", {
                 className: "text-xs font-bold uppercase text-gray-500 mb-2",
-                children: "Image Normalization"
+                children: "Global Normalization"
               }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_13__.ControlGroup, {
                 fill: true,
                 vertical: false,
@@ -30719,6 +30888,9 @@ const AnnotationTab = _ref3 => {
             onChannelVisibilityChange: handleCurrentImageChannelVisibilityChange,
             channelScales: channelScales,
             onChannelScalesChange: handleCurrentImageChannelScalesChange,
+            channelBounds: channelBounds,
+            onChannelBoundsChange: handleCurrentImageChannelBoundsChange,
+            normalizationChannelScales: currentDatasetNormalization.channelScales,
             lockedChannelIndex: selectedAnnotationChannel !== "" ? selectedAnnotationChannel : null
           })
         })
@@ -30840,6 +31012,9 @@ const AnnotationViewer = _ref => {
     onChannelVisibilityChange = null,
     channelScales: externalChannelScales = null,
     onChannelScalesChange = null,
+    channelBounds: externalChannelBounds = null,
+    onChannelBoundsChange = null,
+    normalizationChannelScales = null,
     lockedChannelIndex = null
   } = _ref;
   const canvasRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
@@ -30892,8 +31067,30 @@ const AnnotationViewer = _ref => {
   const channelBoundsRequestRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)({});
   const externalChannelScalesRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(externalChannelScales);
   const onChannelScalesChangeRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(onChannelScalesChange);
+  const mergedChannelBounds = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(() => ({
+    ...(externalChannelBounds || {}),
+    ...(channelBounds || {})
+  }), [externalChannelBounds, channelBounds]);
   const effectiveChannelVisibility = externalChannelVisibility ?? channelVisibility;
   const effectiveChannelScales = externalChannelScales ?? channelScales;
+  const renderChannelVisibility = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(() => {
+    if (lockedChannelIndex == null) {
+      return effectiveChannelVisibility;
+    }
+    return {
+      ...(effectiveChannelVisibility || {}),
+      [lockedChannelIndex]: true
+    };
+  }, [effectiveChannelVisibility, lockedChannelIndex]);
+  const renderChannelScales = (0,react__WEBPACK_IMPORTED_MODULE_0__.useMemo)(() => {
+    if (lockedChannelIndex == null || !normalizationChannelScales?.[lockedChannelIndex]) {
+      return effectiveChannelScales;
+    }
+    return {
+      ...(effectiveChannelScales || {}),
+      [lockedChannelIndex]: sanitizeChannelScale(normalizationChannelScales[lockedChannelIndex])
+    };
+  }, [effectiveChannelScales, lockedChannelIndex, normalizationChannelScales]);
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
     externalChannelScalesRef.current = externalChannelScales;
     onChannelScalesChangeRef.current = onChannelScalesChange;
@@ -31005,12 +31202,13 @@ const AnnotationViewer = _ref => {
     if (!image?.id || channelIndex == null) {
       return null;
     }
-    const cacheKey = `${image.id}:${channelIndex}:${z}:${t}`;
-    if (channelBounds[cacheKey]) {
-      return channelBounds[cacheKey];
+    const boundsKey = `${channelIndex}:${z}:${t}`;
+    const requestKey = `${image.id}:${boundsKey}`;
+    if (mergedChannelBounds[boundsKey]) {
+      return mergedChannelBounds[boundsKey];
     }
-    if (channelBoundsRequestRef.current[cacheKey]) {
-      return channelBoundsRequestRef.current[cacheKey];
+    if (channelBoundsRequestRef.current[requestKey]) {
+      return channelBoundsRequestRef.current[requestKey];
     }
     const request = (async () => {
       const planePayload = await (0,_apiService__WEBPACK_IMPORTED_MODULE_3__.fetchChannelPlaneData)(image.id, channelIndex, z, t);
@@ -31022,17 +31220,23 @@ const AnnotationViewer = _ref => {
       const nextBounds = calculatePlaneMinMax(values);
       setChannelBounds(current => ({
         ...current,
-        [cacheKey]: nextBounds
+        [boundsKey]: nextBounds
       }));
+      if (onChannelBoundsChange) {
+        onChannelBoundsChange({
+          ...(externalChannelBounds || {}),
+          [boundsKey]: nextBounds
+        });
+      }
       return nextBounds;
     })();
-    channelBoundsRequestRef.current[cacheKey] = request;
+    channelBoundsRequestRef.current[requestKey] = request;
     try {
       return await request;
     } finally {
-      delete channelBoundsRequestRef.current[cacheKey];
+      delete channelBoundsRequestRef.current[requestKey];
     }
-  }, [channelBounds, image?.id, t, z]);
+  }, [externalChannelBounds, image?.id, mergedChannelBounds, onChannelBoundsChange, t, z]);
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
     if (lockedChannelIndex == null) {
       return;
@@ -31047,13 +31251,13 @@ const AnnotationViewer = _ref => {
     const pixelMax = Number.isFinite(imagePixelRange.max) ? imagePixelRange.max : 255;
     const channelParam = channels.map(ch => {
       const chNum = ch.index + 1;
-      const visible = effectiveChannelVisibility[ch.index] !== false;
+      const visible = renderChannelVisibility[ch.index] !== false;
       const channelPrefix = visible ? `${chNum}` : `-${chNum}`;
       const rawColor = String(renderChannels[ch.index]?.color || ch.color || "FF0000").replace(/^#/, "").replace(/^\$/, "").toUpperCase();
       const color = `$${rawColor}`;
-      const scale = sanitizeChannelScale(effectiveChannelScales[ch.index]);
-      const channelRangeKey = `${image.id}:${ch.index}:${z}:${t}`;
-      const bounds = channelBounds[channelRangeKey];
+      const scale = sanitizeChannelScale(renderChannelScales[ch.index]);
+      const channelRangeKey = `${ch.index}:${z}:${t}`;
+      const bounds = mergedChannelBounds[channelRangeKey];
       const channelMin = Number.isFinite(bounds?.min) ? bounds.min : pixelMin;
       const channelMax = Number.isFinite(bounds?.max) ? bounds.max : pixelMax;
       const channelSpan = Math.max(1, channelMax - channelMin);
@@ -31066,12 +31270,12 @@ const AnnotationViewer = _ref => {
     params.set("m", "c");
     params.set("p", projectionMode);
     params.set("q", "0.9");
-    params.set("_render", `${Object.keys(effectiveChannelScales).sort().map(key => {
-      const scale = sanitizeChannelScale(effectiveChannelScales[key]);
+    params.set("_render", `${Object.keys(renderChannelScales).sort().map(key => {
+      const scale = sanitizeChannelScale(renderChannelScales[key]);
       return `${key}:${scale.min}-${scale.max}`;
-    }).join("|")}-${Object.keys(effectiveChannelVisibility).sort().map(key => `${key}:${effectiveChannelVisibility[key] !== false ? 1 : 0}`).join("-")}`);
+    }).join("|")}-${Object.keys(renderChannelVisibility).sort().map(key => `${key}:${renderChannelVisibility[key] !== false ? 1 : 0}`).join("-")}`);
     return `${base}?${params.toString()}`;
-  }, [channelBounds, image, channels, effectiveChannelScales, effectiveChannelVisibility, imagePixelRange, projectionMode, renderChannels, z, t]);
+  }, [channels, image, imagePixelRange, mergedChannelBounds, projectionMode, renderChannelScales, renderChannelVisibility, renderChannels, z, t]);
   const handleChannelScaleChange = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)((channelIndex, field, value) => {
     ensureChannelBounds(Number(channelIndex));
     const updateScales = current => {
@@ -31920,6 +32124,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/button/buttons.js");
 /* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/controlGroup.js");
 /* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/forms/numericInput.js");
+/* harmony import */ var _blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @blueprintjs/core */ "./node_modules/@blueprintjs/core/lib/esm/components/slider/rangeSlider.js");
 /* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
 
 
@@ -31975,32 +32180,31 @@ const ImageChannelControls = _ref => {
           fill: true,
           vertical: false,
           className: "gap-3 items-center",
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
-            className: "flex items-center gap-2",
-            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("span", {
-              className: "normalization-input-label",
-              children: "Min"
-            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.NumericInput, {
-              min: 0,
-              max: 100,
-              stepSize: 0.500,
-              value: channelScales?.[ch.index]?.min ?? 0,
-              onValueChange: valueAsNumber => onChannelScaleChange?.(ch.index, "min", valueAsNumber),
-              className: "normalization-input"
-            })]
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsxs)("div", {
-            className: "flex items-center gap-2",
-            children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("span", {
-              className: "normalization-input-label",
-              children: "Max"
-            }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.NumericInput, {
-              min: 0,
-              max: 100,
-              stepSize: 0.5,
-              value: channelScales?.[ch.index]?.max ?? 100,
-              onValueChange: valueAsNumber => onChannelScaleChange?.(ch.index, "max", valueAsNumber),
-              className: "normalization-input"
-            })]
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.NumericInput, {
+            min: 0,
+            max: 100,
+            stepSize: 0.500,
+            value: channelScales?.[ch.index]?.min ?? 0,
+            onValueChange: valueAsNumber => onChannelScaleChange?.(ch.index, "min", valueAsNumber),
+            className: "scale-input-min"
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_6__.RangeSlider, {
+            className: "scale-slider",
+            min: 0,
+            max: 100,
+            stepSize: 0.5,
+            labelRenderer: false,
+            value: [channelScales?.[ch.index]?.min ?? 0, channelScales?.[ch.index]?.max ?? 100],
+            onChange: _ref2 => {
+              let [minValue, maxValue] = _ref2;
+              onChannelScaleChange?.(ch.index, "range", [minValue, maxValue]);
+            }
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)(_blueprintjs_core__WEBPACK_IMPORTED_MODULE_5__.NumericInput, {
+            min: 0,
+            max: 100,
+            stepSize: 0.5,
+            value: channelScales?.[ch.index]?.max ?? 100,
+            onValueChange: valueAsNumber => onChannelScaleChange?.(ch.index, "max", valueAsNumber),
+            className: "scale-input-max"
           })]
         }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_1__.jsx)("div", {
           className: "text-[10px] uppercase tracking-wide text-gray-500 mt-2",
@@ -52846,29 +53050,31 @@ video {
     font-size: 0.75rem;
 }
 
-.numeric-input input, .normalization-input input {
-    width: 72px !important;
-    max-width: 72px !important;
-    min-width: 72px !important;
-    padding-left: 8px !important;
-    padding-right: 8px !important;
-}
-
-.normalization-input-label {
-    width: 28px;
-    min-width: 28px;
-    font-size: 0.75rem;
-    color: rgb(107 114 128);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.numeric-input input {
+.numeric-input input, .scale-input-min input, .scale-input-max input{
     width: 40px !important;
     max-width: 40px !important;
     min-width: 40px !important;
     padding-left: 4px !important;
     padding-right: 4px !important;
+}
+
+.scale-slider {
+    width: 90px !important;
+    min-width: 50px !important;
+    max-width: 90px !important;
+}
+
+.normalization-input input {
+    width: 96px !important;
+    max-width: 96px !important;
+    min-width: 96px !important;
+}
+
+.normalization-input-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgb(107 114 128);
+    min-width: 24px;
 }
 
 .hover\\:bg-blue-100:hover {
@@ -52931,7 +53137,7 @@ video {
   .lg\\:grid-cols-4 {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
-}`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"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nB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA,oCAAmB;UAAnB;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA,kCAAmB;EAAnB,iEAAmB;EAAnB;AAAmB;A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","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n\n.numeric-input input, .normalization-input input {\n    width: 72px !important;\n    max-width: 72px !important;\n    min-width: 72px !important;\n    padding-left: 8px !important;\n    padding-right: 8px !important;\n}\n\n.normalization-input-label {\n    width: 28px;\n    min-width: 28px;\n    font-size: 0.75rem;\n    color: rgb(107 114 128);\n    text-transform: uppercase;\n    letter-spacing: 0.04em;\n}\n\n.numeric-input input {\n    width: 40px !important;\n    max-width: 40px !important;\n    min-width: 40px !important;\n    padding-left: 4px !important;\n    padding-right: 4px !important;\n}"],"sourceRoot":""}]);
+}`, "",{"version":3,"sources":["webpack://./src/tailwind.css"],"names":[],"mappings":"AAAA;EAAA,wBAAc;EAAd,wBAAc;EAAd,mBAAc;EAAd,mBAAc;EAAd,cAAc;EAAd,cAAc;EAAd,cAAc;EAAd,eAAc;EAAd,eAAc;EAAd,aAAc;EAAd,aAAc;EAAd,kBAAc;EAAd,sCAAc;EAAd,8BAAc;EAAd,6BAAc;EAAd,4BAAc;EAAd,eAAc;EAAd,oBAAc;EAAd,sBAAc;EAAd,uBAAc;EAAd,wBAAc;EAAd,kBAAc;EAAd,2BAAc;EAAd,4BAAc;EAAd,sCAAc;EAAd,kCAAc;EAAd,2BAAc;EAAd,sBAAc;EAAd,8BAAc;EAAd,YAAc;EAAd,kBAAc;EAAd,gBAAc;EAAd,iBAAc;EAAd,kBAAc;EAAd,cAAc;EAAd,gBAAc;EAAd,aAAc;EAAd,mBAAc;EAAd,qBAAc;EAAd,2BAAc;EAAd,yBAAc;EAAd,0BAAc;EAAd,2BAAc;EAAd,uBAAc;EAAd,wBAAc;EAAd,yBAAc;EAAd,sBAAc;EAAd,oBAAc;EAAd,sBAAc;EAAd,qBAAc;EAAd;AAAc;;AAAd;EAAA,wBAAc;EAAd,wBAAc;EAAd,mBAAc;EAAd,mBAAc;EAAd,cAAc;EAAd,cAAc;EAAd,cAAc;EAAd,eAAc;EAAd,eAAc;EAAd,aAAc;EAAd,aAAc;EAAd,kBAAc;EAAd,sCAAc;EAAd,8BAAc;EAAd,6BAAc;EAAd,4BAAc;EAAd,eAAc;EAAd,oBAAc;EAAd,sBAAc;EAAd,uBAAc;EAAd,wBAAc;EAAd,kBAAc;EAAd,2BAAc;EAAd,4BAAc;EAAd,sCAAc;EAAd,kCAAc;EAAd,2BAAc;EAAd,sBAAc;EAAd,8BAAc;EAAd,YAAc;EAAd,kBAAc;EAAd,gBAAc;EAAd,iBAAc;EAAd,kBAAc;EAAd,cAAc;EAAd,gBAAc;EAAd,aAAc;EAAd,mBAAc;EAAd,qBAAc;EAAd,2BAAc;EAAd,yBAAc;EAAd,0BAAc;EAAd,2BAAc;EAAd,uBAAc;EAAd,wBAAc;EAAd,yBAAc;EAAd,sBAAc;EAAd,oBAAc;EAAd,sBAAc;EAAd,qBAAc;EAAd;AAAc,CAAd;;CAAc,CAAd;;;CAAc;;AAAd;;;EAAA,sBAAc,EAAd,MAAc;EAAd,eAAc,EAAd,MAAc;EAAd,mBAAc,EAAd,MAAc;EAAd,qBAAc,EAAd,MAAc;AAAA;;AAAd;;EAAA,gBAAc;AAAA;;AAAd;;;;;;;;CAAc;;AAAd;;EAAA,gBAAc,EAAd,MAAc;EAAd,8BAAc,EAAd,MAAc,EAAd,MAAc;EAAd,WAAc,EAAd,MAAc;EAAd,+HAAc,EAAd,MAAc;EAAd,6BAAc,EAAd,MAAc;EAAd,+BAAc,EAAd,MAAc;EAAd,wCAAc,EAAd,MAAc;AAAA;;AAAd;;;CAAc;;AAAd;EAAA,SAAc,EAAd,MAAc;EAAd,oBAAc,EAAd,MAAc;AAAA;;AAAd;;;;CAAc;;AAAd;EAAA,SAAc,EAAd,MAAc;EAAd,cAAc,EAAd,MAAc;EAAd,qBAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,yCAAc;UAAd,iCAAc;AAAA;;AAAd;;CAAc;;AAAd;;;;;;EAAA,kBAAc;EAAd,oBAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,cAAc;EAAd,wBAAc;AAAA;;AAAd;;CAAc;;AAAd;;EAAA,mBAAc;AAAA;;AAAd;;;;;CAAc;;AAAd;;;;EAAA,+GAAc,EAAd,MAAc;EAAd,6BAAc,EAAd,MAAc;EAAd,+BAAc,EAAd,MAAc;EAAd,cAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,cAAc;AAAA;;AAAd;;CAAc;;AAAd;;EAAA,cAAc;EAAd,cAAc;EAAd,kBAAc;EAAd,wBAAc;AAAA;;AAAd;EAAA,eAAc;AAAA;;AAAd;EAAA,WAAc;AAAA;;AAAd;;;;CAAc;;AAAd;EAAA,cAAc,EAAd,MAAc;EAAd,qBAAc,EAAd,MAAc;EAAd,yBAAc,EAAd,MAAc;AAAA;;AAAd;;;;CAAc;;AAAd;;;;;EAAA,oBAAc,EAAd,MAAc;EAAd,8BAAc,EAAd,MAAc;EAAd,gCAAc,EAAd,MAAc;EAAd,eAAc,EAAd,MAAc;EAAd,oBAAc,EAAd,MAAc;EAAd,oBAAc,EAAd,MAAc;EAAd,uBAAc,EAAd,MAAc;EAAd,cAAc,EAAd,MAAc;EAAd,SAAc,EAAd,MAAc;EAAd,UAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;;EAAA,oBAAc;AAAA;;AAAd;;;CAAc;;AAAd;;;;EAAA,0BAAc,EAAd,MAAc;EAAd,6BAAc,EAAd,MAAc;EAAd,sBAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,aAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,gBAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,wBAAc;AAAA;;AAAd;;CAAc;;AAAd;;EAAA,YAAc;AAAA;;AAAd;;;CAAc;;AAAd;EAAA,6BAAc,EAAd,MAAc;EAAd,oBAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,wBAAc;AAAA;;AAAd;;;CAAc;;AAAd;EAAA,0BAAc,EAAd,MAAc;EAAd,aAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,kBAAc;AAAA;;AAAd;;CAAc;;AAAd;;;;;;;;;;;;;EAAA,SAAc;AAAA;;AAAd;EAAA,SAAc;EAAd,UAAc;AAAA;;AAAd;EAAA,UAAc;AAAA;;AAAd;;;EAAA,gBAAc;EAAd,SAAc;EAAd,UAAc;AAAA;;AAAd;;CAAc;AAAd;EAAA,UAAc;AAAA;;AAAd;;CAAc;;AAAd;EAAA,gBAAc;AAAA;;AAAd;;;CAAc;;AAAd;;EAAA,UAAc,EAAd,MAAc;EAAd,cAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;;EAAA,eAAc;AAAA;;AAAd;;CAAc;AAAd;EAAA,eAAc;AAAA;;AAAd;;;;CAAc;;AAAd;;;;;;;;EAAA,cAAc,EAAd,MAAc;EAAd,sBAAc,EAAd,MAAc;AAAA;;AAAd;;CAAc;;AAAd;;EAAA,eAAc;EAAd,YAAc;AAAA;;AAAd,wEAAc;AAAd;EAAA,aAAc;AAAA;AACd;EAAA;AAAoB;AAApB;EAAA;AAAoB;AAApB;;EAAA;IAAA;EAAoB;;EAApB;IAAA;EAAoB;AAAA;AAApB;;EAAA;IAAA;EAAoB;;EAApB;IAAA;EAAoB;AAAA;AAApB;;EAAA;IAAA;EAAoB;;EAApB;IAAA;EAAoB;AAAA;AAApB;;EAAA;IAAA;EAAoB;;EAApB;IAAA;EAAoB;AAAA;AAApB;;EAAA;IAAA;EAAoB;;EAApB;IAAA;EAAoB;AAAA;AACpB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA,oCAAmB;UAAnB;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA;AAAmB;AAAnB;EAAA,kCAAmB;EAAnB,iEAAmB;EAAnB;AAAmB;A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","sourcesContent":["@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n.bp5-tree-node-label {\n    padding-left: 0.5rem;\n    font-size: 0.75rem;\n}\n\n.numeric-input input, .scale-input-min input, .scale-input-max input{\n    width: 40px !important;\n    max-width: 40px !important;\n    min-width: 40px !important;\n    padding-left: 4px !important;\n    padding-right: 4px !important;\n}\n\n.scale-slider {\n    width: 90px !important;\n    min-width: 50px !important;\n    max-width: 90px !important;\n}\n\n.normalization-input input {\n    width: 96px !important;\n    max-width: 96px !important;\n    min-width: 96px !important;\n}\n\n.normalization-input-label {\n    font-size: 0.75rem;\n    font-weight: 600;\n    color: rgb(107 114 128);\n    min-width: 24px;\n}"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
