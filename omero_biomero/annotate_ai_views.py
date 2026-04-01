@@ -1486,7 +1486,12 @@ MIN_TRAIN_IMAGES = 5
 def validate_training_readiness(request, conn=None, **kwargs):
     """Check whether an annotation set has enough annotated images per split.
 
-    Query params:
+    Query params (manifest mode):
+        set_id – manifest set_id
+        container_type – dataset or plate
+        container_id – OMERO container ID
+
+    Query params (legacy mode):
         table_id – tracking table FileAnnotation id
 
     Returns JSON:
@@ -1500,38 +1505,62 @@ def validate_training_readiness(request, conn=None, **kwargs):
             }
         }
     """
+    set_id = request.GET.get("set_id")
     table_id = request.GET.get("table_id")
-    if not table_id:
-        return JsonResponse({"error": "Missing table_id"}, status=400)
+
+    if not set_id and not table_id:
+        return JsonResponse({"error": "Missing set_id or table_id"}, status=400)
 
     try:
-        import ezomero
+        if set_id:
+            # Manifest-based validation
+            lib = _get_omero_annotate_ai()
+            if not lib:
+                return JsonResponse({"error": "omero_annotate_ai not available"}, status=500)
 
-        table_data = ezomero.get_table(conn, int(table_id))
-        if table_data is None:
-            return JsonResponse({"error": "Table not found"}, status=404)
+            container_type = request.GET.get("container_type", "dataset")
+            container_id = int(request.GET["container_id"])
+            _set_group_from_container(conn, container_type, container_id, request.GET.get("group_id"))
 
-        # Split rows by role
-        train_mask = table_data["train"] == True  # noqa: E712
-        val_mask = table_data["validate"] == True  # noqa: E712
-        test_mask = ~train_mask & ~val_mask
+            config = lib["load_manifest_from_omero"](conn, container_type, container_id, set_id)
+            if config is None:
+                return JsonResponse({"error": "Manifest not found"}, status=404)
 
-        train_rows = table_data[train_mask]
-        val_rows = table_data[val_mask]
-        test_rows = table_data[test_mask]
+            # Count units by category
+            train_units = [a for a in config.annotations if a.category == "training"]
+            val_units = [a for a in config.annotations if a.category == "validation"]
+            test_units = [a for a in config.annotations if a.category == "test"]
 
-        train_total = len(train_rows)
-        val_total = len(val_rows)
-        test_total = len(test_rows)
+            train_total = len(train_units)
+            val_total = len(val_units)
+            test_total = len(test_units)
+            train_done = sum(1 for a in train_units if a.processed)
+            val_done = sum(1 for a in val_units if a.processed)
+            test_done = sum(1 for a in test_units if a.processed)
+        else:
+            # Legacy tracking table mode
+            import ezomero
 
-        def _done(df):
-            if "processed" not in df.columns or len(df) == 0:
-                return 0
-            return int(df["processed"].sum())
+            table_data = ezomero.get_table(conn, int(table_id))
+            if table_data is None:
+                return JsonResponse({"error": "Table not found"}, status=404)
 
-        train_done = _done(train_rows)
-        val_done = _done(val_rows)
-        test_done = _done(test_rows)
+            train_mask = table_data["train"] == True  # noqa: E712
+            val_mask = table_data["validate"] == True  # noqa: E712
+            test_mask = ~train_mask & ~val_mask
+
+            train_total = len(table_data[train_mask])
+            val_total = len(table_data[val_mask])
+            test_total = len(table_data[test_mask])
+
+            def _done(df):
+                if "processed" not in df.columns or len(df) == 0:
+                    return 0
+                return int(df["processed"].sum())
+
+            train_done = _done(table_data[train_mask])
+            val_done = _done(table_data[val_mask])
+            test_done = _done(table_data[test_mask])
 
         checks = []
 

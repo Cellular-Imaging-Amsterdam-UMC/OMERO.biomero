@@ -280,6 +280,18 @@ const AnnotateTab = ({ manifest, setId, onManifestUpdate }) => {
       const containerType = manifest?.omero?.container_type || "dataset";
       const containerId = manifest?.omero?.container_id || manifest?.omero?.container_ids?.[0];
 
+      // Build channel presentation from OMERO image-level window data
+      // Uses min/max (full intensity range), NOT start/end (rendering defaults)
+      const channelPresentation = allChannels.length > 0
+        ? allChannels.map((ch) => ({
+            channel_index: ch.index,
+            visible: ch.active !== false,
+            contrast_start: ch.window?.min ?? 0,
+            contrast_end: ch.window?.max ?? 255,
+            color: ch.color || "#FFFFFF",
+          }))
+        : null;
+
       const result = await saveAnnotateAnnotation(
         selectedUnit.image_id,
         geojsonPayload,
@@ -287,7 +299,7 @@ const AnnotateTab = ({ manifest, setId, onManifestUpdate }) => {
         selectedUnitIndex,
         containerType,
         containerId,
-        null, // channelPresentation — TODO: pass from viewer state
+        channelPresentation,
       );
 
       if (result.success) {
@@ -326,6 +338,16 @@ const AnnotateTab = ({ manifest, setId, onManifestUpdate }) => {
       const containerType = manifest?.omero?.container_type || "dataset";
       const containerId = manifest?.omero?.container_id || manifest?.omero?.container_ids?.[0];
 
+      const channelPresentation = allChannels.length > 0
+        ? allChannels.map((ch) => ({
+            channel_index: ch.index,
+            visible: ch.active !== false,
+            contrast_start: ch.window?.min ?? 0,
+            contrast_end: ch.window?.max ?? 255,
+            color: ch.color || "#FFFFFF",
+          }))
+        : null;
+
       await saveAnnotateAnnotation(
         selectedUnit.image_id,
         { type: "FeatureCollection", features: [] },
@@ -333,6 +355,7 @@ const AnnotateTab = ({ manifest, setId, onManifestUpdate }) => {
         selectedUnitIndex,
         containerType,
         containerId,
+        channelPresentation,
       );
 
       if (manifest) {

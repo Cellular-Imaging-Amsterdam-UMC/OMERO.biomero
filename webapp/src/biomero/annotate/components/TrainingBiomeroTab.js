@@ -125,18 +125,24 @@ const TrainingBiomeroTab = () => {
       return;
     }
     listManifests("dataset", dsId).then((resp) => {
-      setAnnotationSets(resp.manifests || []);
+      // Map manifest fields to match AnnotationSetPicker's expected { id, name } shape
+      const sets = (resp.manifests || []).map((m) => ({
+        ...m,
+        id: m.set_id,
+      }));
+      setAnnotationSets(sets);
     }).catch(() => setAnnotationSets([]));
   }, [selectedDatasets, getDatasetId]);
 
   // Validate when annotation set is selected
   useEffect(() => {
-    if (!selectedAnnotationSet) {
+    const dsId = getDatasetId(selectedDatasets);
+    if (!selectedAnnotationSet || !dsId) {
       setValidation(null);
       return;
     }
     setValidationLoading(true);
-    validateTrainingReadiness(selectedAnnotationSet.id)
+    validateTrainingReadiness(selectedAnnotationSet.set_id, "dataset", dsId)
       .then((resp) => setValidation(resp))
       .catch(() => setValidation(null))
       .finally(() => setValidationLoading(false));

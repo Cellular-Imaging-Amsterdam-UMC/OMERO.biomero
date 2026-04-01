@@ -642,8 +642,8 @@ export const getAnnotateProgress = async (tableId) => {
   );
 };
 
-export const validateTrainingReadiness = async (tableId) => {
-  const endpoint = `/omero_biomero/api/annotate/validate_training/?table_id=${tableId}`;
+export const validateTrainingReadiness = async (setId, containerType, containerId) => {
+  const endpoint = `/omero_biomero/api/annotate/validate_training/?set_id=${setId}&container_type=${containerType}&container_id=${containerId}`;
   const response = await apiRequest(endpoint, "GET");
   return response;
 };
