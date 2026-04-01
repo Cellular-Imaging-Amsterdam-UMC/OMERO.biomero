@@ -546,40 +546,32 @@ export const deleteTrackingTable = async (tableId) => {
 export const saveAnnotateAnnotation = async (
   imageId,
   annotations,
-  tableId,
+  setId,
   unitIndex,
-  zSlice,
-  timepoint,
-  channel,
-  patchOffset,
-  configName,
+  containerType,
+  containerId,
+  channelPresentation = null,
+  groupId = null,
 ) => {
-  const csrfToken = window.csrftoken;
-
-  // Width/height omitted — the backend uses actual OMERO image dimensions
   return apiRequest(
     "/omero_biomero/api/annotate/save_annotation/",
     "POST",
     {
       image_id: imageId,
-      annotations: annotations,
-      table_id: tableId,
+      annotations,
+      set_id: setId,
       unit_index: unitIndex,
-      z_slice: zSlice,
-      timepoint: timepoint,
-      channel: channel,
-      patch_offset: patchOffset,
-      config_name: configName,
-    },
-    {
-      headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+      container_type: containerType,
+      container_id: containerId,
+      channel_presentation: channelPresentation,
+      group_id: groupId,
     },
   );
 };
 
-export const fetchAnnotateAnnotation = async (imageId, tableId) => {
+export const fetchAnnotateAnnotation = async (imageId, setId) => {
   return apiRequest(
-    `/omero_biomero/api/annotate/fetch_annotation/?image=${imageId}&table_id=${tableId}`,
+    `/omero_biomero/api/annotate/fetch_annotation/?image=${imageId}&set_id=${setId}`,
     "GET",
   );
 };

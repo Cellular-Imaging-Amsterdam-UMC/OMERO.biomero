@@ -17,7 +17,6 @@ import {
 import {
   runPredictionPrediction,
   saveAnnotateAnnotation,
-  fetchAllImageAnnotations,
   fetchAnnotateAnnotation,
 } from "../../../apiService";
 import ImageChannelControls from "./ImageChannelControls";
@@ -182,16 +181,6 @@ const PreviewViewer = ({
       return next;
     });
   }, []);
-
-  // Fetch existing ROI annotations when image changes
-  useEffect(() => {
-    setExistingAnnotations([]);
-    setExistingRoiVisibility({});
-    if (!image) return;
-    fetchAllImageAnnotations(image.id)
-      .then(applyAnnotationFeatures)
-      .catch(() => setExistingAnnotations([]));
-  }, [image?.id, applyAnnotationFeatures]);
 
   // Fetch ROIs from selected annotation set
   useEffect(() => {
@@ -409,12 +398,8 @@ const PreviewViewer = ({
       }
       setSaveResult({
         ok: true,
-        msg: `Saved ${saved} channel(s) as OMERO ROIs`,
+        msg: `Saved ${saved} channel(s) as annotations`,
       });
-      // Refresh existing ROI layers so newly saved polygons appear immediately
-      fetchAllImageAnnotations(image.id)
-        .then(applyAnnotationFeatures)
-        .catch(() => {});
     } catch (e) {
       const msg = e.response?.data?.error || e.message || "Save failed";
       setSaveResult({ ok: false, msg });

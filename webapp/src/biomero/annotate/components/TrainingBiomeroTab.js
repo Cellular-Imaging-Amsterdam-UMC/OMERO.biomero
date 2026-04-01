@@ -22,7 +22,7 @@ import { useAppContext } from "../../../AppContext";
 import {
   startTraining,
   listTrainedModels,
-  listTrackingTables,
+  listManifests,
   validateTrainingReadiness,
 } from "../../../apiService";
 
@@ -124,8 +124,8 @@ const TrainingBiomeroTab = () => {
       setAnnotationSets([]);
       return;
     }
-    listTrackingTables("dataset", dsId).then((resp) => {
-      setAnnotationSets(resp.tables || []);
+    listManifests("dataset", dsId).then((resp) => {
+      setAnnotationSets(resp.manifests || []);
     }).catch(() => setAnnotationSets([]));
   }, [selectedDatasets, getDatasetId]);
 

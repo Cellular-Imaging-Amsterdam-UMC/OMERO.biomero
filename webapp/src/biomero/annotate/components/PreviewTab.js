@@ -5,7 +5,7 @@ import ImageSelector from "./ImageSelector";
 import ModelSelector from "./ModelSelector";
 import ChannelSelector from "./ChannelSelector";
 import PreviewViewer from "./PreviewViewer";
-import { fetchImageChannels, listTrackingTables } from "../../../apiService";
+import { fetchImageChannels, listManifests } from "../../../apiService";
 
 const PreviewTab = () => {
   const [selectedDatasets, setSelectedDatasets] = useState([]);
@@ -51,8 +51,8 @@ const PreviewTab = () => {
       return;
     }
     setSetsLoading(true);
-    listTrackingTables("dataset", datasetId)
-      .then((resp) => setAnnotationSets(resp.tables || []))
+    listManifests("dataset", datasetId)
+      .then((resp) => setAnnotationSets(resp.manifests || []))
       .catch(() => setAnnotationSets([]))
       .finally(() => setSetsLoading(false));
   }, [datasetId]);
@@ -187,7 +187,7 @@ const PreviewTab = () => {
                     channel={selectedChannel}
                     channels={channels}
                     imageMeta={imageMeta}
-                    annotationSetId={selectedAnnotationSet?.id}
+                    annotationSetId={selectedAnnotationSet?.set_id}
                  />
                  </div>
              </Card>

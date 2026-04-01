@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Tabs, Tab } from "@blueprintjs/core";
 import PreviewTab from "./components/PreviewTab";
 import TrainingBiomeroTab from "./components/TrainingBiomeroTab";
@@ -6,13 +6,13 @@ import ConfigureTab from "./components/ConfigureTab";
 import AnnotateTab from "./components/AnnotateTab";
 
 import { useAppContext } from "../../AppContext";
+import { loadManifest } from "../../apiService";
 import GroupSelect from "../../shared/components/GroupSelect";
 import SlurmStatusIndicator from "../../shared/components/SlurmStatusIndicator";
 
 const AnnotateApp = () => {
   const {
     state,
-    updateState,
     loadOmeroTreeData,
     loadFolderData,
     loadGroups,
@@ -24,25 +24,17 @@ const AnnotateApp = () => {
   const [loadingOmero, setLoadingOmero] = useState(false);
   const [workflowError, setWorkflowError] = useState(false);
 
-  // Shared annotate state
-  const [config, setConfig] = useState(null);
-  const [tableId, setTableId] = useState(null);
-  const [units, setUnits] = useState([]);
-  const [progress, setProgress] = useState(null);
-  const [activeSetName, setActiveSetName] = useState(null);
+  // Manifest-based state (replaces tableId/config/units/progress)
+  const [setId, setSetId] = useState(null);
+  const [manifest, setManifest] = useState(null);
 
   useEffect(() => {
     if (!loadingOmero) {
       setLoadingOmero(true);
       loadOmeroTreeData()
-        .then(() => {
-          setLoadingOmero(false);
-        })
-        .catch(() => {
-          setLoadingOmero(false);
-        });
+        .then(() => setLoadingOmero(false))
+        .catch(() => setLoadingOmero(false));
     }
-
     loadFolderData();
     loadGroups();
     loadWorkflows();
@@ -50,133 +42,154 @@ const AnnotateApp = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleTabChange = (newTabId) => {
-    setActiveTab(newTabId);
-  };
+  const handleTabChange = (newTabId) => setActiveTab(newTabId);
+  const handleWorkflowError = () => setWorkflowError((prev) => !prev);
 
-  const handleWorkflowError = () => {
-    setWorkflowError(prev => !prev);
-  };
-
-  const handleConfigCreated = (newConfig, newTableId, newUnits, newProgress) => {
-    setConfig(newConfig);
-    setTableId(newTableId);
-    setUnits(newUnits);
-    setProgress(newProgress);
-    setActiveSetName(newConfig?.name || `Set #${newTableId}`);
+  // Called by ConfigureTab when a new set is created or an existing one is resumed
+  const handleConfigCreated = useCallback(async (configData, newSetId) => {
+    setSetId(newSetId);
+    if (configData) {
+      setManifest(configData);
+    } else if (newSetId) {
+      // Resume — load full manifest from server
+      try {
+        const containerType = configData?.omero?.container_type || "dataset";
+        const containerId = configData?.omero?.container_id || configData?.omero?.container_ids?.[0];
+        if (containerId) {
+          const result = await loadManifest(containerType, containerId, newSetId);
+          setManifest(result.config);
+        }
+      } catch (e) {
+        console.error("Failed to load manifest:", e);
+      }
+    }
     setActiveTab("annotate");
-  };
+  }, []);
 
-  const handleProgressUpdate = (newProgress) => setProgress(newProgress);
-  const handleUnitsUpdate = (newUnits) => setUnits(newUnits);
+  // Called by AnnotateTab when manifest changes (unit processed, etc.)
+  const handleManifestUpdate = useCallback((updatedManifest) => {
+    setManifest(updatedManifest);
+  }, []);
+
+  // Computed progress from manifest
+  const progress = manifest?.annotations
+    ? {
+        total_units: manifest.annotations.length,
+        completed_units: manifest.annotations.filter((a) => a.processed).length,
+        progress_percent:
+          manifest.annotations.length > 0
+            ? Math.round(
+                (manifest.annotations.filter((a) => a.processed).length /
+                  manifest.annotations.length) *
+                  100,
+              )
+            : 0,
+      }
+    : null;
 
   return (
     <div>
-        <div className="p-4">
-            {state?.user?.groups && (
-            <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                <span className="text-base mr-4">Select group</span>
-                <GroupSelect />
-                </div>
-                <div className="flex items-center gap-4">
-                  {progress && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium">Progress:</span>
-                      <div className="w-48 bg-gray-200 rounded-full h-4">
-                        <div
-                          className="bg-green-500 h-4 rounded-full transition-all"
-                          style={{ width: `${progress.progress_percent}%` }}
-                        />
-                      </div>
-                      <span>
-                        {progress.completed_units}/{progress.total_units} (
-                        {progress.progress_percent}%)
-                      </span>
-                    </div>
-                  )}
-                  <SlurmStatusIndicator
-                    onTabChange={activeTab}
-                    onWorkflowError={workflowError}
-                  />
-                </div>
+      <div className="p-4">
+        {state?.user?.groups && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <span className="text-base mr-4">Select group</span>
+              <GroupSelect />
             </div>
-            )}
-        </div>
-
-        {activeSetName && tableId && (activeTab === "annotate" || activeTab === "training") && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: "8px 16px",
-              background: "#e8f0fe",
-              borderBottom: "1px solid #c4d4e8",
-              fontSize: 13,
-            }}
-          >
-            <span style={{ fontWeight: 600 }}>{activeSetName}</span>
-            {progress && (
-              <span style={{ color: "#555" }}>
-                — {progress.completed_units || 0}/{progress.total_units || 0} images annotated
-              </span>
-            )}
+            <div className="flex items-center gap-4">
+              {progress && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="font-medium">Progress:</span>
+                  <div className="w-48 bg-gray-200 rounded-full h-4">
+                    <div
+                      className="bg-green-500 h-4 rounded-full transition-all"
+                      style={{ width: `${progress.progress_percent}%` }}
+                    />
+                  </div>
+                  <span>
+                    {progress.completed_units}/{progress.total_units} (
+                    {progress.progress_percent}%)
+                  </span>
+                </div>
+              )}
+              <SlurmStatusIndicator
+                onTabChange={activeTab}
+                onWorkflowError={workflowError}
+              />
+            </div>
           </div>
         )}
+      </div>
 
-        <div className="p-4 h-full overflow-hidden">
-        <Tabs
-            id="annotate-app-tabs"
-            className="h-[calc(100vh-200px)]"
-            animate={true}
-            renderActiveTabPanelOnly={false}
-            large={true}
-            selectedTabId={activeTab}
-            onChange={handleTabChange}
+      {manifest?.name && setId && (activeTab === "annotate" || activeTab === "training") && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "8px 16px",
+            background: "#e8f0fe",
+            borderBottom: "1px solid #c4d4e8",
+            fontSize: 13,
+          }}
         >
-            <Tab
+          <span style={{ fontWeight: 600 }}>{manifest.name}</span>
+          {progress && (
+            <span style={{ color: "#555" }}>
+              — {progress.completed_units}/{progress.total_units} images annotated
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="p-4 h-full overflow-hidden">
+        <Tabs
+          id="annotate-app-tabs"
+          className="h-[calc(100vh-200px)]"
+          animate={true}
+          renderActiveTabPanelOnly={false}
+          large={true}
+          selectedTabId={activeTab}
+          onChange={handleTabChange}
+        >
+          <Tab
             id="preview"
             title="Preview"
             icon="eye-open"
-            panel={<PreviewTab />}
-            />
-            <Tab
+            panel={<PreviewTab setId={setId} />}
+          />
+          <Tab
             id="configure"
             title="Configure"
             icon="cog"
             panel={
               <ConfigureTab
                 onConfigCreated={handleConfigCreated}
-                existingConfig={config}
+                existingConfig={manifest}
               />
             }
-            />
-            <Tab
+          />
+          <Tab
             id="annotate"
             title="Annotate"
             icon="edit"
-            disabled={!tableId}
+            disabled={!setId}
             panel={
               <AnnotateTab
-                config={config}
-                tableId={tableId}
-                units={units}
-                progress={progress}
-                onProgressUpdate={handleProgressUpdate}
-                onUnitsUpdate={handleUnitsUpdate}
-                onTableIdUpdate={setTableId}
+                manifest={manifest}
+                setId={setId}
+                onManifestUpdate={handleManifestUpdate}
               />
             }
-            />
-            <Tab
+          />
+          <Tab
             id="training"
             title="Training"
             icon="rocket-slant"
-            panel={<TrainingBiomeroTab />}
-            />
+            panel={<TrainingBiomeroTab setId={setId} manifest={manifest} />}
+          />
         </Tabs>
-        </div>
+      </div>
     </div>
   );
 };

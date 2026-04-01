@@ -1,55 +1,103 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { H4, Card, Button, Spinner, Callout, NumericInput, ButtonGroup, Menu, MenuItem, Popover } from "@blueprintjs/core";
-import TrackingTableView from "./TrackingTableView";
+import React, { useState, useEffect } from "react";
+import { H4, Card, Button, Spinner, Callout, ButtonGroup, Menu, MenuItem, Popover, Tag } from "@blueprintjs/core";
 import AnnotateViewer from "./AnnotateViewer";
 import PatchSelector from "./PatchSelector";
 import { useAppContext } from "../../../AppContext";
 import {
-  getTrackingTableDetail,
   saveAnnotateAnnotation,
   fetchAnnotateAnnotation,
-  getAnnotateProgress,
   getAnnotateImageChannels,
-  markUnitProcessed,
-  addPatchToTrackingTable,
+  addPatchToManifest,
 } from "../../../apiService";
 
-const AnnotateTab = ({
-  config,
-  tableId,
-  units: initialUnits,
-  progress: initialProgress,
-  onProgressUpdate,
-  onUnitsUpdate,
-  onTableIdUpdate,
-}) => {
+// Simple unit list (replaces TrackingTableView)
+const UnitList = ({ units, selectedIndex, onSelect, filterStatus, onFilterChange }) => {
+  const filtered = units
+    .map((u, i) => ({ ...u, _idx: i }))
+    .filter((u) => {
+      if (filterStatus === "pending") return !u.processed;
+      if (filterStatus === "completed") return u.processed;
+      return true;
+    });
+
+  const completed = units.filter((u) => u.processed).length;
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-2 border-b flex items-center justify-between">
+        <span className="text-xs font-bold">{completed}/{units.length} done</span>
+        <ButtonGroup minimal small>
+          {["all", "pending", "completed"].map((s) => (
+            <Button
+              key={s}
+              active={filterStatus === s}
+              onClick={() => onFilterChange(s)}
+              text={s.charAt(0).toUpperCase() + s.slice(1)}
+              small
+            />
+          ))}
+        </ButtonGroup>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {filtered.map((unit) => (
+          <div
+            key={unit._idx}
+            className={`p-2 text-xs cursor-pointer border-b ${
+              unit._idx === selectedIndex
+                ? "bg-blue-100 border-l-2 border-l-blue-500"
+                : "hover:bg-gray-50"
+            } ${unit.processed ? "opacity-60" : ""}`}
+            onClick={() => onSelect(unit._idx)}
+          >
+            <div className="font-medium truncate">{unit.image_name}</div>
+            {unit.is_patch && (
+              <div className="text-gray-500">
+                Patch {unit.patch_width}x{unit.patch_height} at ({unit.patch_x},{unit.patch_y})
+              </div>
+            )}
+            <div className="flex gap-2 text-gray-400 mt-0.5">
+              {unit.channel >= 0 && <span>C:{unit.channel}</span>}
+              {unit.z_slice >= 0 && <span>Z:{unit.z_slice}</span>}
+              {unit.timepoint >= 0 && <span>T:{unit.timepoint}</span>}
+              <Tag minimal round small intent={unit.processed ? "success" : "none"}>
+                {unit.processed ? "Done" : "Pending"}
+              </Tag>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const AnnotateTab = ({ manifest, setId, onManifestUpdate }) => {
   const { toaster } = useAppContext();
 
-  const [units, setUnits] = useState(initialUnits || []);
+  const units = manifest?.annotations || [];
   const [selectedUnitIndex, setSelectedUnitIndex] = useState(null);
   const [filterStatus, setFilterStatus] = useState("pending");
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [annotations, setAnnotations] = useState([]);
-  const [featureTypes, setFeatureTypes] = useState([
-    { id: "1", name: "Object", color: "#00ff00" },
-  ]);
+  const [featureTypes, setFeatureTypes] = useState([]);
   const [channelInfo, setChannelInfo] = useState(null);
   const [skipPopoverOpen, setSkipPopoverOpen] = useState(false);
 
-  // Patch state
-  const [patchWidth, setPatchWidth] = useState(256);
-  const [patchHeight, setPatchHeight] = useState(256);
-
-  // Load table detail when tableId changes or on mount
+  // Initialize feature types from manifest
   useEffect(() => {
-    if (tableId) {
-      loadTableDetail();
+    if (manifest?.feature_types?.length > 0) {
+      setFeatureTypes(
+        manifest.feature_types.map((ft, i) => ({
+          id: ft.name || String(i),
+          name: ft.name,
+          color: ft.color,
+        })),
+      );
+    } else if (featureTypes.length === 0) {
+      setFeatureTypes([{ id: "1", name: "Object", color: "#00ff00" }]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId]);
+  }, [manifest?.feature_types]);
 
-  // Auto-select first pending unit when units load
+  // Auto-select first pending unit
   useEffect(() => {
     if (units.length > 0 && selectedUnitIndex === null) {
       const firstPending = units.findIndex((u) => !u.processed);
@@ -57,43 +105,38 @@ const AnnotateTab = ({
     }
   }, [units, selectedUnitIndex]);
 
-  // Load existing annotations when unit changes
+  // Load annotations when unit changes
   useEffect(() => {
     if (selectedUnitIndex !== null && units[selectedUnitIndex]) {
       loadUnitAnnotations(units[selectedUnitIndex]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedUnitIndex]);
-
-  const loadTableDetail = async () => {
-    setLoading(true);
-    try {
-      const result = await getTrackingTableDetail(tableId);
-      const loadedUnits = result.units || [];
-      setUnits(loadedUnits);
-      onUnitsUpdate?.(loadedUnits);
-      onProgressUpdate?.(result.progress);
-    } catch (e) {
-      console.error("Error loading table detail:", e);
-      toaster?.show({
-        message: "Failed to load tracking table",
-        intent: "danger",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [selectedUnitIndex, setId]);
 
   const loadUnitAnnotations = async (unit) => {
-    if (!unit || !unit.image_id) return;
+    if (!unit || !unit.image_id || !setId) return;
     try {
-      const result = await fetchAnnotateAnnotation(unit.image_id, tableId);
+      const result = await fetchAnnotateAnnotation(unit.image_id, setId);
       const features = result.features || [];
-      const loaded = features.map((f) => ({
-        id: f.id,
-        points: f.geometry.coordinates[0],
-        typeId: f.properties?.typeId || "1",
-        roiId: f.properties?.roiId,
+      // Filter features for this specific patch/plane
+      const filtered = features.filter((f) => {
+        const props = f.properties || {};
+        // If unit is a patch, match by patch coordinates
+        if (unit.is_patch && props.patch) {
+          return (
+            props.patch.x === unit.patch_x &&
+            props.patch.y === unit.patch_y &&
+            props.patch.width === unit.patch_width &&
+            props.patch.height === unit.patch_height
+          );
+        }
+        // For full-image units, include features without patch property
+        return !unit.is_patch && !props.patch;
+      });
+      const loaded = filtered.map((f) => ({
+        id: f.id || crypto.randomUUID(),
+        points: f.geometry?.coordinates?.[0] || [],
+        typeId: f.properties?.featureType || f.properties?.typeId || "1",
       }));
       setAnnotations(loaded);
     } catch (e) {
@@ -102,33 +145,25 @@ const AnnotateTab = ({
     }
   };
 
-  const selectedUnit =
-    selectedUnitIndex !== null ? units[selectedUnitIndex] : null;
-
-  // Get all patch units for the currently selected image
+  const selectedUnit = selectedUnitIndex !== null ? units[selectedUnitIndex] : null;
   const currentImageId = selectedUnit?.image_id;
   const patchesForImage = units
     .map((u, i) => ({ ...u, _unitIndex: i }))
     .filter((u) => u.is_patch && u.image_id === currentImageId);
-
   const allDone = units.length > 0 && units.every((u) => u.processed);
-
-  // Build the patch prop for AnnotateViewer when selected unit is a patch
   const viewerPatch = selectedUnit?.is_patch ? selectedUnit : null;
 
-  // Build an image object compatible with the AnnotationViewer
   const currentImage = selectedUnit
     ? {
         id: selectedUnit.image_id,
         name: selectedUnit.image_name,
-        // Override z/t for the viewer URL
         z: selectedUnit.z_slice >= 0 ? selectedUnit.z_slice : 0,
         t: selectedUnit.timepoint >= 0 ? selectedUnit.timepoint : 0,
         c: selectedUnit.channel >= 0 ? selectedUnit.channel : 0,
       }
     : null;
 
-  // Fetch channel info for contrast slider
+  // Fetch channel info
   useEffect(() => {
     if (currentImage) {
       getAnnotateImageChannels(currentImage.id)
@@ -142,25 +177,34 @@ const AnnotateTab = ({
     }
   }, [currentImage?.id, currentImage?.c]);
 
-  const handleSaveAndNext = async () => {
-    if (allDone) return;
-    if (!selectedUnit || annotations.length === 0) {
-      toaster?.show({
-        message: "Draw some annotations first",
-        intent: "warning",
-      });
-      return;
+  const advanceToNextPending = (fromIndex) => {
+    const next = units.findIndex((u, i) => !u.processed && i > fromIndex);
+    if (next >= 0) {
+      setSelectedUnitIndex(next);
+      setAnnotations([]);
+    } else {
+      const any = units.findIndex((u) => !u.processed);
+      if (any >= 0) {
+        setSelectedUnitIndex(any);
+        setAnnotations([]);
+      } else {
+        toaster?.show({
+          message: "All processing units are complete!",
+          intent: "success",
+          icon: "tick-circle",
+        });
+      }
     }
+  };
+
+  const handleSaveAndNext = async () => {
+    if (allDone || !selectedUnit || annotations.length === 0) return;
     setSaving(true);
     try {
-      // We need image dimensions for mask creation.
-      // The AnnotationViewer works at native image resolution, so we can
-      // get dimensions from the canvas or pass them from the image.
-      // For now, use a reasonable approach: get from the first annotation
-      // point bounds or the image metadata in the unit.
       const zSlice = selectedUnit.z_slice >= 0 ? selectedUnit.z_slice : 0;
       const timepoint = selectedUnit.timepoint >= 0 ? selectedUnit.timepoint : 0;
       const channel = selectedUnit.channel >= 0 ? selectedUnit.channel : -1;
+
       const geojsonPayload = {
         type: "FeatureCollection",
         features: annotations.map((ann) => ({
@@ -169,141 +213,100 @@ const AnnotateTab = ({
           geometry: {
             type: "Polygon",
             coordinates: [ann.points],
-            plane: { c: channel, z: zSlice, t: timepoint },
           },
-          properties: { objectType: "annotation" },
+          properties: {
+            objectType: "annotation",
+            featureType: ann.typeId,
+            plane: { c: channel, z: zSlice, t: timepoint },
+            ...(selectedUnit.is_patch
+              ? {
+                  patch: {
+                    x: selectedUnit.patch_x,
+                    y: selectedUnit.patch_y,
+                    width: selectedUnit.patch_width,
+                    height: selectedUnit.patch_height,
+                  },
+                }
+              : {}),
+          },
         })),
       };
+
+      const containerType = manifest?.omero?.container_type || "dataset";
+      const containerId = manifest?.omero?.container_id || manifest?.omero?.container_ids?.[0];
+
       const result = await saveAnnotateAnnotation(
         selectedUnit.image_id,
         geojsonPayload,
-        tableId,
+        setId,
         selectedUnitIndex,
-        selectedUnit.z_slice >= 0 ? selectedUnit.z_slice : null,
-        selectedUnit.timepoint >= 0 ? selectedUnit.timepoint : null,
-        selectedUnit.channel >= 0 ? selectedUnit.channel : null,
-        selectedUnit.is_patch
-          ? [selectedUnit.patch_x, selectedUnit.patch_y]
-          : null,
-        config?.name || "web_annotation",
+        containerType,
+        containerId,
+        null, // channelPresentation — TODO: pass from viewer state
       );
 
       if (result.success) {
-        // The backend recreates the tracking table (delete + create) so the
-        // table ID may change.  Update parent state so subsequent calls use
-        // the new ID.
-        const currentTableId = result.table_id ?? tableId;
-        if (result.table_id && result.table_id !== tableId) {
-          onTableIdUpdate?.(result.table_id);
-        }
-
         toaster?.show({
-          message: `Annotation saved (ROI: ${result.roi_id}, Label: ${result.label_id})`,
+          message: "Annotation saved",
           intent: "success",
           timeout: 3000,
         });
 
-        // Mark unit as processed locally
-        const updatedUnits = [...units];
-        updatedUnits[selectedUnitIndex] = {
-          ...updatedUnits[selectedUnitIndex],
-          processed: true,
-          roi_id: String(result.roi_id),
-          label_id: String(result.label_id),
-        };
-        setUnits(updatedUnits);
-        onUnitsUpdate?.(updatedUnits);
-
-        // Update progress using the (possibly new) table ID
-        const progressResult = await getAnnotateProgress(currentTableId);
-        onProgressUpdate?.(progressResult);
-
-        // Move to next pending unit
-        const nextPending = updatedUnits.findIndex(
-          (u, i) => !u.processed && i > selectedUnitIndex,
-        );
-        if (nextPending >= 0) {
-          setSelectedUnitIndex(nextPending);
-          setAnnotations([]);
-        } else {
-          // Try from beginning
-          const anyPending = updatedUnits.findIndex((u) => !u.processed);
-          if (anyPending >= 0) {
-            setSelectedUnitIndex(anyPending);
-            setAnnotations([]);
-          } else {
-            toaster?.show({
-              message: "All processing units are complete!",
-              intent: "success",
-              icon: "tick-circle",
-            });
-          }
+        // Update manifest locally
+        if (manifest) {
+          const updated = { ...manifest };
+          updated.annotations = [...updated.annotations];
+          updated.annotations[selectedUnitIndex] = {
+            ...updated.annotations[selectedUnitIndex],
+            processed: true,
+          };
+          onManifestUpdate(updated);
         }
+
+        advanceToNextPending(selectedUnitIndex);
       }
     } catch (e) {
       console.error("Error saving annotation:", e);
-      const errMsg = e.response?.data?.error || e.message;
-      toaster?.show({ message: `Failed to save: ${errMsg}`, intent: "danger" });
+      toaster?.show({ message: `Failed to save: ${e.message}`, intent: "danger" });
     } finally {
       setSaving(false);
     }
   };
 
   const handleMarkEmpty = async () => {
-    if (!selectedUnit || !tableId) return;
+    if (!selectedUnit) return;
+    // Mark processed locally — save_annotation with empty GeoJSON
+    setSaving(true);
     try {
-      setSaving(true);
-      const result = await markUnitProcessed(tableId, selectedUnitIndex);
-      if (result.success) {
-        // Update table ID if it changed
-        const currentTableId = result.table_id ?? tableId;
-        if (result.table_id && result.table_id !== tableId) {
-          onTableIdUpdate?.(result.table_id);
-        }
+      const containerType = manifest?.omero?.container_type || "dataset";
+      const containerId = manifest?.omero?.container_id || manifest?.omero?.container_ids?.[0];
 
-        toaster?.show({
-          message: "Marked as done — no objects to label",
-          intent: "success",
-          icon: "tick",
-          timeout: 2000,
-        });
+      await saveAnnotateAnnotation(
+        selectedUnit.image_id,
+        { type: "FeatureCollection", features: [] },
+        setId,
+        selectedUnitIndex,
+        containerType,
+        containerId,
+      );
 
-        // Mark unit as processed locally
-        const updatedUnits = [...units];
-        updatedUnits[selectedUnitIndex] = {
-          ...updatedUnits[selectedUnitIndex],
+      if (manifest) {
+        const updated = { ...manifest };
+        updated.annotations = [...updated.annotations];
+        updated.annotations[selectedUnitIndex] = {
+          ...updated.annotations[selectedUnitIndex],
           processed: true,
         };
-        setUnits(updatedUnits);
-        onUnitsUpdate?.(updatedUnits);
-
-        // Update progress
-        const progressResult = await getAnnotateProgress(currentTableId);
-        onProgressUpdate?.(progressResult);
-
-        // Move to next pending unit
-        const nextPending = updatedUnits.findIndex(
-          (u, i) => !u.processed && i > selectedUnitIndex,
-        );
-        if (nextPending >= 0) {
-          setSelectedUnitIndex(nextPending);
-          setAnnotations([]);
-        } else {
-          const anyPending = updatedUnits.findIndex((u) => !u.processed);
-          if (anyPending >= 0) {
-            setSelectedUnitIndex(anyPending);
-            setAnnotations([]);
-          } else {
-            toaster?.show({
-              message: "All images have been reviewed!",
-              intent: "success",
-              icon: "tick-circle",
-            });
-          }
-        }
+        onManifestUpdate(updated);
       }
+
+      toaster?.show({
+        message: "Marked as done",
+        intent: "success",
+        timeout: 2000,
+      });
+      advanceToNextPending(selectedUnitIndex);
     } catch (e) {
-      console.error("Error marking empty:", e);
       toaster?.show({ message: `Failed: ${e.message}`, intent: "danger" });
     } finally {
       setSaving(false);
@@ -311,92 +314,52 @@ const AnnotateTab = ({
   };
 
   const handleAddPatch = async () => {
-    if (!selectedUnit || !tableId) return;
+    if (!selectedUnit || !setId || !manifest) return;
     try {
-      // Random position within image bounds
-      // We need image dimensions — use a reasonable default or get from channel info
+      const containerType = manifest.omero?.container_type || "dataset";
+      const containerId = manifest.omero?.container_id || manifest.omero?.container_ids?.[0];
       const imgWidth = channelInfo?.width || 1024;
       const imgHeight = channelInfo?.height || 1024;
-      const maxX = Math.max(0, imgWidth - patchWidth);
-      const maxY = Math.max(0, imgHeight - patchHeight);
-      const px = Math.floor(Math.random() * maxX);
-      const py = Math.floor(Math.random() * maxY);
 
-      const result = await addPatchToTrackingTable(
-        tableId,
+      const result = await addPatchToManifest(
+        containerType,
+        containerId,
+        setId,
         selectedUnit.image_id,
         selectedUnit.image_name,
-        px,
-        py,
-        patchWidth,
-        patchHeight,
-        selectedUnit.category || "training",
+        imgWidth,
+        imgHeight,
       );
 
       if (result.success) {
-        // Update table ID if it changed
-        if (result.table_id && result.table_id !== tableId) {
-          onTableIdUpdate?.(result.table_id);
+        // Update manifest with new unit
+        if (manifest) {
+          const updated = { ...manifest };
+          updated.annotations = [...updated.annotations, result.unit];
+          onManifestUpdate(updated);
         }
-        // Reload the tracking table to get the new unit
-        const detail = await getTrackingTableDetail(result.table_id || tableId);
-        setUnits(detail.units || []);
-        onUnitsUpdate?.(detail.units || []);
-        // Select the newly added patch
         if (result.unit_index !== undefined) {
           setSelectedUnitIndex(result.unit_index);
           setAnnotations([]);
         }
-        toaster?.show({
-          message: "Patch added",
-          intent: "success",
-          timeout: 2000,
-        });
+        toaster?.show({ message: "Patch added", intent: "success", timeout: 2000 });
       }
     } catch (e) {
-      console.error("Error adding patch:", e);
       toaster?.show({ message: `Failed to add patch: ${e.message}`, intent: "danger" });
     }
   };
 
   const handleSkipForLater = () => {
-    // Move to next unit without saving — image stays as pending
-    const next = units.findIndex(
-      (u, i) => !u.processed && i > (selectedUnitIndex ?? -1),
-    );
-    if (next >= 0) {
-      setSelectedUnitIndex(next);
-      setAnnotations([]);
-      toaster?.show({
-        message: "Skipped — will come back later",
-        intent: "warning",
-        icon: "arrow-right",
-        timeout: 2000,
-      });
-    } else {
-      const anyPending = units.findIndex((u) => !u.processed);
-      if (anyPending >= 0) {
-        setSelectedUnitIndex(anyPending);
-        setAnnotations([]);
-      } else {
-        toaster?.show({
-          message: "All images have been reviewed!",
-          intent: "success",
-          icon: "tick-circle",
-        });
-      }
-    }
+    advanceToNextPending(selectedUnitIndex ?? -1);
+    toaster?.show({
+      message: "Skipped — will come back later",
+      intent: "warning",
+      icon: "arrow-right",
+      timeout: 2000,
+    });
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Spinner />
-      </div>
-    );
-  }
-
-  if (!tableId) {
+  if (!setId) {
     return (
       <Callout intent="primary" icon="info-sign">
         Configure and initialize a workflow first using the Configure tab.
@@ -464,12 +427,12 @@ const AnnotateTab = ({
       </div>
 
       <div className="flex gap-4 flex-1 min-h-0">
-        {/* Tracking table sidebar */}
+        {/* Unit list sidebar */}
         <Card className="w-80 shrink-0 p-0 overflow-hidden flex flex-col">
-          <TrackingTableView
+          <UnitList
             units={units}
             selectedIndex={selectedUnitIndex}
-            onSelectUnit={(idx) => {
+            onSelect={(idx) => {
               setSelectedUnitIndex(idx);
               setAnnotations([]);
             }}
@@ -477,41 +440,12 @@ const AnnotateTab = ({
             onFilterChange={setFilterStatus}
           />
 
-          {/* Patch section — shown when an image is selected */}
+          {/* Patch section */}
           {selectedUnit && (
             <div style={{ borderTop: "1px solid #ddd", padding: 8 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 600 }}>Patches</span>
               </div>
-
-              {/* Patch size inputs */}
-              <div style={{ display: "flex", gap: 4, marginBottom: 8, fontSize: 11 }}>
-                <div>
-                  <label style={{ fontSize: 10, color: "#888" }}>Width</label>
-                  <NumericInput
-                    value={patchWidth}
-                    onValueChange={(v) => setPatchWidth(v)}
-                    min={32}
-                    max={2048}
-                    stepSize={32}
-                    style={{ width: 70 }}
-                    small
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 10, color: "#888" }}>Height</label>
-                  <NumericInput
-                    value={patchHeight}
-                    onValueChange={(v) => setPatchHeight(v)}
-                    min={32}
-                    max={2048}
-                    stepSize={32}
-                    style={{ width: 70 }}
-                    small
-                  />
-                </div>
-              </div>
-
               <PatchSelector
                 patches={patchesForImage}
                 selectedPatchIndex={selectedUnitIndex}
@@ -542,7 +476,7 @@ const AnnotateTab = ({
             />
           ) : (
             <div className="flex justify-center items-center h-full text-gray-400">
-              Select a processing unit from the table
+              Select a processing unit from the list
             </div>
           )}
         </Card>
