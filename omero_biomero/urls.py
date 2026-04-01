@@ -120,7 +120,28 @@ urlpatterns = [
         sam_views.predict,
         name="sam_predict",
     ),
-    # Annotate AI URLs
+    # Annotate AI URLs — Manifest CRUD
+    path(
+        "api/annotate/save_manifest/",
+        annotate_ai_views.save_manifest,
+        name="save_manifest",
+    ),
+    path(
+        "api/annotate/load_manifest/",
+        annotate_ai_views.load_manifest,
+        name="load_manifest",
+    ),
+    path(
+        "api/annotate/list_manifests/",
+        annotate_ai_views.list_manifests,
+        name="list_manifests",
+    ),
+    path(
+        "api/annotate/delete_manifest/",
+        annotate_ai_views.delete_manifest,
+        name="delete_manifest",
+    ),
+    # Annotate AI URLs — Container browsing
     path(
         "api/annotate/containers/",
         annotate_ai_views.list_containers,

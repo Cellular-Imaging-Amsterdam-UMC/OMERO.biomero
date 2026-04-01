@@ -41,14 +41,27 @@ def _get_omero_annotate_ai():
             TrainingConfig,
             WorkflowConfig,
         )
+        from omero_annotate_ai.core.annotation_config import (
+            ChannelPresentation,
+            FeatureType,
+        )
         from omero_annotate_ai.omero.omero_functions import (
             create_or_replace_tracking_table,
             download_annotation_config_from_omero,
+            generate_set_id,
             list_annotation_tables,
             sync_config_to_omero_table,
             sync_omero_table_to_config,
             upload_annotation_config_to_omero,
             upload_rois_and_labels,
+            # Manifest/GeoJSON persistence
+            save_manifest_to_omero,
+            load_manifest_from_omero,
+            list_manifests_from_omero,
+            delete_manifest_from_omero,
+            save_geojson_to_omero,
+            load_geojson_from_omero,
+            geojson_namespace,
         )
         from omero_annotate_ai.omero.omero_utils import (
             list_annotations_by_namespace,
@@ -59,6 +72,8 @@ def _get_omero_annotate_ai():
             "AnnotationMethodology": AnnotationMethodology,
             "AIModelConfig": AIModelConfig,
             "AuthorInfo": AuthorInfo,
+            "ChannelPresentation": ChannelPresentation,
+            "FeatureType": FeatureType,
             "ImageAnnotation": ImageAnnotation,
             "OMEROConfig": OMEROConfig,
             "SpatialCoverage": SpatialCoverage,
@@ -67,12 +82,21 @@ def _get_omero_annotate_ai():
             "WorkflowConfig": WorkflowConfig,
             "create_or_replace_tracking_table": create_or_replace_tracking_table,
             "download_annotation_config_from_omero": download_annotation_config_from_omero,
+            "generate_set_id": generate_set_id,
             "list_annotation_tables": list_annotation_tables,
             "sync_config_to_omero_table": sync_config_to_omero_table,
             "sync_omero_table_to_config": sync_omero_table_to_config,
             "upload_annotation_config_to_omero": upload_annotation_config_to_omero,
             "upload_rois_and_labels": upload_rois_and_labels,
             "list_annotations_by_namespace": list_annotations_by_namespace,
+            # Manifest/GeoJSON persistence
+            "save_manifest_to_omero": save_manifest_to_omero,
+            "load_manifest_from_omero": load_manifest_from_omero,
+            "list_manifests_from_omero": list_manifests_from_omero,
+            "delete_manifest_from_omero": delete_manifest_from_omero,
+            "save_geojson_to_omero": save_geojson_to_omero,
+            "load_geojson_from_omero": load_geojson_from_omero,
+            "geojson_namespace": geojson_namespace,
         }
     except Exception as e:
         logger.error("omero_annotate_ai import failed: %s", e, exc_info=True)
@@ -156,6 +180,113 @@ def polygons_to_label_mask(annotations, width, height):
         if len(pts) >= 3:
             cv2.fillPoly(mask, [pts], color=int(i))
     return mask
+
+
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Manifest CRUD
+# ---------------------------------------------------------------------------
+
+
+@login_required()
+@require_POST
+def save_manifest(request, conn=None, **kwargs):
+    """Save or update an AnnotationConfig manifest as JSON FileAnnotation."""
+    try:
+        lib = _get_omero_annotate_ai()
+        if not lib:
+            return JsonResponse({"error": "omero_annotate_ai not available"}, status=500)
+
+        data = json.loads(request.body)
+        container_type = data.get("container_type", "dataset")
+        container_id = int(data["container_id"])
+        set_id = data.get("set_id") or lib["generate_set_id"]()
+
+        config = lib["AnnotationConfig"].from_json(data["config"])
+
+        group_id = data.get("group_id")
+        if group_id:
+            conn.setGroupForSession(int(group_id))
+
+        ann_id = lib["save_manifest_to_omero"](conn, config, container_type, container_id, set_id)
+        return JsonResponse({"success": True, "set_id": set_id, "annotation_id": ann_id})
+    except Exception as e:
+        logger.exception("save_manifest failed")
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@login_required()
+@require_GET
+def load_manifest(request, conn=None, **kwargs):
+    """Load a manifest by set_id from a container."""
+    try:
+        lib = _get_omero_annotate_ai()
+        if not lib:
+            return JsonResponse({"error": "omero_annotate_ai not available"}, status=500)
+
+        container_type = request.GET.get("container_type", "dataset")
+        container_id = int(request.GET["container_id"])
+        set_id = request.GET["set_id"]
+
+        group_id = request.GET.get("group_id")
+        if group_id:
+            conn.setGroupForSession(int(group_id))
+
+        config = lib["load_manifest_from_omero"](conn, container_type, container_id, set_id)
+        if config is None:
+            return JsonResponse({"error": "Manifest not found"}, status=404)
+        return JsonResponse({"config": json.loads(config.to_json()), "set_id": set_id})
+    except Exception as e:
+        logger.exception("load_manifest failed")
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@login_required()
+@require_GET
+def list_manifests(request, conn=None, **kwargs):
+    """List all manifests for a container."""
+    try:
+        lib = _get_omero_annotate_ai()
+        if not lib:
+            return JsonResponse({"error": "omero_annotate_ai not available"}, status=500)
+
+        container_type = request.GET.get("container_type", "dataset")
+        container_id = int(request.GET["container_id"])
+
+        group_id = request.GET.get("group_id")
+        if group_id:
+            conn.setGroupForSession(int(group_id))
+
+        manifests = lib["list_manifests_from_omero"](conn, container_type, container_id)
+        return JsonResponse({"manifests": manifests})
+    except Exception as e:
+        logger.exception("list_manifests failed")
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@login_required()
+@require_POST
+def delete_manifest(request, conn=None, **kwargs):
+    """Delete a manifest and its associated GeoJSON files."""
+    try:
+        lib = _get_omero_annotate_ai()
+        if not lib:
+            return JsonResponse({"error": "omero_annotate_ai not available"}, status=500)
+
+        data = json.loads(request.body)
+        container_type = data.get("container_type", "dataset")
+        container_id = int(data["container_id"])
+        set_id = data["set_id"]
+
+        group_id = data.get("group_id")
+        if group_id:
+            conn.setGroupForSession(int(group_id))
+
+        success = lib["delete_manifest_from_omero"](conn, container_type, container_id, set_id)
+        return JsonResponse({"success": success})
+    except Exception as e:
+        logger.exception("delete_manifest failed")
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 # ---------------------------------------------------------------------------

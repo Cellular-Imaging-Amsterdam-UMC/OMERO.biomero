@@ -744,3 +744,93 @@ export const listTrainedModels = async (datasetId) => {
   const endpoint = `/omero_biomero/api/analyzer/training/models/?dataset=${datasetId}`;
   return apiRequest(endpoint, "GET");
 };
+
+// ---------------------------------------------------------------------------
+// Manifest API
+// ---------------------------------------------------------------------------
+
+export const saveManifest = async (
+  containerType,
+  containerId,
+  config,
+  setId = null,
+  groupId = null,
+) => {
+  return apiRequest("/omero_biomero/api/annotate/save_manifest/", "POST", {
+    container_type: containerType,
+    container_id: containerId,
+    config,
+    set_id: setId,
+    group_id: groupId,
+  });
+};
+
+export const loadManifest = async (
+  containerType,
+  containerId,
+  setId,
+  groupId = null,
+) => {
+  const params = new URLSearchParams({
+    container_type: containerType,
+    container_id: containerId,
+    set_id: setId,
+  });
+  if (groupId) params.set("group_id", groupId);
+  return apiRequest(
+    `/omero_biomero/api/annotate/load_manifest/?${params}`,
+    "GET",
+  );
+};
+
+export const listManifests = async (
+  containerType,
+  containerId,
+  groupId = null,
+) => {
+  const params = new URLSearchParams({
+    container_type: containerType,
+    container_id: containerId,
+  });
+  if (groupId) params.set("group_id", groupId);
+  return apiRequest(
+    `/omero_biomero/api/annotate/list_manifests/?${params}`,
+    "GET",
+  );
+};
+
+export const deleteManifest = async (
+  containerType,
+  containerId,
+  setId,
+  groupId = null,
+) => {
+  return apiRequest("/omero_biomero/api/annotate/delete_manifest/", "POST", {
+    container_type: containerType,
+    container_id: containerId,
+    set_id: setId,
+    group_id: groupId,
+  });
+};
+
+export const addPatchToManifest = async (
+  containerType,
+  containerId,
+  setId,
+  imageId,
+  imageName,
+  imageWidth,
+  imageHeight,
+  groupId = null,
+) => {
+  return apiRequest("/omero_biomero/api/annotate/add_patch/", "POST", {
+    container_type: containerType,
+    container_id: containerId,
+    set_id: setId,
+    image_id: imageId,
+    image_name: imageName,
+    image_width: imageWidth,
+    image_height: imageHeight,
+    group_id: groupId,
+  });
+};
