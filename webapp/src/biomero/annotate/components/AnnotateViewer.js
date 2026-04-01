@@ -47,6 +47,7 @@ import {
 import {
   traceContours,
   subtractAnnotations,
+  appendToAnnotations,
   eraseFromAnnotations,
 } from "../utils/GeometryUtils";
 import { samSetImage, samPredict } from "../../../apiService";
@@ -82,7 +83,10 @@ const AnnotateViewer = ({
   const [tool, setTool] = useState("brush");
   const [brushSize, setBrushSize] = useState(20);
   const [collisionDetection, setCollisionDetection] = useState(true);
-  const [mode, setMode] = useState("add");
+  const [mode, setMode] = useState("add"); // "add" | "subtract" | "append"
+
+  // Selection state for click-to-select
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState(null);
 
   // Feature Types State
   const [activeFeatureType, setActiveFeatureType] = useState(
@@ -205,6 +209,22 @@ const AnnotateViewer = ({
       ctx.stroke();
       ctx.fill();
     });
+
+    // Draw selection highlight
+    if (selectedAnnotationId) {
+      const selected = annotations.find((a) => a.id === selectedAnnotationId);
+      if (selected && selected.points && selected.points.length > 1) {
+        ctx.strokeStyle = "#4a9eed";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(selected.points[0][0], selected.points[0][1]);
+        selected.points.slice(1).forEach((p) => ctx.lineTo(p[0], p[1]));
+        ctx.closePath();
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
 
     if (tool === "polygon" && currentPoints.length > 0) {
       ctx.strokeStyle = mode === "subtract" ? "red" : "lime";
@@ -370,6 +390,12 @@ const AnnotateViewer = ({
 
   const handleMouseUp = (e) => {
     if (tool === "pan") {
+      // Detect click (not drag) for selection
+      const dx = e.clientX - lastPanPoint.x;
+      const dy = e.clientY - lastPanPoint.y;
+      if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
+        handleCanvasClickSelect(e);
+      }
       setIsPanning(false);
       return;
     }
@@ -426,6 +452,25 @@ const AnnotateViewer = ({
         );
       });
       onAnnotationsChange(currentAnns);
+    } else if (mode === "append") {
+      // Merge with overlapping same-type annotations
+      newPolys.forEach((pts) => {
+        const sameTypeAnns = annotations.filter((a) => a.typeId === activeFeatureType);
+        const merged = appendToAnnotations(pts, sameTypeAnns, width, height);
+        if (merged) {
+          // Replace same-type annotations with merged result, keep others
+          const otherAnns = annotations.filter((a) => a.typeId !== activeFeatureType);
+          onAnnotationsChange([...otherAnns, ...merged]);
+        } else {
+          // No overlap — add as new annotation
+          onAnnotationsChange([...annotations, {
+            id: crypto.randomUUID(),
+            points: pts,
+            typeId: activeFeatureType,
+            generated: true,
+          }]);
+        }
+      });
     } else {
       const newAnns = newPolys.map((pts) => ({
         id: crypto.randomUUID(),
@@ -497,7 +542,49 @@ const AnnotateViewer = ({
 
   const deleteAnnotation = (id) => {
     onAnnotationsChange(annotations.filter((a) => a.id !== id));
+    if (selectedAnnotationId === id) setSelectedAnnotationId(null);
   };
+
+  // Point-in-polygon for click-to-select
+  const pointInPolygon = (x, y, points) => {
+    let inside = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+      const xi = points[i][0], yi = points[i][1];
+      const xj = points[j][0], yj = points[j][1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  };
+
+  const handleCanvasClickSelect = (e) => {
+    const pt = getCanvasPoint(e);
+    for (let i = annotations.length - 1; i >= 0; i--) {
+      if (annotations[i].points && pointInPolygon(pt.x, pt.y, annotations[i].points)) {
+        setSelectedAnnotationId(annotations[i].id);
+        return;
+      }
+    }
+    setSelectedAnnotationId(null);
+  };
+
+  // Delete key handler for selected annotation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedAnnotationId) {
+        e.preventDefault();
+        deleteAnnotation(selectedAnnotationId);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedAnnotationId, annotations, onAnnotationsChange]);
+
+  // Redraw when selection changes
+  useEffect(() => {
+    draw();
+  }, [selectedAnnotationId]);
 
   const addFeatureType = () => {
     if (!newFeatureName) return;
@@ -781,8 +868,28 @@ const AnnotateViewer = ({
               >
                 Subtract
               </Button>
+              <Button
+                small
+                active={mode === "append"}
+                onClick={() => setMode("append")}
+                intent={mode === "append" ? "success" : "none"}
+              >
+                Append
+              </Button>
             </ButtonGroup>
           </div>
+
+          {/* Selected annotation indicator */}
+          {selectedAnnotationId && (() => {
+            const ann = annotations.find((a) => a.id === selectedAnnotationId);
+            const ft = ann ? featureTypes.find((t) => t.id === ann.typeId) : null;
+            return (
+              <div style={{ padding: 8, background: "#ffffcc", borderRadius: 4, fontSize: 12, textAlign: "center", marginTop: 8 }}>
+                <em>Selected: {ft?.name || "Unknown"}</em><br />
+                <span style={{ fontSize: 11, color: "#888" }}>Press Delete to remove</span>
+              </div>
+            );
+          })()}
 
           {mode === "add" && (
             <div className="mt-2 px-1">
