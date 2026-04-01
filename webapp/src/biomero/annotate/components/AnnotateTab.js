@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { H4, Card, Button, Spinner, Callout, NumericInput, ButtonGroup } from "@blueprintjs/core";
+import { H4, Card, Button, Spinner, Callout, NumericInput, ButtonGroup, Menu, MenuItem, Popover } from "@blueprintjs/core";
 import TrackingTableView from "./TrackingTableView";
 import AnnotateViewer from "./AnnotateViewer";
 import PatchSelector from "./PatchSelector";
@@ -35,6 +35,7 @@ const AnnotateTab = ({
     { id: "1", name: "Object", color: "#00ff00" },
   ]);
   const [channelInfo, setChannelInfo] = useState(null);
+  const [skipPopoverOpen, setSkipPopoverOpen] = useState(false);
 
   // Patch state
   const [patchWidth, setPatchWidth] = useState(256);
@@ -110,6 +111,8 @@ const AnnotateTab = ({
     .map((u, i) => ({ ...u, _unitIndex: i }))
     .filter((u) => u.is_patch && u.image_id === currentImageId);
 
+  const allDone = units.length > 0 && units.every((u) => u.processed);
+
   // Build the patch prop for AnnotateViewer when selected unit is a patch
   const viewerPatch = selectedUnit?.is_patch ? selectedUnit : null;
 
@@ -140,6 +143,7 @@ const AnnotateTab = ({
   }, [currentImage?.id, currentImage?.c]);
 
   const handleSaveAndNext = async () => {
+    if (allDone) return;
     if (!selectedUnit || annotations.length === 0) {
       toaster?.show({
         message: "Draw some annotations first",
@@ -415,25 +419,45 @@ const AnnotateTab = ({
           )}
         </H4>
         <div className="flex gap-2">
-          <Button
-            icon="tick"
-            text="Done (empty)"
-            onClick={handleMarkEmpty}
-            disabled={!selectedUnit || saving}
-          />
-          <Button
-            minimal
-            icon="arrow-right"
-            text="Skip"
-            onClick={handleSkipForLater}
-            disabled={!selectedUnit || saving}
-          />
+          <Popover
+            isOpen={skipPopoverOpen}
+            onClose={() => setSkipPopoverOpen(false)}
+            placement="bottom-end"
+            content={
+              <Menu>
+                <MenuItem
+                  icon="arrow-right"
+                  text="Skip for now"
+                  onClick={() => {
+                    setSkipPopoverOpen(false);
+                    handleSkipForLater();
+                  }}
+                />
+                <MenuItem
+                  icon="disable"
+                  text="No labels (done)"
+                  onClick={() => {
+                    setSkipPopoverOpen(false);
+                    handleMarkEmpty();
+                  }}
+                />
+              </Menu>
+            }
+          >
+            <Button
+              icon="arrow-right"
+              text="Skip"
+              rightIcon="caret-down"
+              onClick={() => setSkipPopoverOpen(!skipPopoverOpen)}
+              disabled={!selectedUnit || saving || allDone}
+            />
+          </Popover>
           <Button
             intent="primary"
             icon="floppy-disk"
             text="Save & Next"
             onClick={handleSaveAndNext}
-            disabled={!selectedUnit || saving || annotations.length === 0}
+            disabled={!selectedUnit || saving || annotations.length === 0 || allDone}
             loading={saving}
           />
         </div>
