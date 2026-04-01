@@ -47,7 +47,7 @@ def admin_config(request, conn=None, **kwargs):
                 section: dict(configs.items(section)) for section in configs.sections()
             }
 
-            # Load the JSON configuration file (uploader-settings.json)
+            # Load the JSON configuration file (biomero-config.json)
             json_config = {}
             if os.path.exists(CONFIG_FILE_PATH):
                 try:
@@ -108,8 +108,17 @@ def admin_config(request, conn=None, **kwargs):
             json_config_updates = {}
             ini_config_updates = {}
 
+            # Define sections that belong in the JSON configuration
+            JSON_SECTIONS = [
+                "UPLOADER",
+                "PREPROCESSING_CONFIG",
+                "PREPROCESSING_EXTENSION_MAP",
+                "FILE_OR_EXTENSION_PATTERNS_EXCLUSIVE",
+                "UPLOADER_NESTED_FILE_EXTENSIONS",
+            ]
+
             for section, settingsd in config_data.items():
-                if section == "UPLOADER":
+                if section in JSON_SECTIONS:
                     json_config_updates[section] = settingsd
                 else:
                     ini_config_updates[section] = settingsd

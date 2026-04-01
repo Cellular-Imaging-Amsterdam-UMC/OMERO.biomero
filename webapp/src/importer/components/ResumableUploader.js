@@ -43,7 +43,7 @@ const ResumableUploader = ({ datasetId, datasetType, group, groupId }) => {
       },
     }).use(Tus, {
       endpoint: "/omero_biomero/upload/",
-      chunkSize: 150 * 1024 * 1024, // 150MB chunks for faster uploads
+      chunkSize: 100 * 1024 * 1024, // 150MB chunks for faster uploads
       retryDelays: [0, 1000, 3000, 5000],
       limit: 5, // Allow up to 5 concurrent file uploads
       onAfterResponse: (req, res) => {
@@ -83,12 +83,11 @@ const ResumableUploader = ({ datasetId, datasetType, group, groupId }) => {
       height: 500,
       showProgressDetails: true,
       proudlyDisplayPoweredByUppy: false,
-      note: "Drag and drop supported files here or click to browse (.xlef requires folder import)",
+      note: "Drag and drop supported files here or click to browse.",
     });
 
     // Handle upload success
     const onUploadSuccess = async (file, response) => {
-      console.log("Upload success:", file, response);
       if (!datasetId) {
         console.warn("No dataset selected, skipping import trigger");
         return;
@@ -97,7 +96,7 @@ const ResumableUploader = ({ datasetId, datasetType, group, groupId }) => {
       const uploadedFilename = getUploadedFilename(
         file,
         response,
-        uploadedFilenameMapRef.current
+        uploadedFilenameMapRef.current,
       );
 
       try {
@@ -106,12 +105,12 @@ const ResumableUploader = ({ datasetId, datasetType, group, groupId }) => {
           datasetId,
           datasetType,
           group,
-          groupId
+          groupId,
         );
         uppyRef.current.info(
           `Import queued for ${uploadedFilename}`,
           "success",
-          3000
+          3000,
         );
         if (response?.uploadURL) {
           uploadedFilenameMapRef.current.delete(response.uploadURL);
@@ -121,7 +120,7 @@ const ResumableUploader = ({ datasetId, datasetType, group, groupId }) => {
         uppyRef.current.info(
           `Import failed for ${uploadedFilename}: ${error.message}`,
           "error",
-          5000
+          5000,
         );
         if (response?.uploadURL) {
           uploadedFilenameMapRef.current.delete(response.uploadURL);

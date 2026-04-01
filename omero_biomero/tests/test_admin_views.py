@@ -201,7 +201,7 @@ class AdminConfigTests(TestCase):
     def test_post_uploader_settings_saved_to_json_config(self):
         SlurmClient = sys.modules["biomero"].SlurmClient
         cfg_path = Path(self._create_tempfile("[GENERAL]\nfoo=bar\n"))
-        json_cfg = self._tmpdir / "uploader-settings.json"
+        json_cfg = self._tmpdir / "biomero-config.json"
 
         class StubSlurm:
             _DEFAULT_CONFIG_PATH_1 = "unused"

@@ -47,7 +47,7 @@ FOLDER_EXTENSIONS_NON_BROWSABLE = [
 BASE_DIR = os.getenv("IMPORT_MOUNT_PATH", "/data")
 
 CONFIG_FILE_PATH = os.path.expanduser(
-    os.getenv("OMERO_BIOMERO_CONFIG_FILE", "~/.biomero/uplader-settings.json")
+    os.getenv("OMERO_BIOMERO_CONFIG_FILE", "~/.biomero/biomero-config.json")
 )
 
 GROUP_MAPPINGS_FILE_PATH = os.path.expanduser(
