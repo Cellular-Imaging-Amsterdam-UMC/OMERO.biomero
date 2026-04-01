@@ -17,6 +17,28 @@ const TrackingTableView = ({
       return true;
     });
 
+  // Group filtered units by image_id for hierarchical display
+  const groupedUnits = (() => {
+    const groups = [];
+    const groupMap = new Map();
+
+    filteredUnits.forEach((unit) => {
+      const key = unit.image_id;
+      if (!groupMap.has(key)) {
+        const group = {
+          image_id: key,
+          image_name: unit.image_name,
+          units: [],
+        };
+        groupMap.set(key, group);
+        groups.push(group);
+      }
+      groupMap.get(key).units.push(unit);
+    });
+
+    return groups;
+  })();
+
   const totalUnits = units.length;
   const completedUnits = units.filter((u) => u.processed).length;
 
@@ -74,60 +96,88 @@ const TrackingTableView = ({
             </tr>
           </thead>
           <tbody>
-            {filteredUnits.map((unit) => {
-              const actualIndex = unit._originalIndex;
-              const isSelected = actualIndex === selectedIndex;
-              return (
+            {groupedUnits.map((group) => (
+              <React.Fragment key={`group-${group.image_id}`}>
+                {/* Image header row */}
                 <tr
-                  key={actualIndex}
-                  className={`cursor-pointer ${
-                    isSelected ? "bg-blue-100" : ""
-                  } ${unit.processed ? "opacity-60" : ""}`}
-                  onClick={() => onSelectUnit(actualIndex)}
+                  className="cursor-pointer"
+                  style={{ background: "transparent" }}
+                  onClick={() => {
+                    const firstUnit = group.units[0];
+                    if (firstUnit) onSelectUnit(firstUnit._originalIndex);
+                  }}
                 >
                   <td
-                    className="text-xs truncate max-w-[120px]"
-                    title={unit.image_name}
+                    colSpan={4}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#6b7280",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                      paddingTop: 8,
+                      paddingBottom: 4,
+                    }}
+                    title={group.image_name}
                   >
-                    {unit.is_patch ? (
-                      <span>
-                        <span style={{ color: "#888", marginRight: 4 }}>↳</span>
-                        <span style={{ color: "#666", fontSize: 10 }}>
-                          Patch ({unit.patch_x},{unit.patch_y})
-                        </span>
-                      </span>
-                    ) : (
-                      unit.image_name
-                    )}
-                  </td>
-                  <td>
-                    <Tag
-                      minimal
-                      small
-                      intent={
-                        unit.category === "training"
-                          ? "primary"
-                          : unit.category === "validation"
-                            ? "warning"
-                            : "none"
-                      }
-                    >
-                      {(unit.category || "train").slice(0, 3)}
-                    </Tag>
-                  </td>
-                  <td className="text-xs">
-                    {unit.channel}/{unit.z_slice}/{unit.timepoint}
-                  </td>
-                  <td>
-                    {unit.processed ? (
-                      <Icon icon="tick-circle" intent="success" size={14} />
-                    ) : (
-                      <Icon icon="circle" className="text-gray-300" size={14} />
-                    )}
+                    {group.image_name}
                   </td>
                 </tr>
-              );
-            })}
+                {/* Unit rows */}
+                {group.units.map((unit) => {
+                  const actualIndex = unit._originalIndex;
+                  const isSelected = actualIndex === selectedIndex;
+                  return (
+                    <tr
+                      key={actualIndex}
+                      className={`cursor-pointer ${
+                        isSelected ? "bg-blue-100" : ""
+                      } ${unit.processed ? "opacity-60" : ""}`}
+                      onClick={() => onSelectUnit(actualIndex)}
+                    >
+                      <td
+                        className="text-xs truncate max-w-[120px]"
+                        style={{ paddingLeft: unit.is_patch ? 24 : 8 }}
+                        title={unit.image_name}
+                      >
+                        {unit.is_patch ? (
+                          <span style={{ color: "#666", fontSize: 10 }}>
+                            Patch ({unit.patch_x},{unit.patch_y})
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11 }}>Full image</span>
+                        )}
+                      </td>
+                      <td>
+                        <Tag
+                          minimal
+                          small
+                          intent={
+                            unit.category === "training"
+                              ? "primary"
+                              : unit.category === "validation"
+                                ? "warning"
+                                : "none"
+                          }
+                        >
+                          {(unit.category || "train").slice(0, 3)}
+                        </Tag>
+                      </td>
+                      <td className="text-xs">
+                        {unit.channel}/{unit.z_slice}/{unit.timepoint}
+                      </td>
+                      <td>
+                        {unit.processed ? (
+                          <Icon icon="tick-circle" intent="success" size={14} />
+                        ) : (
+                          <Icon icon="circle" className="text-gray-300" size={14} />
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </React.Fragment>
+            ))}
           </tbody>
         </HTMLTable>
         {filteredUnits.length === 0 && (
