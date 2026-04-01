@@ -7,27 +7,29 @@
     font-size: 0.75rem;
 }
 
-.numeric-input input, .normalization-input input {
-    width: 72px !important;
-    max-width: 72px !important;
-    min-width: 72px !important;
-    padding-left: 8px !important;
-    padding-right: 8px !important;
-}
-
-.normalization-input-label {
-    width: 28px;
-    min-width: 28px;
-    font-size: 0.75rem;
-    color: rgb(107 114 128);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.numeric-input input {
+.numeric-input input, .scale-input-min input, .scale-input-max input{
     width: 40px !important;
     max-width: 40px !important;
     min-width: 40px !important;
     padding-left: 4px !important;
     padding-right: 4px !important;
+}
+
+.scale-slider {
+    width: 90px !important;
+    min-width: 50px !important;
+    max-width: 90px !important;
+}
+
+.normalization-input input {
+    width: 96px !important;
+    max-width: 96px !important;
+    min-width: 96px !important;
+}
+
+.normalization-input-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgb(107 114 128);
+    min-width: 24px;
 }

@@ -46,59 +46,74 @@ def _read_annotation_payload(file_ann):
 
 def _normalize_annotation_payload(annotation_data, dataset_id):
     feature_types = annotation_data.get("featureTypes") or []
+    dataset_selected_channel = annotation_data.get("selectedChannel")
+    if dataset_selected_channel is not None:
+        dataset_selected_channel = str(dataset_selected_channel)
+
+    dataset_channel_visibility = {}
+    for key, value in (annotation_data.get("channelVisibility") or {}).items():
+        dataset_channel_visibility[str(key)] = bool(value)
+
+    dataset_channel_scales = {}
+    for key, value in (annotation_data.get("channelScales") or {}).items():
+        if not isinstance(value, dict):
+            continue
+        dataset_channel_scales[str(key)] = {
+            "min": value.get("min", 0),
+            "max": value.get("max", 100),
+        }
+
     image_scalings = []
     for entry in annotation_data.get("imageScalings") or []:
         if not isinstance(entry, dict):
             continue
 
-        selected_channel = entry.get("selectedChannel")
-        if selected_channel is not None:
-            selected_channel = str(selected_channel)
+        entry_selected_channel = entry.get("selectedChannel")
+        if entry_selected_channel is not None:
+            entry_selected_channel = str(entry_selected_channel)
 
-        channel_visibility = {}
+        entry_channel_visibility = {}
         for key, value in (entry.get("channelVisibility") or {}).items():
-            channel_visibility[str(key)] = bool(value)
+            entry_channel_visibility[str(key)] = bool(value)
 
-        channel_scales = {}
+        entry_channel_scales = {}
         for key, value in (entry.get("channelScales") or {}).items():
             if not isinstance(value, dict):
                 continue
-            channel_scales[str(key)] = {
+            entry_channel_scales[str(key)] = {
                 "min": value.get("min", 0),
                 "max": value.get("max", 100),
+            }
+
+        entry_channel_bounds = {}
+        for key, value in (entry.get("channelBounds") or {}).items():
+            if not isinstance(value, dict):
+                continue
+            min_value = value.get("min")
+            max_value = value.get("max")
+            if min_value is None or max_value is None:
+                continue
+            entry_channel_bounds[str(key)] = {
+                "min": min_value,
+                "max": max_value,
             }
 
         image_scalings.append({
             "imageId": str(entry.get("imageId")) if entry.get("imageId") is not None else None,
-            "selectedChannel": selected_channel,
-            "channelVisibility": channel_visibility,
-            "channelScales": channel_scales,
+            "selectedChannel": entry_selected_channel,
+            "channelVisibility": entry_channel_visibility,
+            "channelScales": entry_channel_scales,
+            "channelBounds": entry_channel_bounds,
             "patchIds": [str(patch_id) for patch_id in (entry.get("patchIds") or []) if patch_id is not None],
         })
 
     if not image_scalings:
-        selected_channel = annotation_data.get("selectedChannel")
-        if selected_channel is not None:
-            selected_channel = str(selected_channel)
-
-        channel_visibility = {}
-        for key, value in (annotation_data.get("channelVisibility") or {}).items():
-            channel_visibility[str(key)] = bool(value)
-
-        channel_scales = {}
-        for key, value in (annotation_data.get("channelScales") or {}).items():
-            if not isinstance(value, dict):
-                continue
-            channel_scales[str(key)] = {
-                "min": value.get("min", 0),
-                "max": value.get("max", 100),
-            }
-
         image_scalings = [{
             "imageId": None,
-            "selectedChannel": selected_channel,
-            "channelVisibility": channel_visibility,
-            "channelScales": channel_scales,
+            "selectedChannel": dataset_selected_channel,
+            "channelVisibility": dataset_channel_visibility,
+            "channelScales": dataset_channel_scales,
+            "channelBounds": {},
             "patchIds": [],
         }]
 
@@ -123,6 +138,9 @@ def _normalize_annotation_payload(annotation_data, dataset_id):
         "name": annotation_data.get("name") or DEFAULT_ANNOTATION_SET_NAME,
         "description": annotation_data.get("description") or "",
         "datasetId": str(dataset_id),
+        "selectedChannel": dataset_selected_channel,
+        "channelVisibility": dataset_channel_visibility,
+        "channelScales": dataset_channel_scales,
         "imageScalings": image_scalings,
         "patches": patches,
         "featureTypes": feature_types,
@@ -144,6 +162,8 @@ def _build_annotation_set_summary(file_ann, payload):
         "patchCount": len(payload.get("patches") or []),
         "annotationCount": len(payload.get("annotations") or []),
         "imageCount": len(image_ids),
+        "selectedChannel": payload.get("selectedChannel"),
+        "channelScales": payload.get("channelScales") or {},
     }
 
 

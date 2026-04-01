@@ -60,7 +60,7 @@ const calculatePlaneMinMax = (buffer) => {
     return { min, max };
 };
 
-const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = [], imageMeta = { sizeZ: 1, sizeT: 1 }, featureTypes, onFeatureTypesChange, patch = null, channelVisibility: externalChannelVisibility = null, onChannelVisibilityChange = null, channelScales: externalChannelScales = null, onChannelScalesChange = null, lockedChannelIndex = null }) => {
+const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = [], imageMeta = { sizeZ: 1, sizeT: 1 }, featureTypes, onFeatureTypesChange, patch = null, channelVisibility: externalChannelVisibility = null, onChannelVisibilityChange = null, channelScales: externalChannelScales = null, onChannelScalesChange = null, channelBounds: externalChannelBounds = null, onChannelBoundsChange = null, normalizationChannelScales = null, lockedChannelIndex = null }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
     const patchViewportRef = useRef(null);
@@ -102,9 +102,32 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
         const channelBoundsRequestRef = useRef({});
     const externalChannelScalesRef = useRef(externalChannelScales);
     const onChannelScalesChangeRef = useRef(onChannelScalesChange);
+    const mergedChannelBounds = useMemo(
+        () => ({ ...(externalChannelBounds || {}), ...(channelBounds || {}) }),
+        [externalChannelBounds, channelBounds]
+    );
 
     const effectiveChannelVisibility = externalChannelVisibility ?? channelVisibility;
     const effectiveChannelScales = externalChannelScales ?? channelScales;
+    const renderChannelVisibility = useMemo(() => {
+        if (lockedChannelIndex == null) {
+            return effectiveChannelVisibility;
+        }
+        return {
+            ...(effectiveChannelVisibility || {}),
+            [lockedChannelIndex]: true,
+        };
+    }, [effectiveChannelVisibility, lockedChannelIndex]);
+    const renderChannelScales = useMemo(() => {
+        if (lockedChannelIndex == null || !normalizationChannelScales?.[lockedChannelIndex]) {
+            return effectiveChannelScales;
+        }
+
+        return {
+            ...(effectiveChannelScales || {}),
+            [lockedChannelIndex]: sanitizeChannelScale(normalizationChannelScales[lockedChannelIndex]),
+        };
+    }, [effectiveChannelScales, lockedChannelIndex, normalizationChannelScales]);
 
     useEffect(() => {
         externalChannelScalesRef.current = externalChannelScales;
@@ -229,12 +252,13 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
           return null;
       }
 
-      const cacheKey = `${image.id}:${channelIndex}:${z}:${t}`;
-      if (channelBounds[cacheKey]) {
-          return channelBounds[cacheKey];
+      const boundsKey = `${channelIndex}:${z}:${t}`;
+      const requestKey = `${image.id}:${boundsKey}`;
+      if (mergedChannelBounds[boundsKey]) {
+          return mergedChannelBounds[boundsKey];
       }
-      if (channelBoundsRequestRef.current[cacheKey]) {
-          return channelBoundsRequestRef.current[cacheKey];
+      if (channelBoundsRequestRef.current[requestKey]) {
+          return channelBoundsRequestRef.current[requestKey];
       }
 
       const request = (async () => {
@@ -248,18 +272,24 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
           const nextBounds = calculatePlaneMinMax(values);
           setChannelBounds((current) => ({
               ...current,
-              [cacheKey]: nextBounds,
+              [boundsKey]: nextBounds,
           }));
+          if (onChannelBoundsChange) {
+              onChannelBoundsChange({
+                  ...(externalChannelBounds || {}),
+                  [boundsKey]: nextBounds,
+              });
+          }
           return nextBounds;
       })();
 
-      channelBoundsRequestRef.current[cacheKey] = request;
+      channelBoundsRequestRef.current[requestKey] = request;
       try {
           return await request;
       } finally {
-          delete channelBoundsRequestRef.current[cacheKey];
+          delete channelBoundsRequestRef.current[requestKey];
       }
-  }, [channelBounds, image?.id, t, z]);
+  }, [externalChannelBounds, image?.id, mergedChannelBounds, onChannelBoundsChange, t, z]);
 
   useEffect(() => {
       if (lockedChannelIndex == null) {
@@ -279,16 +309,16 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
 
     const channelParam = channels.map((ch) => {
         const chNum = ch.index + 1;
-        const visible = effectiveChannelVisibility[ch.index] !== false;
+        const visible = renderChannelVisibility[ch.index] !== false;
         const channelPrefix = visible ? `${chNum}` : `-${chNum}`;
         const rawColor = String(renderChannels[ch.index]?.color || ch.color || "FF0000")
             .replace(/^#/, "")
             .replace(/^\$/, "")
             .toUpperCase();
         const color = `$${rawColor}`;
-        const scale = sanitizeChannelScale(effectiveChannelScales[ch.index]);
-        const channelRangeKey = `${image.id}:${ch.index}:${z}:${t}`;
-        const bounds = channelBounds[channelRangeKey];
+        const scale = sanitizeChannelScale(renderChannelScales[ch.index]);
+        const channelRangeKey = `${ch.index}:${z}:${t}`;
+        const bounds = mergedChannelBounds[channelRangeKey];
         const channelMin = Number.isFinite(bounds?.min) ? bounds.min : pixelMin;
         const channelMax = Number.isFinite(bounds?.max) ? bounds.max : pixelMax;
         const channelSpan = Math.max(1, channelMax - channelMin);
@@ -303,19 +333,19 @@ const AnnotationViewer = ({ image, annotations, onAnnotationsChange, channels = 
     params.set("m", "c");
     params.set("p", projectionMode);
     params.set("q", "0.9");
-    params.set("_render", `${Object.keys(effectiveChannelScales)
+        params.set("_render", `${Object.keys(renderChannelScales)
             .sort()
             .map((key) => {
-                const scale = sanitizeChannelScale(effectiveChannelScales[key]);
+                                const scale = sanitizeChannelScale(renderChannelScales[key]);
                 return `${key}:${scale.min}-${scale.max}`;
             })
-            .join("|")}-${Object.keys(effectiveChannelVisibility)
+                .join("|")}-${Object.keys(renderChannelVisibility)
             .sort()
-            .map((key) => `${key}:${effectiveChannelVisibility[key] !== false ? 1 : 0}`)
+                        .map((key) => `${key}:${renderChannelVisibility[key] !== false ? 1 : 0}`)
             .join("-")}`);
 
     return `${base}?${params.toString()}`;
-  }, [channelBounds, image, channels, effectiveChannelScales, effectiveChannelVisibility, imagePixelRange, projectionMode, renderChannels, z, t]);
+    }, [channels, image, imagePixelRange, mergedChannelBounds, projectionMode, renderChannelScales, renderChannelVisibility, renderChannels, z, t]);
 
   const handleChannelScaleChange = useCallback((channelIndex, field, value) => {
       ensureChannelBounds(Number(channelIndex));

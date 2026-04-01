@@ -118,6 +118,8 @@ class PredictionViewsTests(TestCase):
         self.assertEqual(data["annotationSets"][0]["patchCount"], 1)
         self.assertEqual(data["annotationSets"][0]["imageCount"], 2)
         self.assertEqual(data["annotationSets"][0]["annotationCount"], 2)
+        self.assertIsNone(data["annotationSets"][0]["selectedChannel"])
+        self.assertEqual(data["annotationSets"][0]["channelScales"], {})
 
     def test_fetch_annotations_returns_selected_dataset_annotation_set(self):
         view = _raw("fetch_annotations")
@@ -130,12 +132,15 @@ class PredictionViewsTests(TestCase):
                         "name": "Training Set",
                         "description": "main set",
                         "datasetId": "12",
+                        "selectedChannel": "0",
+                        "channelScales": {"0": {"min": 12, "max": 88}},
                         "imageScalings": [
                             {
                                 "imageId": "31",
                                 "selectedChannel": "1",
                                 "channelVisibility": {"0": True, "1": True},
                                 "channelScales": {"0": {"min": 0, "max": 100}, "1": {"min": 0, "max": 99}},
+                                "channelBounds": {"1:0:0": {"min": 123.4, "max": 567.8}},
                                 "patchIds": ["p-1"],
                             }
                         ],
@@ -160,9 +165,13 @@ class PredictionViewsTests(TestCase):
         data = json.loads(response.content)
         self.assertEqual(data["annotationSetId"], 11)
         self.assertEqual(data["name"], "Training Set")
+        self.assertEqual(data["selectedChannel"], "0")
+        self.assertEqual(data["channelScales"]["0"]["min"], 12)
+        self.assertEqual(data["channelScales"]["0"]["max"], 88)
         self.assertEqual(data["imageScalings"][0]["imageId"], "31")
         self.assertEqual(data["imageScalings"][0]["selectedChannel"], "1")
         self.assertEqual(data["imageScalings"][0]["channelScales"]["1"]["max"], 99)
+        self.assertEqual(data["imageScalings"][0]["channelBounds"]["1:0:0"]["min"], 123.4)
         self.assertEqual(data["imageScalings"][0]["patchIds"], ["p-1"])
         self.assertEqual(data["patches"][0]["id"], "p-1")
         self.assertEqual(data["annotations"][0]["patchId"], "p-1")
@@ -178,7 +187,13 @@ class PredictionViewsTests(TestCase):
         dataset = self._make_dataset([existing])
         conn = self._make_conn(dataset)
         created = StubFileAnnotationWrapper(22, "created.json")
-        conn.createFileAnnfromLocalFile.return_value = created
+
+        def create_file_ann_from_local_file(tmp_path, **kwargs):
+            with open(tmp_path, "r", encoding="utf-8") as handle:
+                created._payload = json.load(handle)
+            return created
+
+        conn.createFileAnnfromLocalFile.side_effect = create_file_ann_from_local_file
 
         payload = {
             "datasetId": "12",
@@ -186,12 +201,15 @@ class PredictionViewsTests(TestCase):
             "data": {
                 "name": "Updated Set",
                 "description": "refined masks",
+                "selectedChannel": "0",
+                "channelScales": {"0": {"min": 10, "max": 90}},
                 "imageScalings": [
                     {
                         "imageId": "31",
                         "selectedChannel": "2",
                         "channelVisibility": {"0": True, "2": True},
                         "channelScales": {"2": {"min": 0, "max": 95}},
+                        "channelBounds": {"2:0:0": {"min": 10.5, "max": 250.25}},
                         "patchIds": ["patch-1"],
                     }
                 ],
@@ -227,8 +245,17 @@ class PredictionViewsTests(TestCase):
         self.assertEqual(data["annotationSetId"], 22)
         self.assertEqual(data["annotationSet"]["name"], "Updated Set")
         self.assertEqual(data["annotationSet"]["patchCount"], 1)
+        self.assertEqual(data["annotationSet"]["selectedChannel"], "0")
+        self.assertEqual(data["annotationSet"]["channelScales"]["0"]["max"], 90)
         dataset.linkAnnotation.assert_called_once_with(created)
         conn.deleteObjects.assert_called_once_with("Annotation", [11])
+
+        saved_payload = created._payload
+        self.assertEqual(saved_payload["selectedChannel"], "0")
+        self.assertEqual(saved_payload["channelScales"]["0"]["min"], 10)
+        self.assertEqual(saved_payload["channelScales"]["0"]["max"], 90)
+        self.assertEqual(saved_payload["imageScalings"][0]["selectedChannel"], "2")
+        self.assertEqual(saved_payload["imageScalings"][0]["channelBounds"]["2:0:0"]["max"], 250.25)
 
     def test_get_channel_plane_data_returns_raw_plane_payload(self):
         view = _raw("get_channel_plane_data")

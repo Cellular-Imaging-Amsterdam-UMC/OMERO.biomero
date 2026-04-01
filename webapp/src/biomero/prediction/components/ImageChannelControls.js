@@ -1,5 +1,5 @@
 import React from "react";
-import { Button, Checkbox, NumericInput, ControlGroup} from "@blueprintjs/core";
+import { Button, Checkbox, NumericInput, RangeSlider, ControlGroup} from "@blueprintjs/core";
 
 const ImageChannelControls = ({
   channels,
@@ -48,28 +48,36 @@ const ImageChannelControls = ({
             </div>
 
             <ControlGroup fill={true} vertical={false} className="gap-3 items-center">
-              <div className="flex items-center gap-2">
-                <span className="normalization-input-label">Min</span>
-                <NumericInput
-                  min={0}
-                  max={100}
-                  stepSize={0.500}
-                  value={channelScales?.[ch.index]?.min ?? 0}
-                  onValueChange={(valueAsNumber) => onChannelScaleChange?.(ch.index, "min", valueAsNumber)}
-                  className="normalization-input"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="normalization-input-label">Max</span>
-                <NumericInput
-                  min={0}
-                  max={100}
-                  stepSize={0.5}
-                  value={channelScales?.[ch.index]?.max ?? 100}
-                  onValueChange={(valueAsNumber) => onChannelScaleChange?.(ch.index, "max", valueAsNumber)}
-                  className="normalization-input"
-                />
-              </div>
+              <NumericInput
+                min={0}
+                max={100}
+                stepSize={0.500}
+                value={channelScales?.[ch.index]?.min ?? 0}
+                onValueChange={(valueAsNumber) => onChannelScaleChange?.(ch.index, "min", valueAsNumber)}
+                className="scale-input-min"
+              />
+              <RangeSlider
+                className="scale-slider"
+                min={0}
+                max={100}
+                stepSize={0.5}
+                labelRenderer={false}
+                value={[
+                  channelScales?.[ch.index]?.min ?? 0,
+                  channelScales?.[ch.index]?.max ?? 100,
+                ]}
+                onChange={([minValue, maxValue]) => {
+                  onChannelScaleChange?.(ch.index, "range", [minValue, maxValue]);
+                }}
+              />
+              <NumericInput
+                min={0}
+                max={100}
+                stepSize={0.5}
+                value={channelScales?.[ch.index]?.max ?? 100}
+                onValueChange={(valueAsNumber) => onChannelScaleChange?.(ch.index, "max", valueAsNumber)}
+                className="scale-input-max"
+              />
             </ControlGroup>
 
             <div className="text-[10px] uppercase tracking-wide text-gray-500 mt-2">
