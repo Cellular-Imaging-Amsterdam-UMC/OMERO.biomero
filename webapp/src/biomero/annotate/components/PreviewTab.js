@@ -17,6 +17,7 @@ const PreviewTab = () => {
   const [imageMeta, setImageMeta] = useState({ sizeZ: 1, sizeT: 1 });
   const [annotationSets, setAnnotationSets] = useState([]);
   const [setsLoading, setSetsLoading] = useState(false);
+  const [selectedAnnotationSet, setSelectedAnnotationSet] = useState(null);
 
   // Helper to extract ID from string like "dataset-123"
   const getDatasetId = (selection) => {
@@ -116,22 +117,39 @@ const PreviewTab = () => {
                    <div>
                      <h6 style={{ margin: "0 0 8px 0" }}>Annotation Sets</h6>
                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                       {annotationSets.map((s) => (
-                         <div
-                           key={s.id}
-                           style={{
-                             display: "flex",
-                             justifyContent: "space-between",
-                             alignItems: "center",
-                             padding: "8px 12px",
-                             background: "#f5f5f5",
-                             borderRadius: 4,
-                             fontSize: 13,
-                           }}
-                         >
-                           <span>{s.name || `Set #${s.id}`}</span>
-                         </div>
-                       ))}
+                       {annotationSets.map((s) => {
+                         const isSelected = selectedAnnotationSet?.id === s.id;
+                         return (
+                           <div
+                             key={s.id}
+                             onClick={() =>
+                               setSelectedAnnotationSet(isSelected ? null : s)
+                             }
+                             style={{
+                               display: "flex",
+                               justifyContent: "space-between",
+                               alignItems: "center",
+                               padding: "8px 12px",
+                               background: isSelected ? "#d1e7ff" : "#f5f5f5",
+                               border: isSelected
+                                 ? "1px solid #4a90d9"
+                                 : "1px solid transparent",
+                               borderRadius: 4,
+                               fontSize: 13,
+                               cursor: "pointer",
+                             }}
+                           >
+                             <span>{s.name || `Set #${s.id}`}</span>
+                             {s.description && (
+                               <span
+                                 style={{ fontSize: 11, color: "#888", marginLeft: 8 }}
+                               >
+                                 {s.description}
+                               </span>
+                             )}
+                           </div>
+                         );
+                       })}
                      </div>
                    </div>
                  )}
@@ -163,12 +181,13 @@ const PreviewTab = () => {
              <Card className="flex-1 flex flex-col min-h-0 min-w-0 pb-0 shadow-none border">
                  <h5 className="bp5-heading mb-2">Preview</h5>
                  <div className="flex-1 min-h-0 mt-2">
-                   <PreviewViewer 
+                   <PreviewViewer
                     image={selectedImage}
                     model={selectedModel}
                     channel={selectedChannel}
                     channels={channels}
                     imageMeta={imageMeta}
+                    annotationSetId={selectedAnnotationSet?.id}
                  />
                  </div>
              </Card>

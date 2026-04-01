@@ -18,6 +18,7 @@ import {
   runPredictionPrediction,
   saveAnnotateAnnotation,
   fetchAllImageAnnotations,
+  fetchAnnotateAnnotation,
 } from "../../../apiService";
 import ImageChannelControls from "./ImageChannelControls";
 
@@ -38,6 +39,7 @@ const PreviewViewer = ({
   channel = 0,
   channels = [],
   imageMeta = { sizeZ: 1, sizeT: 1 },
+  annotationSetId = null,
 }) => {
   const imgRef = useRef(null);
   const containerRef = useRef(null);
@@ -58,6 +60,7 @@ const PreviewViewer = ({
 
   const [existingAnnotations, setExistingAnnotations] = useState([]); // parsed ROI polygons
   const [existingRoiVisibility, setExistingRoiVisibility] = useState({}); // roiId → bool
+  const [annotationSetPolygons, setAnnotationSetPolygons] = useState([]);
 
   // Accumulated predictions keyed by channel index
   // { [channelIdx]: { polygons: [...], count: int, visible: bool } }
@@ -169,6 +172,25 @@ const PreviewViewer = ({
       .then(applyAnnotationFeatures)
       .catch(() => setExistingAnnotations([]));
   }, [image?.id, applyAnnotationFeatures]);
+
+  // Fetch ROIs from selected annotation set
+  useEffect(() => {
+    setAnnotationSetPolygons([]);
+    if (!image || !annotationSetId) return;
+    fetchAnnotateAnnotation(image.id, annotationSetId)
+      .then((result) => {
+        const features = result.features || [];
+        const polys = features
+          .map((f) => {
+            const pts = f.geometry?.coordinates?.[0];
+            if (!pts || pts.length < 3) return null;
+            return { id: f.id, points: pts };
+          })
+          .filter(Boolean);
+        setAnnotationSetPolygons(polys);
+      })
+      .catch(() => setAnnotationSetPolygons([]));
+  }, [image, annotationSetId]);
 
   // --- Zoom & Pan handlers ---
   useEffect(() => {
@@ -565,6 +587,18 @@ const PreviewViewer = ({
                       );
                     });
                   })}
+                  {/* Annotation set overlay */}
+                  {annotationSetPolygons.map((poly, idx) => (
+                    <polygon
+                      key={`annset-${poly.id}`}
+                      points={poly.points.map((p) => `${p[0]},${p[1]}`).join(" ")}
+                      fill="none"
+                      stroke={`hsl(${getRoiHue(idx)}, 80%, 60%)`}
+                      strokeWidth={2}
+                      opacity={0.8}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ))}
                 </svg>
               )}
             </div>
