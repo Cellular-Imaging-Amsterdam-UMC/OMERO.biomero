@@ -19,6 +19,7 @@ const AnnotationSetPicker = ({
   onCreateNew,
   loading = false,
   disabled = false,
+  showCreateNew = true,
 }) => {
   const handleChange = (e) => {
     const value = e.target.value;
@@ -53,7 +54,9 @@ const AnnotationSetPicker = ({
             {t.name || `Set #${t.id}`}
           </option>
         ))}
-        <option value="__new__">+ New annotation set</option>
+        {showCreateNew && (
+          <option value="__new__">+ New annotation set</option>
+        )}
       </HTMLSelect>
     </FormGroup>
   );

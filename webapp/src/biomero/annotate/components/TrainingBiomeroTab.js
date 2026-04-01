@@ -316,6 +316,7 @@ const TrainingBiomeroTab = () => {
                 onSelectTable={(table) => setSelectedAnnotationSet(table)}
                 onCreateNew={() => {}}
                 loading={false}
+                showCreateNew={false}
               />
               {(selectedAnnotationSet || validationLoading) && (
                 <TrainingValidation
