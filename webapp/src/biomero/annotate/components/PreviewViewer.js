@@ -69,7 +69,7 @@ const PreviewViewer = ({
   // Image channel visibility — which OMERO channels to render
   // { [channelIdx]: bool }
   const [channelVisibility, setChannelVisibility] = useState({});
-  const [channelWindows, setChannelWindows] = useState({});
+  const [channelScales, setChannelScales] = useState({});
 
   const [z, setZ] = useState(0);
   const [t, setT] = useState(0);
@@ -83,42 +83,62 @@ const PreviewViewer = ({
 
     if (channels.length === 0) return `${base}?q=1.0`;
 
-    // Build channel string with window/color parameters
+    // Build channel string — convert 0-100% scales to pixel window values
     const channelParam = channels
       .map((ch) => {
         const chNum = ch.index + 1;
         const visible = channelVisibility[ch.index] !== false;
         const prefix = visible ? "" : "-";
-        const win = channelWindows[ch.index];
-        if (win) {
+        const scale = channelScales[ch.index];
+        if (scale && ch.window) {
+          const range = ch.window.max - ch.window.min;
+          const winStart = Math.round(ch.window.min + (range * scale.min) / 100);
+          const winEnd = Math.round(ch.window.min + (range * scale.max) / 100);
           const color = (ch.color || "#ffffff").replace("#", "");
-          return `${prefix}${chNum}|${win.start}:${win.end}$${color}`;
+          return `${prefix}${chNum}|${winStart}:${winEnd}$${color}`;
         }
         return `${prefix}${chNum}`;
       })
       .join(",");
 
     return `${base}?c=${channelParam}&q=1.0`;
-  }, [image, channels, channelVisibility, channelWindows, z, t]);
+  }, [image, channels, channelVisibility, channelScales, z, t]);
 
   // Initialize channel visibility and contrast windows when channels change
   useEffect(() => {
     if (channels.length > 0) {
       const vis = {};
-      const wins = {};
+      const scales = {};
       channels.forEach((ch) => {
         vis[ch.index] = ch.active !== false;
         if (ch.window) {
-          wins[ch.index] = { start: ch.window.start, end: ch.window.end };
+          // Convert OMERO window start/end to 0-100% scale
+          const range = ch.window.max - ch.window.min;
+          scales[ch.index] = {
+            min: range > 0 ? ((ch.window.start - ch.window.min) / range) * 100 : 0,
+            max: range > 0 ? ((ch.window.end - ch.window.min) / range) * 100 : 100,
+          };
+        } else {
+          scales[ch.index] = { min: 0, max: 100 };
         }
       });
       setChannelVisibility(vis);
-      setChannelWindows(wins);
+      setChannelScales(scales);
     }
   }, [channels]);
 
-  const handleWindowChange = (idx, { start, end }) => {
-    setChannelWindows((prev) => ({ ...prev, [idx]: { start, end } }));
+  const handleChannelScaleChange = (idx, type, value) => {
+    setChannelScales((prev) => {
+      const current = prev[idx] || { min: 0, max: 100 };
+      if (type === "min") return { ...prev, [idx]: { ...current, min: value } };
+      if (type === "max") return { ...prev, [idx]: { ...current, max: value } };
+      if (type === "range") return { ...prev, [idx]: { min: value[0], max: value[1] } };
+      return prev;
+    });
+  };
+
+  const handleChannelAutoScale = (idx) => {
+    setChannelScales((prev) => ({ ...prev, [idx]: { min: 0, max: 100 } }));
   };
 
   // Clear all predictions and reset view when image or model changes
@@ -654,8 +674,9 @@ const PreviewViewer = ({
                 channels={channels}
                 visibility={channelVisibility}
                 onToggle={toggleChannelVisibility}
-                channelWindows={channelWindows}
-                onWindowChange={handleWindowChange}
+                channelScales={channelScales}
+                onChannelScaleChange={handleChannelScaleChange}
+                onChannelAutoScale={handleChannelAutoScale}
               />
             )}
 

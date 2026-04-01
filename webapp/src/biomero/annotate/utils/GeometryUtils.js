@@ -301,9 +301,124 @@ const simplifyPolygon = (points, epsilon) => {
 };
 
 /**
+ * Appends a new polygon to existing annotations by merging overlapping ones.
+ * If the new polygon overlaps any existing annotations, they are unioned together.
+ * Returns null if no overlap found (caller should add as new annotation).
+ *
+ * @param {Array<[number, number]>} newPolyPoints Points of the new polygon
+ * @param {Array<{id: string, points: Array<[number, number]>, typeId: string}>} existingAnnotations List of existing annotations
+ * @param {number} width Canvas width
+ * @param {number} height Canvas height
+ * @returns {Array|null} New annotation list with merged polygons, or null if no overlap
+ */
+export const appendToAnnotations = (newPolyPoints, existingAnnotations, width, height) => {
+    if (!newPolyPoints || newPolyPoints.length < 3 || !existingAnnotations.length) {
+        return null;
+    }
+
+    const getBounds = (points) => {
+        let minX = width, minY = height, maxX = 0, maxY = 0;
+        points.forEach(([x, y]) => {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+        });
+        return { minX, minY, maxX, maxY };
+    };
+
+    const boxesOverlap = (left, right) => !(
+        left.maxX < right.minX ||
+        left.minX > right.maxX ||
+        left.maxY < right.minY ||
+        left.minY > right.maxY
+    );
+
+    const drawPolygon = (ctx, points) => {
+        if (!points || points.length < 3) return;
+        ctx.beginPath();
+        ctx.moveTo(points[0][0], points[0][1]);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i][0], points[i][1]);
+        }
+        ctx.closePath();
+        ctx.fill();
+    };
+
+    const newBounds = getBounds(newPolyPoints);
+    const overlapCanvas = document.createElement("canvas");
+    overlapCanvas.width = width;
+    overlapCanvas.height = height;
+    const overlapCtx = overlapCanvas.getContext("2d", { willReadFrequently: true });
+
+    const overlapping = [];
+    const others = [];
+
+    existingAnnotations.forEach((annotation) => {
+        if (!annotation.points || annotation.points.length < 3) {
+            others.push(annotation);
+            return;
+        }
+
+        const annotationBounds = getBounds(annotation.points);
+        if (!boxesOverlap(newBounds, annotationBounds)) {
+            others.push(annotation);
+            return;
+        }
+
+        overlapCtx.clearRect(0, 0, width, height);
+        overlapCtx.globalCompositeOperation = "source-over";
+        overlapCtx.fillStyle = "white";
+        drawPolygon(overlapCtx, annotation.points);
+        overlapCtx.globalCompositeOperation = "destination-in";
+        drawPolygon(overlapCtx, newPolyPoints);
+
+        const overlapImage = overlapCtx.getImageData(0, 0, width, height).data;
+        let hasOverlap = false;
+        for (let index = 3; index < overlapImage.length; index += 4) {
+            if (overlapImage[index] > 0) {
+                hasOverlap = true;
+                break;
+            }
+        }
+
+        if (hasOverlap) {
+            overlapping.push(annotation);
+        } else {
+            others.push(annotation);
+        }
+    });
+
+    if (!overlapping.length) {
+        return null;
+    }
+
+    const unionCanvas = document.createElement("canvas");
+    unionCanvas.width = width;
+    unionCanvas.height = height;
+    const unionCtx = unionCanvas.getContext("2d", { willReadFrequently: true });
+    unionCtx.clearRect(0, 0, width, height);
+    unionCtx.globalCompositeOperation = "source-over";
+    unionCtx.fillStyle = "white";
+
+    overlapping.forEach((annotation) => drawPolygon(unionCtx, annotation.points));
+    drawPolygon(unionCtx, newPolyPoints);
+
+    const mergedPolys = traceContours(unionCtx.getImageData(0, 0, width, height));
+    const baseAnnotation = overlapping[0];
+    const mergedAnnotations = mergedPolys.map((points, index) => ({
+        ...baseAnnotation,
+        id: index === 0 ? baseAnnotation.id : crypto.randomUUID(),
+        points,
+    }));
+
+    return [...others, ...mergedAnnotations];
+};
+
+/**
  * Subtracts an eraser polygon from a list of existing annotations.
  * Returns a NEW list of annotations (some might be removed, some modified/split).
- * 
+ *
  * @param {Array<[number, number]>} eraserPoints Points of the eraser polygon
  * @param {Array<{id: string, points: Array<[number, number]>, typeId: string}>} existingAnnotations List of existing annotations
  * @param {number} width Canvas width
