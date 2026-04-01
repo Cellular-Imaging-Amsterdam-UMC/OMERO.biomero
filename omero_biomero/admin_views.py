@@ -115,6 +115,7 @@ def admin_config(request, conn=None, **kwargs):
                 "PREPROCESSING_EXTENSION_MAP",
                 "FILE_OR_EXTENSION_PATTERNS_EXCLUSIVE",
                 "UPLOADER_NESTED_FILE_EXTENSIONS",
+                "group_mappings",
             ]
 
             for section, settingsd in config_data.items():

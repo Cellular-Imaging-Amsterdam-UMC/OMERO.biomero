@@ -26,7 +26,11 @@ from .settings import (
     GROUP_MAPPINGS_FILE_PATH,
     UPLOADER_DESTINATION_DIR,
 )
-from .utils import build_extra_params, get_uploaded_file_candidates
+from .utils import (
+    build_extra_params,
+    get_uploaded_file_candidates,
+    get_all_group_mappings,
+)
 from .leica_file_browser.ci_leica_converters_helpers import extract_nested_leica_items
 
 logger = logging.getLogger(__name__)
@@ -361,20 +365,7 @@ def group_mappings(request, conn=None, **kwargs):
     """GET returns current group mappings; POST updates them (admin only)."""
     try:
         if request.method == "GET":
-            mappings = {}
-            if os.path.exists(GROUP_MAPPINGS_FILE_PATH):
-                try:
-                    with open(GROUP_MAPPINGS_FILE_PATH, "r") as f:
-                        data = json.load(f) or {}
-                    if isinstance(data, dict):
-                        # With the new file, the data IS the mappings
-                        mappings = data
-                except Exception:
-                    logger.warning(
-                        "Failed reading group mappings from %s",
-                        GROUP_MAPPINGS_FILE_PATH,
-                        exc_info=True,
-                    )
+            mappings = get_all_group_mappings()
             return JsonResponse({"mappings": mappings})
 
         # POST
@@ -408,7 +399,7 @@ def group_mappings(request, conn=None, **kwargs):
 
         # The whole file is just mappings now
         existing = mappings
-        
+
         # Ensure parent directory exists (handle cases where path includes
         # ~ which we expanded earlier).
         config_dir = os.path.dirname(GROUP_MAPPINGS_FILE_PATH)
@@ -621,7 +612,11 @@ def import_uploaded_file(request, conn=None, **kwargs):
                 return JsonResponse({"error": "Invalid groupId provided"}, status=400)
 
             group_match = next(
-                (group for group in groups_member_of if group.getId() == selected_group_id),
+                (
+                    group
+                    for group in groups_member_of
+                    if group.getId() == selected_group_id
+                ),
                 None,
             )
             if group_match is None:
@@ -665,12 +660,12 @@ def import_uploaded_file(request, conn=None, **kwargs):
             group_mappings_file_path=GROUP_MAPPINGS_FILE_PATH,
             uploader_destination_dir=UPLOADER_DESTINATION_DIR,
         )
-        file_path = next((path for path in candidate_paths if os.path.exists(path)), None)
+        file_path = next(
+            (path for path in candidate_paths if os.path.exists(path)), None
+        )
 
         if file_path is None:
-            return JsonResponse(
-                {"error": f"File not found: {filename}"}, status=404
-            )
+            return JsonResponse({"error": f"File not found: {filename}"}, status=404)
 
         # Verify user has write access to the target dataset
         if dataset_type == "Dataset":

@@ -143,14 +143,42 @@ def is_upload_to_group_folder_enabled(config_file_path=None):
     return parse_bool_env(uploader_config.get("upload_to_group_folder"), default=False)
 
 
+def get_all_group_mappings(config_file_path=None, group_mappings_file_path=None):
+    """
+    Return merged group mappings from both config locations.
+
+    Backward compatibility:
+    - Load from biomero-config.json (under 'group_mappings' key)
+    - Load from group-mappings.json (the whole file is mappings)
+    - group-mappings.json overrides mappings in biomero-config.json
+    """
+    config_file_path = config_file_path or CONFIG_FILE_PATH
+    group_mappings_file_path = group_mappings_file_path or GROUP_MAPPINGS_FILE_PATH
+
+    # 1. Load legacy mappings from technical config
+    config = load_json_object(config_file_path, {})
+    legacy_mappings = config.get("group_mappings", {})
+    if not isinstance(legacy_mappings, dict):
+        legacy_mappings = {}
+
+    # 2. Load primary mappings from group-mappings file
+    primary_mappings = load_json_object(group_mappings_file_path, {})
+
+    # Merge: primary overrides legacy
+    merged = legacy_mappings.copy()
+    merged.update(primary_mappings)
+    return merged
+
+
 def get_group_folder_path(group_id, base_dir=None, group_mappings_file_path=None):
     """Resolve the mapped filesystem folder for a group id."""
     if group_id is None:
         return None
 
     base_dir = base_dir or BASE_DIR
-    group_mappings_file_path = group_mappings_file_path or GROUP_MAPPINGS_FILE_PATH
-    mappings = load_json_object(group_mappings_file_path, {})
+    mappings = get_all_group_mappings(
+        config_file_path=None, group_mappings_file_path=group_mappings_file_path
+    )
     mapping = mappings.get(str(group_id)) or mappings.get(group_id)
 
     if not isinstance(mapping, dict):
