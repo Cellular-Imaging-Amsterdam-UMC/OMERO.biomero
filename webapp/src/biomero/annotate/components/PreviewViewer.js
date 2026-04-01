@@ -430,17 +430,6 @@ const PreviewViewer = ({
           Run Preview
         </Button>
 
-        <Button
-          intent="success"
-          icon="floppy-disk"
-          onClick={handleSaveAnnotations}
-          loading={saving}
-          disabled={!hasPredictionsForCurrentPlane}
-          title="Save current plane predictions as OMERO ROIs"
-        >
-          Save as Annotation
-        </Button>
-
         {channels.length > 1 && (
           <span
             className="text-xs px-2 py-1 rounded flex items-center gap-1"

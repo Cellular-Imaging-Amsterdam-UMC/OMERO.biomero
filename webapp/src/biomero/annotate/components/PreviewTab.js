@@ -52,7 +52,10 @@ const PreviewTab = () => {
     }
     setSetsLoading(true);
     listManifests("dataset", datasetId)
-      .then((resp) => setAnnotationSets(resp.manifests || []))
+      .then((resp) => {
+        const sets = (resp.manifests || []).map((m) => ({ ...m, id: m.set_id }));
+        setAnnotationSets(sets);
+      })
       .catch(() => setAnnotationSets([]))
       .finally(() => setSetsLoading(false));
   }, [datasetId]);
