@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Tabs, Tab } from "@blueprintjs/core";
+import { Tabs, Tab, Alert } from "@blueprintjs/core";
 import PreviewTab from "./components/PreviewTab";
 import TrainingBiomeroTab from "./components/TrainingBiomeroTab";
 import ConfigureTab from "./components/ConfigureTab";
@@ -27,6 +27,7 @@ const AnnotateApp = () => {
   // Manifest-based state (replaces tableId/config/units/progress)
   const [setId, setSetId] = useState(null);
   const [manifest, setManifest] = useState(null);
+  const [showConfigWarning, setShowConfigWarning] = useState(false);
 
   useEffect(() => {
     if (!loadingOmero) {
@@ -42,7 +43,14 @@ const AnnotateApp = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleTabChange = (newTabId) => setActiveTab(newTabId);
+  const handleTabChange = (newTabId) => {
+    // Warn when navigating to Configure with an active annotation set
+    if (newTabId === "configure" && setId) {
+      setShowConfigWarning(true);
+      return;
+    }
+    setActiveTab(newTabId);
+  };
   const handleWorkflowError = () => setWorkflowError((prev) => !prev);
 
   // Called by ConfigureTab when a new set is created or an existing one is resumed
@@ -146,6 +154,34 @@ const AnnotateApp = () => {
           )}
         </div>
       )}
+
+      {/* Warning dialog when switching to Configure with active set */}
+      <Alert
+        isOpen={showConfigWarning}
+        onClose={() => setShowConfigWarning(false)}
+        cancelButtonText="Keep annotating"
+        confirmButtonText="New annotation set"
+        intent="warning"
+        icon="warning-sign"
+        onCancel={() => {
+          setShowConfigWarning(false);
+          setActiveTab("annotate");
+        }}
+        onConfirm={() => {
+          setShowConfigWarning(false);
+          setSetId(null);
+          setManifest(null);
+          setActiveTab("configure");
+        }}
+      >
+        <p>
+          You have an active annotation set: <strong>{manifest?.name || "unnamed"}</strong>
+        </p>
+        <p>
+          Your progress is saved. You can resume this set later from the Configure tab,
+          or start a new annotation set.
+        </p>
+      </Alert>
 
       <div className="p-4 h-full overflow-hidden">
         <Tabs

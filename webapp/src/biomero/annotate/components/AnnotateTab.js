@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { H4, Card, Button, Spinner, Callout, ButtonGroup, Menu, MenuItem, Popover, Tag } from "@blueprintjs/core";
+import { H4, Card, Button, Spinner, Callout, ButtonGroup, Menu, MenuItem, Popover, Tag, Icon } from "@blueprintjs/core";
 import AnnotateViewer from "./AnnotateViewer";
 import PatchSelector from "./PatchSelector";
 import { useAppContext } from "../../../AppContext";
@@ -10,15 +10,27 @@ import {
   addPatchToManifest,
 } from "../../../apiService";
 
-// Simple unit list (replaces TrackingTableView)
+// Unit list grouped by image
 const UnitList = ({ units, selectedIndex, onSelect, filterStatus, onFilterChange }) => {
-  const filtered = units
-    .map((u, i) => ({ ...u, _idx: i }))
-    .filter((u) => {
-      if (filterStatus === "pending") return !u.processed;
-      if (filterStatus === "completed") return u.processed;
-      return true;
-    });
+  // Group units by image_id, preserving original indices
+  const indexed = units.map((u, i) => ({ ...u, _idx: i }));
+  const filtered = indexed.filter((u) => {
+    if (filterStatus === "pending") return !u.processed;
+    if (filterStatus === "completed") return u.processed;
+    return true;
+  });
+
+  // Build grouped structure: [ { imageId, imageName, units: [...] }, ... ]
+  const grouped = [];
+  const seen = new Map();
+  for (const unit of filtered) {
+    if (!seen.has(unit.image_id)) {
+      const group = { imageId: unit.image_id, imageName: unit.image_name, units: [] };
+      seen.set(unit.image_id, group);
+      grouped.push(group);
+    }
+    seen.get(unit.image_id).units.push(unit);
+  }
 
   const completed = units.filter((u) => u.processed).length;
 
@@ -39,32 +51,62 @@ const UnitList = ({ units, selectedIndex, onSelect, filterStatus, onFilterChange
         </ButtonGroup>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {filtered.map((unit) => (
-          <div
-            key={unit._idx}
-            className={`p-2 text-xs cursor-pointer border-b ${
-              unit._idx === selectedIndex
-                ? "bg-blue-100 border-l-2 border-l-blue-500"
-                : "hover:bg-gray-50"
-            } ${unit.processed ? "opacity-60" : ""}`}
-            onClick={() => onSelect(unit._idx)}
-          >
-            <div className="font-medium truncate">{unit.image_name}</div>
-            {unit.is_patch && (
-              <div className="text-gray-500">
-                Patch {unit.patch_width}x{unit.patch_height} at ({unit.patch_x},{unit.patch_y})
+        {grouped.map((group) => {
+          const groupDone = group.units.every((u) => u.processed);
+          const groupSelected = group.units.some((u) => u._idx === selectedIndex);
+          return (
+            <div key={group.imageId}>
+              {/* Image header */}
+              <div
+                className={`px-2 py-1.5 text-xs font-semibold bg-gray-100 border-b flex items-center justify-between sticky top-0 ${
+                  groupSelected ? "bg-blue-50" : ""
+                }`}
+              >
+                <span className="truncate flex items-center gap-1">
+                  <Icon
+                    icon={groupDone ? "tick-circle" : "circle"}
+                    size={12}
+                    intent={groupDone ? "success" : "none"}
+                  />
+                  {group.imageName}
+                </span>
+                <span className="text-gray-400 text-[10px]">
+                  {group.units.filter((u) => u.processed).length}/{group.units.length}
+                </span>
               </div>
-            )}
-            <div className="flex gap-2 text-gray-400 mt-0.5">
-              {unit.channel >= 0 && <span>C:{unit.channel}</span>}
-              {unit.z_slice >= 0 && <span>Z:{unit.z_slice}</span>}
-              {unit.timepoint >= 0 && <span>T:{unit.timepoint}</span>}
-              <Tag minimal round small intent={unit.processed ? "success" : "none"}>
-                {unit.processed ? "Done" : "Pending"}
-              </Tag>
+              {/* Units under this image */}
+              {group.units.map((unit) => (
+                <div
+                  key={unit._idx}
+                  className={`pl-4 pr-2 py-1.5 text-xs cursor-pointer border-b ${
+                    unit._idx === selectedIndex
+                      ? "bg-blue-100 border-l-2 border-l-blue-500"
+                      : "hover:bg-gray-50"
+                  } ${unit.processed ? "opacity-60" : ""}`}
+                  onClick={() => onSelect(unit._idx)}
+                >
+                  {unit.is_patch ? (
+                    <div className="text-gray-600">
+                      Patch {unit.patch_width}x{unit.patch_height} at ({unit.patch_x},{unit.patch_y})
+                    </div>
+                  ) : (
+                    <div className="text-gray-600">Full image</div>
+                  )}
+                  <div className="flex gap-2 items-center text-gray-400 mt-0.5">
+                    {unit.channel >= 0 && <span>C:{unit.channel}</span>}
+                    {unit.z_slice >= 0 && <span>Z:{unit.z_slice}</span>}
+                    {unit.timepoint >= 0 && <span>T:{unit.timepoint}</span>}
+                    <Icon
+                      icon={unit.processed ? "tick-circle" : "circle"}
+                      size={12}
+                      intent={unit.processed ? "success" : "none"}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -80,6 +122,7 @@ const AnnotateTab = ({ manifest, setId, onManifestUpdate }) => {
   const [annotations, setAnnotations] = useState([]);
   const [featureTypes, setFeatureTypes] = useState([]);
   const [channelInfo, setChannelInfo] = useState(null);
+  const [allChannels, setAllChannels] = useState([]);
   const [skipPopoverOpen, setSkipPopoverOpen] = useState(false);
 
   // Initialize feature types from manifest
@@ -170,10 +213,12 @@ const AnnotateTab = ({ manifest, setId, onManifestUpdate }) => {
         .then((data) => {
           const ch = data.channels?.find((c) => c.index === currentImage.c);
           setChannelInfo(ch || null);
+          setAllChannels(data.channels || []);
         })
-        .catch(() => setChannelInfo(null));
+        .catch(() => { setChannelInfo(null); setAllChannels([]); });
     } else {
       setChannelInfo(null);
+      setAllChannels([]);
     }
   }, [currentImage?.id, currentImage?.c]);
 
@@ -472,6 +517,7 @@ const AnnotateTab = ({ manifest, setId, onManifestUpdate }) => {
               featureTypes={featureTypes}
               onFeatureTypesChange={setFeatureTypes}
               channelInfo={channelInfo}
+              channels={allChannels}
               patch={viewerPatch}
             />
           ) : (

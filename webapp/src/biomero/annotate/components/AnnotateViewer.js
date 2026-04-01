@@ -35,7 +35,6 @@ import React, {
 import {
   Button,
   Slider,
-  RangeSlider,
   ButtonGroup,
   Icon,
   InputGroup,
@@ -44,6 +43,7 @@ import {
   Tag,
   Intent,
 } from "@blueprintjs/core";
+import ImageChannelControls from "./ImageChannelControls";
 import {
   traceContours,
   subtractAnnotations,
@@ -67,6 +67,7 @@ const AnnotateViewer = ({
   featureTypes,
   onFeatureTypesChange,
   channelInfo,
+  channels = [],
   patch,
 }) => {
   const canvasRef = useRef(null);
@@ -113,19 +114,49 @@ const AnnotateViewer = ({
   // Track actual image dimensions for the save flow
   const [imageDims, setImageDims] = useState({ width: 0, height: 0 });
 
-  // Contrast state
-  const [contrastWindow, setContrastWindow] = useState({ start: 0, end: 255 });
+  // Channel visibility and contrast state (mirrors PreviewViewer pattern)
+  const [channelVisibility, setChannelVisibility] = useState({});
+  const [channelScales, setChannelScales] = useState({});
 
+  // Initialize channel visibility and scales when channels prop changes
   useEffect(() => {
-    if (channelInfo?.window) {
-      setContrastWindow({
-        start: channelInfo.window.start,
-        end: channelInfo.window.end,
+    if (channels.length > 0) {
+      const vis = {};
+      const scales = {};
+      channels.forEach((ch) => {
+        vis[ch.index] = ch.active !== false;
+        if (ch.window) {
+          const range = ch.window.max - ch.window.min;
+          scales[ch.index] = {
+            min: range > 0 ? ((ch.window.start - ch.window.min) / range) * 100 : 0,
+            max: range > 0 ? ((ch.window.end - ch.window.min) / range) * 100 : 100,
+          };
+        } else {
+          scales[ch.index] = { min: 0, max: 100 };
+        }
       });
-    } else {
-      setContrastWindow({ start: 0, end: 255 });
+      setChannelVisibility(vis);
+      setChannelScales(scales);
     }
-  }, [channelInfo, image?.id]);
+  }, [channels]);
+
+  const toggleChannelVisibility = (idx) => {
+    setChannelVisibility((prev) => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  const handleChannelScaleChange = (idx, type, value) => {
+    setChannelScales((prev) => {
+      const current = prev[idx] || { min: 0, max: 100 };
+      if (type === "min") return { ...prev, [idx]: { ...current, min: value } };
+      if (type === "max") return { ...prev, [idx]: { ...current, max: value } };
+      if (type === "range") return { ...prev, [idx]: { min: value[0], max: value[1] } };
+      return prev;
+    });
+  };
+
+  const handleChannelAutoScale = (idx) => {
+    setChannelScales((prev) => ({ ...prev, [idx]: { min: 0, max: 100 } }));
+  };
 
   // Patch viewport clipping
   const patchOffsetX = patch ? Number(patch.patch_x || 0) : 0;
@@ -133,20 +164,41 @@ const AnnotateViewer = ({
   const patchWidth = patch ? Number(patch.patch_width) : null;
   const patchHeight = patch ? Number(patch.patch_height) : null;
 
-  // Build image URL with z/t/c support
+  // Build image URL with z/t/c support and per-channel contrast
   const Z = image?.z ?? 0;
   const T = image?.t ?? 0;
   const C = image?.c;
   const imageUrl = useMemo(() => {
     if (!image) return null;
-    let url = `/webgateway/render_image/${image.id}/${Z}/${T}/`;
-    if (C !== undefined && C !== null) {
-      url += `?c=${C + 1}|${contrastWindow.start}:${contrastWindow.end}$FFFFFF&q=1.0`;
-    } else {
-      url += `?q=1.0`;
+    const base = `/webgateway/render_image/${image.id}/${Z}/${T}/`;
+
+    if (channels.length > 0) {
+      // Multi-channel mode: build per-channel parameters with visibility and contrast
+      const channelParam = channels
+        .map((ch) => {
+          const chNum = ch.index + 1;
+          const visible = channelVisibility[ch.index] !== false;
+          const prefix = visible ? "" : "-";
+          const scale = channelScales[ch.index];
+          if (scale && ch.window) {
+            const range = ch.window.max - ch.window.min;
+            const winStart = Math.round(ch.window.min + (range * scale.min) / 100);
+            const winEnd = Math.round(ch.window.min + (range * scale.max) / 100);
+            const color = (ch.color || "#ffffff").replace("#", "");
+            return `${prefix}${chNum}|${winStart}:${winEnd}$${color}`;
+          }
+          return `${prefix}${chNum}`;
+        })
+        .join(",");
+      return `${base}?c=${channelParam}&q=1.0`;
     }
-    return url;
-  }, [image, Z, T, C, contrastWindow]);
+
+    // Fallback: single channel from channelInfo
+    if (C !== undefined && C !== null && channelInfo?.window) {
+      return `${base}?c=${C + 1}|${channelInfo.window.start}:${channelInfo.window.end}$FFFFFF&q=1.0`;
+    }
+    return `${base}?q=1.0`;
+  }, [image, Z, T, C, channels, channelVisibility, channelScales, channelInfo]);
 
   useEffect(() => {
     if (featureTypes.length > 0) {
@@ -746,29 +798,19 @@ const AnnotateViewer = ({
     <div className="flex h-full gap-4">
       {/* Toolbar */}
       <div className="w-64 flex flex-col gap-4 p-2 border-r bg-gray-50 overflow-y-auto shrink-0">
-        {/* Contrast slider */}
-        {C !== undefined && C !== null && (
+        {/* Channel controls */}
+        {channels.length > 0 && (
           <div className="border-b pb-2">
-            <div className="text-xs font-bold uppercase text-gray-500 mb-2">
-              Contrast
-            </div>
-            <div className="px-1">
-              <RangeSlider
-                min={channelInfo?.window?.min ?? 0}
-                max={channelInfo?.window?.max ?? 255}
-                stepSize={Math.max(
-                  1,
-                  Math.floor(
-                    ((channelInfo?.window?.max ?? 255) -
-                      (channelInfo?.window?.min ?? 0)) /
-                      500,
-                  ),
-                )}
-                value={[contrastWindow.start, contrastWindow.end]}
-                onChange={([start, end]) => setContrastWindow({ start, end })}
-                labelRenderer={false}
-              />
-            </div>
+            <ImageChannelControls
+              channels={channels}
+              visibility={channelVisibility}
+              onToggle={toggleChannelVisibility}
+              channelScales={channelScales}
+              onChannelScaleChange={handleChannelScaleChange}
+              onChannelAutoScale={handleChannelAutoScale}
+              title="Channels"
+              lockedChannelIndex={null}
+            />
           </div>
         )}
 

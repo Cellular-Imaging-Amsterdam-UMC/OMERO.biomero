@@ -502,7 +502,7 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
                 <div>
                   <div className="font-medium text-sm">{m.name}</div>
                   <div className="text-xs text-gray-500">
-                    {m.progress?.completed || 0}/{m.progress?.total || 0} units
+                    {m.progress?.completed_units || 0}/{m.progress?.total_units || 0} units
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -801,7 +801,39 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
               </FormGroup>
             )}
 
-            {/* Advanced: 3D + Patches */}
+            {/* Patch settings */}
+            <Switch
+              checked={usePatches}
+              onChange={(e) => setUsePatches(e.target.checked)}
+              label="Use patches"
+              className="mt-2"
+            />
+            {usePatches && (
+              <div className="ml-4 flex flex-col gap-2 mt-1">
+                <FormGroup label="Patch Size (W, H)">
+                  <InputGroup
+                    value={patchSize.join(", ")}
+                    onChange={(e) => {
+                      const vals = e.target.value
+                        .split(",")
+                        .map((v) => parseInt(v.trim(), 10))
+                        .filter((v) => !isNaN(v));
+                      if (vals.length >= 1) setPatchSize(vals.slice(0, 2));
+                    }}
+                  />
+                </FormGroup>
+                <FormGroup label="Patches per Image">
+                  <NumericInput
+                    value={patchesPerImage}
+                    onValueChange={setPatchesPerImage}
+                    min={1}
+                    max={100}
+                  />
+                </FormGroup>
+              </div>
+            )}
+
+            {/* Advanced: 3D */}
             <Button
               minimal
               small
@@ -816,35 +848,6 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
                   onChange={(e) => setThreeD(e.target.checked)}
                   label="3D Volumetric mode"
                 />
-                <Switch
-                  checked={usePatches}
-                  onChange={(e) => setUsePatches(e.target.checked)}
-                  label="Use patches"
-                />
-                {usePatches && (
-                  <>
-                    <FormGroup label="Patch Size (W, H)">
-                      <InputGroup
-                        value={patchSize.join(", ")}
-                        onChange={(e) => {
-                          const vals = e.target.value
-                            .split(",")
-                            .map((v) => parseInt(v.trim(), 10))
-                            .filter((v) => !isNaN(v));
-                          if (vals.length >= 1) setPatchSize(vals.slice(0, 2));
-                        }}
-                      />
-                    </FormGroup>
-                    <FormGroup label="Patches per Image">
-                      <NumericInput
-                        value={patchesPerImage}
-                        onValueChange={setPatchesPerImage}
-                        min={1}
-                        max={100}
-                      />
-                    </FormGroup>
-                  </>
-                )}
               </div>
             </Collapse>
           </Card>

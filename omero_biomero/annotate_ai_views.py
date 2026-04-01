@@ -228,7 +228,12 @@ def save_manifest(request, conn=None, **kwargs):
             for img_id in image_ids:
                 img = conn.getObject("Image", img_id)
                 if img:
-                    images_list.append({"id": img_id, "name": img.getName()})
+                    images_list.append({
+                        "id": img_id,
+                        "name": img.getName(),
+                        "sizeX": img.getSizeX(),
+                        "sizeY": img.getSizeY(),
+                    })
             _prepare_processing_units(config, images_list)
             if not config.annotations:
                 return JsonResponse(
@@ -703,7 +708,11 @@ def _prepare_processing_units(config, images_list):
 
     Follows the same logic as AnnotationPipeline._prepare_processing_units
     but without requiring a full pipeline instance.
+
+    Each image dict should have: id, name, sizeX, sizeY.
     """
+    import random as _rng
+
     lib = _get_omero_annotate_ai()
     if not lib:
         return
@@ -747,8 +756,17 @@ def _prepare_processing_units(config, images_list):
         for z in z_slices:
             for t in timepoints:
                 if sc.use_patches:
-                    # Generate patch coordinates
+                    # Generate patch coordinates with random positions
+                    patch_w = sc.patch_size[0]
+                    patch_h = sc.patch_size[1] if len(sc.patch_size) > 1 else sc.patch_size[0]
+                    img_w = img_info.get("sizeX", 1024)
+                    img_h = img_info.get("sizeY", 1024)
+                    max_x = max(0, img_w - patch_w)
+                    max_y = max(0, img_h - patch_h)
+
                     for p_idx in range(sc.patches_per_image):
+                        px = _rng.randint(0, max_x) if max_x > 0 else 0
+                        py = _rng.randint(0, max_y) if max_y > 0 else 0
                         z_start_val = (sc.z_range_start or 0) if sc.three_d else -1
                         z_end_val = (sc.z_range_end or 0) if sc.three_d else -1
                         ann = lib["ImageAnnotation"](
@@ -763,10 +781,10 @@ def _prepare_processing_units(config, images_list):
                             z_end=z_end_val,
                             z_length=sc.get_z_length() if sc.three_d else 1,
                             is_patch=True,
-                            patch_width=sc.patch_size[0],
-                            patch_height=sc.patch_size[1]
-                            if len(sc.patch_size) > 1
-                            else sc.patch_size[0],
+                            patch_x=px,
+                            patch_y=py,
+                            patch_width=patch_w,
+                            patch_height=patch_h,
                         )
                         config.add_annotation(ann)
                 else:

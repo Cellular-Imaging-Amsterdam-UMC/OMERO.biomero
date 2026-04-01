@@ -24,7 +24,7 @@
 - Modify: `omero_annotate_ai/src/omero_annotate_ai/core/annotation_config.py:34` (near ImageAnnotation)
 - Test: `omero_annotate_ai/tests/test_config.py`
 
-- [ ] **Step 1: Write failing tests for ChannelPresentation**
+- [x] **Step 1: Write failing tests for ChannelPresentation**
 
 Add to `omero_annotate_ai/tests/test_config.py` after line 745:
 
@@ -59,7 +59,7 @@ class TestChannelPresentation:
         assert cp == cp2
 ```
 
-- [ ] **Step 2: Write failing tests for FeatureType**
+- [x] **Step 2: Write failing tests for FeatureType**
 
 Add below the TestChannelPresentation class:
 
@@ -82,13 +82,13 @@ class TestFeatureType:
         assert ft == ft2
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/test_config.py::TestChannelPresentation tests/test_config.py::TestFeatureType -v`
 
 Expected: ImportError — ChannelPresentation and FeatureType not defined yet.
 
-- [ ] **Step 4: Implement ChannelPresentation and FeatureType models**
+- [x] **Step 4: Implement ChannelPresentation and FeatureType models**
 
 Add before `class ImageAnnotation(BaseModel):` (line 34) in `omero_annotate_ai/src/omero_annotate_ai/core/annotation_config.py`:
 
@@ -113,7 +113,7 @@ class FeatureType(BaseModel):
     color: str  # hex color, e.g. "#FF0000"
 ```
 
-- [ ] **Step 5: Add channel_presentation to ImageAnnotation**
+- [x] **Step 5: Add channel_presentation to ImageAnnotation**
 
 In the `ImageAnnotation` class (around line 34, now shifted), add after the last existing field:
 
@@ -123,7 +123,7 @@ In the `ImageAnnotation` class (around line 34, now shifted), add after the last
 
 Add `from typing import List` import if not already present (it should be).
 
-- [ ] **Step 6: Add feature_types to AnnotationConfig**
+- [x] **Step 6: Add feature_types to AnnotationConfig**
 
 In the `AnnotationConfig` class (around line 549, now shifted), add after the `tags` field:
 
@@ -131,19 +131,19 @@ In the `AnnotationConfig` class (around line 549, now shifted), add after the `t
     feature_types: List[FeatureType] = Field(default_factory=list)
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/test_config.py::TestChannelPresentation tests/test_config.py::TestFeatureType -v`
 
 Expected: All 5 tests PASS.
 
-- [ ] **Step 8: Run full test suite to check nothing is broken**
+- [x] **Step 8: Run full test suite to check nothing is broken**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/ -v`
 
 Expected: All existing tests still pass.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai
@@ -163,7 +163,7 @@ annotation classes (name + color) at the annotation set level."
 - Modify: `omero_annotate_ai/src/omero_annotate_ai/core/annotation_config.py` (AnnotationConfig class)
 - Test: `omero_annotate_ai/tests/test_config.py`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `tests/test_config.py`:
 
@@ -243,13 +243,13 @@ class TestAnnotationConfigJSON:
         assert config.to_dict() == loaded.to_dict()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/test_config.py::TestAnnotationConfigJSON -v`
 
 Expected: AttributeError — to_json/from_json not defined.
 
-- [ ] **Step 3: Implement to_json() and from_json()**
+- [x] **Step 3: Implement to_json() and from_json()**
 
 Add to the `AnnotationConfig` class in `annotation_config.py`, near the existing `to_yaml()` method (around line 899):
 
@@ -287,19 +287,19 @@ Add to the `AnnotationConfig` class in `annotation_config.py`, near the existing
 
 Add `import json` at the top of the file if not already present.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/test_config.py::TestAnnotationConfigJSON -v`
 
 Expected: All 5 tests PASS.
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/ -v`
 
 Expected: All tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai
@@ -319,7 +319,7 @@ to_dict/from_dict for consistency with YAML serialization."
 - Modify: `omero_annotate_ai/src/omero_annotate_ai/omero/omero_functions.py`
 - Test: `omero_annotate_ai/tests/test_omero_functions.py`
 
-- [ ] **Step 1: Write failing tests for save/load manifest**
+- [x] **Step 1: Write failing tests for save/load manifest**
 
 Add to `omero_annotate_ai/tests/test_omero_functions.py`:
 
@@ -370,13 +370,13 @@ class TestManifestPersistence:
         assert ns == "omero.biomero.annotations.abc123"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/test_omero_functions.py::TestManifestPersistence -v`
 
 Expected: ImportError — functions not defined.
 
-- [ ] **Step 3: Implement namespace helpers and set_id generator**
+- [x] **Step 3: Implement namespace helpers and set_id generator**
 
 Add to `omero_annotate_ai/src/omero_annotate_ai/omero/omero_functions.py` near the top (after existing imports and constants):
 
@@ -407,13 +407,13 @@ def geojson_namespace(set_id: str) -> str:
     return f"{GEOJSON_NS_PREFIX}{set_id}"
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/test_omero_functions.py::TestManifestPersistence -v`
 
 Expected: All 3 tests PASS.
 
-- [ ] **Step 5: Write failing tests for save_manifest_to_omero and load_manifest_from_omero**
+- [x] **Step 5: Write failing tests for save_manifest_to_omero and load_manifest_from_omero**
 
 Add to the TestManifestPersistence class in `tests/test_omero_functions.py`:
 
@@ -495,13 +495,13 @@ Add to the TestManifestPersistence class in `tests/test_omero_functions.py`:
         assert manifests[0]["name"] == "test_workflow"
 ```
 
-- [ ] **Step 6: Run tests to verify they fail**
+- [x] **Step 6: Run tests to verify they fail**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/test_omero_functions.py::TestManifestPersistence -v`
 
 Expected: ImportError for save_manifest_to_omero, load_manifest_from_omero, list_manifests_from_omero.
 
-- [ ] **Step 7: Implement save_manifest_to_omero**
+- [x] **Step 7: Implement save_manifest_to_omero**
 
 Add to `omero_functions.py`:
 
@@ -550,7 +550,7 @@ def save_manifest_to_omero(
             os.remove(tmp_path)
 ```
 
-- [ ] **Step 8: Implement load_manifest_from_omero**
+- [x] **Step 8: Implement load_manifest_from_omero**
 
 ```python
 def load_manifest_from_omero(conn, container_type: str, container_id: int, set_id: str):
@@ -576,7 +576,7 @@ def load_manifest_from_omero(conn, container_type: str, container_id: int, set_i
     return None
 ```
 
-- [ ] **Step 9: Implement list_manifests_from_omero**
+- [x] **Step 9: Implement list_manifests_from_omero**
 
 ```python
 def list_manifests_from_omero(conn, container_type: str, container_id: int) -> list:
@@ -612,13 +612,13 @@ def list_manifests_from_omero(conn, container_type: str, container_id: int) -> l
     return manifests
 ```
 
-- [ ] **Step 10: Run tests to verify they pass**
+- [x] **Step 10: Run tests to verify they pass**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/test_omero_functions.py::TestManifestPersistence -v`
 
 Expected: All 7 tests PASS.
 
-- [ ] **Step 11: Write failing test for delete_manifest_from_omero**
+- [x] **Step 11: Write failing test for delete_manifest_from_omero**
 
 Add to TestManifestPersistence:
 
@@ -656,7 +656,7 @@ Add to TestManifestPersistence:
         assert conn.deleteObjects.call_count >= 1
 ```
 
-- [ ] **Step 12: Implement delete_manifest_from_omero**
+- [x] **Step 12: Implement delete_manifest_from_omero**
 
 Add to `omero_functions.py`:
 
@@ -707,19 +707,19 @@ def delete_manifest_from_omero(
     return True
 ```
 
-- [ ] **Step 13: Run tests to verify they pass**
+- [x] **Step 13: Run tests to verify they pass**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/test_omero_functions.py::TestManifestPersistence -v`
 
 Expected: All 8 tests PASS.
 
-- [ ] **Step 14: Run full test suite**
+- [x] **Step 14: Run full test suite**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/ -v`
 
 Expected: All tests pass.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai
@@ -739,7 +739,7 @@ Replaces YAML config + OMERO HDF5 table with a single artifact."
 - Modify: `omero_annotate_ai/src/omero_annotate_ai/omero/omero_functions.py`
 - Test: `omero_annotate_ai/tests/test_omero_functions.py`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `tests/test_omero_functions.py`:
 
@@ -830,13 +830,13 @@ class TestGeoJSONPersistence:
         assert merged["features"][0]["properties"]["featureType"] == "nucleus"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/test_omero_functions.py::TestGeoJSONPersistence -v`
 
 Expected: ImportError.
 
-- [ ] **Step 3: Implement merge_geojson_patches**
+- [x] **Step 3: Implement merge_geojson_patches**
 
 Add to `omero_functions.py`:
 
@@ -881,7 +881,7 @@ def merge_geojson_patches(existing: dict, new: dict) -> dict:
     return result
 ```
 
-- [ ] **Step 4: Implement save_geojson_to_omero and load_geojson_from_omero**
+- [x] **Step 4: Implement save_geojson_to_omero and load_geojson_from_omero**
 
 ```python
 def save_geojson_to_omero(
@@ -955,19 +955,19 @@ def load_geojson_from_omero(conn, image_id: int, set_id: str):
     return None
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/test_omero_functions.py::TestGeoJSONPersistence -v`
 
 Expected: All 5 tests PASS.
 
-- [ ] **Step 6: Run full test suite**
+- [x] **Step 6: Run full test suite**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai && pixi run -e dev pytest tests/ -v`
 
 Expected: All tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/omero_annotate_ai
@@ -990,7 +990,7 @@ are added, same-patch features are replaced."
 - Modify: `OMERO.biomero/omero_biomero/urls.py`
 - Modify: `OMERO.biomero/webapp/src/apiService.js`
 
-- [ ] **Step 1: Add manifest view functions to annotate_ai_views.py**
+- [x] **Step 1: Add manifest view functions to annotate_ai_views.py**
 
 Add near the top of the file (after existing imports):
 
@@ -1093,7 +1093,7 @@ def delete_manifest(request, conn=None, **kwargs):
         return JsonResponse({"error": str(e)}, status=500)
 ```
 
-- [ ] **Step 2: Add URL patterns**
+- [x] **Step 2: Add URL patterns**
 
 In `OMERO.biomero/omero_biomero/urls.py`, add in the annotate AI URLs section (around line 123):
 
@@ -1104,7 +1104,7 @@ In `OMERO.biomero/omero_biomero/urls.py`, add in the annotate AI URLs section (a
     url(r'^api/annotate/delete_manifest/$', views_annotate.delete_manifest, name='delete_manifest'),
 ```
 
-- [ ] **Step 3: Add frontend API functions**
+- [x] **Step 3: Add frontend API functions**
 
 Add to `OMERO.biomero/webapp/src/apiService.js`:
 
@@ -1149,7 +1149,7 @@ export const deleteManifest = async (containerType, containerId, setId, groupId 
 };
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero
@@ -1168,7 +1168,7 @@ wrap omero_annotate_ai persistence functions. Frontend API functions added."
 - Modify: `OMERO.biomero/omero_biomero/annotate_ai_views.py:706` (save_annotation)
 - Modify: `OMERO.biomero/omero_biomero/annotate_ai_views.py:1155` (fetch_annotation)
 
-- [ ] **Step 1: Rewrite save_annotation**
+- [x] **Step 1: Rewrite save_annotation**
 
 Replace the existing `save_annotation` function (line 706) with a simplified version that only writes GeoJSON and updates the manifest:
 
@@ -1224,7 +1224,7 @@ def save_annotation(request, conn=None, **kwargs):
         return JsonResponse({"error": str(e)}, status=500)
 ```
 
-- [ ] **Step 2: Rewrite fetch_annotation**
+- [x] **Step 2: Rewrite fetch_annotation**
 
 Replace the existing `fetch_annotation` function (line 1155) with a simplified version:
 
@@ -1256,7 +1256,7 @@ def fetch_annotation(request, conn=None, **kwargs):
         return JsonResponse({"error": str(e)}, status=500)
 ```
 
-- [ ] **Step 3: Update apiService.js to use set_id instead of table_id**
+- [x] **Step 3: Update apiService.js to use set_id instead of table_id**
 
 Update the frontend API calls in `webapp/src/apiService.js`:
 
@@ -1285,7 +1285,7 @@ export const fetchAnnotateAnnotation = async (imageId, setId) => {
 };
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero
@@ -1306,7 +1306,7 @@ fetch_annotation uses set_id namespace, no ROI fallback."
 - Modify: `OMERO.biomero/omero_biomero/urls.py`
 - Modify: `OMERO.biomero/webapp/src/apiService.js`
 
-- [ ] **Step 1: Add add_patch view function**
+- [x] **Step 1: Add add_patch view function**
 
 Add to `annotate_ai_views.py`:
 
@@ -1382,7 +1382,7 @@ def add_patch(request, conn=None, **kwargs):
         return JsonResponse({"error": str(e)}, status=500)
 ```
 
-- [ ] **Step 2: Add URL pattern**
+- [x] **Step 2: Add URL pattern**
 
 In `urls.py`, add:
 
@@ -1390,7 +1390,7 @@ In `urls.py`, add:
     url(r'^api/annotate/add_patch/$', views_annotate.add_patch, name='add_patch_manifest'),
 ```
 
-- [ ] **Step 3: Add frontend API function**
+- [x] **Step 3: Add frontend API function**
 
 Add to `apiService.js`:
 
@@ -1411,7 +1411,7 @@ export const addPatchToManifest = async (
 };
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero
@@ -1432,15 +1432,15 @@ adds unit to manifest, and saves. Replaces tracking table add_patch."
 - Source: `OMERO.biomero/webapp/src/biomero/prediction/components/ImageChannelControls.js`
 - Target: `OMERO.biomero/webapp/src/biomero/annotate/components/ImageChannelControls.js`
 
-- [ ] **Step 1: Copy prediction's ImageChannelControls to annotate**
+- [x] **Step 1: Copy prediction's ImageChannelControls to annotate**
 
 Read the prediction version and copy it over to replace the annotate version. The prediction version has: 0-100% scales, auto-scale button, numeric inputs + RangeSlider, channel locking.
 
-- [ ] **Step 2: Verify the component works with annotate's PreviewViewer**
+- [x] **Step 2: Verify the component works with annotate's PreviewViewer**
 
 Update PreviewViewer.js imports if needed to match the new prop names (channelScales instead of channelWindows, etc.).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero
@@ -1459,15 +1459,15 @@ Replaces simple slider-only version with richer controls:
 - Source: `OMERO.biomero/webapp/src/biomero/prediction/utils/GeometryUtils.js`
 - Target: `OMERO.biomero/webapp/src/biomero/annotate/utils/GeometryUtils.js`
 
-- [ ] **Step 1: Copy appendToAnnotations function from prediction's GeometryUtils**
+- [x] **Step 1: Copy appendToAnnotations function from prediction's GeometryUtils**
 
 Read the prediction version's `appendToAnnotations` function and add it to the annotate version's `GeometryUtils.js`.
 
-- [ ] **Step 2: Export the new function**
+- [x] **Step 2: Export the new function**
 
 Ensure `appendToAnnotations` is exported from the annotate GeometryUtils.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero
@@ -1485,7 +1485,7 @@ annotations of the same feature type."
 **Files:**
 - Modify: `OMERO.biomero/webapp/src/biomero/annotate/components/AnnotateViewer.js`
 
-- [ ] **Step 1: Add selectedAnnotation state and canvas hit-testing**
+- [x] **Step 1: Add selectedAnnotation state and canvas hit-testing**
 
 Add to AnnotateViewer state:
 
@@ -1521,7 +1521,7 @@ const handleCanvasClickSelect = (e) => {
 };
 ```
 
-- [ ] **Step 2: Add Delete key handler**
+- [x] **Step 2: Add Delete key handler**
 
 ```javascript
 useEffect(() => {
@@ -1536,7 +1536,7 @@ useEffect(() => {
 }, [selectedAnnotationId, annotations, onAnnotationsChange]);
 ```
 
-- [ ] **Step 3: Draw selection highlight in the draw function**
+- [x] **Step 3: Draw selection highlight in the draw function**
 
 In the canvas draw function, after drawing all annotations, add:
 
@@ -1558,7 +1558,7 @@ if (selectedAnnotationId) {
 }
 ```
 
-- [ ] **Step 4: Add "Selected" indicator to the sidebar**
+- [x] **Step 4: Add "Selected" indicator to the sidebar**
 
 In the sidebar, below the Classes section, add:
 
@@ -1575,19 +1575,19 @@ In the sidebar, below the Classes section, add:
 })()}
 ```
 
-- [ ] **Step 5: Add append mode**
+- [x] **Step 5: Add append mode**
 
 Add "append" to the mode options alongside "add" and "subtract". When mode is "append", use `appendToAnnotations` from GeometryUtils to merge new polygons with existing annotations of the same feature type.
 
-- [ ] **Step 6: Wire up pan tool click to selection**
+- [x] **Step 6: Wire up pan tool click to selection**
 
 When tool is "pan" and user clicks (not drags), call `handleCanvasClickSelect`.
 
-- [ ] **Step 7: Build and test**
+- [x] **Step 7: Build and test**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero/webapp && yarn build`
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero
@@ -1608,7 +1608,7 @@ Append mode merges overlapping same-type annotations (ported from prediction)."
 **Files:**
 - Modify: `OMERO.biomero/webapp/src/biomero/annotate/components/ConfigureTab.js`
 
-- [ ] **Step 1: Replace tracking table creation with manifest creation**
+- [x] **Step 1: Replace tracking table creation with manifest creation**
 
 Update ConfigureTab to:
 - Replace `createTrackingTable` call with `saveManifest`
@@ -1618,11 +1618,11 @@ Update ConfigureTab to:
 - Remove AnnotationSetPicker import, use a simple select from manifest list
 - On "Initialize & Start", construct AnnotationConfig JSON and call `saveManifest`
 
-- [ ] **Step 2: Build and test**
+- [x] **Step 2: Build and test**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero/webapp && yarn build`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero
@@ -1640,7 +1640,7 @@ Lists and deletes manifests instead of tracking tables."
 **Files:**
 - Modify: `OMERO.biomero/webapp/src/biomero/annotate/components/AnnotateTab.js`
 
-- [ ] **Step 1: Replace tracking table API with manifest API**
+- [x] **Step 1: Replace tracking table API with manifest API**
 
 Update AnnotateTab to:
 - Replace `getTrackingTableDetail(tableId)` with loading units from manifest (passed via props or loaded via `loadManifest`)
@@ -1651,7 +1651,7 @@ Update AnnotateTab to:
 - Remove TrackingTableView import, replace with simple unit list
 - Build GeoJSON payload with patch property when saving patch annotations
 
-- [ ] **Step 2: Build a simple UnitList component inline**
+- [x] **Step 2: Build a simple UnitList component inline**
 
 Replace TrackingTableView with a simpler list that reads units from the manifest and groups by image:
 
@@ -1684,11 +1684,11 @@ const UnitList = ({ units, selectedIndex, onSelect }) => (
 );
 ```
 
-- [ ] **Step 3: Build and test**
+- [x] **Step 3: Build and test**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero/webapp && yarn build`
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero
@@ -1707,19 +1707,19 @@ Save uses set_id, GeoJSON includes patch property."
 **Files:**
 - Modify: `OMERO.biomero/webapp/src/biomero/annotate/components/PreviewViewer.js`
 
-- [ ] **Step 1: Remove fetchAllImageAnnotations usage**
+- [x] **Step 1: Remove fetchAllImageAnnotations usage**
 
 Remove the `fetchAllImageAnnotations` call and the "existing ROIs" layer that loads all ROIs without namespace filtering. Keep only the annotation set overlay that uses `fetchAnnotateAnnotation` with `setId`.
 
-- [ ] **Step 2: Update fetchAnnotateAnnotation call to use set_id**
+- [x] **Step 2: Update fetchAnnotateAnnotation call to use set_id**
 
 Replace `fetchAnnotateAnnotation(image.id, annotationSetId)` with `fetchAnnotateAnnotation(image.id, setId)`.
 
-- [ ] **Step 3: Build and test**
+- [x] **Step 3: Build and test**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero/webapp && yarn build`
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero
@@ -1737,17 +1737,17 @@ Eliminates cross-set annotation contamination."
 **Files:**
 - Modify: `OMERO.biomero/webapp/src/biomero/annotate/components/TrainingBiomeroTab.js`
 
-- [ ] **Step 1: Replace tracking table references with manifest**
+- [x] **Step 1: Replace tracking table references with manifest**
 
 - Replace `listTrackingTables` with `listManifests`
 - Replace `validateTrainingReadiness(annotationSetId)` — validation can now be done client-side by checking manifest unit progress
 - Update data source selection to reference manifest `set_id` instead of `table_id`
 
-- [ ] **Step 2: Build and test**
+- [x] **Step 2: Build and test**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero/webapp && yarn build`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero
@@ -1765,15 +1765,15 @@ Training readiness validated from manifest progress."
 **Files:**
 - Modify: `OMERO.biomero/webapp/src/biomero/annotate/AnnotateApp.js`
 
-- [ ] **Step 1: Replace tableId state with setId and manifest state**
+- [x] **Step 1: Replace tableId state with setId and manifest state**
 
 Update AnnotateApp to manage `setId` and `manifest` (AnnotationConfig JSON) instead of `tableId` and `config`. Pass these to child tabs.
 
-- [ ] **Step 2: Build and test**
+- [x] **Step 2: Build and test**
 
 Run: `cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero/webapp && yarn build`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /var/home/maartenpaul/Documents/GitHub/BIOMERO-repos/OMERO.biomero
