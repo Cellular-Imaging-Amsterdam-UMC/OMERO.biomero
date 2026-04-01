@@ -27,7 +27,7 @@ import {
   getContainerImages,
 } from "../../../apiService";
 
-const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
+const ConfigureTab = ({ onConfigCreated, existingConfig, isActive }) => {
   const { toaster, state } = useAppContext();
 
   // --- Workflow metadata ---
@@ -168,6 +168,14 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
     if (existingConfig) applyConfigToForm(existingConfig);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingConfig]);
+
+  // Refresh annotation sets when tab becomes active
+  useEffect(() => {
+    if (isActive && containerIds.length > 0) {
+      checkExistingManifests(containerIds[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
 
   const checkExistingManifests = async (containerId) => {
     try {
@@ -687,8 +695,9 @@ const ConfigureTab = ({ onConfigCreated, existingConfig }) => {
             {/* Channels */}
             <FormGroup label="Channels" helperText="Channel indices to process">
               <InputGroup
-                value={channels.join(", ")}
-                onChange={(e) => {
+                defaultValue={channels.join(", ")}
+                key={channels.join(",")}
+                onBlur={(e) => {
                   const vals = e.target.value
                     .split(",")
                     .map((v) => parseInt(v.trim(), 10))

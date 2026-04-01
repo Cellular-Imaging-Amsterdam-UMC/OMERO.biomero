@@ -207,6 +207,7 @@ const AnnotateApp = () => {
               <ConfigureTab
                 onConfigCreated={handleConfigCreated}
                 existingConfig={manifest}
+                isActive={activeTab === "configure"}
               />
             }
           />
