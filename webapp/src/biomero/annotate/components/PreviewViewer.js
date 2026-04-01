@@ -184,7 +184,7 @@ const PreviewViewer = ({
           .map((f) => {
             const pts = f.geometry?.coordinates?.[0];
             if (!pts || pts.length < 3) return null;
-            return { id: f.id, points: pts };
+            return { id: f.id, points: pts, z: f.geometry?.plane?.z ?? 0, t: f.geometry?.plane?.t ?? 0 };
           })
           .filter(Boolean);
         setAnnotationSetPolygons(polys);
@@ -547,7 +547,7 @@ const PreviewViewer = ({
                   style={{ width: imageDims.w, height: imageDims.h }}
                   viewBox={`0 0 ${imageDims.w} ${imageDims.h}`}
                 >
-                  {roiGroups.map((group, idx) => {
+                  {!annotationSetId && roiGroups.map((group, idx) => {
                     if (!existingRoiVisibility[group.roiId]) return null;
                     const hue = getRoiHue(idx);
                     return group.shapes
@@ -588,7 +588,9 @@ const PreviewViewer = ({
                     });
                   })}
                   {/* Annotation set overlay */}
-                  {annotationSetPolygons.map((poly, idx) => (
+                  {annotationSetPolygons
+                    .filter((poly) => (poly.z ?? 0) === z && (poly.t ?? 0) === t)
+                    .map((poly, idx) => (
                     <polygon
                       key={`annset-${poly.id}`}
                       points={poly.points.map((p) => `${p[0]},${p[1]}`).join(" ")}
@@ -658,7 +660,7 @@ const PreviewViewer = ({
             )}
 
             {/* Existing ROI layers */}
-            {roiGroups.length > 0 && (
+            {!annotationSetId && roiGroups.length > 0 && (
               <div>
                 <Divider className="mb-2" />
                 <div className="text-xs font-bold uppercase text-gray-500 mb-2">
