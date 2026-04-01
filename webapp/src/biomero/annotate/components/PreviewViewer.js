@@ -16,6 +16,7 @@ import {
 } from "@blueprintjs/core";
 import {
   runPredictionPrediction,
+  saveAnnotateAnnotation,
   fetchAnnotateAnnotation,
 } from "../../../apiService";
 import ImageChannelControls from "./ImageChannelControls";
@@ -53,6 +54,9 @@ const PreviewViewer = ({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveResult, setSaveResult] = useState(null); // null | { ok: bool, msg: string }
+
   const [existingAnnotations, setExistingAnnotations] = useState([]); // parsed ROI polygons
   const [existingRoiVisibility, setExistingRoiVisibility] = useState({}); // roiId → bool
   const [annotationSetPolygons, setAnnotationSetPolygons] = useState([]);
@@ -350,6 +354,60 @@ const PreviewViewer = ({
   );
   const channelsWithPredictions = Object.keys(predictions).map(Number);
 
+  const hasPredictionsForCurrentPlane = channelsWithPredictions.some(
+    (chIdx) =>
+      predictions[chIdx]?.dataByPlane?.[`${z}_${t}`]?.polygons?.length > 0,
+  );
+
+  const handleSaveAnnotations = async () => {
+    if (!image) return;
+    setSaving(true);
+    setSaveResult(null);
+    try {
+      let saved = 0;
+      for (const chIdx of channelsWithPredictions) {
+        const planeData = predictions[chIdx]?.dataByPlane?.[`${z}_${t}`];
+        if (!planeData?.polygons?.length) continue;
+
+        const geojsonPayload = {
+          type: "FeatureCollection",
+          features: planeData.polygons.map((polygon) => ({
+            type: "Feature",
+            id: crypto.randomUUID(),
+            geometry: {
+              type: "Polygon",
+              coordinates: [polygon.points],
+              plane: { c: chIdx, z, t },
+            },
+            properties: { objectType: "annotation" },
+          })),
+        };
+
+        await saveAnnotateAnnotation(
+          image.id,
+          geojsonPayload,
+          null, // tableId — optional, skips tracking table update
+          null, // unitIndex
+          z, // zSlice
+          t, // timepoint
+          chIdx, // channel
+          null, // patchOffset
+          "prediction_preview", // configName
+        );
+        saved++;
+      }
+      setSaveResult({
+        ok: true,
+        msg: `Saved ${saved} channel(s) as annotations`,
+      });
+    } catch (e) {
+      const msg = e.response?.data?.error || e.message || "Save failed";
+      setSaveResult({ ok: false, msg });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!image) {
     return (
       <div className="flex items-center justify-center h-64 bg-gray-100 text-gray-400 border rounded">
@@ -411,7 +469,15 @@ const PreviewViewer = ({
         </Callout>
       )}
 
-
+      {saveResult && (
+        <Callout
+          intent={saveResult.ok ? "success" : "danger"}
+          icon={saveResult.ok ? "tick" : "error"}
+          className="mb-1"
+        >
+          {saveResult.msg}
+        </Callout>
+      )}
 
       <div className="flex gap-3 items-stretch relative flex-1 min-h-0 overflow-hidden">
         {/* Z Slider (Left of image viewer) */}
