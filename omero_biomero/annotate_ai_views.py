@@ -835,23 +835,21 @@ def get_tracking_table_detail(request, conn=None, table_id=None, **kwargs):
 @login_required()
 @require_POST
 def save_annotation(request, conn=None, **kwargs):
-    """Save web polygon annotations for a processing unit.
+    """Save annotation GeoJSON for an image and update the manifest.
 
-    Converts polygons to label mask, uploads via upload_rois_and_labels(),
-    and updates the tracking table.
+    Accepts a GeoJSON FeatureCollection payload. Saves it as a namespaced
+    FileAnnotation on the image (accumulating patches). Updates the manifest
+    to mark the unit as processed and cache channel presentation.
 
     Expects JSON body:
         image_id: int
-        annotations: list of {points: [[x,y], ...], typeId: str}
-        table_id: int
-        unit_index: int (row index in tracking table)
-        width: int (image width)
-        height: int (image height)
-        z_slice: int (optional)
-        timepoint: int (optional)
-        channel: int (optional)
-        patch_offset: [x, y] (optional)
-        config_name: str (optional, for naming)
+        set_id: str — annotation set identifier
+        annotations: GeoJSON FeatureCollection
+        unit_index: int (optional) — index in manifest unit list
+        container_type: str (optional) — for manifest update
+        container_id: int (optional) — for manifest update
+        channel_presentation: list (optional) — channel rendering params
+        group_id: int (optional)
     """
     lib = _get_omero_annotate_ai()
     if not lib:
@@ -862,90 +860,132 @@ def save_annotation(request, conn=None, **kwargs):
 
     try:
         data = json.loads(request.body)
-        image_id = data["image_id"]
-        annotations = _annotations_from_geojson(data["annotations"])
-        table_id = data.get("table_id")
+        image_id = int(data["image_id"])
+        set_id = data["set_id"]
+        geojson = data["annotations"]
         unit_index = data.get("unit_index")
-        width = data.get("width")
-        height = data.get("height")
-        z_slice = data.get("z_slice")
-        timepoint = data.get("timepoint")
-        channel = data.get("channel")
-        patch_offset = data.get("patch_offset")
-        config_name = data.get("config_name", "web_annotation")
+        channel_presentation = data.get("channel_presentation")
 
-        # Set group context
-        image = conn.getObject("Image", image_id)
-        if not image:
-            return JsonResponse({"error": "Image not found"}, status=404)
-        group_id = image.getDetails().getGroup().getId()
-        conn.SERVICE_OPTS.setOmeroGroup(group_id)
+        group_id = data.get("group_id")
+        if group_id:
+            conn.setGroupForSession(int(group_id))
 
-        if not annotations:
-            return JsonResponse({"error": "No annotations provided"}, status=400)
+        # Save GeoJSON (accumulates patches automatically)
+        ann_id = lib["save_geojson_to_omero"](conn, image_id, geojson, set_id)
 
-        # Use actual image dimensions from OMERO if not provided or unreliable
-        if not width or not height or width < 10 or height < 10:
-            width = image.getSizeX()
-            height = image.getSizeY()
-
-        # Convert polygons to label mask
-        mask = polygons_to_label_mask(annotations, width, height)
-
-        # Save mask as temp TIFF
-        import tifffile
-
-        tmp_path = None
-        try:
-            with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp:
-                tifffile.imwrite(tmp.name, mask)
-                tmp_path = tmp.name
-
-            # Upload via omero_annotate_ai
-            patch_tuple = tuple(patch_offset) if patch_offset else None
-            label_id, roi_id = lib["upload_rois_and_labels"](
-                conn,
-                image_id=image_id,
-                annotation_file=tmp_path,
-                patch_offset=patch_tuple,
-                trainingset_name=config_name,
-                timepoint=timepoint,
-                z_slice=z_slice,
-                channel=channel,
+        # Update manifest if unit_index provided
+        if unit_index is not None and data.get("container_type") and data.get("container_id"):
+            config = lib["load_manifest_from_omero"](
+                conn, data["container_type"], int(data["container_id"]), set_id
             )
-        finally:
-            if tmp_path and os.path.exists(tmp_path):
-                os.remove(tmp_path)
+            if config and unit_index < len(config.annotations):
+                from datetime import datetime
 
-        # Persist GeoJSON as a namespaced FileAnnotation so that fetch_annotation
-        # can retrieve annotations per-workflow without scanning all ROIs.
-        # Use table_id for namespace to ensure set isolation.
-        if table_id is not None:
-            namespace = _geojson_namespace(int(table_id))
-        else:
-            namespace = f"omero.biomero.annotations.{config_name}"
-        _save_geojson_file_ann(conn, image_id, data["annotations"], namespace)
+                unit = config.annotations[unit_index]
+                unit.processed = True
+                unit.annotation_updated_at = datetime.now().isoformat()
+                if not unit.annotation_created_at:
+                    unit.annotation_created_at = unit.annotation_updated_at
+                if channel_presentation:
+                    unit.channel_presentation = [
+                        lib["ChannelPresentation"](**cp) for cp in channel_presentation
+                    ]
+                lib["save_manifest_to_omero"](
+                    conn, config, data["container_type"], int(data["container_id"]), set_id
+                )
 
-        # Update tracking table if provided
-        new_table_id = int(table_id) if table_id is not None else None
-        if table_id is not None and unit_index is not None:
-            new_table_id = _update_tracking_table_row(
-                conn, lib, int(table_id), int(unit_index), roi_id, label_id
-            )
-
-        return JsonResponse(
-            {
-                "success": True,
-                "label_id": label_id,
-                "roi_id": roi_id,
-                "namespace": namespace,
-                "table_id": new_table_id,
-            }
-        )
+        return JsonResponse({"success": True, "annotation_id": ann_id})
     except KeyError as e:
         return JsonResponse({"error": f"Missing required field: {e}"}, status=400)
     except Exception as e:
         logger.error("Error saving annotation", exc_info=True)
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@login_required()
+@require_POST
+def add_patch(request, conn=None, **kwargs):
+    """Add a new patch unit to an existing manifest.
+
+    Generates a random patch position for the given image, adds it as
+    a new ImageAnnotation unit to the manifest, and saves.
+
+    Expects JSON body:
+        container_type: str
+        container_id: int
+        set_id: str
+        image_id: int
+        image_name: str
+        image_width: int
+        image_height: int
+        group_id: int (optional)
+    """
+    lib = _get_omero_annotate_ai()
+    if not lib:
+        return JsonResponse({"error": "omero_annotate_ai not available"}, status=500)
+
+    try:
+        import random
+
+        data = json.loads(request.body)
+        container_type = data.get("container_type", "dataset")
+        container_id = int(data["container_id"])
+        set_id = data["set_id"]
+        image_id = int(data["image_id"])
+        image_name = str(data["image_name"])
+        image_width = int(data["image_width"])
+        image_height = int(data["image_height"])
+
+        group_id = data.get("group_id")
+        if group_id:
+            conn.setGroupForSession(int(group_id))
+
+        config = lib["load_manifest_from_omero"](conn, container_type, container_id, set_id)
+        if not config:
+            return JsonResponse({"error": "Manifest not found"}, status=404)
+
+        # Get patch size from spatial coverage config
+        patch_w, patch_h = config.spatial_coverage.patch_size
+        patch_w = min(patch_w, image_width)
+        patch_h = min(patch_h, image_height)
+
+        # Generate random patch position
+        max_x = max(0, image_width - patch_w)
+        max_y = max(0, image_height - patch_h)
+        patch_x = random.randint(0, max_x) if max_x > 0 else 0
+        patch_y = random.randint(0, max_y) if max_y > 0 else 0
+
+        # Determine channel/z/t from existing units for this image
+        existing = [a for a in config.annotations if a.image_id == image_id]
+        channel = existing[0].channel if existing else (
+            config.spatial_coverage.channels[0] if config.spatial_coverage.channels else -1
+        )
+        z_slice = existing[0].z_slice if existing else -1
+        timepoint = existing[0].timepoint if existing else -1
+
+        new_unit = lib["ImageAnnotation"](
+            image_id=image_id,
+            image_name=image_name,
+            is_patch=True,
+            patch_x=patch_x,
+            patch_y=patch_y,
+            patch_width=patch_w,
+            patch_height=patch_h,
+            channel=channel,
+            z_slice=z_slice,
+            timepoint=timepoint,
+            category="training",
+        )
+        config.annotations.append(new_unit)
+        lib["save_manifest_to_omero"](conn, config, container_type, container_id, set_id)
+
+        return JsonResponse({
+            "success": True,
+            "unit": new_unit.model_dump(),
+            "unit_index": len(config.annotations) - 1,
+        })
+    except Exception as e:
+        logger.exception("add_patch failed")
         return JsonResponse({"error": str(e)}, status=500)
 
 
@@ -1284,94 +1324,33 @@ def add_patch(request, conn=None, **kwargs):
 @login_required()
 @require_GET
 def fetch_annotation(request, conn=None, **kwargs):
-    """Fetch existing annotations for an image from OMERO.
+    """Fetch GeoJSON annotations for an image by set_id.
 
-    Looks for a namespaced GeoJSON FileAnnotation first (written by
-    ``save_annotation`` for each workflow).  Falls back to scanning all ROI
-    shapes when no matching FileAnnotation is found, preserving backwards
-    compatibility with annotations created before namespace support was added.
+    Returns a GeoJSON FeatureCollection or empty collection.
 
     Query params:
-        image      – image id (required)
-        table_id   – tracking table FileAnnotation id; used as the primary
-                     namespace key (``omero.biomero.annotations.{table_id}``)
-                     for set isolation
-        config_name – fallback workflow name / namespace suffix when
-                     ``table_id`` is not given (legacy support)
+        image  – image id (required)
+        set_id – annotation set identifier (required for results)
     """
-    image_id = request.GET.get("image")
-    if not image_id:
-        return JsonResponse({"error": "Missing image ID"}, status=400)
-
-    table_id = request.GET.get("table_id")
-    config_name = request.GET.get("config_name")
+    lib = _get_omero_annotate_ai()
+    if not lib:
+        return JsonResponse({"error": "omero_annotate_ai not available"}, status=500)
 
     try:
-        image = conn.getObject("Image", int(image_id))
-        if not image:
-            return JsonResponse({"error": "Image not found"}, status=404)
+        image_id = int(request.GET["image"])
+        set_id = request.GET.get("set_id")
 
-        # ----------------------------------------------------------------
-        # 1. Namespace-aware path: look for a GeoJSON FileAnnotation
-        # ----------------------------------------------------------------
-        # Prefer table_id-based namespace for set isolation; fall back to
-        # config_name for backwards compatibility with older annotations.
-        if table_id:
-            namespace = _geojson_namespace(int(table_id))
-        elif config_name:
-            namespace = f"omero.biomero.annotations.{config_name}"
-        else:
-            namespace = None
+        group_id = request.GET.get("group_id")
+        if group_id:
+            conn.setGroupForSession(int(group_id))
 
-        if namespace:
-            for ann in image.listAnnotations():
-                if (
-                    isinstance(ann, omero.gateway.FileAnnotationWrapper)
-                    and ann.getNs() == namespace
-                ):
-                    try:
-                        content = b"".join(ann.getFileInChunks())
-                        geojson = json.loads(content)
-                        # Ensure it is a FeatureCollection
-                        if geojson.get("type") == "FeatureCollection":
-                            return JsonResponse(geojson)
-                    except Exception:
-                        logger.warning(
-                            "Could not read GeoJSON FileAnnotation %s", ann.getId()
-                        )
+        if not set_id:
+            return JsonResponse({"type": "FeatureCollection", "features": []})
 
-        # ----------------------------------------------------------------
-        # 2. Fallback: reconstruct from ROI shapes (pre-namespace data)
-        # ----------------------------------------------------------------
-        roi_service = conn.getRoiService()
-        result = roi_service.findByImage(int(image_id), None)
-
-        features = []
-        for roi in result.rois:
-            for shape in roi.copyShapes():
-                shape_data = _shape_to_points(shape)
-                if shape_data:
-                    features.append(
-                        {
-                            "type": "Feature",
-                            "id": str(shape.getId().getValue()),
-                            "geometry": {
-                                "type": "Polygon",
-                                "coordinates": [shape_data["points"]],
-                                "plane": {
-                                    "c": -1,
-                                    "z": shape_data["z"],
-                                    "t": shape_data["t"],
-                                },
-                            },
-                            "properties": {
-                                "objectType": "annotation",
-                                "roiId": roi.getId().getValue(),
-                            },
-                        }
-                    )
-
-        return JsonResponse({"type": "FeatureCollection", "features": features})
+        geojson = lib["load_geojson_from_omero"](conn, image_id, set_id)
+        if geojson:
+            return JsonResponse(geojson)
+        return JsonResponse({"type": "FeatureCollection", "features": []})
     except Exception as e:
         logger.error("Error fetching annotations", exc_info=True)
         return JsonResponse({"error": str(e)}, status=500)

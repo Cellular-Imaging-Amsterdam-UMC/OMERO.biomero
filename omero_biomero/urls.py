@@ -141,6 +141,11 @@ urlpatterns = [
         annotate_ai_views.delete_manifest,
         name="delete_manifest",
     ),
+    path(
+        "api/annotate/add_patch/",
+        annotate_ai_views.add_patch,
+        name="add_patch_manifest",
+    ),
     # Annotate AI URLs — Container browsing
     path(
         "api/annotate/containers/",
