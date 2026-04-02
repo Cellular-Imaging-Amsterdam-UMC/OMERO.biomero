@@ -149,7 +149,8 @@ const AnnotateApp = () => {
           <span style={{ fontWeight: 600 }}>{manifest.name}</span>
           {progress && (
             <span style={{ color: "#555" }}>
-              — {progress.completed_units}/{progress.total_units} images annotated
+              — {progress.completed_units}/{progress.total_units}{" "}
+              {manifest?.spatial_coverage?.use_patches ? "patches" : "images"} annotated
             </span>
           )}
         </div>
