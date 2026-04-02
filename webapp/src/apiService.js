@@ -6,7 +6,7 @@ export const apiRequest = async (
   endpoint,
   method = "GET",
   data = null,
-  options = {}
+  options = {},
 ) => {
   try {
     // Include CSRF token for methods that modify data
@@ -150,7 +150,7 @@ export const fetchImages = async (
   page = 1,
   sizeXYZ = false,
   date = false,
-  group = -1
+  group = -1,
 ) => {
   const { urls } = getDjangoConstants(); // Get the URLs from Django constants
 
@@ -247,7 +247,7 @@ export const postUpload = async (upload) => {
         headers: {
           "X-CSRFToken": csrfToken, // Include CSRF token in request headers
         },
-      }
+      },
     );
 
     return response; // Return the API response
@@ -260,18 +260,13 @@ export const postUpload = async (upload) => {
 export const runPredictionTraining = async (params) => {
   try {
     const csrfToken = window.csrftoken;
-    const endpoint = "/omero_biomero/api/prediction/train/"; 
-    
-    const response = await apiRequest(
-      endpoint,
-      "POST",
-      params,
-      {
-        headers: {
-          "X-CSRFToken": csrfToken,
-        },
-      }
-    );
+    const endpoint = "/omero_biomero/api/prediction/train/";
+
+    const response = await apiRequest(endpoint, "POST", params, {
+      headers: {
+        "X-CSRFToken": csrfToken,
+      },
+    });
     return response;
   } catch (error) {
     console.error("Error running prediction training:", error);
@@ -333,7 +328,7 @@ export const runPredictionPrediction = async (imageId, modelName, channel = 0, z
   try {
     const csrfToken = window.csrftoken;
     const endpoint = "/omero_biomero/api/prediction/predict/";
-    
+
     const response = await apiRequest(
       endpoint,
       "POST",
@@ -342,11 +337,11 @@ export const runPredictionPrediction = async (imageId, modelName, channel = 0, z
         headers: {
           "X-CSRFToken": csrfToken,
         },
-      }
+      },
     );
     return response;
   } catch (error) {
-    console.error("Error running prediction prediction:", error);
+    console.error("Error running prediction:", error);
     throw error;
   }
 };
@@ -354,13 +349,12 @@ export const runPredictionPrediction = async (imageId, modelName, channel = 0, z
 export const fetchAnnotationSets = async (datasetId) => {
   if (!datasetId) return { annotationSets: [] };
   try {
-      const endpoint = `/omero_biomero/api/prediction/annotation_sets/?dataset=${datasetId}`;
-      const response = await apiRequest(endpoint, "GET");
-
-      return response;
+    const endpoint = `/omero_biomero/api/prediction/annotation_sets/?dataset=${datasetId}`;
+    const response = await apiRequest(endpoint, "GET");
+    return response;
   } catch (error) {
-      console.error("Error fetching annotation sets:", error);
-      return { annotationSets: [] };
+    console.error("Error fetching annotation sets:", error);
+    return { annotationSets: [] };
   }
 };
 
@@ -369,46 +363,46 @@ export const fetchMapAnnotations = async (datasetId, annotationSetId) => {
     return { annotations: [], featureTypes: [], name: "", description: "" };
   }
   try {
-      const endpoint = `/omero_biomero/api/prediction/fetch_annotations/?dataset=${datasetId}&annotation=${annotationSetId}`;
-      const response = await apiRequest(endpoint, "GET");
-
-      return response;
+    const endpoint = `/omero_biomero/api/prediction/fetch_annotations/?dataset=${datasetId}&annotation=${annotationSetId}`;
+    const response = await apiRequest(endpoint, "GET");
+    return response;
   } catch (error) {
-      console.error("Error fetching annotations:", error);
-      return { annotations: [], featureTypes: [], name: "", description: "" };
+    console.error("Error fetching annotations:", error);
+    return { annotations: [], featureTypes: [], name: "", description: "" };
   }
 };
 
 export const saveMapAnnotation = async (datasetId, annotationData, annotationId = null) => {
-    const endpoint = "/omero_biomero/api/prediction/save_annotations/";
-    const csrfToken = window.csrftoken;
-    
-    try {
-        const payload = {
-            datasetId: datasetId,
-            annotationId: annotationId,
-            data: annotationData
-        };
-        
-        const response = await apiRequest(endpoint, "POST", payload, {
-             headers: {
-                "X-CSRFToken": csrfToken,
-                "Content-Type": "application/json"
-             },
-        });
-        return response;
-    } catch (error) {
-        console.error("Error saving annotations:", error);
-        throw error;
-    }
+  const endpoint = "/omero_biomero/api/prediction/save_annotations/";
+  const csrfToken = window.csrftoken;
+
+  try {
+    const payload = {
+      datasetId: datasetId,
+      annotationId: annotationId,
+      data: annotationData,
+    };
+
+    const response = await apiRequest(endpoint, "POST", payload, {
+      headers: {
+        "X-CSRFToken": csrfToken,
+        "Content-Type": "application/json",
+      },
+    });
+    return response;
+  } catch (error) {
+    console.error("Error saving annotations:", error);
+    throw error;
+  }
 };
+
 
 export const createContainer = async (
   type,
   name,
   description,
   targetContainerId,
-  targetContainerType
+  targetContainerType,
 ) => {
   const { urls } = getDjangoConstants(); // Base URL for the API from Django constants
 
@@ -458,7 +452,7 @@ export const postGroupMappings = async (mappings) => {
         headers: {
           "X-CSRFToken": csrfToken,
         },
-      }
+      },
     );
     return response;
   } catch (error) {
@@ -479,6 +473,188 @@ export const fetchPlatesData = async (item) => {
   return apiRequest(urls.api_plates, "GET", null, { params });
 };
 
+// ---------------------------------------------------------------------------
+// Annotate AI endpoints
+// ---------------------------------------------------------------------------
+
+export const getAnnotateContainers = async (type = "dataset") => {
+  const endpoint = `/omero_biomero/api/annotate/containers/?type=${type}`;
+  return apiRequest(endpoint, "GET");
+};
+
+export const getContainerImages = async (type, id) => {
+  const endpoint = `/omero_biomero/api/annotate/container_images/?type=${type}&id=${id}`;
+  return apiRequest(endpoint, "GET");
+};
+
+export const getAnnotateImageChannels = async (imageId) => {
+  if (!imageId) return { channels: [], sizeC: 0 };
+  const endpoint = `/omero_biomero/api/annotate/image_channels/?image=${imageId}`;
+  return apiRequest(endpoint, "GET");
+};
+
+export const computeNormalization = async (imageId, z = 0, t = 0, low = 1, high = 99) => {
+  const params = `image=${imageId}&z=${z}&t=${t}&low=${low}&high=${high}`;
+  return apiRequest(`/omero_biomero/api/annotate/compute_normalization/?${params}`, "GET");
+};
+
+export const createAnnotateConfig = async (configData) => {
+  const csrfToken = window.csrftoken;
+  return apiRequest("/omero_biomero/api/annotate/config/", "POST", configData, {
+    headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+  });
+};
+
+export const loadAnnotateConfig = async (type, id) => {
+  return apiRequest(
+    `/omero_biomero/api/annotate/config/?type=${type}&id=${id}`,
+    "GET",
+  );
+};
+
+export const createTrackingTable = async (configData) => {
+  const csrfToken = window.csrftoken;
+  return apiRequest(
+    "/omero_biomero/api/annotate/tracking_table/",
+    "POST",
+    configData,
+    {
+      headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+    },
+  );
+};
+
+export const listTrackingTables = async (type, id) => {
+  return apiRequest(
+    `/omero_biomero/api/annotate/tracking_table/?type=${type}&id=${id}`,
+    "GET",
+  );
+};
+
+export const getTrackingTableDetail = async (tableId) => {
+  return apiRequest(
+    `/omero_biomero/api/annotate/tracking_table/${tableId}/`,
+    "GET",
+  );
+};
+
+export const deleteTrackingTable = async (tableId) => {
+  const csrfToken = window.csrftoken;
+  return apiRequest(
+    `/omero_biomero/api/annotate/tracking_table/${tableId}/`,
+    "DELETE",
+    null,
+    { headers: { "X-CSRFToken": csrfToken } },
+  );
+};
+
+export const saveAnnotateAnnotation = async (
+  imageId,
+  annotations,
+  setId,
+  unitIndex,
+  containerType,
+  containerId,
+  channelPresentation = null,
+  groupId = null,
+) => {
+  return apiRequest(
+    "/omero_biomero/api/annotate/save_annotation/",
+    "POST",
+    {
+      image_id: imageId,
+      annotations,
+      set_id: setId,
+      unit_index: unitIndex,
+      container_type: containerType,
+      container_id: containerId,
+      channel_presentation: channelPresentation,
+      group_id: groupId,
+    },
+  );
+};
+
+export const fetchAnnotateAnnotation = async (imageId, setId) => {
+  return apiRequest(
+    `/omero_biomero/api/annotate/fetch_annotation/?image=${imageId}&set_id=${setId}`,
+    "GET",
+  );
+};
+
+export const fetchAllImageAnnotations = async (imageId) => {
+  return apiRequest(
+    `/omero_biomero/api/annotate/fetch_annotation/?image=${imageId}`,
+    "GET",
+  );
+};
+
+export const markUnitProcessed = async (tableId, unitIndex) => {
+  const payload = { table_id: tableId, unit_index: unitIndex };
+  return await apiRequest("/omero_biomero/api/annotate/mark_processed/", "POST", payload);
+};
+
+export const addPatchToTrackingTable = async (tableId, imageId, imageName, patchX, patchY, patchWidth, patchHeight, category = "training") => {
+  const payload = { table_id: tableId, image_id: imageId, image_name: imageName, patch_x: patchX, patch_y: patchY, patch_width: patchWidth, patch_height: patchHeight, category };
+  return await apiRequest("/omero_biomero/api/annotate/add_patch/", "POST", payload);
+};
+
+// ---------------------------------------------------------------------------
+// SAM endpoints
+// ---------------------------------------------------------------------------
+
+export const samSetImage = async (imageId, z, t, channel) => {
+  const csrfToken = window.csrftoken;
+  return apiRequest(
+    "/omero_biomero/api/sam/set_image/",
+    "POST",
+    {
+      image_id: imageId,
+      z,
+      t,
+      channel,
+    },
+    {
+      headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+    },
+  );
+};
+
+export const samPredict = async (
+  cacheKey,
+  { points, labels, bboxes, imageId, z, t, channel } = {},
+) => {
+  const csrfToken = window.csrftoken;
+  const payload = { cache_key: cacheKey };
+  // Always send image params so the backend can re-fetch on cache miss
+  if (imageId != null) payload.image_id = imageId;
+  if (z != null) payload.z = z;
+  if (t != null) payload.t = t;
+  if (channel != null) payload.channel = channel;
+  if (points) payload.points = points;
+  if (labels) payload.labels = labels;
+  if (bboxes) payload.bboxes = bboxes;
+  return apiRequest("/omero_biomero/api/sam/predict/", "POST", payload, {
+    headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+  });
+};
+
+// ---------------------------------------------------------------------------
+
+export const getAnnotateProgress = async (tableId) => {
+  return apiRequest(
+    `/omero_biomero/api/annotate/progress/?table_id=${tableId}`,
+    "GET",
+  );
+};
+
+export const validateTrainingReadiness = async (setId, containerType, containerId) => {
+  const endpoint = `/omero_biomero/api/annotate/validate_training/?set_id=${setId}&container_type=${containerType}&container_id=${containerId}`;
+  const response = await apiRequest(endpoint, "GET");
+  return response;
+};
+
+// ---------------------------------------------------------------------------
+
 export const fetchPlateImages = async (plateId) => {
   const { urls } = getDjangoConstants();
 
@@ -491,7 +667,7 @@ export const fetchPlateImages = async (plateId) => {
     // Get paginated wells
     const response = await apiRequest(
       `${urls.api_wells}?plate=${plateId}&offset=${offset}&limit=${limit}`,
-      "GET"
+      "GET",
     );
 
     // Extract images from wells
@@ -539,5 +715,119 @@ export const importUploadedFile = async (
     datasetType,
     group,
     groupId,
+  });
+};
+
+// --- Training (biomero) ---
+
+export const startTraining = async (params) => {
+  try {
+    const csrfToken = window.csrftoken;
+    const endpoint = "/omero_biomero/api/analyzer/training/start/";
+    const response = await apiRequest(endpoint, "POST", params, {
+      headers: {
+        "X-CSRFToken": csrfToken,
+        "Content-Type": "application/json",
+      },
+    });
+    return response;
+  } catch (error) {
+    console.error("Error starting training:", error);
+    throw error;
+  }
+};
+
+export const listTrainedModels = async (datasetId) => {
+  const endpoint = `/omero_biomero/api/analyzer/training/models/?dataset=${datasetId}`;
+  return apiRequest(endpoint, "GET");
+};
+
+// ---------------------------------------------------------------------------
+// Manifest API
+// ---------------------------------------------------------------------------
+
+export const saveManifest = async (
+  containerType,
+  containerId,
+  config,
+  setId = null,
+  groupId = null,
+) => {
+  return apiRequest("/omero_biomero/api/annotate/save_manifest/", "POST", {
+    container_type: containerType,
+    container_id: containerId,
+    config,
+    set_id: setId,
+    group_id: groupId,
+  });
+};
+
+export const loadManifest = async (
+  containerType,
+  containerId,
+  setId,
+  groupId = null,
+) => {
+  const params = new URLSearchParams({
+    container_type: containerType,
+    container_id: containerId,
+    set_id: setId,
+  });
+  if (groupId) params.set("group_id", groupId);
+  return apiRequest(
+    `/omero_biomero/api/annotate/load_manifest/?${params}`,
+    "GET",
+  );
+};
+
+export const listManifests = async (
+  containerType,
+  containerId,
+  groupId = null,
+) => {
+  const params = new URLSearchParams({
+    container_type: containerType,
+    container_id: containerId,
+  });
+  if (groupId) params.set("group_id", groupId);
+  return apiRequest(
+    `/omero_biomero/api/annotate/list_manifests/?${params}`,
+    "GET",
+  );
+};
+
+export const deleteManifest = async (
+  containerType,
+  containerId,
+  setId,
+  groupId = null,
+) => {
+  return apiRequest("/omero_biomero/api/annotate/delete_manifest/", "POST", {
+    container_type: containerType,
+    container_id: containerId,
+    set_id: setId,
+    group_id: groupId,
+  });
+};
+
+export const addPatchToManifest = async (
+  containerType,
+  containerId,
+  setId,
+  imageId,
+  imageName,
+  imageWidth,
+  imageHeight,
+  groupId = null,
+) => {
+  return apiRequest("/omero_biomero/api/annotate/add_patch/", "POST", {
+    container_type: containerType,
+    container_id: containerId,
+    set_id: setId,
+    image_id: imageId,
+    image_name: imageName,
+    image_width: imageWidth,
+    image_height: imageHeight,
+    group_id: groupId,
   });
 };

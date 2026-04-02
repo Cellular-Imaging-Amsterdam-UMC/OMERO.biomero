@@ -25,7 +25,7 @@ if [ $? -eq 0 ]; then
   # require an OMERO.web restart after in-place updates.
   echo "Restarting OMERO.web to refresh cached static metadata..."
   docker exec "$CONTAINER_NAME" bash -lc "/opt/omero/web/venv3/bin/omero web restart"
-  
+
   # Ensure readable permissions
   docker exec "$CONTAINER_NAME" bash -c "chmod -R a+rX ${DEST_DIR}"
 
