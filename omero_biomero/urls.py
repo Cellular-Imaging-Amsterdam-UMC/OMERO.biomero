@@ -198,6 +198,11 @@ urlpatterns = [
         name="annotate_validate_training",
     ),
     path(
+        "api/annotate/compute_normalization/",
+        annotate_ai_views.compute_normalization,
+        name="annotate_compute_normalization",
+    ),
+    path(
         "api/annotate/mark_processed/",
         annotate_ai_views.mark_unit_processed,
         name="annotate_mark_processed",

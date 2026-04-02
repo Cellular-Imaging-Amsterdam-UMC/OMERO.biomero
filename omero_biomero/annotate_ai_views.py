@@ -233,6 +233,8 @@ def save_manifest(request, conn=None, **kwargs):
                         "name": img.getName(),
                         "sizeX": img.getSizeX(),
                         "sizeY": img.getSizeY(),
+                        "sizeZ": img.getSizeZ(),
+                        "sizeT": img.getSizeT(),
                     })
             _prepare_processing_units(config, images_list)
             if not config.annotations:
@@ -748,46 +750,68 @@ def _prepare_processing_units(config, images_list):
     for idx, img_info in enumerate(selected_images):
         category = categories[idx] if idx < len(categories) else "training"
 
-        # Determine z-slices, timepoints, channels from spatial coverage
-        z_slices = sc.z_slices if not sc.three_d else [sc.z_range_start or 0]
-        timepoints = sc.timepoints
+        # Determine z-slices based on mode (per-image, since sizeZ can vary)
+        max_z = img_info.get("sizeZ", 1)
+        max_t = img_info.get("sizeT", 1)
+
+        if sc.three_d:
+            z_slices = [sc.z_range_start or 0]
+        elif sc.z_slice_mode == "all":
+            z_slices = list(range(max_z))
+        elif sc.z_slice_mode == "random":
+            n = min(sc.n_slices or len(sc.z_slices), max_z)
+            z_slices = _rng.sample(range(max_z), n) if n > 0 else [0]
+        else:  # specific
+            z_slices = [z for z in sc.z_slices if z < max_z] or [0]
+
+        # Determine timepoints based on mode
+        if sc.timepoint_mode == "all":
+            timepoints = list(range(max_t))
+        elif sc.timepoint_mode == "random":
+            n = min(sc.n_timepoints or len(sc.timepoints), max_t)
+            timepoints = _rng.sample(range(max_t), n) if n > 0 else [0]
+        else:  # specific
+            timepoints = [t for t in sc.timepoints if t < max_t] or [0]
+
         channel = sc.get_label_channel()
 
-        for z in z_slices:
-            for t in timepoints:
-                if sc.use_patches:
-                    # Generate patch coordinates with random positions
-                    patch_w = sc.patch_size[0]
-                    patch_h = sc.patch_size[1] if len(sc.patch_size) > 1 else sc.patch_size[0]
-                    img_w = img_info.get("sizeX", 1024)
-                    img_h = img_info.get("sizeY", 1024)
-                    max_x = max(0, img_w - patch_w)
-                    max_y = max(0, img_h - patch_h)
+        if sc.use_patches:
+            # Distribute patches_per_image total across (z, t) combos
+            zt_combos = [(z, t) for z in z_slices for t in timepoints]
+            patch_w = sc.patch_size[0]
+            patch_h = sc.patch_size[1] if len(sc.patch_size) > 1 else sc.patch_size[0]
+            img_w = img_info.get("sizeX", 1024)
+            img_h = img_info.get("sizeY", 1024)
+            max_x = max(0, img_w - patch_w)
+            max_y = max(0, img_h - patch_h)
 
-                    for p_idx in range(sc.patches_per_image):
-                        px = _rng.randint(0, max_x) if max_x > 0 else 0
-                        py = _rng.randint(0, max_y) if max_y > 0 else 0
-                        z_start_val = (sc.z_range_start or 0) if sc.three_d else -1
-                        z_end_val = (sc.z_range_end or 0) if sc.three_d else -1
-                        ann = lib["ImageAnnotation"](
-                            image_id=img_info["id"],
-                            image_name=img_info["name"],
-                            category=category,
-                            timepoint=t,
-                            z_slice=z,
-                            channel=channel,
-                            is_volumetric=sc.three_d,
-                            z_start=z_start_val,
-                            z_end=z_end_val,
-                            z_length=sc.get_z_length() if sc.three_d else 1,
-                            is_patch=True,
-                            patch_x=px,
-                            patch_y=py,
-                            patch_width=patch_w,
-                            patch_height=patch_h,
-                        )
-                        config.add_annotation(ann)
-                else:
+            for p_idx in range(sc.patches_per_image):
+                z, t = zt_combos[p_idx % len(zt_combos)]
+                px = _rng.randint(0, max_x) if max_x > 0 else 0
+                py = _rng.randint(0, max_y) if max_y > 0 else 0
+                z_start_val = (sc.z_range_start or 0) if sc.three_d else -1
+                z_end_val = (sc.z_range_end or 0) if sc.three_d else -1
+                ann = lib["ImageAnnotation"](
+                    image_id=img_info["id"],
+                    image_name=img_info["name"],
+                    category=category,
+                    timepoint=t,
+                    z_slice=z,
+                    channel=channel,
+                    is_volumetric=sc.three_d,
+                    z_start=z_start_val,
+                    z_end=z_end_val,
+                    z_length=sc.get_z_length() if sc.three_d else 1,
+                    is_patch=True,
+                    patch_x=px,
+                    patch_y=py,
+                    patch_width=patch_w,
+                    patch_height=patch_h,
+                )
+                config.add_annotation(ann)
+        else:
+            for z in z_slices:
+                for t in timepoints:
                     z_start_val = (sc.z_range_start or 0) if sc.three_d else -1
                     z_end_val = (sc.z_range_end or 0) if sc.three_d else -1
                     ann = lib["ImageAnnotation"](
@@ -1657,4 +1681,61 @@ def validate_training_readiness(request, conn=None, **kwargs):
         )
     except Exception as e:
         logger.error("Error validating training readiness", exc_info=True)
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+# ---------------------------------------------------------------------------
+# Image normalization
+# ---------------------------------------------------------------------------
+
+@login_required()
+@require_GET
+def compute_normalization(request, conn=None, **kwargs):
+    """Compute percentile-based normalization bounds for an image.
+
+    GET params: image, z (default 0), t (default 0),
+                low (default 1), high (default 99)
+    Returns per-channel bounds: {channels: [{index, min, max}, ...]}
+    """
+    try:
+        import numpy as np
+
+        image_id = request.GET.get("image")
+        z = int(request.GET.get("z", 0))
+        t = int(request.GET.get("t", 0))
+        low = float(request.GET.get("low", 1.0))
+        high = float(request.GET.get("high", 99.0))
+
+        if not image_id:
+            return JsonResponse({"error": "Missing image parameter"}, status=400)
+
+        image = conn.getObject("Image", image_id)
+        if not image:
+            return JsonResponse({"error": "Image not found"}, status=404)
+
+        size_c = image.getSizeC()
+        pixels = image.getPrimaryPixels()
+        channels = []
+
+        for c in range(size_c):
+            plane = pixels.getPlane(z, c, t)
+            plane_arr = np.asarray(plane, dtype=np.float64)
+            p_low = float(np.percentile(plane_arr, low))
+            p_high = float(np.percentile(plane_arr, high))
+            channels.append({
+                "index": c,
+                "min": p_low,
+                "max": p_high,
+            })
+
+        return JsonResponse({
+            "imageId": int(image_id),
+            "z": z,
+            "t": t,
+            "percentile_low": low,
+            "percentile_high": high,
+            "channels": channels,
+        })
+    except Exception as e:
+        logger.error("Error computing normalization", exc_info=True)
         return JsonResponse({"error": str(e)}, status=500)

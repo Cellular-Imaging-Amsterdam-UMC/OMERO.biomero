@@ -28,6 +28,7 @@ const AnnotateApp = () => {
   const [setId, setSetId] = useState(null);
   const [manifest, setManifest] = useState(null);
   const [showConfigWarning, setShowConfigWarning] = useState(false);
+  const [pendingTab, setPendingTab] = useState(null);
 
   useEffect(() => {
     if (!loadingOmero) {
@@ -44,8 +45,9 @@ const AnnotateApp = () => {
   }, []);
 
   const handleTabChange = (newTabId) => {
-    // Warn when navigating to Configure with an active annotation set
-    if (newTabId === "configure" && setId) {
+    // Warn when leaving Annotate tab with an active annotation set
+    if (activeTab === "annotate" && setId && newTabId !== "annotate") {
+      setPendingTab(newTabId);
       setShowConfigWarning(true);
       return;
     }
@@ -159,28 +161,30 @@ const AnnotateApp = () => {
       {/* Warning dialog when switching to Configure with active set */}
       <Alert
         isOpen={showConfigWarning}
-        onClose={() => setShowConfigWarning(false)}
+        onClose={() => { setShowConfigWarning(false); setPendingTab(null); }}
         cancelButtonText="Keep annotating"
-        confirmButtonText="New annotation set"
+        confirmButtonText="Leave annotation"
         intent="warning"
         icon="warning-sign"
         onCancel={() => {
           setShowConfigWarning(false);
-          setActiveTab("annotate");
+          setPendingTab(null);
         }}
         onConfirm={() => {
           setShowConfigWarning(false);
-          setSetId(null);
-          setManifest(null);
-          setActiveTab("configure");
+          if (pendingTab === "configure") {
+            setSetId(null);
+            setManifest(null);
+          }
+          setActiveTab(pendingTab || "preview");
+          setPendingTab(null);
         }}
       >
         <p>
           You have an active annotation set: <strong>{manifest?.name || "unnamed"}</strong>
         </p>
         <p>
-          Your progress is saved. You can resume this set later from the Configure tab,
-          or start a new annotation set.
+          Your progress is saved. You can resume this set later from the Configure tab.
         </p>
       </Alert>
 

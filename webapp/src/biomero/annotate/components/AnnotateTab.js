@@ -8,6 +8,7 @@ import {
   fetchAnnotateAnnotation,
   getAnnotateImageChannels,
   addPatchToManifest,
+  computeNormalization,
 } from "../../../apiService";
 
 // Unit list grouped by image
@@ -35,8 +36,8 @@ const UnitList = ({ units, selectedIndex, onSelect, filterStatus, onFilterChange
   const completed = units.filter((u) => u.processed).length;
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-2 border-b flex items-center justify-between">
+    <div className="flex flex-col min-h-0 flex-1">
+      <div className="p-2 border-b flex items-center justify-between shrink-0">
         <span className="text-xs font-bold">{completed}/{units.length} done</span>
         <ButtonGroup minimal small>
           {["all", "pending", "completed"].map((s) => (
@@ -206,21 +207,61 @@ const AnnotateTab = ({ manifest, setId, onManifestUpdate }) => {
       }
     : null;
 
-  // Fetch channel info
+  // Fetch channel info and apply normalization
+  const normMethod = manifest?.spatial_coverage?.normalization_method || "percentile";
+  const pctLow = manifest?.spatial_coverage?.percentile_low ?? 1;
+  const pctHigh = manifest?.spatial_coverage?.percentile_high ?? 99;
+
   useEffect(() => {
-    if (currentImage) {
-      getAnnotateImageChannels(currentImage.id)
-        .then((data) => {
-          const ch = data.channels?.find((c) => c.index === currentImage.c);
-          setChannelInfo(ch || null);
-          setAllChannels(data.channels || []);
-        })
-        .catch(() => { setChannelInfo(null); setAllChannels([]); });
-    } else {
+    if (!currentImage) {
       setChannelInfo(null);
       setAllChannels([]);
+      return;
     }
-  }, [currentImage?.id, currentImage?.c]);
+    let cancelled = false;
+
+    getAnnotateImageChannels(currentImage.id)
+      .then(async (data) => {
+        if (cancelled) return;
+        let channels = data.channels || [];
+        const ch = channels.find((c) => c.index === currentImage.c);
+        setChannelInfo(ch || null);
+
+        // Apply percentile normalization: override window.start/end with computed bounds
+        if (normMethod === "percentile" && channels.length > 0) {
+          try {
+            const normData = await computeNormalization(
+              currentImage.id,
+              currentImage.z ?? 0,
+              currentImage.t ?? 0,
+              pctLow,
+              pctHigh,
+            );
+            if (!cancelled && normData.channels) {
+              channels = channels.map((ch) => {
+                const norm = normData.channels.find((n) => n.index === ch.index);
+                if (norm) {
+                  return {
+                    ...ch,
+                    window: { ...ch.window, start: norm.min, end: norm.max },
+                  };
+                }
+                return ch;
+              });
+            }
+          } catch (e) {
+            console.warn("Percentile normalization failed, using defaults:", e);
+          }
+        }
+
+        if (!cancelled) setAllChannels(channels);
+      })
+      .catch(() => {
+        if (!cancelled) { setChannelInfo(null); setAllChannels([]); }
+      });
+
+    return () => { cancelled = true; };
+  }, [currentImage?.id, currentImage?.c, currentImage?.z, currentImage?.t, normMethod, pctLow, pctHigh]);
 
   const advanceToNextPending = (fromIndex) => {
     const next = units.findIndex((u, i) => !u.processed && i > fromIndex);
@@ -280,14 +321,15 @@ const AnnotateTab = ({ manifest, setId, onManifestUpdate }) => {
       const containerType = manifest?.omero?.container_type || "dataset";
       const containerId = manifest?.omero?.container_id || manifest?.omero?.container_ids?.[0];
 
-      // Build channel presentation from OMERO image-level window data
-      // Uses min/max (full intensity range), NOT start/end (rendering defaults)
+      // Build channel presentation from the active normalization.
+      // When percentile normalization is applied, window.start/end hold the
+      // computed bounds; otherwise fall back to the full range (min/max).
       const channelPresentation = allChannels.length > 0
         ? allChannels.map((ch) => ({
             channel_index: ch.index,
             visible: ch.active !== false,
-            contrast_start: ch.window?.min ?? 0,
-            contrast_end: ch.window?.max ?? 255,
+            contrast_start: ch.window?.start ?? ch.window?.min ?? 0,
+            contrast_end: ch.window?.end ?? ch.window?.max ?? 255,
             color: ch.color || "#FFFFFF",
           }))
         : null;
@@ -496,7 +538,7 @@ const AnnotateTab = ({ manifest, setId, onManifestUpdate }) => {
 
       <div className="flex gap-4 flex-1 min-h-0">
         {/* Unit list sidebar */}
-        <Card className="w-80 shrink-0 p-0 overflow-hidden flex flex-col">
+        <Card className="w-80 shrink-0 p-0 overflow-hidden flex flex-col min-h-0">
           <UnitList
             units={units}
             selectedIndex={selectedUnitIndex}

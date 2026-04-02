@@ -493,6 +493,11 @@ export const getAnnotateImageChannels = async (imageId) => {
   return apiRequest(endpoint, "GET");
 };
 
+export const computeNormalization = async (imageId, z = 0, t = 0, low = 1, high = 99) => {
+  const params = `image=${imageId}&z=${z}&t=${t}&low=${low}&high=${high}`;
+  return apiRequest(`/omero_biomero/api/annotate/compute_normalization/?${params}`, "GET");
+};
+
 export const createAnnotateConfig = async (configData) => {
   const csrfToken = window.csrftoken;
   return apiRequest("/omero_biomero/api/annotate/config/", "POST", configData, {

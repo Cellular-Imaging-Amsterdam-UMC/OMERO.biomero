@@ -15,6 +15,7 @@ import {
   Tag,
   Alert,
   Icon,
+  Tooltip,
 } from "@blueprintjs/core";
 import DatasetSelectWithPopover from "../../components/DatasetSelectWithPopover";
 import { useAppContext } from "../../../AppContext";
@@ -55,9 +56,16 @@ const ConfigureTab = ({ onConfigCreated, existingConfig, isActive }) => {
   const [timepointMode, setTimepointMode] = useState("specific");
   const [timepoints, setTimepoints] = useState([0]);
   const [threeD, setThreeD] = useState(false);
-  const [usePatches, setUsePatches] = useState(false);
+  const [nSlices, setNSlices] = useState(3);
+  const [nTimepoints, setNTimepoints] = useState(3);
+  const [usePatches, setUsePatches] = useState(true);
   const [patchSize, setPatchSize] = useState([512, 512]);
   const [patchesPerImage, setPatchesPerImage] = useState(1);
+
+  // --- Normalization ---
+  const [normalizationMethod, setNormalizationMethod] = useState("percentile");
+  const [percentileLow, setPercentileLow] = useState(0.5);
+  const [percentileHigh, setPercentileHigh] = useState(99.5);
 
   // --- Training split ---
   const [segmentAll, setSegmentAll] = useState(false);
@@ -144,12 +152,17 @@ const ConfigureTab = ({ onConfigCreated, existingConfig, isActive }) => {
       setLabelChannel(sc.label_channel ?? sc.channels?.[0] ?? 0);
       setZSlices(sc.z_slices || [0]);
       setZSliceMode(sc.z_slice_mode || "specific");
+      setNSlices(sc.n_slices ?? 3);
       setTimepoints(sc.timepoints || [0]);
       setTimepointMode(sc.timepoint_mode || "specific");
+      setNTimepoints(sc.n_timepoints ?? 3);
       setThreeD(sc.three_d || false);
-      setUsePatches(sc.use_patches || false);
+      setUsePatches(sc.use_patches ?? true);
       setPatchSize(sc.patch_size || [512, 512]);
       setPatchesPerImage(sc.patches_per_image || 1);
+      setNormalizationMethod(sc.normalization_method || "percentile");
+      setPercentileLow(sc.percentile_low ?? 0.5);
+      setPercentileHigh(sc.percentile_high ?? 99.5);
     }
     if (cfg.training) {
       const tr = cfg.training;
@@ -253,13 +266,18 @@ const ConfigureTab = ({ onConfigCreated, existingConfig, isActive }) => {
         label_channel: labelChannel,
         timepoints,
         timepoint_mode: timepointMode,
+        n_timepoints: timepointMode === "random" ? nTimepoints : null,
         z_slices: zSlices,
         z_slice_mode: zSliceMode,
+        n_slices: zSliceMode === "random" ? nSlices : null,
         three_d: threeD,
         use_patches: usePatches,
         patch_size: patchSize,
         patches_per_image: patchesPerImage,
         random_patches: true,
+        normalization_method: normalizationMethod,
+        percentile_low: normalizationMethod === "percentile" ? percentileLow : null,
+        percentile_high: normalizationMethod === "percentile" ? percentileHigh : null,
       },
       training: {
         segment_all: segmentAll,
@@ -315,26 +333,13 @@ const ConfigureTab = ({ onConfigCreated, existingConfig, isActive }) => {
       });
       return;
     }
-    setSaving(true);
-    try {
-      const configData = buildConfigData();
-      // Validate by attempting a dry save (config is validated by pydantic on the backend)
-      await saveManifest(containerType, containerIds[0], configData);
-      const warningNote = warnings.length > 0 ? ` (warning: ${warnings[0]})` : "";
-      toaster?.show({
-        message: `Configuration valid and saved${warningNote}`,
-        intent: warnings.length > 0 ? "warning" : "success",
-        timeout: 5000,
-      });
-    } catch (e) {
-      console.error("Error saving config:", e);
-      toaster?.show({
-        message: `Failed to save config: ${e.message}`,
-        intent: "danger",
-      });
-    } finally {
-      setSaving(false);
-    }
+    // Local-only validation — do NOT call saveManifest
+    const warningNote = warnings.length > 0 ? ` (warning: ${warnings[0]})` : "";
+    toaster?.show({
+      message: `Configuration valid${warningNote}`,
+      intent: warnings.length > 0 ? "warning" : "success",
+      timeout: 5000,
+    });
   };
 
   const handleDeleteManifest = async (manifest) => {
@@ -753,8 +758,58 @@ const ConfigureTab = ({ onConfigCreated, existingConfig, isActive }) => {
               />
             </FormGroup>
 
+            {/* Patch settings (prominent, before Z/T) */}
+            <Switch
+              checked={usePatches}
+              onChange={(e) => setUsePatches(e.target.checked)}
+              label="Use patches"
+              className="mt-2"
+            />
+            <p className="text-xs text-gray-500 mt-0 mb-2">
+              Extract random crops instead of annotating full images. Recommended for large images.
+            </p>
+            {usePatches && (
+              <div className="ml-4 flex flex-col gap-2 mt-1">
+                <FormGroup
+                  label="Patch Size (W, H)"
+                  helperText="Width and height in pixels of each random crop"
+                >
+                  <InputGroup
+                    value={patchSize.join(", ")}
+                    onChange={(e) => {
+                      const vals = e.target.value
+                        .split(",")
+                        .map((v) => parseInt(v.trim(), 10))
+                        .filter((v) => !isNaN(v));
+                      if (vals.length >= 1) setPatchSize(vals.slice(0, 2));
+                    }}
+                  />
+                </FormGroup>
+                <FormGroup
+                  label="Patches per Image"
+                  helperText="Number of random crops per image. When multiple Z/T selected, patches are distributed across them."
+                >
+                  <NumericInput
+                    value={patchesPerImage}
+                    onValueChange={setPatchesPerImage}
+                    min={1}
+                    max={100}
+                  />
+                </FormGroup>
+              </div>
+            )}
+
             {/* Z-slices */}
-            <FormGroup label="Z-slice Mode">
+            <FormGroup
+              label={
+                <span>
+                  Z-slice Mode{" "}
+                  <Tooltip content="Specific: choose exact slices. Random: sample N slices from available range. All: use every z-slice." placement="top">
+                    <Icon icon="info-sign" size={12} className="text-gray-400" />
+                  </Tooltip>
+                </span>
+              }
+            >
               <HTMLSelect
                 value={zSliceMode}
                 onChange={(e) => setZSliceMode(e.target.value)}
@@ -766,7 +821,7 @@ const ConfigureTab = ({ onConfigCreated, existingConfig, isActive }) => {
               />
             </FormGroup>
             {zSliceMode === "specific" && (
-              <FormGroup label="Z-slices" helperText="Comma-separated indices">
+              <FormGroup label="Z-slices" helperText="Comma-separated indices (0-based)">
                 <InputGroup
                   value={zSlices.join(", ")}
                   onChange={(e) => {
@@ -779,9 +834,31 @@ const ConfigureTab = ({ onConfigCreated, existingConfig, isActive }) => {
                 />
               </FormGroup>
             )}
+            {zSliceMode === "random" && (
+              <FormGroup
+                label="Number of Z-slices"
+                helperText="Number of random z-slices to sample per image"
+              >
+                <NumericInput
+                  value={nSlices}
+                  onValueChange={setNSlices}
+                  min={1}
+                  max={1000}
+                />
+              </FormGroup>
+            )}
 
             {/* Timepoints */}
-            <FormGroup label="Timepoint Mode">
+            <FormGroup
+              label={
+                <span>
+                  Timepoint Mode{" "}
+                  <Tooltip content="Specific: choose exact timepoints. Random: sample N timepoints from available range. All: use every timepoint." placement="top">
+                    <Icon icon="info-sign" size={12} className="text-gray-400" />
+                  </Tooltip>
+                </span>
+              }
+            >
               <HTMLSelect
                 value={timepointMode}
                 onChange={(e) => setTimepointMode(e.target.value)}
@@ -795,7 +872,7 @@ const ConfigureTab = ({ onConfigCreated, existingConfig, isActive }) => {
             {timepointMode === "specific" && (
               <FormGroup
                 label="Timepoints"
-                helperText="Comma-separated indices"
+                helperText="Comma-separated indices (0-based)"
               >
                 <InputGroup
                   value={timepoints.join(", ")}
@@ -809,34 +886,63 @@ const ConfigureTab = ({ onConfigCreated, existingConfig, isActive }) => {
                 />
               </FormGroup>
             )}
+            {timepointMode === "random" && (
+              <FormGroup
+                label="Number of Timepoints"
+                helperText="Number of random timepoints to sample per image"
+              >
+                <NumericInput
+                  value={nTimepoints}
+                  onValueChange={setNTimepoints}
+                  min={1}
+                  max={1000}
+                />
+              </FormGroup>
+            )}
 
-            {/* Patch settings */}
-            <Switch
-              checked={usePatches}
-              onChange={(e) => setUsePatches(e.target.checked)}
-              label="Use patches"
-              className="mt-2"
-            />
-            {usePatches && (
-              <div className="ml-4 flex flex-col gap-2 mt-1">
-                <FormGroup label="Patch Size (W, H)">
-                  <InputGroup
-                    value={patchSize.join(", ")}
-                    onChange={(e) => {
-                      const vals = e.target.value
-                        .split(",")
-                        .map((v) => parseInt(v.trim(), 10))
-                        .filter((v) => !isNaN(v));
-                      if (vals.length >= 1) setPatchSize(vals.slice(0, 2));
-                    }}
+            {/* Normalization */}
+            <FormGroup
+              label={
+                <span>
+                  Normalization{" "}
+                  <Tooltip content="How to normalize image intensities for training. Percentile computes per-image bounds from pixel data. OMERO defaults uses the server's rendering settings." placement="top">
+                    <Icon icon="info-sign" size={12} className="text-gray-400" />
+                  </Tooltip>
+                </span>
+              }
+              helperText="Applied per-image (not per-patch) to ensure consistent contrast across all annotations"
+            >
+              <HTMLSelect
+                value={normalizationMethod}
+                onChange={(e) => setNormalizationMethod(e.target.value)}
+                options={[
+                  { label: "Percentile", value: "percentile" },
+                  { label: "None", value: "none" },
+                ]}
+              />
+            </FormGroup>
+            {normalizationMethod === "percentile" && (
+              <div className="ml-4 flex gap-4">
+                <FormGroup label="Low %" helperText="Lower bound">
+                  <NumericInput
+                    value={percentileLow}
+                    onValueChange={setPercentileLow}
+                    min={0}
+                    max={100}
+                    stepSize={0.5}
+                    minorStepSize={0.1}
+                    style={{ width: 80 }}
                   />
                 </FormGroup>
-                <FormGroup label="Patches per Image">
+                <FormGroup label="High %" helperText="Upper bound">
                   <NumericInput
-                    value={patchesPerImage}
-                    onValueChange={setPatchesPerImage}
-                    min={1}
+                    value={percentileHigh}
+                    onValueChange={setPercentileHigh}
+                    min={0}
                     max={100}
+                    stepSize={0.5}
+                    minorStepSize={0.1}
+                    style={{ width: 80 }}
                   />
                 </FormGroup>
               </div>
@@ -957,19 +1063,31 @@ const ConfigureTab = ({ onConfigCreated, existingConfig, isActive }) => {
                 </div>
                 <div>
                   <strong>Z-slices:</strong>{" "}
-                  {zSliceMode === "specific" ? zSlices.join(", ") : zSliceMode}
+                  {zSliceMode === "specific"
+                    ? zSlices.join(", ")
+                    : zSliceMode === "random"
+                      ? `${nSlices} random`
+                      : zSliceMode}
                 </div>
                 <div>
                   <strong>Timepoints:</strong>{" "}
                   {timepointMode === "specific"
                     ? timepoints.join(", ")
-                    : timepointMode}
+                    : timepointMode === "random"
+                      ? `${nTimepoints} random`
+                      : timepointMode}
                 </div>
                 <div>
                   <strong>Split:</strong>{" "}
                   {segmentAll
                     ? `${(trainFraction * 100).toFixed(0)}% train / ${(valFraction * 100).toFixed(0)}% val / ${(testFraction * 100).toFixed(0)}% test`
                     : `${trainN} train / ${validateN} val / ${testN} test`}
+                </div>
+                <div>
+                  <strong>Normalization:</strong>{" "}
+                  {normalizationMethod === "percentile"
+                    ? `Percentile ${percentileLow}%-${percentileHigh}%`
+                    : "None"}
                 </div>
                 {usePatches && (
                   <div>

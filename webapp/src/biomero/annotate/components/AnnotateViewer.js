@@ -1,28 +1,13 @@
 /**
- * Thin wrapper around AnnotationViewer that supports z/t/c props on the image object.
+ * AnnotateViewer — annotation editor with z/t/c support.
  *
- * The StarDist AnnotationViewer hardcodes Z=0, T=0 and renders all channels.
- * This wrapper intercepts the image prop and rewrites the thumbnail URL so the
- * correct plane is shown.  It does this by overriding the image URL via a
- * hidden <img> preload and patching the AnnotationViewer's expected URL
- * pattern through a custom image object.
+ * Uses SVG overlay for vector-quality annotations at any zoom level.
+ * A secondary canvas is used only for brush stroke preview (performance).
  *
- * Approach: We construct a modified image ID string that encodes the z/t/c
- * parameters.  Because the AnnotationViewer builds the URL as:
- *   `/webgateway/render_image/${image.id}/${Z}/${T}/`
- * with Z=0 and T=0, we override `image.id` to include the actual z and t:
- *   image.id = `${realId}/${z}/${t}` so the URL becomes
- *   `/webgateway/render_image/${realId}/${z}/${t}/0/0/`
- * But this adds extra path segments which won't work.
- *
- * Instead, we'll use a simpler approach: pass an imageUrl override.
- * Since AnnotationViewer doesn't accept a custom URL prop, we need to
- * duplicate the minimal viewer logic here.
- *
- * Actually the simplest fix: AnnotationViewer uses the pattern:
- *   `/webgateway/render_image/${image.id}/${Z}/${T}/`
- * We can make Z and T dynamic by also passing them on the image object.
- * Let's just fork the URL construction.
+ * Props:
+ *   image: { id, name, z?, t?, c? }
+ *   annotations, onAnnotationsChange, featureTypes, onFeatureTypesChange
+ *   channelInfo, channels, patch
  */
 
 import React, {
@@ -52,14 +37,6 @@ import {
 } from "../utils/GeometryUtils";
 import { samSetImage, samPredict } from "../../../apiService";
 
-/**
- * AnnotateViewer — adapted from StarDist AnnotationViewer with z/t/c support.
- *
- * Props:
- *   image: { id, name, z?, t?, c? }
- *   annotations, onAnnotationsChange, featureTypes, onFeatureTypesChange
- *   (same as AnnotationViewer)
- */
 const AnnotateViewer = ({
   image,
   annotations,
@@ -70,7 +47,8 @@ const AnnotateViewer = ({
   channels = [],
   patch,
 }) => {
-  const canvasRef = useRef(null);
+  const svgRef = useRef(null);
+  const brushCanvasRef = useRef(null);
   const containerRef = useRef(null);
 
   // View State
@@ -164,6 +142,10 @@ const AnnotateViewer = ({
   const patchWidth = patch ? Number(patch.patch_width) : null;
   const patchHeight = patch ? Number(patch.patch_height) : null;
 
+  // Overlay dimensions (patch size or full image size)
+  const overlayWidth = patchWidth !== null ? patchWidth : imageDims.width;
+  const overlayHeight = patchHeight !== null ? patchHeight : imageDims.height;
+
   // Build image URL with z/t/c support and per-channel contrast
   const Z = image?.z ?? 0;
   const T = image?.t ?? 0;
@@ -173,7 +155,6 @@ const AnnotateViewer = ({
     const base = `/webgateway/render_image/${image.id}/${Z}/${T}/`;
 
     if (channels.length > 0) {
-      // Multi-channel mode: build per-channel parameters with visibility and contrast
       const channelParam = channels
         .map((ch) => {
           const chNum = ch.index + 1;
@@ -193,7 +174,6 @@ const AnnotateViewer = ({
       return `${base}?c=${channelParam}&q=1.0`;
     }
 
-    // Fallback: single channel from channelInfo
     if (C !== undefined && C !== null && channelInfo?.window) {
       return `${base}?c=${C + 1}|${channelInfo.window.start}:${channelInfo.window.end}$FFFFFF&q=1.0`;
     }
@@ -220,142 +200,21 @@ const AnnotateViewer = ({
     setPan({ x: 0, y: 0 });
   }, [image?.id, Z, T, C]);
 
-  // Keep zoomRef in sync with zoom state (for button-triggered zoom changes)
+  // Keep zoomRef in sync with zoom state
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
 
-  // --- Drawing Helpers ---
-  const getCanvasPoint = (e) => {
-    if (!canvasRef.current) return { x: 0, y: 0 };
-    const rect = canvasRef.current.getBoundingClientRect();
-    const canvas = canvasRef.current;
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+  // --- Coordinate Helpers ---
+  const getOverlayPoint = (e) => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const rect = svg.getBoundingClientRect();
     return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
+      x: ((e.clientX - rect.left) / rect.width) * overlayWidth,
+      y: ((e.clientY - rect.top) / rect.height) * overlayHeight,
     };
   };
-
-  const draw = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    annotations.forEach((ann) => {
-      if (!ann.points || ann.points.length < 2) return;
-      const type = featureTypes.find((t) => t.id === ann.typeId) || {
-        color: "yellow",
-      };
-      ctx.beginPath();
-      ctx.moveTo(ann.points[0][0], ann.points[0][1]);
-      for (let i = 1; i < ann.points.length; i++) {
-        ctx.lineTo(ann.points[i][0], ann.points[i][1]);
-      }
-      ctx.closePath();
-      ctx.strokeStyle = type.color;
-      ctx.lineWidth = 2;
-      ctx.fillStyle = type.color + "33";
-      ctx.stroke();
-      ctx.fill();
-    });
-
-    // Draw selection highlight
-    if (selectedAnnotationId) {
-      const selected = annotations.find((a) => a.id === selectedAnnotationId);
-      if (selected && selected.points && selected.points.length > 1) {
-        ctx.strokeStyle = "#4a9eed";
-        ctx.lineWidth = 3;
-        ctx.setLineDash([6, 4]);
-        ctx.beginPath();
-        ctx.moveTo(selected.points[0][0], selected.points[0][1]);
-        selected.points.slice(1).forEach((p) => ctx.lineTo(p[0], p[1]));
-        ctx.closePath();
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-    }
-
-    if (tool === "polygon" && currentPoints.length > 0) {
-      ctx.strokeStyle = mode === "subtract" ? "red" : "lime";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(currentPoints[0][0], currentPoints[0][1]);
-      for (let i = 1; i < currentPoints.length; i++) {
-        ctx.lineTo(currentPoints[i][0], currentPoints[i][1]);
-      }
-      ctx.stroke();
-      ctx.fillStyle = mode === "subtract" ? "red" : "lime";
-      const ptSize = 3;
-      currentPoints.forEach((p) => {
-        ctx.beginPath();
-        ctx.arc(p[0], p[1], ptSize, 0, 2 * Math.PI);
-        ctx.fill();
-      });
-    }
-
-    // 3. Draw SAM prompts and preview
-    if (tool === "sam-point" || tool === "sam-box") {
-      samPoints.forEach((p) => {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
-        ctx.fillStyle = p.label === 1 ? "#00ff00" : "#ff0000";
-        ctx.fill();
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      });
-
-      if (samBox) {
-        ctx.setLineDash([6, 4]);
-        ctx.strokeStyle = "#3b82f6";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(
-          samBox.x1,
-          samBox.y1,
-          samBox.x2 - samBox.x1,
-          samBox.y2 - samBox.y1,
-        );
-        ctx.setLineDash([]);
-      }
-
-      const previewType = featureTypes.find(
-        (ft) => ft.id === activeFeatureType,
-      );
-      const previewColor = previewType?.color || "#00ff00";
-      samPreviewPolys.forEach((pts) => {
-        if (!pts || pts.length < 3) return;
-        ctx.setLineDash([8, 4]);
-        ctx.strokeStyle = previewColor;
-        ctx.lineWidth = 2;
-        ctx.fillStyle = previewColor + "33";
-        ctx.beginPath();
-        ctx.moveTo(pts[0][0], pts[0][1]);
-        for (let i = 1; i < pts.length; i++) {
-          ctx.lineTo(pts[i][0], pts[i][1]);
-        }
-        ctx.closePath();
-        ctx.stroke();
-        ctx.fill();
-        ctx.setLineDash([]);
-      });
-    }
-  };
-
-  useEffect(() => {
-    requestAnimationFrame(draw);
-  }, [
-    annotations,
-    currentPoints,
-    featureTypes,
-    mode,
-    samPoints,
-    samBox,
-    samPreviewPolys,
-    tool,
-  ]);
 
   // --- Handlers ---
   const handleMouseDown = (e) => {
@@ -367,7 +226,7 @@ const AnnotateViewer = ({
     }
     if (mode === "add" && (!featureTypes.length || !activeFeatureType)) return;
 
-    const pt = getCanvasPoint(e);
+    const pt = getOverlayPoint(e);
     if (tool === "polygon") {
       if (currentPoints.length > 2) {
         const start = currentPoints[0];
@@ -380,12 +239,15 @@ const AnnotateViewer = ({
       setCurrentPoints([...currentPoints, [pt.x, pt.y]]);
     } else if (tool === "brush") {
       setIsDrawing(true);
-      if (
-        maskCanvas.width !== canvasRef.current.width ||
-        maskCanvas.height !== canvasRef.current.height
-      ) {
-        maskCanvas.width = canvasRef.current.width;
-        maskCanvas.height = canvasRef.current.height;
+      // Size brush canvas and mask canvas to overlay dimensions
+      const bCanvas = brushCanvasRef.current;
+      if (bCanvas && (bCanvas.width !== overlayWidth || bCanvas.height !== overlayHeight)) {
+        bCanvas.width = overlayWidth;
+        bCanvas.height = overlayHeight;
+      }
+      if (maskCanvas.width !== overlayWidth || maskCanvas.height !== overlayHeight) {
+        maskCanvas.width = overlayWidth;
+        maskCanvas.height = overlayHeight;
       }
       const mCtx = maskCanvas.getContext("2d");
       mCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
@@ -393,6 +255,17 @@ const AnnotateViewer = ({
       mCtx.beginPath();
       mCtx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
       mCtx.fill();
+      // Draw brush preview
+      if (bCanvas) {
+        const bCtx = bCanvas.getContext("2d");
+        bCtx.clearRect(0, 0, bCanvas.width, bCanvas.height);
+        const type = featureTypes.find((t) => t.id === activeFeatureType);
+        const color = mode === "subtract" ? "#ff0000" : type?.color || "yellow";
+        bCtx.fillStyle = color + "80";
+        bCtx.beginPath();
+        bCtx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
+        bCtx.fill();
+      }
     } else if (tool === "sam-point") {
       const label = e.shiftKey ? 0 : 1;
       const newPoints = [...samPoints, { x: pt.x, y: pt.y, label }];
@@ -414,45 +287,53 @@ const AnnotateViewer = ({
       return;
     }
     if (tool === "brush" && isDrawing) {
-      const pt = getCanvasPoint(e);
+      const pt = getOverlayPoint(e);
       const mCtx = maskCanvas.getContext("2d");
       mCtx.beginPath();
       mCtx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
       mCtx.fill();
-      const ctx = canvasRef.current.getContext("2d");
-      const type = featureTypes.find((t) => t.id === activeFeatureType);
-      const color = mode === "subtract" ? "#ff0000" : type?.color || "yellow";
-      ctx.fillStyle = color + "80";
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
-      ctx.fill();
+      // Draw brush preview on brushCanvas
+      const bCanvas = brushCanvasRef.current;
+      if (bCanvas) {
+        const bCtx = bCanvas.getContext("2d");
+        const type = featureTypes.find((t) => t.id === activeFeatureType);
+        const color = mode === "subtract" ? "#ff0000" : type?.color || "yellow";
+        bCtx.fillStyle = color + "80";
+        bCtx.beginPath();
+        bCtx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
+        bCtx.fill();
+      }
     }
 
     if (tool === "sam-box" && samBoxStart) {
-      const pt = getCanvasPoint(e);
+      const pt = getOverlayPoint(e);
       setSamBox({
         x1: Math.min(samBoxStart.x, pt.x),
         y1: Math.min(samBoxStart.y, pt.y),
         x2: Math.max(samBoxStart.x, pt.x),
         y2: Math.max(samBoxStart.y, pt.y),
       });
-      draw();
     }
   };
 
   const handleMouseUp = (e) => {
     if (tool === "pan") {
-      // Detect click (not drag) for selection
       const dx = e.clientX - lastPanPoint.x;
       const dy = e.clientY - lastPanPoint.y;
       if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
-        handleCanvasClickSelect(e);
+        handleClickSelect(e);
       }
       setIsPanning(false);
       return;
     }
     if (tool === "brush" && isDrawing) {
       setIsDrawing(false);
+      // Clear brush preview
+      const bCanvas = brushCanvasRef.current;
+      if (bCanvas) {
+        const bCtx = bCanvas.getContext("2d");
+        bCtx.clearRect(0, 0, bCanvas.width, bCanvas.height);
+      }
       const ctx = maskCanvas.getContext("2d");
       const imageData = ctx.getImageData(
         0,
@@ -462,11 +343,10 @@ const AnnotateViewer = ({
       );
       const polys = traceContours(imageData);
       processNewPolygons(polys);
-      draw();
     }
 
     if (tool === "sam-box" && samBoxStart && e) {
-      const pt = getCanvasPoint(e);
+      const pt = getOverlayPoint(e);
       const box = {
         x1: Math.min(samBoxStart.x, pt.x),
         y1: Math.min(samBoxStart.y, pt.y),
@@ -491,8 +371,8 @@ const AnnotateViewer = ({
   };
 
   const processNewPolygons = (newPolys) => {
-    const width = canvasRef.current.width;
-    const height = canvasRef.current.height;
+    const width = overlayWidth;
+    const height = overlayHeight;
     if (mode === "subtract") {
       let currentAnns = [...annotations];
       newPolys.forEach((erasePoly) => {
@@ -505,16 +385,13 @@ const AnnotateViewer = ({
       });
       onAnnotationsChange(currentAnns);
     } else if (mode === "append") {
-      // Merge with overlapping same-type annotations
       newPolys.forEach((pts) => {
         const sameTypeAnns = annotations.filter((a) => a.typeId === activeFeatureType);
         const merged = appendToAnnotations(pts, sameTypeAnns, width, height);
         if (merged) {
-          // Replace same-type annotations with merged result, keep others
           const otherAnns = annotations.filter((a) => a.typeId !== activeFeatureType);
           onAnnotationsChange([...otherAnns, ...merged]);
         } else {
-          // No overlap — add as new annotation
           onAnnotationsChange([...annotations, {
             id: crypto.randomUUID(),
             points: pts,
@@ -539,8 +416,8 @@ const AnnotateViewer = ({
   };
 
   const handleCollisionAndAdd = (newPolys) => {
-    const width = canvasRef.current.width;
-    const height = canvasRef.current.height;
+    const width = overlayWidth;
+    const height = overlayHeight;
     let finalAnns = [...annotations];
     newPolys.forEach((newPoly) => {
       const resultPolys = subtractAnnotations(
@@ -610,8 +487,8 @@ const AnnotateViewer = ({
     return inside;
   };
 
-  const handleCanvasClickSelect = (e) => {
-    const pt = getCanvasPoint(e);
+  const handleClickSelect = (e) => {
+    const pt = getOverlayPoint(e);
     for (let i = annotations.length - 1; i >= 0; i--) {
       if (annotations[i].points && pointInPolygon(pt.x, pt.y, annotations[i].points)) {
         setSelectedAnnotationId(annotations[i].id);
@@ -632,11 +509,6 @@ const AnnotateViewer = ({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedAnnotationId, annotations, onAnnotationsChange]);
-
-  // Redraw when selection changes
-  useEffect(() => {
-    draw();
-  }, [selectedAnnotationId]);
 
   const addFeatureType = () => {
     if (!newFeatureName) return;
@@ -660,35 +532,14 @@ const AnnotateViewer = ({
   };
 
   const handleImageLoad = (e) => {
-    if (canvasRef.current) {
-      const naturalW = e.target.naturalWidth;
-      const naturalH = e.target.naturalHeight;
-      // In patch mode, canvas covers only the patch sub-region
-      canvasRef.current.width = patchWidth !== null ? patchWidth : naturalW;
-      canvasRef.current.height = patchHeight !== null ? patchHeight : naturalH;
-      setImageDims({
-        width: naturalW,
-        height: naturalH,
-      });
-      draw();
-    }
+    const naturalW = e.target.naturalWidth;
+    const naturalH = e.target.naturalHeight;
+    setImageDims({ width: naturalW, height: naturalH });
   };
-
-  // Re-size canvas when patch changes (same image, different sub-region)
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    if (patchWidth !== null && patchHeight !== null) {
-      canvasRef.current.width = patchWidth;
-      canvasRef.current.height = patchHeight;
-    }
-    draw();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patch?.patch_x, patch?.patch_y, patch?.patch_width, patch?.patch_height]);
 
   // Expose image dimensions for the save flow
   useEffect(() => {
     if (imageDims.width > 0 && imageDims.height > 0 && image) {
-      // Store on the image object so parent can access via ref if needed
       image._width = imageDims.width;
       image._height = imageDims.height;
     }
@@ -792,7 +643,151 @@ const AnnotateViewer = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [tool, acceptSamPreview]);
 
+  // --- SVG Rendering Helpers ---
+  const pointsToSvg = (pts) => pts.map((p) => `${p[0]},${p[1]}`).join(" ");
+
+  const previewType = featureTypes.find((ft) => ft.id === activeFeatureType);
+  const previewColor = previewType?.color || "#00ff00";
+
   if (!image) return <div>Select an image</div>;
+
+  // SVG overlay element (shared between patch and normal mode)
+  const svgOverlay = overlayWidth > 0 && overlayHeight > 0 ? (
+    <svg
+      ref={svgRef}
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+      }}
+      viewBox={`0 0 ${overlayWidth} ${overlayHeight}`}
+      preserveAspectRatio="none"
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onContextMenu={handleContextMenu}
+    >
+      {/* 1. Completed annotations */}
+      {annotations.map((ann) => {
+        if (!ann.points || ann.points.length < 2) return null;
+        const type = featureTypes.find((t) => t.id === ann.typeId) || { color: "yellow" };
+        return (
+          <polygon
+            key={ann.id}
+            points={pointsToSvg(ann.points)}
+            fill={type.color + "33"}
+            stroke={type.color}
+            strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
+          />
+        );
+      })}
+
+      {/* 2. Selection highlight */}
+      {selectedAnnotationId && (() => {
+        const selected = annotations.find((a) => a.id === selectedAnnotationId);
+        if (!selected?.points || selected.points.length < 2) return null;
+        return (
+          <polygon
+            points={pointsToSvg(selected.points)}
+            fill="none"
+            stroke="#4a9eed"
+            strokeWidth={2}
+            strokeDasharray="6 4"
+            vectorEffect="non-scaling-stroke"
+          />
+        );
+      })()}
+
+      {/* 3. In-progress polygon */}
+      {tool === "polygon" && currentPoints.length > 0 && (
+        <>
+          <polyline
+            points={pointsToSvg(currentPoints)}
+            fill="none"
+            stroke={mode === "subtract" ? "red" : "lime"}
+            strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
+          />
+          {currentPoints.map((p, i) => (
+            <circle
+              key={i}
+              cx={p[0]}
+              cy={p[1]}
+              r={2}
+              fill={mode === "subtract" ? "red" : "lime"}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </>
+      )}
+
+      {/* 4. SAM prompts and preview */}
+      {(tool === "sam-point" || tool === "sam-box") && (
+        <>
+          {samPoints.map((p, i) => (
+            <circle
+              key={`sam-pt-${i}`}
+              cx={p.x}
+              cy={p.y}
+              r={3}
+              fill={p.label === 1 ? "#00ff00" : "#ff0000"}
+              stroke="#ffffff"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+
+          {samBox && (
+            <rect
+              x={samBox.x1}
+              y={samBox.y1}
+              width={samBox.x2 - samBox.x1}
+              height={samBox.y2 - samBox.y1}
+              fill="none"
+              stroke="#3b82f6"
+              strokeWidth={1}
+              strokeDasharray="6 4"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+
+          {samPreviewPolys.map((pts, i) => {
+            if (!pts || pts.length < 3) return null;
+            return (
+              <polygon
+                key={`sam-preview-${i}`}
+                points={pointsToSvg(pts)}
+                fill={previewColor + "33"}
+                stroke={previewColor}
+                strokeWidth={1}
+                strokeDasharray="8 4"
+                vectorEffect="non-scaling-stroke"
+              />
+            );
+          })}
+        </>
+      )}
+    </svg>
+  ) : null;
+
+  // Brush preview canvas (between image and SVG)
+  const brushCanvas = (
+    <canvas
+      ref={brushCanvasRef}
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+      }}
+    />
+  );
 
   return (
     <div className="flex h-full gap-4">
@@ -1124,21 +1119,8 @@ const AnnotateViewer = ({
                 }}
                 onLoad={handleImageLoad}
               />
-              <canvas
-                ref={canvasRef}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  height: "100%",
-                }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                onContextMenu={handleContextMenu}
-              />
+              {brushCanvas}
+              {svgOverlay}
             </div>
           ) : (
             // Normal mode: full image
@@ -1149,15 +1131,8 @@ const AnnotateViewer = ({
                 className="block pointer-events-none select-none max-w-none"
                 onLoad={handleImageLoad}
               />
-              <canvas
-                ref={canvasRef}
-                className="absolute top-0 left-0 w-full h-full"
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                onContextMenu={handleContextMenu}
-              />
+              {brushCanvas}
+              {svgOverlay}
             </>
           )}
         </div>
