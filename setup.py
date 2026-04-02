@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import os
-from setuptools import setup, find_packages
+
+from setuptools import find_packages, setup
 
 
 # Utility function to read the README file.
@@ -55,6 +56,9 @@ setup(
         "biomero>=2.1.0",
         "configupdater>=3.2",
         "biomero-importer>=1.0.0",
+        "omero-annotate-ai[all]>=0.2.0",
+        "opencv-python-headless",
+        "ultralytics",
     ],
     python_requires=">=3.12",
     include_package_data=True,

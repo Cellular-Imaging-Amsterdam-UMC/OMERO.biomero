@@ -12,7 +12,7 @@ import "./tailwind.css";
 import { AppProvider } from "./AppContext";
 import BiomeroApp from "./biomero/BiomeroApp";
 import ImporterApp from "./importer/ImporterApp";
-import PredictionApp from "./biomero/prediction/PredictionApp";
+import AnnotateApp from "./biomero/annotate/AnnotateApp";
 import {
   Navbar,
   NavbarGroup,
@@ -95,38 +95,38 @@ const AppRouter = () => {
               />
             )}
             {ANALYZER_ENABLED && (
-              <Button
-                className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
-                  appName === "biomero"
-                    ? "bp5-intent-primary font-bold shadow-md"
-                    : ""
-                }`}
-                icon="data-sync"
-                text="Analyze"
-                onClick={() => navigate("?tab=biomero")}
-                outlined={appName === "biomero"}
-              />
+              <>
+                <Button
+                  className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
+                    appName === "biomero"
+                      ? "bp5-intent-primary font-bold shadow-md"
+                      : ""
+                  }`}
+                  icon="data-sync"
+                  text="Analyze"
+                  onClick={() => navigate("?tab=biomero")}
+                  outlined={appName === "biomero"}
+                />
+                <Button
+                  className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
+                    appName === "prediction"
+                      ? "bp5-intent-primary font-bold shadow-md"
+                      : ""
+                  }`}
+                  icon="learning"
+                  text="Train"
+                  onClick={() => navigate("?tab=prediction")}
+                  outlined={appName === "prediction"}
+                />
+              </>
             )}
-            {/* {TRAINER_ENABLED && (  */}
-              <Button
-                className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
-                  appName === "prediction"
-                    ? "bp5-intent-primary font-bold shadow-md"
-                    : ""
-                }`}
-                icon="learning"
-                text="Train"
-                onClick={() => navigate("?tab=prediction")}
-                outlined={appName === "prediction"}
-              />
-            {/* )} */}
           </NavbarGroup>
         </Navbar>
         <div className="pt-[50px]">
           {appName === "biomero" ? (
             <BiomeroApp />
           ) : appName === "prediction" ? (
-            <PredictionApp />
+            <AnnotateApp />
           ) : (
             <ImporterApp />
           )}
@@ -144,6 +144,6 @@ window.onload = function () {
       <Routes>
         <Route path="*" element={<AppRouter />} />
       </Routes>
-    </BrowserRouter>
+    </BrowserRouter>,
   );
 };

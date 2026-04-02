@@ -21,11 +21,11 @@ def main():
     parser.add_argument("--patch-size", type=int, default=256)
     parser.add_argument("--model-name", required=True)
     args = parser.parse_args()
-    
+
     # 1. Connect to OMERO
     conn = BlitzGateway(host=args.host, port=args.port)
     conn.connect(sUuid=args.session)
-    
+
     if not conn.isConnected():
         print("Failed to connect to OMERO")
         return
@@ -45,11 +45,11 @@ def main():
         os.makedirs(f"{base_dir}/masks")
 
         images = []
-        
+
         import json
         from skimage.draw import polygon
         import omero
-        
+
         # 2. Download Data
         print("Downloading images and annotations...")
         annotation_payload = None
@@ -83,51 +83,51 @@ def main():
             if not found_polys:
                 print(f"Skipping image {image.getId()} (no dataset-level annotations)")
                 continue
-                
+
             # Download Image
             pixels = image.getPrimaryPixels()
             # We fetch plane (z=0, t=0)
             plane = pixels.getPlane(0, 0) # numpy array
-            
+
             img_path = f"{base_dir}/images/{image.getId()}.tif"
             imwrite(img_path, plane)
-            
+
             # Create Mask from Polygons
             mask = np.zeros(plane.shape, dtype=np.uint16)
-            
+
             for idx, poly in enumerate(found_polys):
                 points = poly.get("points")
                 if not points or len(points) < 3: continue
-                
+
                 # points is [[x,y], ..]
                 # skimage polygon expects rows(y), cols(x)
                 rr = [p[1] for p in points]
                 cc = [p[0] for p in points]
-                
+
                 try:
                     r_idx, c_idx = polygon(rr, cc, shape=mask.shape)
                     mask[r_idx, c_idx] = idx + 1 # Instance labels 1..N
                 except Exception as e:
                     print(f"Error rasterizing polygon {idx} on image {image.getId()}: {e}")
-            
+
             mask_path = f"{base_dir}/masks/{image.getId()}.tif"
             imwrite(mask_path, mask)
-            
+
             images.append(image.getId())
-            
+
         print(f"Downloaded {len(images)} annotated images.")
-        
+
         if len(images) == 0:
             print("No training data found.")
             return
 
         # 3. Train
         print(f"Starting training for {args.epochs} epochs...")
-        
+
         # Data reading
         X = sorted(glob(f"{base_dir}/images/*.tif"))
         Y = sorted(glob(f"{base_dir}/masks/*.tif"))
-        
+
         # In real world, we would restart from existing model or use defaults
         # configuration
         conf = Config2D (
@@ -139,36 +139,36 @@ def main():
             train_epochs = args.epochs,
             train_learning_rate = 0.0003,
         )
-        
+
         model = StarDist2D(conf, name=args.model_name, basedir="models")
-        
+
         # Need to read images into numpy arrays
         # Stardist expects lists of arrays
         from tifffile import imread
         X_data = [normalize(imread(x), 1,99.8, axis=(0,1)) for x in X]
         Y_data = [imread(y) for y in Y]
-        
+
         model.train(X_data, Y_data, validation_split=args.val_split)
-        
+
         print("Training finished.")
-        
+
         # 4. Upload Model
         # Zip the model directory and upload as FileAnnotation or original file
         model_path = f"models/{args.model_name}"
         zip_path = f"{args.model_name}.zip"
-        
+
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for root, dirs, files in os.walk(model_path):
                 for file in files:
-                    zipf.write(os.path.join(root, file), 
-                               os.path.relpath(os.path.join(root, file), 
+                    zipf.write(os.path.join(root, file),
+                               os.path.relpath(os.path.join(root, file),
                                os.path.join(model_path, '..')))
-                               
+
         print(f"Model zipped to {zip_path}. Uploading...")
-        
+
         # Upload to OMERO (attach to Dataset?)
         # For now, just leave it on disk or print location
-        
+
         print("Done.")
 
     finally:

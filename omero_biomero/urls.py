@@ -1,6 +1,15 @@
 from django.urls import path
 from .tus_views import TusUploadView
-from . import biomero_views, importer_views, admin_views, analyzer_views, prediction_views
+from . import (
+    admin_views,
+    analyzer_views,
+    annotate_ai_views,
+    biomero_views,
+    importer_views,
+    prediction_views,
+    sam_views,
+    training_views,
+)
 
 urlpatterns = [
     # Importer URLs
@@ -59,7 +68,7 @@ urlpatterns = [
         analyzer_views.get_slurm_status,  # GET: SLURM cluster status
         name="analyzer_slurm_status",
     ),
-    # Prediction URLs
+    # Prediction URLs (renamed from stardist)
     path(
         "api/prediction/models/",
         prediction_views.list_models,
@@ -99,6 +108,115 @@ urlpatterns = [
         "api/prediction/predict/",
         prediction_views.run_prediction,
         name="prediction_predict",
+    ),
+    # SAM URLs
+    path(
+        "api/sam/set_image/",
+        sam_views.set_image,
+        name="sam_set_image",
+    ),
+    path(
+        "api/sam/predict/",
+        sam_views.predict,
+        name="sam_predict",
+    ),
+    # Annotate AI URLs — Manifest CRUD
+    path(
+        "api/annotate/save_manifest/",
+        annotate_ai_views.save_manifest,
+        name="save_manifest",
+    ),
+    path(
+        "api/annotate/load_manifest/",
+        annotate_ai_views.load_manifest,
+        name="load_manifest",
+    ),
+    path(
+        "api/annotate/list_manifests/",
+        annotate_ai_views.list_manifests,
+        name="list_manifests",
+    ),
+    path(
+        "api/annotate/delete_manifest/",
+        annotate_ai_views.delete_manifest,
+        name="delete_manifest",
+    ),
+    path(
+        "api/annotate/add_patch/",
+        annotate_ai_views.add_patch,
+        name="add_patch_manifest",
+    ),
+    # Annotate AI URLs — Container browsing
+    path(
+        "api/annotate/containers/",
+        annotate_ai_views.list_containers,
+        name="annotate_list_containers",
+    ),
+    path(
+        "api/annotate/container_images/",
+        annotate_ai_views.get_container_images,
+        name="annotate_container_images",
+    ),
+    path(
+        "api/annotate/image_channels/",
+        annotate_ai_views.get_image_channels,
+        name="annotate_image_channels",
+    ),
+    path(
+        "api/annotate/config/",
+        annotate_ai_views.manage_config,
+        name="annotate_config",
+    ),
+    path(
+        "api/annotate/tracking_table/",
+        annotate_ai_views.manage_tracking_table,
+        name="annotate_tracking_table",
+    ),
+    path(
+        "api/annotate/tracking_table/<int:table_id>/",
+        annotate_ai_views.get_tracking_table_detail,
+        name="annotate_tracking_table_detail",
+    ),
+    path(
+        "api/annotate/save_annotation/",
+        annotate_ai_views.save_annotation,
+        name="annotate_save_annotation",
+    ),
+    path(
+        "api/annotate/fetch_annotation/",
+        annotate_ai_views.fetch_annotation,
+        name="annotate_fetch_annotation",
+    ),
+    path(
+        "api/annotate/progress/",
+        annotate_ai_views.get_progress,
+        name="annotate_progress",
+    ),
+    path(
+        "api/annotate/validate_training/",
+        annotate_ai_views.validate_training_readiness,
+        name="annotate_validate_training",
+    ),
+    path(
+        "api/annotate/mark_processed/",
+        annotate_ai_views.mark_unit_processed,
+        name="annotate_mark_processed",
+    ),
+    path(
+        "api/annotate/add_patch/",
+        annotate_ai_views.add_patch,
+        name="annotate_add_patch",
+    ),
+    # Training URLs
+    path(
+        "api/analyzer/training/start/",
+        training_views.start_training,
+        name="training_start",
+    ),
+    path(
+        "api/analyzer/training/models/",
+        training_views.list_trained_models,
+        name="training_list_models",
     ),
     # Main Biomero URL
     path(
