@@ -272,16 +272,52 @@ export const subtractAnnotations = (newPolyPoints, existingAnnotations, width, h
     return traceContours(imageData);
 };
 
+// Simple polygon simplification (Douglas-Peucker-ish)
+const simplifyPolygon = (points, epsilon) => {
+    if (points.length < 3) return points;
+    // For now returning as is, proper DP algorithm is recursive
+    // Implementing very basic distance filter
+    if (!epsilon) return points;
+    
+    const result = [points[0]];
+    for (let i = 1; i < points.length; i++) {
+        const last = result[result.length - 1];
+        const curr = points[i];
+        const dist = Math.hypot(curr[0] - last[0], curr[1] - last[1]);
+        if (dist > epsilon) {
+            result.push(curr);
+        }
+    }
+    // ensure closed
+    const first = result[0];
+    const last = result[result.length - 1];
+    if (Math.hypot(first[0]-last[0], first[1]-last[1]) > epsilon) {
+        result.push(first); // Close loop if not close enough
+    } else {
+        // already simplified close to start
+    }
+    
+    return result;
+};
+
+/**
+ * Appends a new polygon to existing annotations by merging overlapping ones.
+ * If the new polygon overlaps any existing annotations, they are unioned together.
+ * Returns null if no overlap found (caller should add as new annotation).
+ *
+ * @param {Array<[number, number]>} newPolyPoints Points of the new polygon
+ * @param {Array<{id: string, points: Array<[number, number]>, typeId: string}>} existingAnnotations List of existing annotations
+ * @param {number} width Canvas width
+ * @param {number} height Canvas height
+ * @returns {Array|null} New annotation list with merged polygons, or null if no overlap
+ */
 export const appendToAnnotations = (newPolyPoints, existingAnnotations, width, height) => {
     if (!newPolyPoints || newPolyPoints.length < 3 || !existingAnnotations.length) {
         return null;
     }
 
     const getBounds = (points) => {
-        let minX = width;
-        let minY = height;
-        let maxX = 0;
-        let maxY = 0;
+        let minX = width, minY = height, maxX = 0, maxY = 0;
         points.forEach(([x, y]) => {
             if (x < minX) minX = x;
             if (x > maxX) maxX = x;
@@ -299,9 +335,7 @@ export const appendToAnnotations = (newPolyPoints, existingAnnotations, width, h
     );
 
     const drawPolygon = (ctx, points) => {
-        if (!points || points.length < 3) {
-            return;
-        }
+        if (!points || points.length < 3) return;
         ctx.beginPath();
         ctx.moveTo(points[0][0], points[0][1]);
         for (let i = 1; i < points.length; i++) {
@@ -381,38 +415,10 @@ export const appendToAnnotations = (newPolyPoints, existingAnnotations, width, h
     return [...others, ...mergedAnnotations];
 };
 
-// Simple polygon simplification (Douglas-Peucker-ish)
-const simplifyPolygon = (points, epsilon) => {
-    if (points.length < 3) return points;
-    // For now returning as is, proper DP algorithm is recursive
-    // Implementing very basic distance filter
-    if (!epsilon) return points;
-    
-    const result = [points[0]];
-    for (let i = 1; i < points.length; i++) {
-        const last = result[result.length - 1];
-        const curr = points[i];
-        const dist = Math.hypot(curr[0] - last[0], curr[1] - last[1]);
-        if (dist > epsilon) {
-            result.push(curr);
-        }
-    }
-    // ensure closed
-    const first = result[0];
-    const last = result[result.length - 1];
-    if (Math.hypot(first[0]-last[0], first[1]-last[1]) > epsilon) {
-        result.push(first); // Close loop if not close enough
-    } else {
-        // already simplified close to start
-    }
-    
-    return result;
-};
-
 /**
  * Subtracts an eraser polygon from a list of existing annotations.
  * Returns a NEW list of annotations (some might be removed, some modified/split).
- * 
+ *
  * @param {Array<[number, number]>} eraserPoints Points of the eraser polygon
  * @param {Array<{id: string, points: Array<[number, number]>, typeId: string}>} existingAnnotations List of existing annotations
  * @param {number} width Canvas width

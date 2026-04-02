@@ -5,25 +5,19 @@ import ImageSelector from "./ImageSelector";
 import ModelSelector from "./ModelSelector";
 import ChannelSelector from "./ChannelSelector";
 import PreviewViewer from "./PreviewViewer";
-import { fetchImageChannels } from "../../../apiService";
+import { fetchImageChannels, listManifests } from "../../../apiService";
 
-const sanitizeDatasetSelection = (selection = []) => {
-    if (!Array.isArray(selection) || selection.length === 0) {
-        return [];
-    }
-    return [selection[0]];
-};
-
-const PreviewTab = ({ selectedDatasets: externalSelectedDatasets = [], onSelectedDatasetsChange }) => {
-    const [localSelectedDatasets, setLocalSelectedDatasets] = useState([]);
+const PreviewTab = () => {
+  const [selectedDatasets, setSelectedDatasets] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedModel, setSelectedModel] = useState("2D_versatile_fluo");
   const [channels, setChannels] = useState([]);
   const [selectedChannel, setSelectedChannel] = useState(0);
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [imageMeta, setImageMeta] = useState({ sizeZ: 1, sizeT: 1 });
-
-    const selectedDatasets = onSelectedDatasetsChange ? externalSelectedDatasets : localSelectedDatasets;
+  const [annotationSets, setAnnotationSets] = useState([]);
+  const [setsLoading, setSetsLoading] = useState(false);
+  const [selectedAnnotationSet, setSelectedAnnotationSet] = useState(null);
 
   // Helper to extract ID from string like "dataset-123"
   const getDatasetId = (selection) => {
@@ -38,12 +32,7 @@ const PreviewTab = ({ selectedDatasets: externalSelectedDatasets = [], onSelecte
   const datasetId = getDatasetId(selectedDatasets);
 
   const handleDatasetChange = (newSelection) => {
-      const nextSelection = sanitizeDatasetSelection(newSelection);
-      if (onSelectedDatasetsChange) {
-          onSelectedDatasetsChange(nextSelection);
-      } else {
-          setLocalSelectedDatasets(nextSelection);
-      }
+      setSelectedDatasets(newSelection);
       setSelectedImage(null);
       setChannels([]);
       setSelectedChannel(0);
@@ -54,6 +43,22 @@ const PreviewTab = ({ selectedDatasets: externalSelectedDatasets = [], onSelecte
       setSelectedImage(img);
       setSelectedChannel(0);
   };
+
+  // Fetch annotation sets when dataset changes
+  useEffect(() => {
+    if (!datasetId) {
+      setAnnotationSets([]);
+      return;
+    }
+    setSetsLoading(true);
+    listManifests("dataset", datasetId)
+      .then((resp) => {
+        const sets = (resp.manifests || []).map((m) => ({ ...m, id: m.set_id }));
+        setAnnotationSets(sets);
+      })
+      .catch(() => setAnnotationSets([]))
+      .finally(() => setSetsLoading(false));
+  }, [datasetId]);
 
   // Fetch channels when image changes
   useEffect(() => {
@@ -96,16 +101,63 @@ const PreviewTab = ({ selectedDatasets: externalSelectedDatasets = [], onSelecte
                     onChange={handleDatasetChange}
                     multiSelect={false}
                     allowedCategories={["datasets"]}
-                    buttonText={selectedDatasets.length ? "1 selected" : "Select Dataset"}
+                    buttonText={selectedDatasets.length ? `${selectedDatasets.length} selected` : "Select Dataset"}
                 />
              </Card>
              
              <Card>
-                 <ModelSelector 
+                 <ModelSelector
                     selectedModel={selectedModel}
                     onSelect={setSelectedModel}
                  />
              </Card>
+
+             {(setsLoading || annotationSets.length > 0) && (
+               <Card>
+                 {setsLoading ? (
+                   <p className="bp5-text-muted" style={{ fontSize: 13 }}>Loading annotation sets…</p>
+                 ) : (
+                   <div>
+                     <h6 style={{ margin: "0 0 8px 0" }}>Annotation Sets</h6>
+                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                       {annotationSets.map((s) => {
+                         const isSelected = selectedAnnotationSet?.id === s.id;
+                         return (
+                           <div
+                             key={s.id}
+                             onClick={() =>
+                               setSelectedAnnotationSet(isSelected ? null : s)
+                             }
+                             style={{
+                               display: "flex",
+                               justifyContent: "space-between",
+                               alignItems: "center",
+                               padding: "8px 12px",
+                               background: isSelected ? "#d1e7ff" : "#f5f5f5",
+                               border: isSelected
+                                 ? "1px solid #4a90d9"
+                                 : "1px solid transparent",
+                               borderRadius: 4,
+                               fontSize: 13,
+                               cursor: "pointer",
+                             }}
+                           >
+                             <span>{s.name || `Set #${s.id}`}</span>
+                             {s.description && (
+                               <span
+                                 style={{ fontSize: 11, color: "#888", marginLeft: 8 }}
+                               >
+                                 {s.description}
+                               </span>
+                             )}
+                           </div>
+                         );
+                       })}
+                     </div>
+                   </div>
+                 )}
+               </Card>
+             )}
 
              {channels.length > 1 && (
                  <Card>
@@ -132,12 +184,13 @@ const PreviewTab = ({ selectedDatasets: externalSelectedDatasets = [], onSelecte
              <Card className="flex-1 flex flex-col min-h-0 min-w-0 pb-0 shadow-none border">
                  <h5 className="bp5-heading mb-2">Preview</h5>
                  <div className="flex-1 min-h-0 mt-2">
-                   <PreviewViewer 
+                   <PreviewViewer
                     image={selectedImage}
                     model={selectedModel}
                     channel={selectedChannel}
                     channels={channels}
                     imageMeta={imageMeta}
+                    annotationSetId={selectedAnnotationSet?.set_id}
                  />
                  </div>
              </Card>

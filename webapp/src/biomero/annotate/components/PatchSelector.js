@@ -1,101 +1,167 @@
 import React from "react";
 import { Button, Card, Elevation } from "@blueprintjs/core";
 
-const getPatchPreviewStyle = (patch, image) => {
-  const imageWidth = Number(image?.sizeX || patch.imageWidth || patch.width || 1);
-  const imageHeight = Number(image?.sizeY || patch.imageHeight || patch.height || 1);
-  const patchWidth = Number(patch.width || 1);
-  const patchHeight = Number(patch.height || 1);
-  const offsetX = Number(patch.x || 0);
-  const offsetY = Number(patch.y || 0);
+const getPatchPreviewStyle = (patch, imageWidth, imageHeight) => {
+  const pW = Number(patch.patch_width || 1);
+  const pH = Number(patch.patch_height || 1);
+  const oX = Number(patch.patch_x || 0);
+  const oY = Number(patch.patch_y || 0);
+  const iW = Number(imageWidth || 1);
+  const iH = Number(imageHeight || 1);
 
   return {
-    width: `${(imageWidth / patchWidth) * 100}%`,
-    height: `${(imageHeight / patchHeight) * 100}%`,
-    marginLeft: `-${(offsetX / patchWidth) * 100}%`,
-    marginTop: `-${(offsetY / patchHeight) * 100}%`,
+    width: `${(iW / pW) * 100}%`,
+    height: `${(iH / pH) * 100}%`,
+    marginLeft: `-${(oX / pW) * 100}%`,
+    marginTop: `-${(oY / pH) * 100}%`,
     maxWidth: "none",
   };
 };
 
+/**
+ * Displays patches for the current image with thumbnail previews.
+ *
+ * Props:
+ *   patches: array of unit objects where is_patch === true for the selected image
+ *   selectedPatchIndex: index of the currently selected patch (in the full units array)
+ *   imageId: current image ID (for thumbnail URL)
+ *   imageWidth: image width in pixels
+ *   imageHeight: image height in pixels
+ *   onSelectPatch: (unitIndex) => void
+ *   onAddPatch: () => void
+ *   onRemovePatch: (unitIndex) => void — optional, for removing patches
+ */
 const PatchSelector = ({
-  patches,
-  imagesById,
-  thumbnails,
-  selectedPatchId,
-  onSelect,
+  patches = [],
+  selectedPatchIndex,
+  imageId,
+  imageWidth,
+  imageHeight,
+  onSelectPatch,
   onAddPatch,
   onRemovePatch,
-  totalAnnotations,
-  annotationCounts,
 }) => {
+  const thumbnailUrl = imageId
+    ? `/webgateway/render_thumbnail/${imageId}/96/`
+    : null;
+
   if (patches.length === 0) {
     return (
-      <div className="flex flex-col gap-3 p-2 border rounded bg-white">
-        <div className="text-sm text-gray-500">No patches yet. Generate the first patch to start patch-based annotation.</div>
-        <Button icon="add" intent="primary" onClick={onAddPatch}>
-          Add New Patch
+      <div style={{ padding: 8 }}>
+        <p style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
+          No patches for this image.
+        </p>
+        <Button icon="add" small onClick={onAddPatch}>
+          Add Patch
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3 min-h-0">
-      <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
-        <span>{`${patches.length} patches`}</span>
-        <span>{`${totalAnnotations} total annotations`}</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          fontSize: 11,
+          color: "#888",
+        }}
+      >
+        <span>{patches.length} patches</span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 overflow-y-auto p-2 border rounded bg-white max-h-[400px]">
-        {patches.map((patch, index) => {
-          const image = imagesById[String(patch.imageId)] || null;
-          const annotationCount = annotationCounts[String(patch.id)] || 0;
-          const thumbnailSrc = thumbnails[patch.imageId];
-
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 6,
+          maxHeight: 300,
+          overflowY: "auto",
+        }}
+      >
+        {patches.map((patch, i) => {
+          const isSelected = patch._unitIndex === selectedPatchIndex;
           return (
             <Card
-              key={patch.id}
+              key={patch._unitIndex}
               interactive
-              elevation={String(selectedPatchId) === String(patch.id) ? Elevation.TWO : Elevation.ZERO}
-              className={`p-2 cursor-pointer flex flex-col gap-2 ${
-                String(selectedPatchId) === String(patch.id)
-                  ? "bg-blue-100 border-blue-500 border"
-                  : "hover:bg-gray-50"
-              }`}
-              onClick={() => onSelect(patch)}
+              elevation={isSelected ? Elevation.TWO : Elevation.ZERO}
+              style={{
+                padding: 6,
+                cursor: "pointer",
+                background: isSelected ? "#e8f0fe" : undefined,
+                border: isSelected ? "1px solid #4a90d9" : "1px solid #ddd",
+              }}
+              onClick={() => onSelectPatch(patch._unitIndex)}
             >
-              <div className="w-full aspect-square bg-gray-100 rounded overflow-hidden relative">
-                <Button
-                  icon="cross"
-                  minimal
-                  small
-                  className="!absolute top-1 right-1 z-10 bg-white/90"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onRemovePatch(patch);
-                  }}
-                />
-                {thumbnailSrc ? (
-                  <img src={thumbnailSrc} alt={patch.imageName || `Patch ${index + 1}`} style={getPatchPreviewStyle(patch, image)} />
+              <div
+                style={{
+                  width: "100%",
+                  aspectRatio: "1",
+                  background: "#f0f0f0",
+                  borderRadius: 4,
+                  overflow: "hidden",
+                  position: "relative",
+                  marginBottom: 4,
+                }}
+              >
+                {onRemovePatch && (
+                  <Button
+                    icon="cross"
+                    minimal
+                    small
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      right: 2,
+                      zIndex: 10,
+                      background: "rgba(255,255,255,0.9)",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemovePatch(patch._unitIndex);
+                    }}
+                  />
+                )}
+                {thumbnailUrl ? (
+                  <img
+                    src={thumbnailUrl}
+                    alt={`Patch ${i + 1}`}
+                    style={getPatchPreviewStyle(patch, imageWidth, imageHeight)}
+                  />
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-400">No Thumb</div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      fontSize: 10,
+                      color: "#aaa",
+                    }}
+                  >
+                    No preview
+                  </div>
                 )}
               </div>
-
-              <div className="text-xs font-medium truncate" title={patch.imageName || image?.name || `Image ${patch.imageId}`}>
-                {patch.imageName || image?.name || `Image ${patch.imageId}`}
+              <div style={{ fontSize: 11, fontWeight: 500 }}>
+                Patch {i + 1}
               </div>
-              <div className="text-[11px] text-gray-500">{`Patch ${index + 1} · ${patch.width}x${patch.height}`}</div>
-              <div className="text-[11px] text-gray-500">{`x:${patch.x}, y:${patch.y}`}</div>
-              <div className="text-[11px] text-gray-600">{`${annotationCount} annotations`}</div>
+              <div style={{ fontSize: 10, color: "#888" }}>
+                {patch.patch_width}x{patch.patch_height} at ({patch.patch_x},{patch.patch_y})
+              </div>
+              <div style={{ fontSize: 10, color: patch.processed ? "#0d8050" : "#888" }}>
+                {patch.processed ? "✓ Done" : "Pending"}
+              </div>
             </Card>
           );
         })}
       </div>
 
-      <Button icon="add" onClick={onAddPatch}>
-        Add New Patch
+      <Button icon="add" small onClick={onAddPatch}>
+        Add Patch
       </Button>
     </div>
   );
