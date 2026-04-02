@@ -166,6 +166,7 @@ def run_workflow_script(request, conn=None, **kwargs):
             "batchEnabled",   # Frontend flag (not sent to script)
             "batchCount",     # Frontend calculated (not sent to script)
             "batchSize",      # Converted to Batch_Size for script
+            "custom_model",   # Handled separately below
         ]
         inputs = {
             f"{workflow_name}_|_{key}": wrap(value)
@@ -195,6 +196,11 @@ def run_workflow_script(request, conn=None, **kwargs):
             }
         )
         
+        # Add custom model selection if provided
+        custom_model = params.get("custom_model")
+        if custom_model:
+            inputs[f"{workflow_name}_|_custom_model"] = wrap(custom_model)
+
         # Remove None values for non-batched workflows
         inputs = {k: v for k, v in inputs.items() if v is not None}
         logger.debug(inputs)
@@ -427,6 +433,7 @@ def prepare_workflow_parameters(workflow_name, params):
     return converted_params
 
 
+
 @login_required()
 def get_slurm_status(request, conn=None, **kwargs):
     """
@@ -462,27 +469,39 @@ def get_slurm_status(request, conn=None, **kwargs):
         
         # Extract workflow versions from params
         workflow_versions = {}
-        
-        # Parse the params inputs to find workflow versions
+        workflow_models = {}
+
+        # Parse the params inputs to find workflow versions and models
         if hasattr(params, 'inputs') and params.inputs:
             for key, param in params.inputs.items():
                 # Look for version parameters (e.g., "stardist_Version", "cellpose_Version")
                 if key.endswith('_Version') and hasattr(param, 'values') and param.values:
                     # Extract workflow name (remove "_Version" suffix)
                     workflow_name = key.replace('_Version', '')
-                    
+
                     # Extract available versions from the values list
                     versions = []
                     if hasattr(param.values, '_val'):
                         for version_obj in param.values._val:
                             if hasattr(version_obj, '_val'):
                                 versions.append(version_obj._val)
-                    
+
                     if versions:
                         workflow_versions[workflow_name] = {
                             'available_versions': versions,
                             'latest_version': versions[0] if versions else None  # Assume first is latest
                         }
+
+                # Look for model parameters (e.g., "cellpose_Models")
+                elif key.endswith('_Models') and hasattr(param, 'values') and param.values:
+                    workflow_name = key.replace('_Models', '')
+                    models = []
+                    if hasattr(param.values, '_val'):
+                        for model_obj in param.values._val:
+                            if hasattr(model_obj, '_val'):
+                                models.append(model_obj._val)
+                    if models:
+                        workflow_models[workflow_name] = models
         
         # Count workflow statuses for better messaging
         total_workflows = len(workflow_versions)
@@ -501,7 +520,8 @@ def get_slurm_status(request, conn=None, **kwargs):
             "last_checked": datetime.datetime.now().isoformat(),
             "icon": "tick-circle",
             "intent": "success",
-            "workflow_versions": workflow_versions
+            "workflow_versions": workflow_versions,
+            "workflow_models": workflow_models
         }
         
     except Exception as e:

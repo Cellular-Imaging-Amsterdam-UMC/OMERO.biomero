@@ -15,6 +15,7 @@ const WorkflowForm = () => {
   const availableVersions = workflowVersions?.available_versions || [];
   const latestVersion = workflowVersions?.latest_version;
   const slurmOnline = state.slurmStatus === "online";
+  const availableModels = state.workflowModels?.[workflowName] || [];
 
   // Determine version status
   const getVersionStatus = (version) => {
@@ -256,8 +257,28 @@ const WorkflowForm = () => {
         </FormGroup>
       )}
       
+      {/* Custom model selector - only shown when models are available on SLURM */}
+      {availableModels.length > 0 && (
+        <FormGroup
+          label="Custom Model"
+          labelInfo="(optional)"
+          helperText="Select a custom-trained model from the SLURM cluster"
+        >
+          <HTMLSelect
+            value={state.formData?.custom_model || ""}
+            onChange={(e) => handleInputChange("custom_model", e.target.value)}
+            fill
+          >
+            <option value="">Use default model</option>
+            {availableModels.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </HTMLSelect>
+        </FormGroup>
+      )}
+
       <Divider />
-      
+
       {renderFormFields()}
     </form>
   );
