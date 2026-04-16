@@ -141,6 +141,8 @@ def run_workflow_script(request, conn=None, **kwargs):
         version = params.get("version")
         # EXPERIMENTAL: ZARR format support
         use_zarr = params.get("useZarrFormat", False)
+        # Always default to 0.4 so omero-cli-zarr doesn't fall back to 0.5 (Zarr v3)
+        ome_zarr_version = params.get("omeZarrVersion", transfer.OME_ZARR_VERSION_0_4)
         # Batch processing parameters
         batch_enabled = params.get("batchEnabled", False)
         batch_count = params.get("batchCount", 1)
@@ -166,6 +168,7 @@ def run_workflow_script(request, conn=None, **kwargs):
             "cytomine_public_key",
             "version",
             "useZarrFormat",  # EXPERIMENTAL: ZARR format support
+            "omeZarrVersion",  # handled explicitly below
             "batchEnabled",   # Frontend flag (not sent to script)
             "batchCount",     # Frontend calculated (not sent to script)
             "batchSize",      # Converted to Batch_Size for script
@@ -183,6 +186,7 @@ def run_workflow_script(request, conn=None, **kwargs):
                 transfer.DATA_TYPE: wrap(data_type),
                 workflow.EMAIL: rbool(out_email),
                 workflow.USE_ZARR_FORMAT: rbool(use_zarr),  # EXPERIMENTAL
+                transfer.OME_VERSION: wrap(ome_zarr_version),  # always explicit, default 0.4
                 workflow_batched.BATCH_SIZE: wrap(batch_size) if batch_enabled else None,  # Only for batched script
                 workflow.SELECT_IMPORT: rbool(True),
                 workflow.OUTPUT_PARENT: rbool(import_zp),
