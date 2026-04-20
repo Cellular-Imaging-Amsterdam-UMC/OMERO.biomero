@@ -69,6 +69,16 @@ const WorkflowOutput = ({ onSelectionChange }) => {
       handleInputChange("selectedDatasets", inputDatasetNames);
     }
   }, [state.inputDatasets]);
+  
+  // Check output selection state whenever formData changes
+  useEffect(() => {
+    const hasSelection = outputOptions.some((opt) =>
+      Array.isArray(state.formData[opt])
+        ? state.formData[opt].length > 0
+        : !!state.formData[opt]
+    );
+    setHasOutputSelection(hasSelection);
+  }, [state.formData]);
 
   const validateRenamePattern = (pattern) => {
     

@@ -15,6 +15,7 @@ import {
   fetchThumbnails,
   fetchImages,
   fetchPlateImages,
+  fetchPlateGridData,
   createContainer,
   fetchGroupMappings,
   postGroupMappings,
@@ -496,6 +497,34 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const loadPlateGridData = async (plateId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const plateData = await fetchPlateGridData(plateId);
+      
+      // Calculate well information from grid
+      const totalPositions = plateData.rowlabels.length * plateData.collabels.length;
+      const wellsWithImages = plateData.grid.flat().filter(cell => cell !== null).length;
+      
+      // Format well count info
+      const plateFormat = `${plateData.rowlabels.length}×${plateData.collabels.length}`;
+      const wellCount = wellsWithImages === totalPositions 
+        ? `${totalPositions} wells (${plateFormat})`
+        : `${wellsWithImages}/${totalPositions} wells (${plateFormat})`;
+
+      return {
+        plateData,
+        wellCount,
+      };
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadGroups = async () => {
     setLoading(true);
     setError(null);
@@ -680,6 +709,7 @@ export const AppProvider = ({ children }) => {
         needsSlurmCheck,
         loadOmeroTreeData,
         loadFolderData,
+        loadPlateGridData,
         loadGroups,
         loadScripts,
         fetchScriptDetails,

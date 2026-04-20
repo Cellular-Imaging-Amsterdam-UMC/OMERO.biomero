@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { FormGroup, InputGroup, NumericInput, Switch, HTMLSelect, Intent, Tag, Callout, Divider, Tooltip } from "@blueprintjs/core";
+import { FormGroup, InputGroup, NumericInput, Switch, HTMLSelect, Intent, Tag, Callout, Divider, Tooltip, Icon } from "@blueprintjs/core";
 import { useAppContext } from "../../AppContext";
 
 const WorkflowForm = () => {
@@ -28,6 +28,22 @@ const WorkflowForm = () => {
       return { intent: Intent.WARNING, message: `Outdated version (latest: ${latestVersion})` };
     }
     return { intent: Intent.SUCCESS, message: "Version available" };
+  };
+
+  // Helper function to check workflow flags from config
+  const getWorkflowFlags = (workflowName) => {
+    const config = state.config;
+    if (!config || !config.UI) return { isPlateWorkflow: false, isZarrWorkflow: false };
+    
+    const plateWorkflows = config.UI.plate_workflows ? 
+      JSON.parse(config.UI.plate_workflows || '[]') : [];
+    const isPlateWorkflow = plateWorkflows.includes(workflowName);
+    
+    const zarrWorkflows = config.UI.zarr_workflows ? 
+      JSON.parse(config.UI.zarr_workflows || '[]') : [];
+    const isZarrWorkflow = zarrWorkflows.includes(workflowName);
+    
+    return { isPlateWorkflow, isZarrWorkflow };
   };
 
   // Initialize selected version
@@ -73,6 +89,24 @@ const WorkflowForm = () => {
     }
   }, [selectedVersion]);
 
+  // Force ZARR format when workflow requires it (plate workflows or admin-configured ZARR workflows)
+  useEffect(() => {
+    if (workflowName) {
+      const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflowName);
+      
+      if (isPlateWorkflow || isZarrWorkflow) {
+        // Force ZARR for plate workflows or admin-configured ZARR workflows
+        updateState({
+          formData: {
+            ...state.formData,
+            Format: "ZARR", // Force zarr format for configured workflows
+            useZarrFormat: true, // Force zarr backend flag for configured workflows
+          },
+        });
+      }
+    }
+  }, [workflowName, state.config]);
+
   const handleInputChange = (id, value) => {
     updateState({
       formData: {
@@ -88,9 +122,36 @@ const WorkflowForm = () => {
       .map((input) => {
         const { id, name, description, type, optional } = input;
         const defaultValue = input["default-value"];
+        const isFormatField = id === "Format";
+        const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflowName);
+        const requiresZarr = isPlateWorkflow || isZarrWorkflow;
 
         switch (type) {
           case "String":
+            // Special handling for Format field when workflow requires ZARR
+            if (isFormatField && requiresZarr) {
+              return (
+                <FormGroup
+                  key={id}
+                  label={name}
+                  labelFor={id}
+                  helperText="Format is locked to ZARR for admin-configured workflows"
+                >
+                  <InputGroup
+                    id={id}
+                    value="ZARR"
+                    readOnly={true}
+                    disabled={true}
+                    intent="primary"
+                    rightElement={
+                      <Tooltip content="This workflow requires ZARR format (admin-configured)">
+                        <Icon icon="lock" intent="primary" />
+                      </Tooltip>
+                    }
+                  />
+                </FormGroup>
+              );
+            }
             return (
               <FormGroup
                 key={id}

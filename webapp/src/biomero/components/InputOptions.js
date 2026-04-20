@@ -262,37 +262,7 @@ const InputOptions = () => {
           </div>
         )}
       </FormGroup>
-      
-      <Divider />
-      
-      {/* ZARR Format Option - Moved to bottom as experimental */}
-      <FormGroup
-        label="Experimental Input Format"
-        helperText="⚠️ Advanced users only - can break your workflow if used incorrectly"
-      >
-        <Switch
-          id="useZarrFormat"
-          checked={state.formData?.useZarrFormat || false}
-          onChange={(e) => handleInputChange('useZarrFormat', e.target.checked)}
-          label={
-            <Tooltip
-              content="Skip TIFF conversion and use ZARR format directly. Only use if your workflow explicitly supports ZARR input and you understand the implications."
-              placement="top"
-              intent={Intent.DANGER}
-            >
-              <span>Use ZARR Format (Experimental) ⚠️</span>
-            </Tooltip>
-          }
-        />
-        
-        {state.formData?.useZarrFormat && (
-          <Callout intent={Intent.DANGER} className="mt-2">
-            <strong>EXPERIMENTAL FEATURE:</strong> You are bypassing standard TIFF conversion. 
-            This may cause workflow failures if your selected workflow doesn't support ZARR input. 
-            Only proceed if you know your workflow explicitly supports ZARR format.
-          </Callout>
-        )}
-      </FormGroup>
+
     </form>
   );
 };
