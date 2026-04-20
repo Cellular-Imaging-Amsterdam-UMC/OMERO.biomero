@@ -52,7 +52,7 @@ setup(
     install_requires=[
         "omero-web>=5.31.0,<6",
         "pyjwt>=2.12.1,<3",
-        "biomero==2.5.0a1",
+        "biomero>=2.5.0,<3",
         "configupdater>=3.2,<4",
         "biomero-importer>=1.2.1,<2",
     ],
