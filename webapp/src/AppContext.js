@@ -23,7 +23,93 @@ import {
 } from "./apiService";
 import { getDjangoConstants } from "./constants";
 import { transformStructure, extractGroups } from "./utils";
-import { OverlayToaster, Position } from "@blueprintjs/core";
+import { OverlayToaster, Position, Collapse, Divider, Icon } from "@blueprintjs/core";
+
+// Fields that are infrastructure/output config, not workflow-specific parameters
+const INFRA_PARAMS = new Set([
+  'IDs', 'Data_Type', 'workflowMode', 'plateMode', 'useZarrFormat', 'Format',
+  'active_group_id', 'receiveEmail', 'importAsZip', 'uploadCsv',
+  'attachToOriginalImages', 'selectedDatasets', 'selectedScreens', 'renamePattern', 'enableRename',
+  'batchEnabled', 'batchCount', 'batchSize', 'version',
+  'cytomine_host', 'cytomine_public_key', 'cytomine_private_key',
+  'cytomine_id_project', 'cytomine_id_software',
+]);
+
+const MAX_INPUT_IDS_SHOWN = 20;
+
+const WorkflowSubmitToast = ({ workflowName, startedAt, params }) => {
+  const [openSection, setOpenSection] = React.useState(null);
+  const toggle = (key) => setOpenSection((prev) => (prev === key ? null : key));
+
+  const outputLines = [];
+  if (params.selectedDatasets?.length) {
+    const pattern = params.enableRename && params.renamePattern ? ` as "${params.renamePattern}"` : "";
+    outputLines.push(`Dataset: ${params.selectedDatasets.join(", ")}${pattern}`);
+  }
+  if (params.selectedScreens?.length) {
+    outputLines.push(`Screen: ${params.selectedScreens.join(", ")}`);
+  }
+  if (params.importAsZip) outputLines.push("Zip archive");
+  if (params.uploadCsv) outputLines.push("OMERO tables (CSV)");
+  if (params.attachToOriginalImages) outputLines.push("Attached to input images");
+  if (params.receiveEmail) outputLines.push("E-mail on completion");
+
+  const wfParams = Object.entries(params).filter(([k]) => !INFRA_PARAMS.has(k));
+  const inputCount = params.IDs?.length || 0;
+  const dataType = params.Data_Type || "Image";
+  const batchInfo = params.batchEnabled
+    ? `${params.batchCount} jobs × ${params.batchSize} ${dataType}s`
+    : null;
+
+  const SectionRow = ({ label, sectionKey, children }) => (
+    <div className="mt-1">
+      <div
+        className="flex items-center gap-1 cursor-pointer select-none"
+        onClick={() => toggle(sectionKey)}
+      >
+        <Icon icon={openSection === sectionKey ? "chevron-down" : "chevron-right"} size={11} />
+        <span className="bp5-text-small font-semibold">{label}</span>
+      </div>
+      <Collapse isOpen={openSection === sectionKey}>
+        <div className="ml-3 mt-0.5 bp5-text-small opacity-80">{children}</div>
+      </Collapse>
+    </div>
+  );
+
+  return (
+    <div className="min-w-64">
+      <div><strong>{workflowName}</strong> submitted successfully</div>
+      {startedAt && <div className="bp5-text-small mt-0.5 opacity-80">Started at {startedAt}</div>}
+
+      {outputLines.length > 0 && (
+        <SectionRow label={`Output (${outputLines.length})`} sectionKey="output">
+          {outputLines.map((l, i) => <div key={i}>• {l}</div>)}
+        </SectionRow>
+      )}
+
+      <SectionRow label={`Input: ${inputCount} ${dataType}${inputCount !== 1 ? "s" : ""}`} sectionKey="input">
+        {params.IDs?.slice(0, MAX_INPUT_IDS_SHOWN).map((id) => <div key={id}>• {dataType} #{id}</div>)}
+        {inputCount > MAX_INPUT_IDS_SHOWN && <div className="opacity-60">…and {inputCount - MAX_INPUT_IDS_SHOWN} more</div>}
+        {params.useZarrFormat && <div>• Format: ZARR</div>}
+        {batchInfo && <div>• Batch: {batchInfo}</div>}
+      </SectionRow>
+
+      {wfParams.length > 0 && (
+        <SectionRow label={`Parameters (${wfParams.length})`} sectionKey="params">
+          {params.version && <div>• version: <strong>{params.version}</strong></div>}
+          {wfParams.map(([k, v]) => (
+            <div key={k}>• {k}: <strong>{String(v)}</strong></div>
+          ))}
+        </SectionRow>
+      )}
+
+      <Divider className="my-1" />
+      <div className="bp5-text-small">
+        <strong>⚠ Do not log out or close this browser tab.</strong> Your OMERO session must stay active for results to be automatically imported. Logging out risks data loss and wastes compute time.
+      </div>
+    </div>
+  );
+};
 
 // Create the context
 const AppContext = createContext();
@@ -256,10 +342,13 @@ export const AppProvider = ({ children }) => {
 
       const message = response?.message || "Workflow executed successfully.";
 
+      // Use local browser time with timezone label (server time is UTC, browser clock may differ)
+      const startedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
+
       toaster.show({
         intent: "success",
         icon: "tick-circle",
-        message: `${workflowName}: ${message}`,
+        message: <WorkflowSubmitToast workflowName={workflowName} startedAt={startedAt} params={params} />,
         timeout: 0,
       });
     } catch (err) {
