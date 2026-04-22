@@ -153,17 +153,27 @@ const WorkflowOutput = ({ onSelectionChange }) => {
 
   const handleExampleClick = (pattern) => {
     setRenamePattern(pattern);
-    handleInputChange("renamePattern", pattern);
-    
+
     // Validate pattern
     const validation = validateRenamePattern(pattern);
     setRenameValidation(validation);
-    
-    // Auto-enable rename if it's currently disabled
-    if (!state.formData.enableRename) {
-      handleInputChange("enableRename", true);
-    }
-    
+
+    // Apply renamePattern + enableRename in a single update to avoid stale-closure clobber
+    const updatedFormData = {
+      ...state.formData,
+      renamePattern: pattern,
+      enableRename: true,
+    };
+    updateState({ formData: updatedFormData });
+
+    // Recompute output selection with the merged data
+    const hasSelection = outputOptions.some((opt) =>
+      Array.isArray(updatedFormData[opt])
+        ? updatedFormData[opt].length > 0
+        : !!updatedFormData[opt]
+    );
+    setHasOutputSelection(hasSelection);
+
     // Focus the input after clicking example
     if (renameInputRef.current) {
       renameInputRef.current.focus();
