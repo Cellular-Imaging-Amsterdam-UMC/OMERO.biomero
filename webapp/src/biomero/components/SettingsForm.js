@@ -17,8 +17,7 @@ import CollapsibleSection from "./CollapsibleSection";
 import ConfigSection from "./ConfigSection";
 import ModelCard from "./ModelCard.js";
 import ConverterCard from "./ConverterCard.js";
-import { checkModelVersions } from "../../apiService";
-import { clearGitHubCache } from "../../apiService";
+import { checkModelVersions, clearGitHubCache, fetchDescriptorName } from "../../apiService";
 
 const SettingsForm = () => {
   const { 
@@ -251,10 +250,29 @@ const SettingsForm = () => {
   };
 
   // Handle when user finishes editing repo URL
-  const handleRepoUrlBlur = (modelIndex) => {
+  const handleRepoUrlBlur = async (modelIndex) => {
     if (!settingsForm?.MODELS?.[modelIndex]?.repo) return;
     
     const model = settingsForm.MODELS[modelIndex];
+
+    // Auto-populate name from descriptor.json if the name field is still empty
+    if (!model.name) {
+      const descriptorName = await fetchDescriptorName(model.repo);
+      if (descriptorName) {
+        // Ensure uniqueness among existing model names (excluding this slot)
+        const existingNames = (settingsForm.MODELS || [])
+          .filter((_, i) => i !== modelIndex)
+          .map((m) => m.name)
+          .filter(Boolean);
+        let uniqueName = descriptorName;
+        let counter = 2;
+        while (existingNames.includes(uniqueName)) {
+          uniqueName = `${descriptorName}_${counter++}`;
+        }
+        handleModelChange(modelIndex, "name", uniqueName);
+      }
+    }
+
     recheckModelVersion(modelIndex, model);
   };
 
@@ -390,6 +408,17 @@ const SettingsForm = () => {
     setSettingsForm((prev) => {
       const updatedModels = prev.MODELS.filter((_, i) => i !== index);
       return { ...prev, MODELS: updatedModels };
+    });
+    // Rebuild versionStatus: remove the deleted entry and shift higher indices down
+    setVersionStatus((prev) => {
+      const updated = {};
+      Object.entries(prev).forEach(([key, val]) => {
+        const i = parseInt(key);
+        if (i < index) updated[i] = val;
+        else if (i > index) updated[i - 1] = val;
+        // i === index is dropped
+      });
+      return updated;
     });
   };
 

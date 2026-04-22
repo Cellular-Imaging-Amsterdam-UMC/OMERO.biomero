@@ -412,6 +412,31 @@ export const extractGitHubInfo = (repoUrl) => {
   };
 };
 
+/**
+ * Fetches the name field from a descriptor.json in a GitHub repository.
+ * Uses raw.githubusercontent.com (no API rate limits).
+ * @param {string} repoUrl - GitHub repository URL (e.g., https://github.com/owner/repo/tree/v1.0.0)
+ * @returns {Promise<string|null>} The name field from descriptor.json, lowercased and slugified, or null
+ */
+export const fetchDescriptorName = async (repoUrl) => {
+  const info = extractGitHubInfo(repoUrl);
+  if (!info?.owner || !info?.repo) return null;
+
+  const ref = info.currentVersion || 'main';
+  const rawUrl = `https://raw.githubusercontent.com/${info.owner}/${info.repo}/${ref}/descriptor.json`;
+
+  try {
+    const response = await fetch(rawUrl);
+    if (!response.ok) return null;
+    const descriptor = await response.json();
+    if (!descriptor?.name) return null;
+    // Slugify: lowercase, spaces/hyphens → underscores, strip non-alphanumeric except _
+    return descriptor.name.toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '');
+  } catch {
+    return null;
+  }
+};
+
 // GitHub API persistent caching utilities
 const DEFAULT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
 const GITHUB_CACHE_PREFIX = 'github_';
