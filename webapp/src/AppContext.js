@@ -29,7 +29,7 @@ import { OverlayToaster, Position, Collapse, Divider, Icon } from "@blueprintjs/
 const INFRA_PARAMS = new Set([
   'IDs', 'Data_Type', 'workflowMode', 'plateMode', 'useZarrFormat', 'Format',
   'active_group_id', 'receiveEmail', 'importAsZip', 'uploadCsv',
-  'attachToOriginalImages', 'selectedDatasets', 'selectedScreens', 'renamePattern', 'enableRename',
+  'attachToOriginalImages', 'selectedDatasets', 'selectedDatasetId', 'selectedScreens', 'selectedScreenId', 'renamePattern', 'enableRename',
   'batchEnabled', 'batchCount', 'batchSize', 'version',
   'cytomine_host', 'cytomine_public_key', 'cytomine_private_key',
   'cytomine_id_project', 'cytomine_id_software',
@@ -130,6 +130,14 @@ export const AppProvider = ({ children }) => {
     omeroFileTreeSelection: [],
     localFileTreeSelection: [],
     groupFolderMappings: {},
+    // Persisted UI state for the workflow input step (survives Back/Next navigation)
+    workflowInputState: {
+      selectedImageIds: [],
+      searchQuery: "",
+      activeTab: "grid",
+      zoom: 7,
+      selectedPlates: [],
+    },
     // Admin state tracking
     hasUnsavedSettingsChanges: false,
     lastSettingsSaveTime: null,
@@ -221,10 +229,11 @@ export const AppProvider = ({ children }) => {
         Object.assign(thumbnailsMap, fetchedThumbnails); // Merge batch results into the thumbnailsMap
       }
 
-      // Update state with the merged thumbnails map
-      updateState({
-        thumbnails: { ...state.thumbnails, ...thumbnailsMap }, // Merge with existing thumbnails
-      });
+      // Update state with the merged thumbnails map (functional update to avoid race condition)
+      setState(prev => ({
+        ...prev,
+        thumbnails: { ...prev.thumbnails, ...thumbnailsMap },
+      }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -282,16 +291,22 @@ export const AppProvider = ({ children }) => {
         }
 
         // Store images in the parent structure in state.omeroFileTreeData
-        updateState({
+        // Use functional setState to avoid race condition when loading multiple datasets concurrently
+        setState(prev => ({
+          ...prev,
           omeroFileTreeData: {
-            ...state.omeroFileTreeData,
+            ...prev.omeroFileTreeData,
             [index]: {
               ...dataset,
-              children: allImages, // Attach fetched images to the dataset
+              children: allImages,
             },
           },
-          images: [...(state.images || []), ...allImages],
-        });
+          images: [
+            ...new Map(
+              [...(prev.images || []), ...allImages].map((img) => [img.id, img])
+            ).values(),
+          ],
+        }));
       } else if (type === "plate") {
         const plateId = parseInt(id, 10);
         // Use our existing API service functions
@@ -304,16 +319,21 @@ export const AppProvider = ({ children }) => {
         }));
 
         // Store images in state the same way as datasets
-        updateState({
+        setState(prev => ({
+          ...prev,
           omeroFileTreeData: {
-            ...state.omeroFileTreeData,
+            ...prev.omeroFileTreeData,
             [index]: {
               ...dataset,
               children: imagesWithSource,
             },
           },
-          images: [...(state.images || []), ...imagesWithSource],
-        });
+          images: [
+            ...new Map(
+              [...(prev.images || []), ...imagesWithSource].map((img) => [img.id, img])
+            ).values(),
+          ],
+        }));
 
         // Load thumbnails for these images
         const imageIds = imagesWithSource.map((img) => img.id);

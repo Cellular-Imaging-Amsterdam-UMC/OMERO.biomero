@@ -22,6 +22,8 @@ const DatasetSelectWithPopover = ({
   placeholder = "Add new dataset name or select...",
   intent = "",
   allowedCategories = ["datasets", "plates", "screens"], // default: allow most except projects
+  tagProps = undefined, // optional: (value, index) => TagProps for per-tag styling
+  onClear = null, // optional: called when user clicks the clear-all X button
 }) => {
   const { state, updateState, toaster, loadOmeroTreeData, apiLoading } = useAppContext();
   const [isPopoverOpen, setPopoverOpen] = useState(false);
@@ -176,7 +178,20 @@ const DatasetSelectWithPopover = ({
         onChange={handleManualInputChange}
         onKeyDown={handleKeyDown}
         intent={intent}
+        tagProps={tagProps}
         rightElement={
+          <div style={{ display: "flex", alignItems: "center" }}>
+            {onClear && value?.length > 0 && (
+              <Tooltip content="Clear all">
+                <Button
+                  minimal
+                  small
+                  icon="cross"
+                  intent="danger"
+                  onClick={onClear}
+                />
+              </Tooltip>
+            )}
           <Popover
             interactionKind={PopoverInteractionKind.CLICK}
             isOpen={isPopoverOpen}
@@ -228,6 +243,7 @@ const DatasetSelectWithPopover = ({
               <Button icon="folder-open" text={buttonText} />
             </Tooltip>
           </Popover>
+          </div>
         }
       />
     </FormGroup>

@@ -9,6 +9,7 @@ import { useAppContext } from "../../../AppContext";
 import PlateWorkflowInput from "./PlateWorkflowInput";
 import PlateWorkflowOutput from "./PlateWorkflowOutput";
 import WorkflowForm from "../WorkflowForm";
+import InputOptions from "../InputOptions";
 
 const PlateWorkflowDialog = ({ 
   workflow, 
@@ -76,7 +77,21 @@ const PlateWorkflowDialog = ({
         }}
       />
 
-      {/* Step 2: Configure Workflow */}
+      {/* Step 2 (conditional): Batch Options when >1 plate selected */}
+      {(state.formData?.IDs?.length || 0) > 1 && (
+        <DialogStep
+          id="batch-options"
+          title="Batch Options"
+          panel={
+            <DialogBody>
+              <H6>Batch Processing (Optional)</H6>
+              <InputOptions itemLabel="plates" />
+            </DialogBody>
+          }
+        />
+      )}
+
+      {/* Step 2/3: Configure Workflow */}
       <DialogStep
         id="workflow-config"
         title="Configure Workflow"
