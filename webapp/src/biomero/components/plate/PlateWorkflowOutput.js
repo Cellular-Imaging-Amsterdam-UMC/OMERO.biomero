@@ -37,6 +37,7 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
     importAsZip: false,
     uploadCsv: false,
     selectedScreens: [], // Changed from selectedDatasets
+    selectedScreenId: null, // OMERO ID when selected from tree (null = typed/new)
   };
 
   useEffect(() => {
@@ -65,7 +66,8 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
         updateState({
           formData: {
             ...state.formData,
-            selectedScreens: [parentScreen.data]
+            selectedScreens: [parentScreen.data],
+            selectedScreenId: parentScreen.id,
           }
         });
         setDefaultScreenSet(true);
@@ -101,6 +103,18 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
       );
       setHasOutputSelection(hasSelection);
     }
+  };
+
+  // Atomic multi-key update — avoids stale-closure bug when updating related fields together
+  const handleFormDataUpdate = (changes) => {
+    const updatedFormData = { ...state.formData, ...changes };
+    updateState({ formData: updatedFormData });
+    const hasSelection = outputOptions.some((opt) =>
+      Array.isArray(updatedFormData[opt])
+        ? updatedFormData[opt].length > 0
+        : !!updatedFormData[opt]
+    );
+    setHasOutputSelection(hasSelection);
   };
 
   return (
@@ -196,23 +210,49 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
             tooltip="Select the OMERO screen for your workflow results."
             buttonText="Select Screen"
             placeholder="Add new screen name or select..."
-            value={state.formData.selectedScreens || []}
+            value={(state.formData.selectedScreens || []).map((name) => {
+              const id = state.formData.selectedScreenId;
+              return id ? `${name} (ID: ${id})` : name;
+            })}
             onChange={(values, type) => {
               if (type === "manual") {
-                handleInputChange(
-                  "selectedScreens",
-                  values?.length ? [values[values.length - 1]] : []
-                );
+                // Strip any "(ID: X)" suffix the user may have left in, take the last value
+                const rawName = values.length
+                  ? values[values.length - 1].replace(/\s*\(ID:\s*\d+\)$/, '').trim()
+                  : '';
+                // Look up this name in the tree — auto-attach ID if it exists
+                const matchedScreen = rawName
+                  ? Object.values(state.omeroFileTreeData || {}).find(
+                      (n) => n.category === "screens" && n.data === rawName
+                    )
+                  : null;
+                handleFormDataUpdate({
+                  selectedScreens: rawName ? [rawName] : [],
+                  selectedScreenId: matchedScreen ? matchedScreen.id : null,
+                });
               } else {
-                const selectedScreen = values.map(
-                  (screen) => state.omeroFileTreeData[screen].data
-                );
-                handleInputChange("selectedScreens", selectedScreen);
+                // Selected from tree — extract name and ID
+                const screenNode = state.omeroFileTreeData[values[0]];
+                if (screenNode) {
+                  handleFormDataUpdate({
+                    selectedScreens: [screenNode.data],
+                    selectedScreenId: screenNode.id,
+                  });
+                }
               }
             }}
             multiSelect={false}
             intent={hasOutputSelection ? "" : "danger"}
             allowedCategories={["screens"]}
+            tagProps={(val) => {
+              // Orange warning when the tag value doesn't contain "(ID: X)" — means it's a new screen
+              const isKnown = /\(ID:\s*\d+\)/.test(String(val));
+              if (isKnown) return {};
+              return {
+                intent: "warning",
+                title: "No matching screen found — a new screen will be created with this name.",
+              };
+            }}
           />
         </FormGroup>
       </form>

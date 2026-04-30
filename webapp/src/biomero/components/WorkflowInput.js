@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   DialogBody,
   H6,
@@ -23,14 +23,26 @@ import { useAppContext } from "../../AppContext";
 const WorkflowInput = () => {
   const { state, updateState, loadThumbnails, loadImagesForDataset } =
     useAppContext();
-  const [searchQuery, setSearchQuery] = useState("");
   const [filteredImages, setFilteredImages] = useState([]);
-  const [selectedImageIds, setSelectedImageIds] = useState([]);
-  const [activeTab, setActiveTab] = useState("grid"); // Tabs: "list" or "grid"
-  const [zoom, setZoom] = useState(7); // Starting size 65px, like OMERO
   const [selectedPlate, setSelectedPlate] = useState(null);
   const [plateWellCount, setPlateWellCount] = useState(null);
   const [plateGridData, setPlateGridData] = useState(null);
+
+  // Persistent state (survives Back/Next navigation)
+  const wis = state.workflowInputState || {};
+  const selectedImageIds = wis.selectedImageIds ?? [];
+  const searchQuery = wis.searchQuery ?? "";
+  const activeTab = wis.activeTab ?? "grid";
+  const zoom = wis.zoom ?? 7;
+
+  // Atomic helper — updates one or more fields in workflowInputState
+  const updateWIS = (changes) =>
+    updateState({ workflowInputState: { ...state.workflowInputState, ...changes } });
+
+  // Track previous image IDs so we can add new / remove deleted without resetting manual deselections
+  const prevImageIdsRef = useRef([]);
+  // Skip the first run of the inputMode reset effect (component mount ≠ mode change)
+  const inputModeInitRef = useRef(true);
   
   // Get input mode from formData instead of local state
   const inputMode = state.formData?.workflowMode || "images";
@@ -50,6 +62,18 @@ const WorkflowInput = () => {
     
     return { isPlateWorkflow, isZarrWorkflow };
   };
+
+  // Build imageId → dataset node lookup so each image knows its parent dataset
+  const datasetByImageId = useMemo(() => {
+    const map = {};
+    (state.inputDatasets || []).forEach((ds) => {
+      const node = state.omeroFileTreeData[ds.index];
+      if (node?.children) {
+        node.children.forEach((img) => { map[img.id] = ds; });
+      }
+    });
+    return map;
+  }, [state.inputDatasets, state.omeroFileTreeData]);
 
   // Load images when datasets change
   useEffect(() => {
@@ -75,14 +99,47 @@ const WorkflowInput = () => {
     });
   }, [state.inputDatasets]);
 
-  // Load thumbnails and initialize image selections
+  // Load thumbnails and sync image selection when images list changes
   useEffect(() => {
-    if (state.images) {
-      const imageIds = state.images.map((image) => image.id);
-      loadThumbnails(imageIds);
-      setSelectedImageIds(imageIds); // Default: all selected
+    if (!state.images) return;
+
+    const allIds = state.images.map((img) => img.id);
+    const prevIds = prevImageIdsRef.current;
+    prevImageIdsRef.current = allIds;
+
+    // Fetch only thumbnails not already cached
+    const missingIds = allIds.filter((id) => !state.thumbnails?.[String(id)]);
+    if (missingIds.length > 0) loadThumbnails(missingIds);
+
+    // Update filteredImages (respecting active search)
+    if (searchQuery) {
+      const lq = searchQuery.toLowerCase();
+      setFilteredImages(
+        state.images
+          .map((img) => ({ ...img, isDisabled: !img.name.toLowerCase().includes(lq) }))
+          .sort((a, b) => Number(a.isDisabled) - Number(b.isDisabled))
+      );
+    } else {
       setFilteredImages(state.images);
     }
+
+    if (prevIds.length === 0) {
+      // First mount — if we have stored selections keep them, otherwise select all
+      if (selectedImageIds.length === 0) {
+        updateWIS({ selectedImageIds: allIds });
+      }
+      return;
+    }
+
+    // Incremental update: keep existing selections, add new images, drop removed ones
+    const removedSet = new Set(prevIds.filter((id) => !allIds.includes(id)));
+    const addedIds = allIds.filter((id) => !prevIds.includes(id));
+    if (removedSet.size === 0 && addedIds.length === 0) return;
+    const updated = [
+      ...selectedImageIds.filter((id) => !removedSet.has(id)),
+      ...addedIds,
+    ];
+    updateWIS({ selectedImageIds: updated });
   }, [state.images]);
 
   // Fetch well count when plate is selected
@@ -145,54 +202,43 @@ const WorkflowInput = () => {
             ...image,
             isDisabled: !image.name.toLowerCase().includes(lowerQuery),
           }))
-          .sort((a, b) => Number(a.isDisabled) - Number(b.isDisabled)) // Sort disabled images to the bottom
+          .sort((a, b) => Number(a.isDisabled) - Number(b.isDisabled))
       );
     } else {
-      setFilteredImages(state.images || []); // Show all images when no query
+      setFilteredImages(state.images || []);
     }
   }, [searchQuery, state.images]);
 
   const handleToggleImage = (id) => {
-    setSelectedImageIds((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((imageId) => imageId !== id);
-      } else {
-        return [...prev, id];
-      }
-    });
+    const updated = selectedImageIds.includes(id)
+      ? selectedImageIds.filter((x) => x !== id)
+      : [...selectedImageIds, id];
+    updateWIS({ selectedImageIds: updated });
   };
 
-  const handleUncheckAll = () => setSelectedImageIds([]);
+  const handleUncheckAll = () => updateWIS({ selectedImageIds: [] });
 
-  const getAllEnabledIds = () => {
-    return filteredImages
-      .filter((image) => !image.isDisabled)
-      .map((image) => image.id);
-  };
+  const getAllEnabledIds = () =>
+    filteredImages.filter((img) => !img.isDisabled).map((img) => img.id);
 
   const handleCheckAllFiltered = () => {
     const allEnabledIds = getAllEnabledIds();
-
-    setSelectedImageIds((prev) => [...new Set([...prev, ...allEnabledIds])]);
+    updateWIS({ selectedImageIds: [...new Set([...selectedImageIds, ...allEnabledIds])] });
   };
 
   const handleCheckOnlyFiltered = () => {
-    const allEnabledIds = getAllEnabledIds();
-
-    setSelectedImageIds([...new Set([...allEnabledIds])]);
+    updateWIS({ selectedImageIds: [...new Set(getAllEnabledIds())] });
   };
 
   const handleCheckAll = () => {
-    const allIds = state.images.map((image) => image.id);
-    setSelectedImageIds(allIds);
+    updateWIS({ selectedImageIds: state.images.map((img) => img.id) });
   };
 
   const handleUncheckAllFiltered = () => {
-    const updatedSet = selectedImageIds.filter(
-      (id) =>
-        !filteredImages.some((image) => image.id === id && !image.isDisabled)
+    const updated = selectedImageIds.filter(
+      (id) => !filteredImages.some((img) => img.id === id && !img.isDisabled)
     );
-    setSelectedImageIds(updatedSet);
+    updateWIS({ selectedImageIds: updated });
   };
 
   // Save selected IDs when proceeding to the next step
@@ -227,8 +273,12 @@ const WorkflowInput = () => {
   }, [selectedImageIds, selectedPlate, inputMode, state.selectedWorkflow, state.config]);
 
   // Reset selections when input mode changes (controlled from parent)
+  // Skip on first mount — we only want to clear when the user actively switches modes
   useEffect(() => {
-    // Clear selections when switching between modes
+    if (inputModeInitRef.current) {
+      inputModeInitRef.current = false;
+      return;
+    }
     setSelectedPlate(null);
     setPlateWellCount(null);
     setPlateGridData(null);
@@ -326,45 +376,60 @@ const WorkflowInput = () => {
         
         {inputMode === "images" ? (
           // Image/Dataset selection UI
+          <>
           <DatasetSelectWithPopover
-            value={state.inputDatasets.map((dataset) => dataset?.data) || []}
+            value={state.inputDatasets.map((dataset) =>
+              dataset?.id ? `${dataset.data} (ID: ${dataset.id})` : dataset?.data
+            ) || []}
             label="Select datasets"
             placeholder="Add new dataset name or select..."
             buttonText="Add Datasets"
             tooltip="Select the OMERO datasets as workflow input."
             onChange={(datasets, type) => {
-              const inputDatasets = datasets
-                .map((dataset) => {
-                  // Handle both `index` (dataset key) and `data` (dataset value)
-                  const resolvedDataset =
-                    state.omeroFileTreeData[dataset] || // Case 1: dataset is already the key/index
-                    Object.values(state.omeroFileTreeData).find(
-                      (node) => node.data === dataset
-                    ); // Case 2: dataset is the data value (e.g. name typed by user)
-                  return resolvedDataset;
-                })
-                .filter(Boolean); // Filter out any unresolved datasets
               if (type === "manual") {
-                updateState({ inputDatasets }); // full info
-              } else {
-                updateState({
-                  inputDatasets: [
-                    // Adding, keep unique
-                    ...new Map(
-                      [...state.inputDatasets, ...inputDatasets].map((item) => [
-                        item.index,
-                        item,
-                      ])
-                    ).values(),
-                  ],
-                });
+                // datasets are remaining display strings like "name (ID: 56)"
+                if (datasets.length === 0) {
+                  updateState({ inputDatasets: [] });
+                } else {
+                  const remainingIds = new Set(
+                    datasets.map((s) => {
+                      const m = s.match(/\(ID:\s*(\d+)\)$/);
+                      return m ? parseInt(m[1], 10) : null;
+                    }).filter((id) => id !== null)
+                  );
+                  updateState({
+                    inputDatasets: state.inputDatasets.filter((ds) =>
+                      remainingIds.has(ds.id)
+                    ),
+                  });
+                }
+                return;
               }
+              // Tree selection — datasets are node keys like "dataset-123"
+              const inputDatasets = datasets
+                .map((dataset) => state.omeroFileTreeData[dataset])
+                .filter(Boolean);
+              updateState({
+                inputDatasets: [
+                  // Adding, keep unique by index
+                  ...new Map(
+                    [...state.inputDatasets, ...inputDatasets].map((item) => [
+                      item.index,
+                      item,
+                    ])
+                  ).values(),
+                ],
+              });
             }}
             multiSelect={true}
             allowedCategories={["datasets", "plates"]}
+            onClear={() => {
+              updateState({ inputDatasets: [], images: [] });
+              updateWIS({ selectedImageIds: [] });
+            }}
           />
+          </>
         ) : (
-          // Plate selection UI (for plate-specific workflows)
           <DatasetSelectWithPopover
             value={selectedPlate ? [selectedPlate.data] : []} 
             label="Select plate"
@@ -444,13 +509,13 @@ const WorkflowInput = () => {
                       <Button
                         minimal
                         icon="cross"
-                        onClick={() => setSearchQuery("")}
+                        onClick={() => updateWIS({ searchQuery: "" })}
                       />
                     )
                   }
                   placeholder="Type to filter images..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => updateWIS({ searchQuery: e.target.value })}
                 />
               </FormGroup>
               <ButtonGroup className="mb-2 w-full" fill={true}>
@@ -660,7 +725,7 @@ const WorkflowInput = () => {
           <Tabs
             id="workflow-input-tabs"
             selectedTabId={activeTab}
-            onChange={(newTab) => setActiveTab(newTab)}
+            onChange={(newTab) => updateWIS({ activeTab: newTab })}
             renderActiveTabPanelOnly={true}
           >
             <Tab
@@ -704,22 +769,30 @@ const WorkflowInput = () => {
                         checked={selectedImageIds.includes(image.id)}
                         onChange={() => handleToggleImage(image.id)}
                         disabled={image.isDisabled}
+                        className="mb-0 min-w-0"
                       >
                         {image.name}
                       </Switch>
 
-                      {/* Small Thumbnail */}
-                      {state.thumbnails?.[image.id] ? (
-                        <img
-                          src={state.thumbnails[image.id]}
-                          alt={image.name || "Thumbnail"}
-                          className="w-6 h-6 object-cover rounded-sm shadow-sm"
-                        />
-                      ) : (
-                        <div className="w-6 h-6 bg-gray-200 flex items-center justify-center text-xs text-gray-500 rounded-sm">
-                          N/A
-                        </div>
-                      )}
+                      {/* Right side: dataset tag + thumbnail */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {datasetByImageId[image.id] && (
+                          <Tag minimal round size="small" icon="id-number">
+                            {datasetByImageId[image.id].data} (ID: {datasetByImageId[image.id].id})
+                          </Tag>
+                        )}
+                        {state.thumbnails?.[image.id] ? (
+                          <img
+                            src={state.thumbnails[image.id]}
+                            alt={image.name || "Thumbnail"}
+                            className="w-6 h-6 object-cover rounded-sm shadow-sm"
+                          />
+                        ) : (
+                          <div className="w-6 h-6 bg-gray-200 flex items-center justify-center text-xs text-gray-500 rounded-sm">
+                            N/A
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))
                 ) : (
@@ -744,7 +817,7 @@ const WorkflowInput = () => {
                       min={1}
                       max={12}
                       value={zoom}
-                      onChange={setZoom}
+                      onChange={(v) => updateWIS({ zoom: v })}
                       showTrackFill={false}
                       labelStepSize={11}
                       vertical={false}
@@ -760,7 +833,16 @@ const WorkflowInput = () => {
                     filteredImages.map((image) => (
                       <Tooltip
                         key={image.id}
-                        content={image.name}
+                        content={
+                          <div>
+                            <div>{image.name}</div>
+                            {datasetByImageId[image.id] && (
+                              <div className="text-xs opacity-75 mt-0.5">
+                                {datasetByImageId[image.id].data} (ID: {datasetByImageId[image.id].id})
+                              </div>
+                            )}
+                          </div>
+                        }
                         targetProps={{
                           className: image.isDisabled
                             ? "cursor-not-allowed"

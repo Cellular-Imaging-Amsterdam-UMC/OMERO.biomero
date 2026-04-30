@@ -21,6 +21,7 @@ const WorkflowOutput = ({ onSelectionChange }) => {
     uploadCsv: false,
     attachToOriginalImages: false,
     selectedDatasets: [],
+    selectedDatasetId: null, // OMERO ID when selected from tree (null = typed/new)
     renamePattern: "{original_file}_result.{ext}",
     enableRename: false,
   };
@@ -54,7 +55,7 @@ const WorkflowOutput = ({ onSelectionChange }) => {
     // If any plate present (alone or mixed), don't auto-populate (and clear existing auto defaults)
     if (hasPlate || !allDatasets) {
       if (state.formData.selectedDatasets?.length) {
-        handleInputChange("selectedDatasets", []); // clear; requirement: empty when plates involved
+        handleFormDataUpdate({ selectedDatasets: [], selectedDatasetId: null });
       }
       return;
     }
@@ -66,7 +67,12 @@ const WorkflowOutput = ({ onSelectionChange }) => {
         state.formData.selectedDatasets.length === 0)
     ) {
       const inputDatasetNames = inputs.map((dataset) => dataset.data);
-      handleInputChange("selectedDatasets", inputDatasetNames);
+      // Also carry the OMERO ID when there is exactly one input dataset
+      const autoId = inputs.length === 1 ? (inputs[0].id ?? null) : null;
+      handleFormDataUpdate({
+        selectedDatasets: inputDatasetNames,
+        selectedDatasetId: autoId,
+      });
     }
   }, [state.inputDatasets]);
   
@@ -129,6 +135,18 @@ const WorkflowOutput = ({ onSelectionChange }) => {
       );
       setHasOutputSelection(hasSelection);
     }
+  };
+
+  // Atomic multi-key update — avoids stale-closure bug when updating related fields together
+  const handleFormDataUpdate = (changes) => {
+    const updatedFormData = { ...state.formData, ...changes };
+    updateState({ formData: updatedFormData });
+    const hasSelection = outputOptions.some((opt) =>
+      Array.isArray(updatedFormData[opt])
+        ? updatedFormData[opt].length > 0
+        : !!updatedFormData[opt]
+    );
+    setHasOutputSelection(hasSelection);
   };
 
   const handleRenamePatternChange = (e) => {
@@ -318,23 +336,49 @@ const WorkflowOutput = ({ onSelectionChange }) => {
           subLabel="Don't forget to press ENTER if you type a new name!"
           tooltip="Select the OMERO dataset for your workflow results."
           buttonText="Select Dataset"
-          value={state.formData.selectedDatasets || []}
+          value={(state.formData.selectedDatasets || []).map((name) => {
+            const id = state.formData.selectedDatasetId;
+            return id ? `${name} (ID: ${id})` : name;
+          })}
           onChange={(values, type) => {
             if (type === "manual") {
-              handleInputChange(
-                "selectedDatasets",
-                values?.length ? [values[values.length - 1]] : []
-              );
+              // Strip any "(ID: X)" suffix, take the last value
+              const rawName = values.length
+                ? values[values.length - 1].replace(/\s*\(ID:\s*\d+\)$/, '').trim()
+                : '';
+              // Look up this name in the tree — auto-attach ID if it exists
+              const matchedDataset = rawName
+                ? Object.values(state.omeroFileTreeData || {}).find(
+                    (n) => n.category === "datasets" && n.data === rawName
+                  )
+                : null;
+              handleFormDataUpdate({
+                selectedDatasets: rawName ? [rawName] : [],
+                selectedDatasetId: matchedDataset ? matchedDataset.id : null,
+              });
             } else {
-              const selectedDataset = values.map(
-                (dataset) => state.omeroFileTreeData[dataset].data
-              );
-              handleInputChange("selectedDatasets", selectedDataset);
+              // Selected from tree — extract name and ID
+              const datasetNode = state.omeroFileTreeData[values[0]];
+              if (datasetNode) {
+                handleFormDataUpdate({
+                  selectedDatasets: [datasetNode.data],
+                  selectedDatasetId: datasetNode.id,
+                });
+              }
             }
           }}
           multiSelect={false}
           intent={hasOutputSelection ? "" : "danger"}
           allowedCategories={["datasets"]}
+          tagProps={(val) => {
+            // Orange warning when the tag value doesn't contain "(ID: X)" — means it's a new dataset
+            const isKnown = /\(ID:\s*\d+\)/.test(String(val));
+            if (isKnown) return {};
+            return {
+              intent: "warning",
+              title: "No matching dataset found — a new dataset will be created with this name.",
+            };
+          }}
         />
 
         {/* Optional Image File Renamer */}
