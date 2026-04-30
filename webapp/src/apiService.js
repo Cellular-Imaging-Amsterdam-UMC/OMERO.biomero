@@ -95,7 +95,7 @@ export const fetchWorkflows = async () => {
 
 export const fetchConfig = async () => {
   const { urls } = getDjangoConstants();
-  return apiRequest(urls.api_config, "GET");
+  return apiRequest(urls.api_config, "GET", null, { params: { _: new Date().getTime() } });
 };
 
 export const fetchSlurmStatus = async () => {
