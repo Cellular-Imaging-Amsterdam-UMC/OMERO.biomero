@@ -15,13 +15,15 @@ import {
   Slider,
   TabPanel,
   Tag,
+  Spinner,
+  SpinnerSize,
 } from "@blueprintjs/core";
 import { fetchPlateImages } from "../../apiService";
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover";
 import { useAppContext } from "../../AppContext";
 
 const WorkflowInput = () => {
-  const { state, updateState, loadThumbnails, loadImagesForDataset } =
+  const { state, updateState, loadThumbnails, loadImagesForDataset, apiLoading } =
     useAppContext();
   const [filteredImages, setFilteredImages] = useState([]);
   const [selectedPlate, setSelectedPlate] = useState(null);
@@ -501,7 +503,31 @@ const WorkflowInput = () => {
         <>
             {/* Filter bar and buttons */}
             <div className="pb-2">
-              <FormGroup label="Filter filenames" className="mb-4">
+              <FormGroup
+                label={
+                  <div className="flex items-center justify-between">
+                    <span>Filter filenames</span>
+                    <Tooltip content="Reload images from OMERO for selected datasets">
+                      <Button
+                        icon="refresh"
+                        minimal
+                        small
+                        onClick={() => {
+                          updateState({ images: [] });
+                          updateWIS({ selectedImageIds: [] });
+                          state.inputDatasets.forEach((ds) => {
+                            loadImagesForDataset({
+                              dataset: ds,
+                              group: state.user.active_group_id,
+                            });
+                          });
+                        }}
+                      />
+                    </Tooltip>
+                  </div>
+                }
+                className="mb-4"
+              >
                 <InputGroup
                   leftElement={<Icon icon="filter" />}
                   rightElement={
@@ -787,6 +813,10 @@ const WorkflowInput = () => {
                             alt={image.name || "Thumbnail"}
                             className="w-6 h-6 object-cover rounded-sm shadow-sm"
                           />
+                        ) : apiLoading ? (
+                          <div className="w-6 h-6 bg-gray-200 flex items-center justify-center rounded-sm">
+                            <Spinner size={SpinnerSize.SMALL} />
+                          </div>
                         ) : (
                           <div className="w-6 h-6 bg-gray-200 flex items-center justify-center text-xs text-gray-500 rounded-sm">
                             N/A
@@ -876,6 +906,10 @@ const WorkflowInput = () => {
                               alt={image.name || "Thumbnail"}
                               className="object-cover w-full"
                             />
+                          ) : apiLoading ? (
+                            <div className="bg-gray-300 rounded-md w-full h-[100px] flex items-center justify-center">
+                              <Spinner size={SpinnerSize.SMALL} />
+                            </div>
                           ) : (
                             <div className="bg-gray-300 rounded-md w-full h-[100px] flex items-center justify-center">
                               <span className="text-gray-500 text-xs">
