@@ -31,7 +31,7 @@ class AnalyzerViewsTests(TestCase):
         def __exit__(self, exc_type, exc, tb):
             return False
 
-        def pull_descriptor_from_github(self, name):
+        def generic_descriptor_from_github(self, name):
             return self._metadata.get(name, {})
 
         @classmethod
