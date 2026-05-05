@@ -17,9 +17,6 @@ jobs:
         fetch-depth: 0
         fetch-tags: true
 
-    - name: Checkout the release tag explicitly
-      run: git checkout ${{ github.ref }}
-
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -40,6 +37,8 @@ jobs:
         yarn build
 
     - name: Build package
+      env:
+        SETUPTOOLS_SCM_PRETEND_VERSION: ${{ github.ref_name }}
       run: |
         python -m pip install --upgrade pip build setuptools_scm wheel
         python -m build
