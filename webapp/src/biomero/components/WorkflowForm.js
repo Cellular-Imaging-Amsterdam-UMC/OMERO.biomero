@@ -152,6 +152,27 @@ const WorkflowForm = () => {
                 </FormGroup>
               );
             }
+            // Dropdown when value-choices are provided
+            if (input["value-choices"]?.length > 0) {
+              return (
+                <FormGroup
+                  key={id}
+                  label={name}
+                  labelFor={id}
+                  helperText={description || ""}
+                >
+                  <HTMLSelect
+                    id={id}
+                    value={state.formData[id] !== undefined ? state.formData[id] : (defaultValue || "")}
+                    onChange={(e) => handleInputChange(id, e.target.value)}
+                  >
+                    {input["value-choices"].map((choice) => (
+                      <option key={choice} value={choice}>{choice}</option>
+                    ))}
+                  </HTMLSelect>
+                </FormGroup>
+              );
+            }
             return (
               <FormGroup
                 key={id}

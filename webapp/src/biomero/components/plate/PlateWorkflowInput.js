@@ -6,57 +6,91 @@ import {
   Tag,
   Icon,
   Tooltip,
+  Button,
 } from "@blueprintjs/core";
 import DatasetSelectWithPopover from "../DatasetSelectWithPopover";
 import { useAppContext } from "../../../AppContext";
+import { fetchPlatesData } from "../../../apiService";
 
 const PlateWorkflowInput = () => {
   const { state, updateState, loadPlateGridData } = useAppContext();
-  const [selectedPlate, setSelectedPlate] = useState(null);
+  const [activePreviewIndex, setActivePreviewIndex] = useState(0);
   const [plateWellCount, setPlateWellCount] = useState(null);
   const [plateGridData, setPlateGridData] = useState(null);
+  // Cache per plate ID so switching tabs doesn't re-fetch
+  const [plateDataCache, setPlateDataCache] = useState({});
 
-  // Fetch well count when plate is selected
+  // Persistent state shared with AppContext (survives Back/Next)
+  const selectedPlates = state.workflowInputState?.selectedPlates ?? [];
+  const updateWIS = (changes) =>
+    updateState({ workflowInputState: { ...state.workflowInputState, ...changes } });
+
+  // Reset preview to first plate when the selection changes
+  useEffect(() => {
+    setActivePreviewIndex(0);
+  }, [selectedPlates.length]);
+
+  // Fetch well count/grid for the active preview plate (cached per plate ID)
   useEffect(() => {
     const fetchPlateWellCount = async () => {
-      if (selectedPlate?.id) {
-        try {
-          setPlateWellCount("Fetching...");
-          setPlateGridData(null);
-          
-          const result = await loadPlateGridData(selectedPlate.id);
-          
-          // Store the complete grid data for visualization
-          setPlateGridData(result.plateData);
-          
-          // Use the formatted well count from AppContext
-          setPlateWellCount(result.wellCount);
-        } catch (error) {
-          console.error("Error fetching plate details:", error);
-          setPlateWellCount("Error loading");
-          setPlateGridData(null);
-        }
+      const activePlate = selectedPlates[activePreviewIndex];
+      if (!activePlate?.id) {
+        setPlateWellCount(null);
+        setPlateGridData(null);
+        return;
+      }
+      // Serve from cache if already fetched
+      if (plateDataCache[activePlate.id]) {
+        const cached = plateDataCache[activePlate.id];
+        setPlateGridData(cached.plateData);
+        setPlateWellCount(cached.wellCount);
+        return;
+      }
+      try {
+        setPlateWellCount("Fetching...");
+        setPlateGridData(null);
+
+        const result = await loadPlateGridData(activePlate.id);
+
+        // Store in cache
+        setPlateDataCache((prev) => ({
+          ...prev,
+          [activePlate.id]: result,
+        }));
+        setPlateGridData(result.plateData);
+        setPlateWellCount(result.wellCount);
+      } catch (error) {
+        console.error("Failed to fetch plate details:", error);
+        setPlateWellCount("Error loading");
+        setPlateGridData(null);
       }
     };
 
     fetchPlateWellCount();
-  }, [selectedPlate?.id]);
+  }, [selectedPlates[activePreviewIndex]?.id, activePreviewIndex]);
 
-  // Save selected plate when proceeding to the next step
+  // Save selected plates when changed
   useEffect(() => {
-    if (selectedPlate) {
-      // For plate mode, save plate ID and set data type to PLATE
+    if (selectedPlates.length > 0) {
+      // For plate mode, save all plate IDs and set data type to PLATE
       updateState({
         formData: {
           ...state.formData,
-          IDs: [selectedPlate.id],
+          IDs: selectedPlates.map((p) => p.id),
           Data_Type: "Plate", // Backend expects "Plate" (case sensitive!)
           plateMode: true,
           useZarrFormat: true, // Force zarr format for plates
         },
       });
+    } else {
+      updateState({
+        formData: {
+          ...state.formData,
+          IDs: [],
+        },
+      });
     }
-  }, [selectedPlate]);
+  }, [selectedPlates]);
 
   // Render plate grid visualization
   const renderPlateGrid = () => {
@@ -143,71 +177,160 @@ const PlateWorkflowInput = () => {
   return (
     <DialogBody className="flex flex-col min-h-[75vh]">
       <div className="w-full">
-        <H6 className="mb-2">Select Input Plate</H6>
+        <H6 className="mb-2">Select Input Plates</H6>
         
         {/* Plate selection UI */}
         <DatasetSelectWithPopover
-          value={selectedPlate ? [selectedPlate.data] : []} 
-          label="Select plate"
-          placeholder="Add new plate name or select..."
-          buttonText="Select Plate"
-          tooltip="Select the OMERO plate as workflow input."
-          onChange={(plates, type) => {
-            if (plates.length > 0) {
-              const resolvedPlate =
-                state.omeroFileTreeData[plates[0]] || // Case 1: plate is already the key/index
-                Object.values(state.omeroFileTreeData).find(
-                  (node) => node.data === plates[0]
-                ); // Case 2: plate is the data value
-              setSelectedPlate(resolvedPlate);
-              setPlateWellCount(null); // Reset well count when changing plates
-              setPlateGridData(null); // Reset grid data when changing plates
+          value={selectedPlates.map((p) => `${p.data} (ID: ${p.id})`)}
+          label="Select plate(s)"
+          placeholder="Select one or more plates..."
+          buttonText="Select Plates"
+          tooltip="Select one or more OMERO plates as workflow input."
+          onChange={async (ids, type) => {
+            if (type === "manual") {
+              // TagInput fired a deletion — ids are remaining display strings like "name (ID: 501)"
+              if (ids.length === 0) {
+                updateWIS({ selectedPlates: [] });
+                setPlateWellCount(null);
+                setPlateGridData(null);
+              } else {
+                const remainingIds = new Set(
+                  ids.map((s) => {
+                    const m = s.match(/\(ID:\s*(\d+)\)$/);
+                    return m ? parseInt(m[1], 10) : null;
+                  }).filter((id) => id !== null)
+                );
+                updateWIS({ selectedPlates: selectedPlates.filter((p) => remainingIds.has(p.id)) });
+              }
+              return;
+            }
+
+            // Tree selection — ids are node keys like "plate-123" or "screen-456"
+            if (ids.length > 0) {
+              const plateIds = [];
+              const extraNodes = {};
+
+              for (const id of ids) {
+                if (id.startsWith("screen-")) {
+                  const screenNode = state.omeroFileTreeData[id];
+                  if (screenNode?.children?.length > 0) {
+                    plateIds.push(...screenNode.children.filter((cid) => cid.startsWith("plate-")));
+                  } else {
+                    try {
+                      const screenId = parseInt(id.replace("screen-", ""), 10);
+                      const response = await fetchPlatesData({ id: screenId });
+                      const plates = response.plates || [];
+                      plates.forEach((plate) => {
+                        const key = `plate-${plate.id}`;
+                        extraNodes[key] = {
+                          index: key,
+                          isFolder: false,
+                          children: [],
+                          childCount: plate.childCount || 0,
+                          data: plate.name,
+                          id: plate.id,
+                          category: "plates",
+                          source: "omero",
+                        };
+                        plateIds.push(key);
+                      });
+                      if (Object.keys(extraNodes).length > 0) {
+                        updateState({
+                          omeroFileTreeData: {
+                            ...state.omeroFileTreeData,
+                            ...extraNodes,
+                            [id]: {
+                              ...screenNode,
+                              children: plates.map((p) => `plate-${p.id}`),
+                            },
+                          },
+                        });
+                      }
+                    } catch (e) {
+                      console.error("Failed to fetch plates for screen", id, e);
+                    }
+                  }
+                } else if (id.startsWith("plate-")) {
+                  plateIds.push(id);
+                }
+              }
+
+              const allNodes = { ...state.omeroFileTreeData, ...extraNodes };
+              const resolvedPlates = plateIds.map((p) => allNodes[p]).filter(Boolean);
+              // Merge with existing selection, deduplicate by id
+              const merged = [...selectedPlates, ...resolvedPlates];
+              updateWIS({
+                selectedPlates: merged.filter(
+                  (plate, idx, arr) => arr.findIndex((p) => p.id === plate.id) === idx
+                ),
+              });
             } else {
-              setSelectedPlate(null);
+              updateWIS({ selectedPlates: [] });
               setPlateWellCount(null);
               setPlateGridData(null);
             }
           }}
-          multiSelect={false}
-          allowedCategories={["plates"]}
+          multiSelect={true}
+          allowedCategories={["plates", "screens"]}
+          onClear={() => {
+            updateWIS({ selectedPlates: [] });
+            setPlateWellCount(null);
+            setPlateGridData(null);
+          }}
         />
-        
-        {/* Plate Preview */}
-        {selectedPlate && (
+        {selectedPlates.length > 0 && (
           <Card className="mt-4">
             <div className="p-4 pb-2">
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-2">
-                  <H6 className="mb-0">
-                    <Icon icon="lab-test" className="mr-2" />
-                    {selectedPlate.data}
-                  </H6>
-                  <Tag
-                    icon="id-number"
-                    intent="none"
-                    minimal={true}
-                    small={true}
-                    className="text-xs"
-                  >
-                    ID: {selectedPlate.id}
-                  </Tag>
+              {/* Plate tabs — only shown when >1 plate selected */}
+              {selectedPlates.length > 1 && (
+                <div className="flex flex-wrap gap-1 mb-4 border-b pb-3">
+                  {selectedPlates.map((plate, idx) => (
+                    <Button
+                      key={plate.id}
+                      small={true}
+                      icon="lab-test"
+                      intent={idx === activePreviewIndex ? "primary" : "none"}
+                      minimal={idx !== activePreviewIndex}
+                      active={idx === activePreviewIndex}
+                      onClick={() => setActivePreviewIndex(idx)}
+                    >
+                      {plate.data} (ID: {plate.id})
+                    </Button>
+                  ))}
                 </div>
-              </div>
-              
-              <div className="flex items-center space-x-3 mb-3">
-                <Tag
-                  icon="grid-view"
-                  intent="none"
-                  minimal={true}
-                >
-                  {plateWellCount !== null ? plateWellCount : 
-                    (selectedPlate.childCount ? selectedPlate.childCount : "Loading wells...")}
-                </Tag>
-              </div>
+              )}
+
+              {/* Single-plate preview for the active plate */}
+              {(() => {
+                const activePlate = selectedPlates[activePreviewIndex];
+                if (!activePlate) return null;
+                return (
+                  <>
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center gap-2">
+                        <H6 className="mb-0">
+                          <Icon icon="lab-test" className="mr-2" />
+                          {activePlate.data}
+                        </H6>
+                        <Tag icon="id-number" intent="none" minimal={true} small={true} className="text-xs">
+                          ID: {activePlate.id}
+                        </Tag>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 mb-3">
+                      <Tag icon="grid-view" intent="none" minimal={true}>
+                        {plateWellCount !== null ? plateWellCount :
+                          (activePlate.childCount ? activePlate.childCount : "Loading wells...")}
+                      </Tag>
+                    </div>
+
+                    {/* Plate Grid Visualization */}
+                    {renderPlateGrid()}
+                  </>
+                );
+              })()}
             </div>
-            
-            {/* Plate Grid Visualization */}
-            {renderPlateGrid()}
           </Card>
         )}
       </div>

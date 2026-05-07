@@ -44,7 +44,9 @@ def admin_config(request, conn=None, **kwargs):
                 section: dict(configs.items(section)) for section in configs.sections()
             }
 
-            return JsonResponse({"config": config_dict})
+            response = JsonResponse({"config": config_dict})
+            response["Cache-Control"] = "no-store"
+            return response
         except Exception as e:
             logger.error(f"Error retrieving BIOMERO config: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)

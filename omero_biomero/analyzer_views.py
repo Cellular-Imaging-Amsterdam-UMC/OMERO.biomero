@@ -136,6 +136,8 @@ def run_workflow_script(request, conn=None, **kwargs):
         uploadcsv = params.get("uploadCsv")
         output_ds = params.get("selectedDatasets", [])
         output_sc = params.get("selectedScreens", [])
+        output_ds_id = params.get("selectedDatasetId")  # OMERO ID (int or None)
+        output_sc_id = params.get("selectedScreenId")   # OMERO ID (int or None)
         rename_enabled = params.get("enableRename", False)
         rename_pt = params.get("renamePattern", "")
         version = params.get("version")
@@ -158,6 +160,8 @@ def run_workflow_script(request, conn=None, **kwargs):
             "attachToOriginalImages",
             "selectedDatasets",
             "selectedScreens",
+            "selectedDatasetId",
+            "selectedScreenId",
             "renamePattern",
             "enableRename",
             "workflow_name",
@@ -196,6 +200,12 @@ def run_workflow_script(request, conn=None, **kwargs):
                 ),
                 workflow.OUTPUT_NEW_SCREEN: (
                     wrap(output_sc[0]) if output_sc else wrap(workflow.NO)
+                ),
+                constants.results.OUTPUT_ATTACH_NEW_DATASET_ID: (
+                    rlong(int(output_ds_id)) if output_ds_id else None
+                ),
+                constants.results.OUTPUT_ATTACH_NEW_SCREEN_ID: (
+                    rlong(int(output_sc_id)) if output_sc_id else None
                 ),
                 workflow.OUTPUT_DUPLICATES: rbool(False),
                 workflow.OUTPUT_RENAME: (
