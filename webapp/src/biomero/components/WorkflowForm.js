@@ -66,9 +66,9 @@ const WorkflowForm = () => {
   const defaultValues = workflowMetadata.inputs.reduce((acc, input) => {
     const defaultValue = input["default-value"];
 
-    if (input.type === "Number") {
+    if (input.type === "Number" || input.type === "integer" || input.type === "float") {
       acc[input.id] = defaultValue !== undefined ? Number(defaultValue) : 0;
-    } else if (input.type === "Boolean") {
+    } else if (input.type === "Boolean" || input.type === "boolean") {
       acc[input.id] =
         defaultValue !== undefined ? Boolean(defaultValue) : false;
     } else {
@@ -127,6 +127,7 @@ const WorkflowForm = () => {
         const requiresZarr = isPlateWorkflow || isZarrWorkflow;
 
         switch (type) {
+          case "string":
           case "String":
             // Special handling for Format field when workflow requires ZARR
             if (isFormatField && requiresZarr) {
@@ -188,6 +189,93 @@ const WorkflowForm = () => {
                 />
               </FormGroup>
             );
+          case "integer":
+            return (
+              <FormGroup
+                key={id}
+                label={name}
+                labelFor={id}
+                helperText={description || ""}
+              >
+                <NumericInput
+                  id={id}
+                  value={
+                    state.formData[id] !== undefined
+                      ? state.formData[id]
+                      : defaultValue !== undefined
+                      ? defaultValue
+                      : 0
+                  }
+                  stepSize={1}
+                  minorStepSize={null}
+                  onValueChange={(valueAsNumber, valueAsString) => {
+                    if (isNaN(valueAsNumber) || valueAsNumber === null) {
+                      handleInputChange(id, valueAsString);
+                    } else {
+                      handleInputChange(id, Math.trunc(valueAsNumber));
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const finalValue = parseInt(e.target.value, 10);
+                    handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const finalValue = parseInt(e.currentTarget.value, 10);
+                      handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
+                    }
+                  }}
+                  placeholder={optional ? `Optional ${name}` : name}
+                  allowNumericCharactersOnly={true}
+                />
+              </FormGroup>
+            );
+          case "float":
+            return (
+              <FormGroup
+                key={id}
+                label={name}
+                labelFor={id}
+                helperText={description || ""}
+              >
+                <NumericInput
+                  id={id}
+                  value={
+                    state.formData[id] !== undefined
+                      ? state.formData[id]
+                      : defaultValue !== undefined
+                      ? defaultValue
+                      : 0
+                  }
+                  stepSize={0.01}
+                  minorStepSize={0.001}
+                  onValueChange={(valueAsNumber, valueAsString) => {
+                    if (
+                      valueAsString.endsWith(".") ||
+                      valueAsString.includes("e") ||
+                      isNaN(valueAsNumber) ||
+                      valueAsNumber === null
+                    ) {
+                      handleInputChange(id, valueAsString);
+                    } else {
+                      handleInputChange(id, valueAsNumber);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const finalValue = parseFloat(e.target.value);
+                    handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const finalValue = parseFloat(e.currentTarget.value);
+                      handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
+                    }
+                  }}
+                  placeholder={optional ? `Optional ${name}` : name}
+                  allowNumericCharactersOnly={false}
+                />
+              </FormGroup>
+            );
           case "Number":
             return (
               <FormGroup
@@ -206,8 +294,6 @@ const WorkflowForm = () => {
                       : 0
                   }
                   onValueChange={(valueAsNumber, valueAsString) => {
-                    // Use string value if it contains a decimal point at the end (partial input)
-                    // or if it's invalid (like "1e")
                     if (
                       valueAsString.endsWith(".") ||
                       valueAsString.includes("e") ||
@@ -216,17 +302,14 @@ const WorkflowForm = () => {
                     ) {
                       handleInputChange(id, valueAsString);
                     } else {
-                      // Use the number value for complete valid numbers
                       handleInputChange(id, valueAsNumber);
                     }
                   }}
                   onBlur={(e) => {
-                    // Convert to final number on blur, fallback to 0 if invalid
                     const finalValue = parseFloat(e.target.value);
                     handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
                   }}
                   onKeyDown={(e) => {
-                    // Also handle Enter key like the example
                     if (e.key === "Enter") {
                       const finalValue = parseFloat(e.currentTarget.value);
                       handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
@@ -237,6 +320,7 @@ const WorkflowForm = () => {
                 />
               </FormGroup>
             );
+          case "boolean":
           case "Boolean":
             return (
               <FormGroup
@@ -265,7 +349,7 @@ const WorkflowForm = () => {
 
   return (
     <form>
-      <h2>{workflowMetadata.workflow}</h2>
+      <h2>{workflowMetadata.name || workflowMetadata.workflow}</h2>
       
       {/* Version Selection */}
       <FormGroup
