@@ -437,16 +437,6 @@ def get_slurm_status(request, conn=None, **kwargs):
     """
     Check SLURM cluster availability and get workflow version information.
     """
-    # TODO: re-enable real SLURM health check
-    return JsonResponse({
-        "status": "online",
-        "message": "SLURM cluster is available.",
-        "last_checked": datetime.datetime.now().isoformat(),
-        "icon": "tick-circle",
-        "intent": "success",
-        "workflow_versions": {}
-    })
-
     import logging
     logger = logging.getLogger(__name__)
     

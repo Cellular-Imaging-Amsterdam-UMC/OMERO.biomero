@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   DialogBody,
   H6,
@@ -22,6 +22,145 @@ import { fetchPlateImages } from "../../apiService";
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover";
 import { useAppContext } from "../../AppContext";
 
+/**
+ * Renders a single thumbnail lazily — only requests the image when it scrolls
+ * within 400 px of the viewport.  The parent supplies an `onVisible` callback
+ * that batches multiple IDs before calling the real fetch.
+ */
+const LazyThumbnail = ({ imageId, thumbnail, apiLoading, onVisible, listMode = false }) => {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (thumbnail) return; // already in cache – nothing to observe
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          onVisible(imageId);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "400px" } // pre-load before fully visible
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [imageId, thumbnail, onVisible]);
+
+  if (listMode) {
+    // List mode: small inline icon — ref sits on the outer div, content inside
+    return (
+      <div ref={ref} className="w-6 h-6 shrink-0">
+        {thumbnail ? (
+          <img src={thumbnail} alt="" className="w-6 h-6 object-cover rounded-sm shadow-sm" />
+        ) : (
+          <div className="w-6 h-6 bg-gray-200 flex items-center justify-center rounded-sm">
+            {apiLoading && <Spinner size={SpinnerSize.SMALL} />}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Grid mode: ref sits on a wrapper that exactly matches the original img/placeholder sizing
+  // The Card itself is rendered by the parent; we just supply the inner content here.
+  return (
+    <div ref={ref} className="w-full">
+      {thumbnail ? (
+        <img src={thumbnail} alt="" className="object-cover w-full" />
+      ) : (
+        <div className="bg-gray-300 rounded-md w-full h-[100px] flex items-center justify-center">
+          {apiLoading
+            ? <Spinner size={SpinnerSize.SMALL} />
+            : <span className="text-gray-500 text-xs">No preview</span>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Shared shallow comparator for memoized image item components.
+// Callbacks (onToggle, onVisible) are always stable refs — excluded intentionally.
+// datasetInfo is excluded too: it only changes when datasets change (rare), not on selection.
+const imageItemPropsAreEqual = (prev, next) =>
+  prev.isSelected === next.isSelected &&
+  prev.thumbnail === next.thumbnail &&
+  prev.image === next.image &&
+  prev.apiLoading === next.apiLoading;
+
+// Memoized list row — only re-renders when this specific image’s selection/thumbnail changes.
+const ImageListRow = React.memo(
+  ({ image, isSelected, thumbnail, apiLoading, datasetInfo, onToggle, onVisible }) => (
+    <div
+      className={`flex items-center justify-between gap-4 ${
+        image.isDisabled ? "opacity-50 cursor-not-allowed" : ""
+      }`}
+    >
+      <Switch
+        checked={isSelected}
+        onChange={() => onToggle(image.id)}
+        disabled={image.isDisabled}
+        className="mb-0 min-w-0"
+      >
+        {image.name}
+      </Switch>
+      <div className="flex items-center gap-1 shrink-0">
+        {datasetInfo && (
+          <Tag minimal round size="small" icon="id-number">
+            {datasetInfo.data} (ID: {datasetInfo.id})
+          </Tag>
+        )}
+        <LazyThumbnail
+          imageId={image.id}
+          thumbnail={thumbnail}
+          apiLoading={apiLoading}
+          onVisible={onVisible}
+          listMode={true}
+        />
+      </div>
+    </div>
+  ),
+  imageItemPropsAreEqual
+);
+
+// Memoized grid card — same principle.
+const ImageGridCard = React.memo(
+  ({ image, isSelected, thumbnail, apiLoading, datasetInfo, onToggle, onVisible }) => (
+    <Tooltip
+      content={
+        <div>
+          <div>{image.name}</div>
+          {datasetInfo && (
+            <div className="text-xs opacity-75 mt-0.5">
+              {datasetInfo.data} (ID: {datasetInfo.id})
+            </div>
+          )}
+        </div>
+      }
+      targetProps={{ className: image.isDisabled ? "cursor-not-allowed" : "" }}
+    >
+      <Card
+        interactive={true}
+        elevation={image.isDisabled ? 1 : 3}
+        className={`p-1 flex flex-col items-center justify-between border transition-all duration-150
+          ${image.isDisabled ? "opacity-50 pointer-events-none cursor-not-allowed" : ""}
+          ${isSelected ? "bg-blue-500" : ""}
+        `}
+        onClick={() => !image.isDisabled && onToggle(image.id)}
+        selected={isSelected}
+      >
+        <LazyThumbnail
+          imageId={image.id}
+          thumbnail={thumbnail}
+          apiLoading={apiLoading}
+          onVisible={onVisible}
+        />
+      </Card>
+    </Tooltip>
+  ),
+  imageItemPropsAreEqual
+);
+
 const WorkflowInput = () => {
   const { state, updateState, loadThumbnails, loadImagesForDataset, apiLoading } =
     useAppContext();
@@ -41,29 +180,56 @@ const WorkflowInput = () => {
   const updateWIS = (changes) =>
     updateState({ workflowInputState: { ...state.workflowInputState, ...changes } });
 
+  // O(1) lookup set — avoids O(n) .includes() over 1800+ ids per render
+  const selectedSet = useMemo(() => new Set(selectedImageIds), [selectedImageIds]);
+
   // Track previous image IDs so we can add new / remove deleted without resetting manual deselections
   const prevImageIdsRef = useRef([]);
   // Skip the first run of the inputMode reset effect (component mount ≠ mode change)
   const inputModeInitRef = useRef(true);
-  
+
+  // Batched lazy-thumbnail loader — collect IDs as they become visible, flush after 150 ms.
+  // requestThumbnailImpl holds the latest closure; requestThumbnail is a stable ref-forwarding
+  // wrapper with a fixed identity so React.memo children never re-render just for it.
+  const pendingIdsRef = useRef(new Set());
+  const flushTimerRef = useRef(null);
+  useEffect(() => () => clearTimeout(flushTimerRef.current), []);
+  const requestThumbnailImpl = useRef(null);
+  requestThumbnailImpl.current = (id) => {
+    if (state.thumbnails?.[String(id)]) return;
+    pendingIdsRef.current.add(id);
+    clearTimeout(flushTimerRef.current);
+    flushTimerRef.current = setTimeout(() => {
+      const ids = [...pendingIdsRef.current];
+      pendingIdsRef.current.clear();
+      if (ids.length > 0) loadThumbnails(ids);
+    }, 150);
+  };
+  const requestThumbnail = useCallback((id) => requestThumbnailImpl.current(id), []);
+
+  // Pre-load the first 50 thumbnails immediately so the initial viewport isn't blank
+  const preloadedRef = useRef(false);
+  useEffect(() => {
+    if (preloadedRef.current || !state.images?.length) return;
+    preloadedRef.current = true;
+    const firstBatch = state.images.slice(0, 50).map((img) => img.id).filter((id) => !state.thumbnails?.[String(id)]);
+    if (firstBatch.length > 0) loadThumbnails(firstBatch);
+  }, [state.images]);
+
   // Get input mode from formData instead of local state
   const inputMode = state.formData?.workflowMode || "images";
-  
-  // Helper function to check workflow flags from config
-  const getWorkflowFlags = (workflowName) => {
-    const config = state.config;
-    if (!config || !config.UI) return { isPlateWorkflow: false, isZarrWorkflow: false };
-    
-    const plateWorkflows = config.UI.plate_workflows ? 
-      JSON.parse(config.UI.plate_workflows || '[]') : [];
-    const isPlateWorkflow = plateWorkflows.includes(workflowName);
-    
-    const zarrWorkflows = config.UI.zarr_workflows ? 
-      JSON.parse(config.UI.zarr_workflows || '[]') : [];
-    const isZarrWorkflow = zarrWorkflows.includes(workflowName);
-    
-    return { isPlateWorkflow, isZarrWorkflow };
-  };
+
+  // Derive plate/zarr workflow flags from admin config
+  const getWorkflowFlags = useCallback((workflowName) => {
+    const ui = state.config?.UI;
+    if (!ui) return { isPlateWorkflow: false, isZarrWorkflow: false };
+    const plateWorkflows = JSON.parse(ui.plate_workflows || "[]");
+    const zarrWorkflows  = JSON.parse(ui.zarr_workflows  || "[]");
+    return {
+      isPlateWorkflow: plateWorkflows.includes(workflowName),
+      isZarrWorkflow:  zarrWorkflows.includes(workflowName),
+    };
+  }, [state.config]);
 
   // Build imageId → dataset node lookup so each image knows its parent dataset
   const datasetByImageId = useMemo(() => {
@@ -84,7 +250,7 @@ const WorkflowInput = () => {
     // Remove images of datasets not in inputDatasets
     const filteredImages = Object.entries(state.omeroFileTreeData)
       .filter(([key]) => currentDatasetIds.includes(key))
-      .flatMap(([_, datasetNode]) => datasetNode.children || []);
+      .flatMap(([, datasetNode]) => datasetNode.children || []);
 
     updateState({ images: filteredImages });
 
@@ -109,10 +275,7 @@ const WorkflowInput = () => {
     const prevIds = prevImageIdsRef.current;
     prevImageIdsRef.current = allIds;
 
-    // Fetch only thumbnails not already cached
-    const missingIds = allIds.filter((id) => !state.thumbnails?.[String(id)]);
-    if (missingIds.length > 0) loadThumbnails(missingIds);
-
+    // Thumbnails are now loaded lazily via IntersectionObserver in <LazyThumbnail>.
     // Update filteredImages (respecting active search)
     if (searchQuery) {
       const lq = searchQuery.toLowerCase();
@@ -211,12 +374,16 @@ const WorkflowInput = () => {
     }
   }, [searchQuery, state.images]);
 
-  const handleToggleImage = (id) => {
-    const updated = selectedImageIds.includes(id)
+  // handleToggleImage is stable (ref-forwarding pattern) so React.memo items don't re-render
+  // when the parent re-renders for unrelated reasons.
+  const toggleImpl = useRef(null);
+  toggleImpl.current = (id) => {
+    const updated = selectedSet.has(id)
       ? selectedImageIds.filter((x) => x !== id)
       : [...selectedImageIds, id];
     updateWIS({ selectedImageIds: updated });
   };
+  const handleToggleImage = useCallback((id) => toggleImpl.current(id), []);
 
   const handleUncheckAll = () => updateWIS({ selectedImageIds: [] });
 
@@ -663,7 +830,7 @@ const WorkflowInput = () => {
                   intent={
                     searchQuery &&
                     !getAllEnabledIds().every((imageId) =>
-                      selectedImageIds.includes(imageId)
+                      selectedSet.has(imageId)
                     )
                       ? "primary"
                       : "none"
@@ -672,7 +839,7 @@ const WorkflowInput = () => {
                     !searchQuery
                       ? "Add a filter first"
                       : getAllEnabledIds().every((imageId) =>
-                          selectedImageIds.includes(imageId)
+                          selectedSet.has(imageId)
                         )
                       ? "All filtered images are already selected"
                       : "Select all filtered images"
@@ -686,7 +853,7 @@ const WorkflowInput = () => {
                     intent={
                       searchQuery &&
                       !getAllEnabledIds().every((imageId) =>
-                        selectedImageIds.includes(imageId)
+                        selectedSet.has(imageId)
                       )
                         ? "primary"
                         : "none"
@@ -694,7 +861,7 @@ const WorkflowInput = () => {
                     disabled={
                       !searchQuery ||
                       getAllEnabledIds().every((imageId) =>
-                        selectedImageIds.includes(imageId)
+                        selectedSet.has(imageId)
                       )
                     }
                     className="flex-grow"
@@ -705,7 +872,7 @@ const WorkflowInput = () => {
                   intent={
                     searchQuery &&
                     !getAllEnabledIds().every(
-                      (imageId) => !selectedImageIds.includes(imageId)
+                      (imageId) => !selectedSet.has(imageId)
                     )
                       ? "primary"
                       : "none"
@@ -714,7 +881,7 @@ const WorkflowInput = () => {
                     !searchQuery
                       ? "Add a filter first"
                       : getAllEnabledIds().every(
-                          (imageId) => !selectedImageIds.includes(imageId)
+                          (imageId) => !selectedSet.has(imageId)
                         )
                       ? "No filtered images are selected to deselect"
                       : "Deselect all filtered images"
@@ -728,7 +895,7 @@ const WorkflowInput = () => {
                     intent={
                       searchQuery &&
                       !getAllEnabledIds().every(
-                        (imageId) => !selectedImageIds.includes(imageId)
+                        (imageId) => !selectedSet.has(imageId)
                       )
                         ? "primary"
                         : "none"
@@ -736,7 +903,7 @@ const WorkflowInput = () => {
                     disabled={
                       !searchQuery ||
                       getAllEnabledIds().every(
-                        (imageId) => !selectedImageIds.includes(imageId)
+                        (imageId) => !selectedSet.has(imageId)
                       )
                     }
                     className="flex-grow"
@@ -782,48 +949,23 @@ const WorkflowInput = () => {
             className="overflow-auto"
             panel={
               <div className="flex flex-col gap-2 overflow-y-auto pt-1 pl-1 min-h-[calc(100vh-80vh)] max-h-[45vh]">
-                {filteredImages.length > 0 ? (
+                {apiLoading && filteredImages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-32 gap-2 text-gray-400">
+                    <Spinner size={SpinnerSize.LARGE} />
+                    <span className="text-sm">Loading images…</span>
+                  </div>
+                ) : filteredImages.length > 0 ? (
                   filteredImages.map((image) => (
-                    <div
+                    <ImageListRow
                       key={image.id}
-                      className={`flex items-center justify-between gap-4 ${
-                        image.isDisabled ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                    >
-                      {/* Switch for selection */}
-                      <Switch
-                        checked={selectedImageIds.includes(image.id)}
-                        onChange={() => handleToggleImage(image.id)}
-                        disabled={image.isDisabled}
-                        className="mb-0 min-w-0"
-                      >
-                        {image.name}
-                      </Switch>
-
-                      {/* Right side: dataset tag + thumbnail */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        {datasetByImageId[image.id] && (
-                          <Tag minimal round size="small" icon="id-number">
-                            {datasetByImageId[image.id].data} (ID: {datasetByImageId[image.id].id})
-                          </Tag>
-                        )}
-                        {state.thumbnails?.[image.id] ? (
-                          <img
-                            src={state.thumbnails[image.id]}
-                            alt={image.name || "Thumbnail"}
-                            className="w-6 h-6 object-cover rounded-sm shadow-sm"
-                          />
-                        ) : apiLoading ? (
-                          <div className="w-6 h-6 bg-gray-200 flex items-center justify-center rounded-sm">
-                            <Spinner size={SpinnerSize.SMALL} />
-                          </div>
-                        ) : (
-                          <div className="w-6 h-6 bg-gray-200 flex items-center justify-center text-xs text-gray-500 rounded-sm">
-                            N/A
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                      image={image}
+                      isSelected={selectedSet.has(image.id)}
+                      thumbnail={state.thumbnails?.[image.id]}
+                      datasetInfo={datasetByImageId[image.id]}
+                      apiLoading={apiLoading}
+                      onToggle={handleToggleImage}
+                      onVisible={requestThumbnail}
+                    />
                   ))
                 ) : (
                   <p className="text-gray-500 text-xs">
@@ -859,66 +1001,23 @@ const WorkflowInput = () => {
                 <div
                   className={`grid grid-cols-${zoom} gap-2 overflow-y-auto p-1 w-full`}
                 >
-                  {filteredImages.length > 0 ? (
+                  {apiLoading && filteredImages.length === 0 ? (
+                    <div className="col-span-full flex flex-col items-center justify-center h-32 gap-2 text-gray-400">
+                      <Spinner size={SpinnerSize.LARGE} />
+                      <span className="text-sm">Loading images…</span>
+                    </div>
+                  ) : filteredImages.length > 0 ? (
                     filteredImages.map((image) => (
-                      <Tooltip
+                      <ImageGridCard
                         key={image.id}
-                        content={
-                          <div>
-                            <div>{image.name}</div>
-                            {datasetByImageId[image.id] && (
-                              <div className="text-xs opacity-75 mt-0.5">
-                                {datasetByImageId[image.id].data} (ID: {datasetByImageId[image.id].id})
-                              </div>
-                            )}
-                          </div>
-                        }
-                        targetProps={{
-                          className: image.isDisabled
-                            ? "cursor-not-allowed"
-                            : "",
-                        }}
-                      >
-                        <Card
-                          interactive={true}
-                          elevation={image.isDisabled ? 1 : 3}
-                          className={`p-1 flex flex-col items-center justify-between 
-                          border transition-all duration-150 
-                          ${
-                            image.isDisabled
-                              ? "opacity-50 pointer-events-none cursor-not-allowed"
-                              : ""
-                          }
-                          ${
-                            selectedImageIds.includes(image.id)
-                              ? "bg-blue-500"
-                              : ""
-                          }
-                        `}
-                          onClick={() =>
-                            !image.isDisabled && handleToggleImage(image.id)
-                          }
-                          selected={selectedImageIds.includes(image.id)}
-                        >
-                          {state.thumbnails?.[image.id] ? (
-                            <img
-                              src={state.thumbnails[image.id]}
-                              alt={image.name || "Thumbnail"}
-                              className="object-cover w-full"
-                            />
-                          ) : apiLoading ? (
-                            <div className="bg-gray-300 rounded-md w-full h-[100px] flex items-center justify-center">
-                              <Spinner size={SpinnerSize.SMALL} />
-                            </div>
-                          ) : (
-                            <div className="bg-gray-300 rounded-md w-full h-[100px] flex items-center justify-center">
-                              <span className="text-gray-500 text-xs">
-                                No preview
-                              </span>
-                            </div>
-                          )}
-                        </Card>
-                      </Tooltip>
+                        image={image}
+                        isSelected={selectedSet.has(image.id)}
+                        thumbnail={state.thumbnails?.[image.id]}
+                        datasetInfo={datasetByImageId[image.id]}
+                        apiLoading={apiLoading}
+                        onToggle={handleToggleImage}
+                        onVisible={requestThumbnail}
+                      />
                     ))
                   ) : (
                     <p className="text-gray-500 text-xs col-span-4">
