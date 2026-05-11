@@ -28,7 +28,7 @@ import InputOptions from "./InputOptions";
 import PlateWorkflowDialog from "./plate/PlateWorkflowDialog";
 
 const RunPanel = ({ onWorkflowError }) => {
-  const { state, updateState, toaster, runWorkflowData } = useAppContext();
+  const { state, updateState, toaster, runWorkflowData, apiLoading } = useAppContext();
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isNextDisabled, setIsNextDisabled] = useState(true);
@@ -140,8 +140,8 @@ const RunPanel = ({ onWorkflowError }) => {
   });
 
   useEffect(() => {
-    setIsNextDisabled(state.formData?.IDs?.length === 0);
-  }, [state.formData?.IDs]);
+    setIsNextDisabled(state.formData?.IDs?.length === 0 || apiLoading);
+  }, [state.formData?.IDs, apiLoading]);
 
   // Auto-switch to tab with results only when search term changes (not when user manually clicks tab)
   useEffect(() => {
@@ -376,8 +376,9 @@ const RunPanel = ({ onWorkflowError }) => {
                         title="View Container Image"
                         onClick={(e) => {
                           e.stopPropagation();
+                          const imageNoTag = workflow.metadata["container-image"].image.split(":")[0];
                           window.open(
-                            `https://hub.docker.com/r/${workflow.metadata["container-image"].image}`,
+                            `https://hub.docker.com/r/${imageNoTag}`,
                             "_blank",
                             "noopener,noreferrer"
                           );
@@ -546,6 +547,9 @@ const RunPanel = ({ onWorkflowError }) => {
             }
             nextButtonProps={{
               disabled: isNextDisabled,
+              icon: apiLoading ? <Spinner size={14} /> : undefined,
+              text: apiLoading ? "Loading images…" : "Next",
+              title: apiLoading ? "Wait for all images to finish loading" : undefined,
             }}
           />
 

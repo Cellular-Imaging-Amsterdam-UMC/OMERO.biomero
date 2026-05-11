@@ -215,7 +215,6 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   const loadThumbnails = async (imageIds) => {
-    setLoading(true);
     setError(null);
 
     try {
@@ -236,8 +235,6 @@ export const AppProvider = ({ children }) => {
       }));
     } catch (err) {
       setError(err.message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -279,6 +276,24 @@ export const AppProvider = ({ children }) => {
           if (images.length > 0) {
             allImages = [...allImages, ...imagesWithSource];
 
+            // Flush each page into state immediately so thumbnails can start loading
+            // for the first page while remaining pages are still in flight.
+            setState(prev => ({
+              ...prev,
+              omeroFileTreeData: {
+                ...prev.omeroFileTreeData,
+                [index]: {
+                  ...dataset,
+                  children: allImages,
+                },
+              },
+              images: [
+                ...new Map(
+                  [...(prev.images || []), ...allImages].map((img) => [img.id, img])
+                ).values(),
+              ],
+            }));
+
             // Check if we have fetched enough images
             if (allImages.length >= childCount) {
               keepFetching = false; // We fetched enough images
@@ -289,24 +304,6 @@ export const AppProvider = ({ children }) => {
             keepFetching = false; // No more images to fetch
           }
         }
-
-        // Store images in the parent structure in state.omeroFileTreeData
-        // Use functional setState to avoid race condition when loading multiple datasets concurrently
-        setState(prev => ({
-          ...prev,
-          omeroFileTreeData: {
-            ...prev.omeroFileTreeData,
-            [index]: {
-              ...dataset,
-              children: allImages,
-            },
-          },
-          images: [
-            ...new Map(
-              [...(prev.images || []), ...allImages].map((img) => [img.id, img])
-            ).values(),
-          ],
-        }));
       } else if (type === "plate") {
         const plateId = parseInt(id, 10);
         // Use our existing API service functions

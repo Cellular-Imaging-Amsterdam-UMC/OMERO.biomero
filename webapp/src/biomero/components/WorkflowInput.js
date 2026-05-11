@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback, useTransition } from "react";
 import {
   DialogBody,
   H6,
@@ -84,22 +84,23 @@ const LazyThumbnail = ({ imageId, thumbnail, apiLoading, onVisible, listMode = f
 // datasetInfo is excluded too: it only changes when datasets change (rare), not on selection.
 const imageItemPropsAreEqual = (prev, next) =>
   prev.isSelected === next.isSelected &&
+  prev.isDisabled === next.isDisabled &&
   prev.thumbnail === next.thumbnail &&
   prev.image === next.image &&
   prev.apiLoading === next.apiLoading;
 
 // Memoized list row — only re-renders when this specific image’s selection/thumbnail changes.
 const ImageListRow = React.memo(
-  ({ image, isSelected, thumbnail, apiLoading, datasetInfo, onToggle, onVisible }) => (
+  ({ image, isSelected, isDisabled, thumbnail, apiLoading, datasetInfo, onToggle, onVisible }) => (
     <div
       className={`flex items-center justify-between gap-4 ${
-        image.isDisabled ? "opacity-50 cursor-not-allowed" : ""
+        isDisabled ? "opacity-50 cursor-not-allowed" : ""
       }`}
     >
       <Switch
         checked={isSelected}
         onChange={() => onToggle(image.id)}
-        disabled={image.isDisabled}
+        disabled={isDisabled}
         className="mb-0 min-w-0"
       >
         {image.name}
@@ -125,7 +126,7 @@ const ImageListRow = React.memo(
 
 // Memoized grid card — same principle.
 const ImageGridCard = React.memo(
-  ({ image, isSelected, thumbnail, apiLoading, datasetInfo, onToggle, onVisible }) => (
+  ({ image, isSelected, isDisabled, thumbnail, apiLoading, datasetInfo, onToggle, onVisible }) => (
     <Tooltip
       content={
         <div>
@@ -137,16 +138,16 @@ const ImageGridCard = React.memo(
           )}
         </div>
       }
-      targetProps={{ className: image.isDisabled ? "cursor-not-allowed" : "" }}
+      targetProps={{ className: isDisabled ? "cursor-not-allowed" : "" }}
     >
       <Card
         interactive={true}
-        elevation={image.isDisabled ? 1 : 3}
-        className={`p-1 flex flex-col items-center justify-between border transition-all duration-150
-          ${image.isDisabled ? "opacity-50 pointer-events-none cursor-not-allowed" : ""}
+        elevation={isDisabled ? 1 : 3}
+        className={`p-1 flex flex-col items-center justify-between border
+          ${isDisabled ? "opacity-50 pointer-events-none cursor-not-allowed" : ""}
           ${isSelected ? "bg-blue-500" : ""}
         `}
-        onClick={() => !image.isDisabled && onToggle(image.id)}
+        onClick={() => !isDisabled && onToggle(image.id)}
         selected={isSelected}
       >
         <LazyThumbnail
@@ -164,7 +165,6 @@ const ImageGridCard = React.memo(
 const WorkflowInput = () => {
   const { state, updateState, loadThumbnails, loadImagesForDataset, apiLoading } =
     useAppContext();
-  const [filteredImages, setFilteredImages] = useState([]);
   const [selectedPlate, setSelectedPlate] = useState(null);
   const [plateWellCount, setPlateWellCount] = useState(null);
   const [plateGridData, setPlateGridData] = useState(null);
@@ -172,13 +172,20 @@ const WorkflowInput = () => {
   // Persistent state (survives Back/Next navigation)
   const wis = state.workflowInputState || {};
   const selectedImageIds = wis.selectedImageIds ?? [];
-  const searchQuery = wis.searchQuery ?? "";
+  // searchQuery stays local for instant typing; debounced value is mirrored to AppContext
+  // so it survives Back/Next navigation
+  const [searchQuery, setSearchQuery] = useState(wis.searchQuery ?? "");
+  const [debouncedQuery, setDebouncedQuery] = useState(wis.searchQuery ?? "");
+  const debounceRef = useRef(null);
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
   const activeTab = wis.activeTab ?? "grid";
   const zoom = wis.zoom ?? 7;
 
   // Atomic helper — updates one or more fields in workflowInputState
   const updateWIS = (changes) =>
     updateState({ workflowInputState: { ...state.workflowInputState, ...changes } });
+
+  const [isPending, startTransition] = useTransition();
 
   // O(1) lookup set — avoids O(n) .includes() over 1800+ ids per render
   const selectedSet = useMemo(() => new Set(selectedImageIds), [selectedImageIds]);
@@ -212,7 +219,7 @@ const WorkflowInput = () => {
   useEffect(() => {
     if (preloadedRef.current || !state.images?.length) return;
     preloadedRef.current = true;
-    const firstBatch = state.images.slice(0, 50).map((img) => img.id).filter((id) => !state.thumbnails?.[String(id)]);
+    const firstBatch = state.images.slice(0, 28).map((img) => img.id).filter((id) => !state.thumbnails?.[String(id)]);
     if (firstBatch.length > 0) loadThumbnails(firstBatch);
   }, [state.images]);
 
@@ -276,17 +283,7 @@ const WorkflowInput = () => {
     prevImageIdsRef.current = allIds;
 
     // Thumbnails are now loaded lazily via IntersectionObserver in <LazyThumbnail>.
-    // Update filteredImages (respecting active search)
-    if (searchQuery) {
-      const lq = searchQuery.toLowerCase();
-      setFilteredImages(
-        state.images
-          .map((img) => ({ ...img, isDisabled: !img.name.toLowerCase().includes(lq) }))
-          .sort((a, b) => Number(a.isDisabled) - Number(b.isDisabled))
-      );
-    } else {
-      setFilteredImages(state.images);
-    }
+    // filteredImages is derived via useMemo below — no setFilteredImages needed here.
 
     if (prevIds.length === 0) {
       // First mount — if we have stored selections keep them, otherwise select all
@@ -357,22 +354,33 @@ const WorkflowInput = () => {
     fetchPlateWellCount();
   }, [selectedPlate?.id]);
 
-  // Update the filtered list dynamically as the search query changes
-  useEffect(() => {
-    if (searchQuery && state.images) {
-      const lowerQuery = searchQuery.toLowerCase();
-      setFilteredImages(
-        state.images
-          .map((image) => ({
-            ...image,
-            isDisabled: !image.name.toLowerCase().includes(lowerQuery),
-          }))
-          .sort((a, b) => Number(a.isDisabled) - Number(b.isDisabled))
-      );
-    } else {
-      setFilteredImages(state.images || []);
+  // Split images into matched/unmatched — original objects are never spread/cloned,
+  // so React.memo only re-renders items whose isDisabled prop actually flips.
+  const [matchedImages, disabledImages] = useMemo(() => {
+    if (!state.images) return [[], []];
+    if (!debouncedQuery) return [state.images, []];
+    const lq = debouncedQuery.toLowerCase();
+    const matched = [], disabled = [];
+    for (const img of state.images) {
+      (img.name.toLowerCase().includes(lq) ? matched : disabled).push(img);
     }
-  }, [searchQuery, state.images]);
+    return [matched, disabled];
+  }, [state.images, debouncedQuery]);
+
+  // enabledIds, allEnabledSelected, noneEnabledSelected — memoized to avoid repeated O(n) scans in JSX
+  const enabledIds = useMemo(() => matchedImages.map((img) => img.id), [matchedImages]);
+  // true only when the selection is exactly the enabled set — same count AND all enabled are selected
+  const allEnabledSelected = useMemo(
+    () =>
+      enabledIds.length > 0 &&
+      selectedImageIds.length === enabledIds.length &&
+      enabledIds.every((id) => selectedSet.has(id)),
+    [enabledIds, selectedImageIds, selectedSet]
+  );
+  const noneEnabledSelected = useMemo(
+    () => enabledIds.every((id) => !selectedSet.has(id)),
+    [enabledIds, selectedSet]
+  );
 
   // handleToggleImage is stable (ref-forwarding pattern) so React.memo items don't re-render
   // when the parent re-renders for unrelated reasons.
@@ -385,29 +393,29 @@ const WorkflowInput = () => {
   };
   const handleToggleImage = useCallback((id) => toggleImpl.current(id), []);
 
-  const handleUncheckAll = () => updateWIS({ selectedImageIds: [] });
-
-  const getAllEnabledIds = () =>
-    filteredImages.filter((img) => !img.isDisabled).map((img) => img.id);
+  const handleUncheckAll = () => startTransition(() => updateWIS({ selectedImageIds: [] }));
 
   const handleCheckAllFiltered = () => {
-    const allEnabledIds = getAllEnabledIds();
-    updateWIS({ selectedImageIds: [...new Set([...selectedImageIds, ...allEnabledIds])] });
+    startTransition(() =>
+      updateWIS({ selectedImageIds: [...new Set([...selectedImageIds, ...enabledIds])] })
+    );
   };
 
   const handleCheckOnlyFiltered = () => {
-    updateWIS({ selectedImageIds: [...new Set(getAllEnabledIds())] });
+    startTransition(() => updateWIS({ selectedImageIds: [...enabledIds] }));
   };
 
   const handleCheckAll = () => {
-    updateWIS({ selectedImageIds: state.images.map((img) => img.id) });
+    startTransition(() =>
+      updateWIS({ selectedImageIds: state.images.map((img) => img.id) })
+    );
   };
 
   const handleUncheckAllFiltered = () => {
-    const updated = selectedImageIds.filter(
-      (id) => !filteredImages.some((img) => img.id === id && !img.isDisabled)
+    const enabledSet = new Set(enabledIds);
+    startTransition(() =>
+      updateWIS({ selectedImageIds: selectedImageIds.filter((id) => !enabledSet.has(id)) })
     );
-    updateWIS({ selectedImageIds: updated });
   };
 
   // Save selected IDs when proceeding to the next step
@@ -702,13 +710,30 @@ const WorkflowInput = () => {
                       <Button
                         minimal
                         icon="cross"
-                        onClick={() => updateWIS({ searchQuery: "" })}
+                        onClick={() => {
+                          clearTimeout(debounceRef.current);
+                          setSearchQuery("");
+                          startTransition(() => {
+                            setDebouncedQuery("");
+                            updateWIS({ searchQuery: "" });
+                          });
+                        }}
                       />
                     )
                   }
                   placeholder="Type to filter images..."
                   value={searchQuery}
-                  onChange={(e) => updateWIS({ searchQuery: e.target.value })}
+                  onChange={(e) => {
+                    const q = e.target.value;
+                    setSearchQuery(q);
+                    clearTimeout(debounceRef.current);
+                    debounceRef.current = setTimeout(() => {
+                      startTransition(() => {
+                        setDebouncedQuery(q);
+                        updateWIS({ searchQuery: q });
+                      });
+                    }, 150);
+                  }}
                 />
               </FormGroup>
               <ButtonGroup className="mb-2 w-full" fill={true}>
@@ -767,35 +792,21 @@ const WorkflowInput = () => {
                 <Tooltip
                   intent={
                     searchQuery &&
-                    !(
-                      selectedImageIds.length === getAllEnabledIds().length &&
-                      selectedImageIds.every((imageId) =>
-                        getAllEnabledIds().includes(imageId)
-                      )
-                    )
+                    !allEnabledSelected
                       ? "success"
                       : "none"
                   }
                   content={
                     !searchQuery
                       ? "Add a filter first"
-                      : selectedImageIds.length === getAllEnabledIds().length &&
-                        selectedImageIds.every((imageId) =>
-                          getAllEnabledIds().includes(imageId)
-                        )
+                      : allEnabledSelected
                       ? "Only the filtered images are already selected"
                       : "Select ONLY the images matching your filter"
                   }
                   isOpen={
-                    searchQuery &&
-                    !(
-                      selectedImageIds.length === getAllEnabledIds().length &&
-                      selectedImageIds.every((imageId) =>
-                        getAllEnabledIds().includes(imageId)
-                      )
-                    ) // Auto-show only if filter is not yet applied
+                    searchQuery && !allEnabledSelected
                       ? true
-                      : undefined // Restore hover behavior when applied
+                      : undefined
                   }
                 >
                   <Button
@@ -806,41 +817,26 @@ const WorkflowInput = () => {
                       handleCheckOnlyFiltered();
                     }}
                     intent={
-                      searchQuery &&
-                      !(
-                        selectedImageIds.length === getAllEnabledIds().length &&
-                        selectedImageIds.every((imageId) =>
-                          getAllEnabledIds().includes(imageId)
-                        )
-                      )
+                      searchQuery && !allEnabledSelected
                         ? "success"
                         : "none"
                     }
                     disabled={
-                      !searchQuery ||
-                      (selectedImageIds.length === getAllEnabledIds().length &&
-                        selectedImageIds.every((imageId) =>
-                          getAllEnabledIds().includes(imageId)
-                        ))
+                      !searchQuery || allEnabledSelected
                     }
                     className="flex-grow"
                   />
                 </Tooltip>
                 <Tooltip
                   intent={
-                    searchQuery &&
-                    !getAllEnabledIds().every((imageId) =>
-                      selectedSet.has(imageId)
-                    )
+                    searchQuery && !allEnabledSelected
                       ? "primary"
                       : "none"
                   }
                   content={
                     !searchQuery
                       ? "Add a filter first"
-                      : getAllEnabledIds().every((imageId) =>
-                          selectedSet.has(imageId)
-                        )
+                      : allEnabledSelected
                       ? "All filtered images are already selected"
                       : "Select all filtered images"
                   }
@@ -851,18 +847,12 @@ const WorkflowInput = () => {
                     text="Select Filtered"
                     onClick={handleCheckAllFiltered}
                     intent={
-                      searchQuery &&
-                      !getAllEnabledIds().every((imageId) =>
-                        selectedSet.has(imageId)
-                      )
+                      searchQuery && !allEnabledSelected
                         ? "primary"
                         : "none"
                     }
                     disabled={
-                      !searchQuery ||
-                      getAllEnabledIds().every((imageId) =>
-                        selectedSet.has(imageId)
-                      )
+                      !searchQuery || allEnabledSelected
                     }
                     className="flex-grow"
                   />
@@ -870,19 +860,14 @@ const WorkflowInput = () => {
 
                 <Tooltip
                   intent={
-                    searchQuery &&
-                    !getAllEnabledIds().every(
-                      (imageId) => !selectedSet.has(imageId)
-                    )
+                    searchQuery && !noneEnabledSelected
                       ? "primary"
                       : "none"
                   }
                   content={
                     !searchQuery
                       ? "Add a filter first"
-                      : getAllEnabledIds().every(
-                          (imageId) => !selectedSet.has(imageId)
-                        )
+                      : noneEnabledSelected
                       ? "No filtered images are selected to deselect"
                       : "Deselect all filtered images"
                   }
@@ -893,18 +878,12 @@ const WorkflowInput = () => {
                     text="Deselect Filtered"
                     onClick={handleUncheckAllFiltered}
                     intent={
-                      searchQuery &&
-                      !getAllEnabledIds().every(
-                        (imageId) => !selectedSet.has(imageId)
-                      )
+                      searchQuery && !noneEnabledSelected
                         ? "primary"
                         : "none"
                     }
                     disabled={
-                      !searchQuery ||
-                      getAllEnabledIds().every(
-                        (imageId) => !selectedSet.has(imageId)
-                      )
+                      !searchQuery || noneEnabledSelected
                     }
                     className="flex-grow"
                   />
@@ -948,25 +927,41 @@ const WorkflowInput = () => {
             parentId="workflow-input-tabs"
             className="overflow-auto"
             panel={
-              <div className="flex flex-col gap-2 overflow-y-auto pt-1 pl-1 min-h-[calc(100vh-80vh)] max-h-[45vh]">
-                {apiLoading && filteredImages.length === 0 ? (
+              <div className={`flex flex-col gap-2 overflow-y-auto pt-1 pl-1 min-h-[calc(100vh-80vh)] max-h-[45vh] transition-opacity duration-150 ${isPending ? "opacity-50" : ""}`}>
+                {apiLoading && matchedImages.length === 0 && disabledImages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-32 gap-2 text-gray-400">
                     <Spinner size={SpinnerSize.LARGE} />
                     <span className="text-sm">Loading images…</span>
                   </div>
-                ) : filteredImages.length > 0 ? (
-                  filteredImages.map((image) => (
-                    <ImageListRow
-                      key={image.id}
-                      image={image}
-                      isSelected={selectedSet.has(image.id)}
-                      thumbnail={state.thumbnails?.[image.id]}
-                      datasetInfo={datasetByImageId[image.id]}
-                      apiLoading={apiLoading}
-                      onToggle={handleToggleImage}
-                      onVisible={requestThumbnail}
-                    />
-                  ))
+                ) : matchedImages.length > 0 || disabledImages.length > 0 ? (
+                  <>
+                    {matchedImages.map((image) => (
+                      <ImageListRow
+                        key={image.id}
+                        image={image}
+                        isSelected={selectedSet.has(image.id)}
+                        isDisabled={false}
+                        thumbnail={state.thumbnails?.[image.id]}
+                        datasetInfo={datasetByImageId[image.id]}
+                        apiLoading={apiLoading}
+                        onToggle={handleToggleImage}
+                        onVisible={requestThumbnail}
+                      />
+                    ))}
+                    {disabledImages.map((image) => (
+                      <ImageListRow
+                        key={image.id}
+                        image={image}
+                        isSelected={selectedSet.has(image.id)}
+                        isDisabled={true}
+                        thumbnail={state.thumbnails?.[image.id]}
+                        datasetInfo={datasetByImageId[image.id]}
+                        apiLoading={apiLoading}
+                        onToggle={handleToggleImage}
+                        onVisible={requestThumbnail}
+                      />
+                    ))}
+                  </>
                 ) : (
                   <p className="text-gray-500 text-xs">
                     No images match your search.
@@ -981,7 +976,7 @@ const WorkflowInput = () => {
             parentId="workflow-input-tabs"
             className="overflow-auto min-h-[calc(100vh-80vh)] max-h-[45vh]"
             panel={
-              <div className="flex flex-col items-center">
+              <div className={`flex flex-col items-center transition-opacity duration-150 ${isPending ? "opacity-50" : ""}` }>
                 {/* Slider Section */}
                 <div className="w-full px-4">
                   <FormGroup label="Columns" inline={false}>
@@ -1001,24 +996,40 @@ const WorkflowInput = () => {
                 <div
                   className={`grid grid-cols-${zoom} gap-2 overflow-y-auto p-1 w-full`}
                 >
-                  {apiLoading && filteredImages.length === 0 ? (
+                  {apiLoading && matchedImages.length === 0 && disabledImages.length === 0 ? (
                     <div className="col-span-full flex flex-col items-center justify-center h-32 gap-2 text-gray-400">
                       <Spinner size={SpinnerSize.LARGE} />
                       <span className="text-sm">Loading images…</span>
                     </div>
-                  ) : filteredImages.length > 0 ? (
-                    filteredImages.map((image) => (
-                      <ImageGridCard
-                        key={image.id}
-                        image={image}
-                        isSelected={selectedSet.has(image.id)}
-                        thumbnail={state.thumbnails?.[image.id]}
-                        datasetInfo={datasetByImageId[image.id]}
-                        apiLoading={apiLoading}
-                        onToggle={handleToggleImage}
-                        onVisible={requestThumbnail}
-                      />
-                    ))
+                  ) : matchedImages.length > 0 || disabledImages.length > 0 ? (
+                    <>
+                      {matchedImages.map((image) => (
+                        <ImageGridCard
+                          key={image.id}
+                          image={image}
+                          isSelected={selectedSet.has(image.id)}
+                          isDisabled={false}
+                          thumbnail={state.thumbnails?.[image.id]}
+                          datasetInfo={datasetByImageId[image.id]}
+                          apiLoading={apiLoading}
+                          onToggle={handleToggleImage}
+                          onVisible={requestThumbnail}
+                        />
+                      ))}
+                      {disabledImages.map((image) => (
+                        <ImageGridCard
+                          key={image.id}
+                          image={image}
+                          isSelected={selectedSet.has(image.id)}
+                          isDisabled={true}
+                          thumbnail={state.thumbnails?.[image.id]}
+                          datasetInfo={datasetByImageId[image.id]}
+                          apiLoading={apiLoading}
+                          onToggle={handleToggleImage}
+                          onVisible={requestThumbnail}
+                        />
+                      ))}
+                    </>
                   ) : (
                     <p className="text-gray-500 text-xs col-span-4">
                       No images match your search.
