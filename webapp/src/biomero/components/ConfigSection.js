@@ -68,7 +68,9 @@ const ConfigSection = ({
           <div key={index}>
             <div className="flex items-center justify-between">
               <H4 className={`font-semibold flex items-center cursor-pointer ${
-                versionStatus && versionStatus[index] && versionStatus[index].status === 'outdated' && !versionStatus[index].justUpdated
+                versionStatus && versionStatus[index] && 
+                  (versionStatus[index].status === 'outdated' || (versionStatus[index].status === 'unknown' && versionStatus[index].latestVersion)) &&
+                  !versionStatus[index].justUpdated
                   ? 'text-orange-600' 
                   : ''
               }`}
@@ -80,7 +82,7 @@ const ConfigSection = ({
                   const status = versionStatus && versionStatus[index];
                   
                   if (status) {
-                    const isOutdated = status.status === 'outdated' && !status.justUpdated;
+                    const isOutdated = (status.status === 'outdated' || (status.status === 'unknown' && status.latestVersion)) && !status.justUpdated;
                     const isRateLimited = status.status === 'rate-limited';
                     const isStale = status.isStale || status.status?.includes('-stale');
                     

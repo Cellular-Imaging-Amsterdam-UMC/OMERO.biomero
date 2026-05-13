@@ -231,6 +231,8 @@ const SettingsForm = () => {
         upToDate++;
       } else if (status.status === 'outdated') {
         outdated++;
+      } else if (status.status === 'unknown' && status.latestVersion) {
+        outdated++; // unversioned URLs count as needing an update
       } else if (status.status === 'up-to-date-stale' || status.status === 'outdated-stale') {
         stale++;
         if (status.status === 'up-to-date-stale') upToDate++;

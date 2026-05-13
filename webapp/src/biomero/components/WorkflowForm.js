@@ -119,6 +119,8 @@ const WorkflowForm = () => {
   const renderFormFields = () => {
     return workflowMetadata.inputs
       .filter((input) => !input.id.startsWith("cytomine")) // Ignore fields starting with "cytomine"
+      .filter((input) => !input["set-by-server"]) // Ignore server-assigned parameters
+      .filter((input) => !input["output-dir-set"]) // Ignore output directory parameters (set by biomero)
       .map((input) => {
         const { id, name, description, type, optional } = input;
         const defaultValue = input["default-value"];

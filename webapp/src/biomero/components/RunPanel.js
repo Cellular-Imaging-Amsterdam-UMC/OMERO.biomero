@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAppContext } from "../../AppContext";
 import {
   Card,
@@ -26,6 +26,54 @@ import WorkflowOutput from "./WorkflowOutput";
 import WorkflowInput from "./WorkflowInput";
 import InputOptions from "./InputOptions";
 import PlateWorkflowDialog from "./plate/PlateWorkflowDialog";
+
+const DescriptionWithToggle = ({ description }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const textRef = useRef(null);
+
+  // Check real DOM overflow while clamped — re-runs on every resize (column changes, window resize)
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+    const checkOverflow = () => setIsOverflowing(el.scrollHeight > el.clientHeight);
+    const observer = new ResizeObserver(checkOverflow);
+    observer.observe(el);
+    checkOverflow();
+    return () => observer.disconnect();
+  }, [description]);
+
+  // Re-check after collapsing so the button reappears correctly
+  useEffect(() => {
+    if (!isExpanded) {
+      requestAnimationFrame(() => {
+        if (textRef.current)
+          setIsOverflowing(textRef.current.scrollHeight > textRef.current.clientHeight);
+      });
+    }
+  }, [isExpanded]);
+
+  return (
+    <div>
+      <p ref={textRef} className={`text-sm text-gray-600 ${!isExpanded ? 'line-clamp-5' : ''}`}>
+        {description}
+      </p>
+      {(isOverflowing || isExpanded) && (
+        <div className="flex justify-end mt-1">
+          <Button
+            minimal
+            small
+            text={isExpanded ? "Show less" : "Show more"}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded((prev) => !prev);
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
 
 const RunPanel = ({ onWorkflowError }) => {
   const { state, updateState, toaster, runWorkflowData, apiLoading } = useAppContext();
@@ -376,9 +424,30 @@ const RunPanel = ({ onWorkflowError }) => {
                         title="View Container Image"
                         onClick={(e) => {
                           e.stopPropagation();
-                          const imageNoTag = workflow.metadata["container-image"].image.split(":")[0];
+                          const image = workflow.metadata["container-image"].image;
+                          // Version lives in githubUrl (e.g. /tree/v1.0.1), not in the image string
+                          const versionMatch = workflow.githubUrl?.match(/\/tree\/(v[\d.]+)/);
+                          const imageTag = versionMatch?.[1] || '';
+                          const tagsUrl = imageTag
+                            ? `https://hub.docker.com/r/${image}/tags?name=${imageTag}`
+                            : `https://hub.docker.com/r/${image}`;
+                          window.open(tagsUrl, "_blank", "noopener,noreferrer");
+                        }}
+                      />
+                    )}
+
+                    {/* DOI / Citation Icon */}
+                    {workflow.metadata?.citations?.find(c => c.doi) && (
+                      <Button
+                        icon="manual"
+                        minimal
+                        intent="primary"
+                        title={`View citation: ${workflow.metadata.citations.find(c => c.doi).name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const doi = workflow.metadata.citations.find(c => c.doi).doi;
                           window.open(
-                            `https://hub.docker.com/r/${imageNoTag}`,
+                            `https://doi.org/${doi}`,
                             "_blank",
                             "noopener,noreferrer"
                           );
@@ -389,7 +458,7 @@ const RunPanel = ({ onWorkflowError }) => {
                   </div>
 
                 {/* Description Section */}
-                <p className="text-sm text-gray-600">{workflow.description}</p>
+                <DescriptionWithToggle description={workflow.description} />
               </Card>
               );
               
