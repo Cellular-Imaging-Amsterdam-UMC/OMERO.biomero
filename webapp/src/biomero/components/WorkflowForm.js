@@ -30,19 +30,26 @@ const WorkflowForm = () => {
     return { intent: Intent.SUCCESS, message: "Version available" };
   };
 
-  // Helper function to check workflow flags from config
+  // Helper function to check workflow flags from config and from schema metadata
   const getWorkflowFlags = (workflowName) => {
     const config = state.config;
-    if (!config || !config.UI) return { isPlateWorkflow: false, isZarrWorkflow: false };
-    
-    const plateWorkflows = config.UI.plate_workflows ? 
-      JSON.parse(config.UI.plate_workflows || '[]') : [];
-    const isPlateWorkflow = plateWorkflows.includes(workflowName);
-    
-    const zarrWorkflows = config.UI.zarr_workflows ? 
-      JSON.parse(config.UI.zarr_workflows || '[]') : [];
-    const isZarrWorkflow = zarrWorkflows.includes(workflowName);
-    
+    let isPlateWorkflow = false;
+    let isZarrWorkflow = false;
+
+    // Admin-configured overrides (zarr_workflows / plate_workflows lists)
+    if (config?.UI) {
+      const plateWorkflows = config.UI.plate_workflows ?
+        JSON.parse(config.UI.plate_workflows || '[]') : [];
+      const zarrWorkflows = config.UI.zarr_workflows ?
+        JSON.parse(config.UI.zarr_workflows || '[]') : [];
+      isPlateWorkflow = plateWorkflows.includes(workflowName);
+      isZarrWorkflow = zarrWorkflows.includes(workflowName);
+    }
+
+    // Schema-level flags auto-detected from the descriptor (bilayers)
+    isZarrWorkflow = isZarrWorkflow || (workflowMetadata?.['requires-zarr'] ?? false);
+    isPlateWorkflow = isPlateWorkflow || (workflowMetadata?.['requires-plate'] ?? false);
+
     return { isPlateWorkflow, isZarrWorkflow };
   };
 
@@ -105,7 +112,7 @@ const WorkflowForm = () => {
         });
       }
     }
-  }, [workflowName, state.config]);
+  }, [workflowName, state.config, workflowMetadata]);
 
   const handleInputChange = (id, value) => {
     updateState({

@@ -103,11 +103,19 @@ export const fetchSlurmStatus = async () => {
   return apiRequest(urls.api_slurm_status, "GET");
 };
 
-// Fetch metadata for a specific workflow
-export const fetchWorkflowMetadata = async (workflow) => {
+// Fetch metadata for a specific workflow, or descriptor info for an unsaved repo URL.
+// - fetchWorkflowMetadata(workflowName)  → GET /api/analyzer/workflows/<name>/
+// - fetchWorkflowMetadata(null, repoUrl) → GET /api/analyzer/workflows/?repo=<url>
+//   Returns the full biomero-schema descriptor dict including 'requires-zarr',
+//   'requires-plate', and 'name' (tool name from descriptor).
+export const fetchWorkflowMetadata = async (workflow, repoUrl = null) => {
   const { urls } = getDjangoConstants();
-  const workflowMetadataUrl = `${urls.workflows}${workflow}/`; // analyzer detail includes metadata
-  return apiRequest(workflowMetadataUrl, "GET");
+  if (repoUrl) {
+    return apiRequest(
+      `${urls.workflows}?repo=${encodeURIComponent(repoUrl)}`, "GET"
+    );
+  }
+  return apiRequest(`${urls.workflows}${workflow}/`, "GET");
 };
 
 // GitHub URL is included in fetchWorkflowMetadata().githubUrl
@@ -473,7 +481,7 @@ const _fetchDescriptor = async (owner, repo, ref) => {
   return result;
 };
 
-const slugify = (name) => name.toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '');
+export const slugify = (name) => name.toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '');
 
 export const fetchDescriptorName = async (repoUrl) => {
   const info = extractGitHubInfo(repoUrl);

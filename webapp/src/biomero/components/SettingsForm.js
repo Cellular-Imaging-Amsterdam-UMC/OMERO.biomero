@@ -17,7 +17,7 @@ import CollapsibleSection from "./CollapsibleSection";
 import ConfigSection from "./ConfigSection";
 import ModelCard from "./ModelCard.js";
 import ConverterCard from "./ConverterCard.js";
-import { checkModelVersions, clearGitHubCache, fetchDescriptorName } from "../../apiService";
+import { checkModelVersions, clearGitHubCache, slugify, fetchWorkflowMetadata } from "../../apiService";
 
 const SettingsForm = () => {
   const { 
@@ -257,9 +257,13 @@ const SettingsForm = () => {
     
     const model = settingsForm.MODELS[modelIndex];
 
-    // Auto-populate name from descriptor.json if the name field is still empty
-    if (!model.name) {
-      const descriptorName = await fetchDescriptorName(model.repo);
+    // Fetch the descriptor once — gets us the tool name AND zarr/plate flags
+    // in a single Django→GitHub round-trip (server-side caching applies).
+    const metadata = await fetchWorkflowMetadata(null, model.repo);
+
+    // Auto-populate name from descriptor if the name field is still empty
+    if (!model.name && metadata?.name) {
+      const descriptorName = slugify(metadata.name);
       if (descriptorName) {
         // Ensure uniqueness among existing model names (excluding this slot)
         const existingNames = (settingsForm.MODELS || [])
@@ -272,6 +276,16 @@ const SettingsForm = () => {
           uniqueName = `${descriptorName}_${counter++}`;
         }
         handleModelChange(modelIndex, "name", uniqueName);
+      }
+    }
+
+    // Auto-detect zarr/plate flags from the descriptor
+    if (metadata) {
+      if (metadata['requires-plate'] && !model.isPlateWorkflow) {
+        handleModelChange(modelIndex, "isPlateWorkflow", true, { skipVersionCheck: true });
+      }
+      if (metadata['requires-zarr'] && !model.isZarrWorkflow) {
+        handleModelChange(modelIndex, "isZarrWorkflow", true, { skipVersionCheck: true });
       }
     }
 

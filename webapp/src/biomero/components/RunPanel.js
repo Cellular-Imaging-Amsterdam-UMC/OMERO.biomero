@@ -90,19 +90,27 @@ const RunPanel = ({ onWorkflowError }) => {
   // Check if importer is enabled - only show plate features if it is
   const isImporterEnabled = window.WEBCLIENT?.UI?.IMPORTER_ENABLED || false;
 
-  // Helper function to check if a workflow has specific flags from config
+  // Helper function to check if a workflow has specific flags from config or schema
   const getWorkflowFlags = (workflowName) => {
     const config = state.config;
-    if (!config || !config.UI) return { isPlateWorkflow: false, isZarrWorkflow: false };
-    
-    const plateWorkflows = config.UI.plate_workflows ? 
-      JSON.parse(config.UI.plate_workflows || '[]') : [];
-    const isPlateWorkflow = plateWorkflows.includes(workflowName);
-    
-    const zarrWorkflows = config.UI.zarr_workflows ? 
-      JSON.parse(config.UI.zarr_workflows || '[]') : [];
-    const isZarrWorkflow = zarrWorkflows.includes(workflowName);
-    
+    let isPlateWorkflow = false;
+    let isZarrWorkflow = false;
+
+    // Admin-configured overrides (zarr_workflows / plate_workflows lists)
+    if (config?.UI) {
+      const plateWorkflows = config.UI.plate_workflows ?
+        JSON.parse(config.UI.plate_workflows || '[]') : [];
+      const zarrWorkflows = config.UI.zarr_workflows ?
+        JSON.parse(config.UI.zarr_workflows || '[]') : [];
+      isPlateWorkflow = plateWorkflows.includes(workflowName);
+      isZarrWorkflow = zarrWorkflows.includes(workflowName);
+    }
+
+    // Schema-level flags auto-detected from the descriptor (bilayers)
+    const wfData = state.workflows?.find(w => w.name === workflowName);
+    isZarrWorkflow = isZarrWorkflow || (wfData?.metadata?.['requires-zarr'] ?? false);
+    isPlateWorkflow = isPlateWorkflow || (wfData?.metadata?.['requires-plate'] ?? false);
+
     return { isPlateWorkflow, isZarrWorkflow };
   };
   

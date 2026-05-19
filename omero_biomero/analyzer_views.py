@@ -259,9 +259,7 @@ def run_workflow_script(request, conn=None, **kwargs):
 @login_required()
 @require_http_methods(["GET"])
 def list_workflows(request, conn=None, **kwargs):
-    """
-    List available workflows using SlurmClient.
-    """
+    """GET /api/analyzer/workflows/ → {"workflows": [name, ...]}"""
     try:
         with SlurmClient.from_config(config_only=True) as sc:
             workflows = list(sc.slurm_model_images.keys())
@@ -275,29 +273,37 @@ def list_workflows(request, conn=None, **kwargs):
 @require_http_methods(["GET"])
 def get_workflow_metadata(request, conn=None, **kwargs):
     """
-    Get metadata for a specific workflow.
-    Also includes the GitHub repository URL for the workflow.
+    GET /api/analyzer/workflows/<name>/   → descriptor for a configured workflow.
+    GET /api/analyzer/workflows/?repo=URL → descriptor fetched directly from GitHub.
+
+    Returns the biomero-schema descriptor dict enriched with ``githubUrl``.
     """
-    # workflow_name = request.GET.get("workflow", None)
     workflow_name = kwargs.get("name")
-    if not workflow_name:
-        return JsonResponse({"error": "Workflow name is required"}, status=400)
+    repo_url = request.GET.get("repo", "").strip()
+
+    if not workflow_name and not repo_url:
+        return JsonResponse(
+            {"error": "Workflow name (URL segment) or ?repo= parameter required"},
+            status=400,
+        )
 
     try:
         with SlurmClient.from_config(config_only=True) as sc:
-            if workflow_name not in sc.slurm_model_images:
-                return JsonResponse(
-                    {"error": "Workflow not found"}, status=404
-                )
-
-            metadata = sc.generic_descriptor_from_github(workflow_name)
-            github_url = sc.slurm_model_repos.get(workflow_name)
-    # Keep description/inputs at top-level for backward compatibility
-        enriched = {**metadata, "name": workflow_name, "githubUrl": github_url}
+            if repo_url:
+                metadata = sc.generic_descriptor_from_github(repo_url)
+                enriched = {**metadata, "githubUrl": repo_url}
+            else:
+                if workflow_name not in sc.slurm_model_images:
+                    return JsonResponse(
+                        {"error": "Workflow not found"}, status=404
+                    )
+                metadata = sc.generic_descriptor_from_github(workflow_name)
+                github_url = sc.slurm_model_repos.get(workflow_name)
+                enriched = {**metadata, "name": workflow_name, "githubUrl": github_url}
         return JsonResponse(enriched)
     except Exception as e:
         logger.error(
-            f"Error fetching metadata for workflow {workflow_name}: {str(e)}"
+            f"Error fetching metadata for workflow {workflow_name or repo_url}: {str(e)}"
         )
         return JsonResponse({"error": str(e)}, status=500)
 

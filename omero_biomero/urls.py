@@ -27,7 +27,7 @@ urlpatterns = [
     # Analyzer API under /api/analyzer/
     path(
         "api/analyzer/workflows/",
-        analyzer_views.list_workflows,  # GET
+        analyzer_views.list_workflows,  # GET: returns {"workflows": [name, ...]}
         name="analyzer_workflows_list",
     ),
     path(
