@@ -105,14 +105,14 @@ export const fetchSlurmStatus = async () => {
 
 // Fetch metadata for a specific workflow, or descriptor info for an unsaved repo URL.
 // - fetchWorkflowMetadata(workflowName)  → GET /api/analyzer/workflows/<name>/
-// - fetchWorkflowMetadata(null, repoUrl) → GET /api/analyzer/workflows/?repo=<url>
+// - fetchWorkflowMetadata(null, repoUrl) → GET /api/analyzer/workflows/_/?repo=<url>  (urls.workflow_metadata)
 //   Returns the full biomero-schema descriptor dict including 'requires-zarr',
 //   'requires-plate', and 'name' (tool name from descriptor).
 export const fetchWorkflowMetadata = async (workflow, repoUrl = null) => {
   const { urls } = getDjangoConstants();
   if (repoUrl) {
     return apiRequest(
-      `${urls.workflows}?repo=${encodeURIComponent(repoUrl)}`, "GET"
+      `${urls.workflow_metadata}?repo=${encodeURIComponent(repoUrl)}`, "GET"
     );
   }
   return apiRequest(`${urls.workflows}${workflow}/`, "GET");
@@ -420,85 +420,30 @@ export const extractGitHubInfo = (repoUrl) => {
   };
 };
 
-/**
- * In-memory cache for raw descriptor content (session-scoped).
- * Key: "owner/repo@ref"  Value: { name, image } (either field may be null)
- * Avoids re-probing descriptor.json / descriptor.yaml / config.yaml on every blur.
- */
-const _descriptorCache = new Map();
+export const slugify = (name) => name.toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '');
 
-/**
- * Core helper: fetches and parses the descriptor for a repo ref.
- * Result is cached so the file-probing waterfall only runs once per repo+ref.
- */
-const _fetchDescriptor = async (owner, repo, ref) => {
-  const cacheKey = `${owner}/${repo}@${ref}`;
-  if (_descriptorCache.has(cacheKey)) return _descriptorCache.get(cacheKey);
+// In-memory cache for workflow metadata (session-scoped, keyed by repo URL).
+const _metadataCache = new Map();
 
-  const base = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}`;
-  let result = { name: null, image: null };
-
-  // Try descriptor.json first (biaflows / biomero-schema)
-  try {
-    const response = await fetch(`${base}/descriptor.json`);
-    if (response.ok) {
-      const d = await response.json();
-      if (d?.name) result.name = slugify(d.name);
-      const img = d?.['container-image']?.image;
-      if (img) result.image = img;
-      if (result.name || result.image) {
-        _descriptorCache.set(cacheKey, result);
-        return result;
-      }
-    }
-  } catch { /* fall through */ }
-
-  // Fall back to descriptor.yaml then config.yaml (bilayers)
-  const yamlNames = ['descriptor.yaml', 'config.yaml'];
-  for (const yamlName of yamlNames) {
-    try {
-      const response = await fetch(`${base}/${yamlName}`);
-      if (!response.ok) continue;
-      const text = await response.text();
-      const dockerName = text.match(/^\s*docker_image:[\s\S]*?\n\s+name:\s*["']?([\w-]+)["']?/m)?.[1];
-      const algoName   = text.match(/^\s*algorithm_folder_name:\s*["']?([^"'\n]+)["']?/m)?.[1];
-      const citName    = text.match(/^\s*citations:[\s\S]*?\n\s+-\s*name:\s*["']?([^"'\n]+)["']?/m)?.[1];
-      const imgOrg     = text.match(/^\s*docker_image:[\s\S]*?\n(?:.*\n)*?\s+org:\s*["']?([\w\-]+)["']?/m)?.[1];
-      const imgName    = text.match(/^\s*docker_image:[\s\S]*?\n(?:.*\n)*?\s+name:\s*["']?([\w\-\/]+)["']?/m)?.[1];
-      const imgTag     = text.match(/^\s*docker_image:[\s\S]*?\n(?:.*\n)*?\s+tag:\s*["']?([^\s"'\n]+)["']?/m)?.[1];
-      if (dockerName) result.name = slugify(dockerName);
-      else if (algoName) result.name = slugify(algoName);
-      else if (citName) result.name = slugify(citName);
-      if (imgName) {
-        const fullRepo = imgOrg ? `${imgOrg}/${imgName}` : imgName;
-        result.image = imgTag ? `${fullRepo}:${imgTag}` : fullRepo;
-      }
-      if (result.name || result.image) break;
-    } catch { /* fall through */ }
-  }
-
-  _descriptorCache.set(cacheKey, result);
+const fetchWorkflowMetadataCached = async (repoUrl) => {
+  if (_metadataCache.has(repoUrl)) return _metadataCache.get(repoUrl);
+  const result = await fetchWorkflowMetadata(null, repoUrl);
+  _metadataCache.set(repoUrl, result);
   return result;
 };
 
-export const slugify = (name) => name.toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '');
-
-export const fetchDescriptorName = async (repoUrl) => {
-  const info = extractGitHubInfo(repoUrl);
-  if (!info?.owner || !info?.repo) return null;
-  const result = await _fetchDescriptor(info.owner, info.repo, info.currentVersion || 'main');
-  return result.name;
-};
-
 /**
- * Fetches the container image reference from a descriptor (cached).
+ * Fetches the container image reference via the backend (cached).
  * Returns the full image string e.g. "cellularimagingcf/w_cellpose:v1.0.0", or null.
  */
 export const fetchContainerImage = async (repoUrl) => {
-  const info = extractGitHubInfo(repoUrl);
-  if (!info?.owner || !info?.repo) return null;
-  const result = await _fetchDescriptor(info.owner, info.repo, info.currentVersion || 'main');
-  return result.image;
+  if (!repoUrl) return null;
+  try {
+    const metadata = await fetchWorkflowMetadataCached(repoUrl);
+    return metadata?.['container-image']?.image ?? null;
+  } catch {
+    return null;
+  }
 };
 
 // GitHub API persistent caching utilities

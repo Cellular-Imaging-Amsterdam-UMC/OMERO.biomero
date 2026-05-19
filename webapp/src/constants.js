@@ -45,6 +45,7 @@ export const getDjangoConstants = () => {
     api_group_mappings: "/omero_biomero/api/importer/group_mappings/",
     api_import_selected: "/omero_biomero/api/importer/import_selected/",
     workflows: "/omero_biomero/api/analyzer/workflows/",
+    workflow_metadata: "/omero_biomero/api/analyzer/workflows/_/",
     api_config: "/omero_biomero/api/biomero/admin/config/",
     api_run_workflow: "/omero_biomero/api/analyzer/workflows/", // append <name>/jobs/
     get_workflows: "/omero_biomero/api/analyzer/scripts/",

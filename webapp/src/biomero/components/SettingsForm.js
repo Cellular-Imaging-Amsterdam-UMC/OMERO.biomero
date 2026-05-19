@@ -261,32 +261,41 @@ const SettingsForm = () => {
     // in a single Django→GitHub round-trip (server-side caching applies).
     const metadata = await fetchWorkflowMetadata(null, model.repo);
 
-    // Auto-populate name from descriptor if the name field is still empty
-    if (!model.name && metadata?.name) {
-      const descriptorName = slugify(metadata.name);
-      if (descriptorName) {
-        // Ensure uniqueness among existing model names (excluding this slot)
-        const existingNames = (settingsForm.MODELS || [])
-          .filter((_, i) => i !== modelIndex)
-          .map((m) => m.name)
-          .filter(Boolean);
-        let uniqueName = descriptorName;
-        let counter = 2;
-        while (existingNames.includes(uniqueName)) {
-          uniqueName = `${descriptorName}_${counter++}`;
-        }
-        handleModelChange(modelIndex, "name", uniqueName);
-      }
-    }
-
-    // Auto-detect zarr/plate flags from the descriptor
     if (metadata) {
-      if (metadata['requires-plate'] && !model.isPlateWorkflow) {
-        handleModelChange(modelIndex, "isPlateWorkflow", true, { skipVersionCheck: true });
-      }
-      if (metadata['requires-zarr'] && !model.isZarrWorkflow) {
-        handleModelChange(modelIndex, "isZarrWorkflow", true, { skipVersionCheck: true });
-      }
+      setSettingsForm((prev) => {
+        const updatedModels = structuredClone(prev.MODELS);
+        const m = updatedModels[modelIndex];
+
+        // Auto-populate name from descriptor if the name field is still empty
+        if (!m.name && metadata.name) {
+          const descriptorName = slugify(metadata.name);
+          if (descriptorName) {
+            const existingNames = updatedModels
+              .filter((_, i) => i !== modelIndex)
+              .map((n) => n.name)
+              .filter(Boolean);
+            let uniqueName = descriptorName;
+            let counter = 2;
+            while (existingNames.includes(uniqueName)) {
+              uniqueName = `${descriptorName}_${counter++}`;
+            }
+            m.name = uniqueName;
+            if (prev.SLURM.slurm_script_repo === "") {
+              m.job = `jobs/${uniqueName}.sh`;
+            }
+          }
+        }
+
+        // Auto-detect zarr/plate flags from the descriptor
+        if (metadata['requires-plate'] && !m.isPlateWorkflow) {
+          m.isPlateWorkflow = true;
+          m.isZarrWorkflow = true; // plate implies zarr
+        } else if (metadata['requires-zarr'] && !m.isZarrWorkflow) {
+          m.isZarrWorkflow = true;
+        }
+
+        return { ...prev, MODELS: updatedModels };
+      });
     }
 
     recheckModelVersion(modelIndex, model);
@@ -297,20 +306,22 @@ const SettingsForm = () => {
   };
 
   const handleModelChange = (index, field, value, options = {}) => {
-    const updatedModels = structuredClone(settingsForm.MODELS);
-    updatedModels[index][field] = value;
+    setSettingsForm((prev) => {
+      const updatedModels = structuredClone(prev.MODELS);
+      updatedModels[index][field] = value;
 
-    if (field === "name" && settingsForm.SLURM.slurm_script_repo === "") {
-      updatedModels[index]["job"] = `jobs/${value}.sh`;
-    }
+      if (field === "name" && prev.SLURM.slurm_script_repo === "") {
+        updatedModels[index]["job"] = `jobs/${value}.sh`;
+      }
 
-    // Special handling for plate/zarr workflow coupling
-    if (field === "isPlateWorkflow" && value === true) {
-      // When enabling plate workflow, also enable ZARR
-      updatedModels[index]["isZarrWorkflow"] = true;
-    }
+      // Special handling for plate/zarr workflow coupling
+      if (field === "isPlateWorkflow" && value === true) {
+        // When enabling plate workflow, also enable ZARR
+        updatedModels[index]["isZarrWorkflow"] = true;
+      }
 
-    setSettingsForm((prev) => ({ ...prev, MODELS: updatedModels }));
+      return { ...prev, MODELS: updatedModels };
+    });
 
     // Clear version status when repo URL changes - we'll check on blur
     if (field === "repo" && !options.skipVersionCheck) {

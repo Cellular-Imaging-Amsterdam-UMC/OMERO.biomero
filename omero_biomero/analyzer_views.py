@@ -277,6 +277,7 @@ def get_workflow_metadata(request, conn=None, **kwargs):
     GET /api/analyzer/workflows/?repo=URL → descriptor fetched directly from GitHub.
 
     Returns the biomero-schema descriptor dict enriched with ``githubUrl``.
+    Results are cached for 1 hour (versioned URLs won't change within a version).
     """
     workflow_name = kwargs.get("name")
     repo_url = request.GET.get("repo", "").strip()
@@ -286,6 +287,14 @@ def get_workflow_metadata(request, conn=None, **kwargs):
             {"error": "Workflow name (URL segment) or ?repo= parameter required"},
             status=400,
         )
+
+    cache_key = f"workflow_metadata:{repo_url or workflow_name}"
+    no_cache = "no-cache" in request.headers.get("Cache-Control", "")
+    cached = None if no_cache else cache.get(cache_key)
+    if cached is not None:
+        response = JsonResponse(cached)
+        response["X-Cache"] = "HIT"
+        return response
 
     try:
         with SlurmClient.from_config(config_only=True) as sc:
@@ -300,7 +309,10 @@ def get_workflow_metadata(request, conn=None, **kwargs):
                 metadata = sc.generic_descriptor_from_github(workflow_name)
                 github_url = sc.slurm_model_repos.get(workflow_name)
                 enriched = {**metadata, "name": workflow_name, "githubUrl": github_url}
-        return JsonResponse(enriched)
+        cache.set(cache_key, enriched, 3600)
+        response = JsonResponse(enriched)
+        response["X-Cache"] = "MISS"
+        return response
     except Exception as e:
         logger.error(
             f"Error fetching metadata for workflow {workflow_name or repo_url}: {str(e)}"
