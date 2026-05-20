@@ -29,7 +29,9 @@ const ModelCard = ({
   versionStatus,
   versionCheckLoading,
   descriptorMeta,
+  config,
 }) => {
+  const hasScriptRepo = !!config?.SLURM?.slurm_script_repo;
   const [inputValue, setInputValue] = useState("");
   const [showWarning, setShowWarning] = useState(false);
   const [containerImage, setContainerImage] = useState(null);
@@ -140,11 +142,18 @@ const ModelCard = ({
           </span>
         }
         subLabel="Also the path to store the container on the slurm_images_path."
+        intent={errors?.name ? "danger" : undefined}
+        helperText={
+          errors?.name ? (
+            <span className="text-red-500"><Icon icon="error" size={10} className="mr-1" />{errors.name}</span>
+          ) : undefined
+        }
       >
         <InputGroup
           value={item.name}
           placeholder="e.g., cellpose"
           readOnly={!editable}
+          intent={errors?.name ? "danger" : undefined}
           onChange={(e) =>
             onChange(index, "name", e.target.value.toLowerCase())
           }
@@ -307,13 +316,30 @@ const ModelCard = ({
           </span>
         }
         subLabel="The jobscript path in the 'slurm_script_repo'. Use jobs/<modelname>.sh, unless you added your own Slurm Script Repository."
+        intent={errors?.job ? "danger" : undefined}
+        helperText={
+          errors?.job ? (
+            <span className="text-red-500"><Icon icon="error" size={10} className="mr-1" />{errors.job} — rename the model above to fix this automatically.</span>
+          ) : !hasScriptRepo ? (
+            <span className="text-gray-400">Auto-generated from the model name — rename the model to update this. To use custom scripts instead, add a <em>Slurm Script Repository</em> in Slurm Settings.</span>
+          ) : undefined
+        }
       >
-        <InputGroup
-          value={item.job}
-          placeholder="e.g., jobs/cellpose.sh"
-          readOnly={!editable}
-          onChange={(e) => onChange(index, "job", e.target.value)}
-        />
+        <Tooltip
+          content={errors?.job
+            ? `Duplicate path — rename the model above and this will update automatically.`
+            : "Auto-generated from the model name. Rename the model to update this. To use custom job scripts, add a Slurm Script Repository in Slurm Settings."}
+          disabled={hasScriptRepo && !errors?.job}
+          placement="top"
+        >
+          <InputGroup
+            value={item.job}
+            placeholder="e.g., jobs/cellpose.sh"
+            disabled={!hasScriptRepo}
+            intent={errors?.job ? "danger" : undefined}
+            onChange={(e) => onChange(index, "job", e.target.value)}
+          />
+        </Tooltip>
       </FormGroup>
 
       {/* Workflow Input Configuration */}

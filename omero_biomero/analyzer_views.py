@@ -580,3 +580,96 @@ def get_slurm_status(request, conn=None, **kwargs):
             }
     
     return JsonResponse(status)
+
+
+@login_required()
+@require_http_methods(["GET"])
+def get_attachments(request, conn=None, **kwargs):
+    """
+    Return OMERO file annotations (attachments) accessible to the current user.
+
+    Query params:
+        format   (repeatable) — filter by file extension, e.g. ?format=csv&format=parquet
+        search   — substring match on file name (case-insensitive)
+        group    — OMERO group ID to query in; defaults to the user's active group
+
+    Response shape:
+        {
+            "attachments": [
+                {
+                    "id": 42,
+                    "name": "measurements.csv",
+                    "size": 1234,
+                    "mimetype": "text/csv",
+                    "extension": "csv",
+                    "parents": [
+                        {"type": "Image", "id": 7, "name": "my_image.tif"}
+                    ]
+                },
+                ...
+            ]
+        }
+    """
+    formats = [f.lower() for f in request.GET.getlist("format") if f]
+    search = (request.GET.get("search") or "").strip().lower()
+    group_id = request.GET.get("group")
+
+    try:
+        if group_id is not None:
+            try:
+                conn.setGroupForSession(int(group_id))
+            except Exception as e:
+                logger.warning(f"get_attachments: could not switch to group {group_id}: {e}")
+
+        params = {}
+        current_group = conn.getEventContext().groupId
+        if current_group is not None:
+            params["group"] = current_group
+
+        attachments = []
+        for ann in conn.getObjects("FileAnnotation", opts=params):
+            orig_file = ann.getFile()
+            if orig_file is None:
+                continue
+
+            name = orig_file.getName() or ""
+            ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+
+            # Format filter
+            if formats and ext not in formats:
+                continue
+
+            # Search filter
+            if search and search not in name.lower():
+                continue
+
+            # Collect parent objects this annotation is linked to
+            parents = []
+            for obj_type in ("Image", "Dataset", "Project", "Plate", "Screen"):
+                try:
+                    for link in ann.getParentLinks(f"{obj_type}AnnotationLink"):
+                        parent = link.getParent()
+                        if parent is not None:
+                            parents.append({
+                                "type": obj_type,
+                                "id": parent.getId(),
+                                "name": parent.getName() or "",
+                            })
+                except Exception:
+                    # Not all annotation types have all parent link types
+                    pass
+
+            attachments.append({
+                "id": ann.getId(),
+                "name": name,
+                "size": orig_file.getSize(),
+                "mimetype": orig_file.getMimetype() or "",
+                "extension": ext,
+                "parents": parents,
+            })
+
+        return JsonResponse({"attachments": attachments})
+
+    except Exception as e:
+        logger.exception("get_attachments failed")
+        return JsonResponse({"error": str(e)}, status=500)

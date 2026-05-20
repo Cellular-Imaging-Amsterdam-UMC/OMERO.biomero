@@ -10,6 +10,7 @@ import PlateWorkflowInput from "./PlateWorkflowInput";
 import PlateWorkflowOutput from "./PlateWorkflowOutput";
 import WorkflowForm from "../WorkflowForm";
 import InputOptions from "../InputOptions";
+import WorkflowFileInputStep, { getFileInputParams } from "../WorkflowFileInputStep";
 
 const PlateWorkflowDialog = ({ 
   workflow, 
@@ -102,6 +103,15 @@ const PlateWorkflowDialog = ({
           </DialogBody>
         }
       />
+
+      {/* Conditionally show File Inputs step for workflows with non-image file params */}
+      {getFileInputParams(workflow?.metadata).length > 0 && (
+        <DialogStep
+          id="file-inputs"
+          title="File Inputs"
+          panel={<WorkflowFileInputStep />}
+        />
+      )}
 
       {/* Step 3: Output to Screen */}
       <DialogStep

@@ -86,11 +86,18 @@ const ConfigSection = ({
           <div key={index}>
             <div className="flex items-center justify-between">
               <H4 className={`font-semibold flex items-center cursor-pointer ${
+                errors && errors[index] ? 'text-red-600' :
                 isVersionOutdated || hasDescriptorMismatch ? 'text-orange-600' : ''
               }`}
                 onClick={() => toggleItem(index)}
               >
                 {item.name || item.key || `${title} ${index + 1}`}
+                {/* Validation error indicator — first, highest priority */}
+                {errors && errors[index] && (
+                  <Tooltip content={Object.values(errors[index]).filter(Boolean).join(' · ')}>
+                    <Icon icon="error" size={12} intent="danger" className="ml-2" />
+                  </Tooltip>
+                )}
                 {/* Add icons for different version statuses */}
                 {(() => {
                   const status = versionStatus && versionStatus[index];
@@ -172,6 +179,7 @@ const ConfigSection = ({
                 versionStatus={versionStatus ? versionStatus[index] : null} // Pass version status for this item
                 versionCheckLoading={versionCheckLoading} // Pass loading state
                 descriptorMeta={descriptorMetadata ? descriptorMetadata[index] ?? null : null}
+                config={config}
               />
             </Collapse>
           </div>

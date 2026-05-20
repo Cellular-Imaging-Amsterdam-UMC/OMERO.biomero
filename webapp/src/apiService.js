@@ -103,6 +103,22 @@ export const fetchSlurmStatus = async () => {
   return apiRequest(urls.api_slurm_status, "GET");
 };
 
+/**
+ * Fetch OMERO file annotations (attachments) accessible to the current user.
+ * @param {string[]} formats - Optional list of file extensions to filter by (e.g. ["csv", "parquet"])
+ * @param {string}   search  - Optional substring to filter by filename
+ * @param {number}   groupId - Optional OMERO group ID to scope the query
+ * @returns {Promise<{attachments: Array}>}
+ */
+export const fetchAttachments = async (formats = [], search = "", groupId = null) => {
+  const { urls, user } = getDjangoConstants();
+  const params = { _: new Date().getTime() };
+  if (formats.length > 0) params.format = formats;
+  if (search) params.search = search;
+  params.group = groupId !== null ? groupId : user.active_group_id;
+  return apiRequest(urls.api_attachments, "GET", null, { params });
+};
+
 // Fetch metadata for a specific workflow, or descriptor info for an unsaved repo URL.
 // - fetchWorkflowMetadata(workflowName)  → GET /api/analyzer/workflows/<name>/
 // - fetchWorkflowMetadata(null, repoUrl) → GET /api/analyzer/workflows/_/?repo=<url>  (urls.workflow_metadata)

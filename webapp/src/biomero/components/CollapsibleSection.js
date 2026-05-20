@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Collapse, Button, H5, Icon, Tag, Tooltip } from "@blueprintjs/core";
 
-const CollapsibleSection = ({ title, children, versionSummary, versionCheckLoading, onRefresh }) => {
+const CollapsibleSection = ({ title, children, versionSummary, versionCheckLoading, onRefresh, errorCount }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -13,6 +13,14 @@ const CollapsibleSection = ({ title, children, versionSummary, versionCheckLoadi
             className="mr-2" 
           />
           <span>{title}</span>
+          {/* Validation error count tag — same style as version warning tags */}
+          {errorCount > 0 && (
+            <Tooltip content="Expand this section to see and fix the validation errors">
+              <Tag minimal intent="danger" className="ml-2">
+                {errorCount} validation error{errorCount !== 1 ? 's' : ''}
+              </Tag>
+            </Tooltip>
+          )}
           {/* Version summary for Models Settings */}
           {versionSummary && (
             <span className="ml-2 flex items-center">

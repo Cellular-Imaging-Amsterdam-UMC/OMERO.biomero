@@ -50,6 +50,11 @@ urlpatterns = [
         analyzer_views.get_slurm_status,  # GET: SLURM cluster status
         name="analyzer_slurm_status",
     ),
+    path(
+        "api/analyzer/attachments/",
+        analyzer_views.get_attachments,  # GET: browse OMERO file annotations
+        name="analyzer_attachments",
+    ),
     # Main Biomero URL
     path(
         "biomero/",

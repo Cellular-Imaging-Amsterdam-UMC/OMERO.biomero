@@ -26,6 +26,7 @@ import WorkflowOutput from "./WorkflowOutput";
 import WorkflowInput from "./WorkflowInput";
 import InputOptions from "./InputOptions";
 import PlateWorkflowDialog from "./plate/PlateWorkflowDialog";
+import WorkflowFileInputStep, { getFileInputParams } from "./WorkflowFileInputStep";
 
 const DescriptionWithToggle = ({ description }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -654,6 +655,15 @@ const RunPanel = ({ onWorkflowError }) => {
               </DialogBody>
             }
           />
+
+          {/* Conditionally show File Inputs step for workflows with non-image file params */}
+          {getFileInputParams(state.selectedWorkflow?.metadata).length > 0 && (
+            <DialogStep
+              id="step2b"
+              title="File Inputs"
+              panel={<WorkflowFileInputStep />}
+            />
+          )}
 
           <DialogStep
             id="step3"
