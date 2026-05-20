@@ -550,20 +550,30 @@ def get_slurm_status(request, conn=None, **kwargs):
     except Exception as e:
         error_msg = str(e)
         logger.error(f"SLURM status check failed: {error_msg}", exc_info=True)
-        if "Can't find params" in error_msg or "NoValidConnectionsError" in error_msg:
+        if "NoValidConnectionsError" in error_msg or "Connection refused" in error_msg or "timed out" in error_msg.lower():
             status = {
-                "status": "offline", 
+                "status": "offline",
                 "message": "SLURM cluster is offline or unreachable",
                 "last_checked": datetime.datetime.now().isoformat(),
                 "icon": "error",
                 "intent": "danger",
                 "workflow_versions": {}
             }
+        elif "Can't find params" in error_msg or "ValidationException" in error_msg:
+            # Script crashed on load — SLURM may be fine but the script has an error
+            status = {
+                "status": "unknown",
+                "message": "Run-workflow script failed to load — check script logs for details",
+                "last_checked": datetime.datetime.now().isoformat(),
+                "icon": "warning-sign",
+                "intent": "warning",
+                "workflow_versions": {}
+            }
         else:
             status = {
                 "status": "unknown",
                 "message": f"SLURM status check failed: {error_msg}",
-                "last_checked": datetime.datetime.now().isoformat(), 
+                "last_checked": datetime.datetime.now().isoformat(),
                 "icon": "warning-sign",
                 "intent": "warning",
                 "workflow_versions": {}
