@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Card,
   FormGroup,
@@ -39,6 +39,22 @@ const SettingsForm = () => {
   const [converters, setConverters] = useState([]);
   const [errors, setErrors] = useState({});
   
+  // Descriptor flags derived from already-fetched state.workflows (populated by Run tab on load)
+  const descriptorMetadata = useMemo(() => {
+    if (!settingsForm?.MODELS || !state.workflows) return {};
+    const result = {};
+    settingsForm.MODELS.forEach((model, index) => {
+      const wf = state.workflows.find((w) => w.name === model.name);
+      if (wf?.metadata) {
+        result[index] = {
+          requiresZarr: wf.metadata['requires-zarr'] ?? null,
+          requiresPlate: wf.metadata['requires-plate'] ?? null,
+        };
+      }
+    });
+    return result;
+  }, [settingsForm?.MODELS, state.workflows]);
+
   // Version checking state
   const [versionStatus, setVersionStatus] = useState({});
   const [versionCheckLoading, setVersionCheckLoading] = useState(false);
@@ -1076,6 +1092,7 @@ const SettingsForm = () => {
           versionCheckLoading={versionCheckLoading} // Pass loading state
           config={state.config} // Pass config for workflow type detection
           onRepoBlur={handleRepoUrlBlur} // Pass repo blur handler
+          descriptorMetadata={descriptorMetadata} // Descriptor flags from already-fetched workflow metadata
         />
       </CollapsibleSection>
       <H5>Note on saving BIOMERO settings</H5>

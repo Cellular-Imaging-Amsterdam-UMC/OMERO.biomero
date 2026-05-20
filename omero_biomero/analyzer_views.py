@@ -437,10 +437,17 @@ def prepare_workflow_parameters(workflow_name, params):
             continue
         val = coerced[key]
         try:
-            if type_ == "integer":
+            if type_ in ("integer", "Integer"):
                 coerced[key] = int(float(val))  # handle "1.0" -> 1
-            elif type_ == "float":
+            elif type_ in ("float", "Float"):
                 coerced[key] = float(val)
+            elif type_ in ("Number", "number"):
+                # Use the default-value's Python type to decide int vs float
+                default_val = inp.get("default-value")
+                if isinstance(default_val, float):
+                    coerced[key] = float(val)
+                else:
+                    coerced[key] = int(float(val))
         except (ValueError, TypeError) as coerce_err:
             logger.warning(
                 f"Could not coerce param {key}={val!r} to {type_}: {coerce_err}"

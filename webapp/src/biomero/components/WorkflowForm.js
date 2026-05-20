@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { FormGroup, InputGroup, NumericInput, Switch, HTMLSelect, Intent, Tag, Callout, Divider, Tooltip, Icon } from "@blueprintjs/core";
+import { FormGroup, InputGroup, NumericInput, Switch, HTMLSelect, Intent, Tag, Callout, Divider, Tooltip, Icon, Collapse, Button } from "@blueprintjs/core";
 import { useAppContext } from "../../AppContext";
 
 const WorkflowForm = () => {
   const { state, updateState } = useAppContext();
   const [selectedVersion, setSelectedVersion] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const ghURL = state.selectedWorkflow?.githubUrl;
   const versionMatch = ghURL?.match(/\/tree\/(v[\d.]+)/);
@@ -124,16 +125,22 @@ const WorkflowForm = () => {
   };
 
   const renderFormFields = () => {
-    return workflowMetadata.inputs
-      .filter((input) => !input.id.startsWith("cytomine")) // Ignore fields starting with "cytomine"
-      .filter((input) => !input["set-by-server"]) // Ignore server-assigned parameters
-      .filter((input) => !input["output-dir-set"]) // Ignore output directory parameters (set by biomero)
-      .map((input) => {
-        const { id, name, description, type, optional } = input;
-        const defaultValue = input["default-value"];
-        const isFormatField = id === "Format";
-        const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflowName);
-        const requiresZarr = isPlateWorkflow || isZarrWorkflow;
+    const visibleInputs = workflowMetadata.inputs
+      .filter((input) => !input.id.startsWith("cytomine"))
+      .filter((input) => !input["set-by-server"])
+      .filter((input) => !input["output-dir-set"]);
+
+    const beginnerInputs = visibleInputs.filter((inp) => inp.mode !== "advanced");
+    const advancedInputs = visibleInputs.filter((inp) => inp.mode === "advanced");
+
+    const renderOne = (input) => {
+      const { id, name, description, type, optional } = input;
+      const defaultValue = input["default-value"];
+      const choices = input["value-choices"] || [];
+      const choiceLabels = input["value-choices-labels"] || [];
+      const isFormatField = id === "Format";
+      const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflowName);
+      const requiresZarr = isPlateWorkflow || isZarrWorkflow;
 
         switch (type) {
           case "string":
@@ -163,7 +170,7 @@ const WorkflowForm = () => {
               );
             }
             // Dropdown when value-choices are provided
-            if (input["value-choices"]?.length > 0) {
+            if (choices.length > 0) {
               return (
                 <FormGroup
                   key={id}
@@ -176,9 +183,10 @@ const WorkflowForm = () => {
                     value={state.formData[id] !== undefined ? state.formData[id] : (defaultValue || "")}
                     onChange={(e) => handleInputChange(id, e.target.value)}
                   >
-                    {input["value-choices"].map((choice) => (
-                      <option key={choice} value={choice}>{choice}</option>
-                    ))}
+                    {choices.map((choice, i) => {
+                      const label = choiceLabels[i] != null ? String(choiceLabels[i]) : String(choice);
+                      return <option key={choice} value={choice}>{label}</option>;
+                    })}
                   </HTMLSelect>
                 </FormGroup>
               );
@@ -353,7 +361,30 @@ const WorkflowForm = () => {
           default:
             return null;
         }
-      });
+      };
+
+    return (
+      <>
+        {beginnerInputs.map(renderOne)}
+        {advancedInputs.length > 0 && (
+          <>
+            <Divider />
+            <Button
+              minimal
+              small
+              rightIcon={advancedOpen ? "chevron-up" : "chevron-down"}
+              onClick={() => setAdvancedOpen((o) => !o)}
+              className="text-gray-500 mb-2"
+            >
+              Advanced ({advancedInputs.length})
+            </Button>
+            <Collapse isOpen={advancedOpen}>
+              {advancedInputs.map(renderOne)}
+            </Collapse>
+          </>
+        )}
+      </>
+    );
   };
 
   return (

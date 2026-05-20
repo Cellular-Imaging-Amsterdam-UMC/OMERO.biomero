@@ -28,6 +28,7 @@ const ModelCard = ({
   validateField,
   versionStatus,
   versionCheckLoading,
+  descriptorMeta,
 }) => {
   const [inputValue, setInputValue] = useState("");
   const [showWarning, setShowWarning] = useState(false);
@@ -338,6 +339,14 @@ const ModelCard = ({
             }}
           />
         </div>
+        {descriptorMeta !== null && descriptorMeta !== undefined && descriptorMeta.requiresPlate !== null && (item.isPlateWorkflow || false) !== descriptorMeta.requiresPlate && (
+          <div className="text-orange-500 text-xs mt-1 flex items-center gap-1">
+            <Icon icon="warning-sign" size={10} />
+            {descriptorMeta.requiresPlate
+              ? 'Descriptor declares plate input required — consider enabling'
+              : 'Descriptor does not declare plate requirement'}
+          </div>
+        )}
         
         <div className="flex items-center justify-between mt-3">
           <div className="flex flex-col">
@@ -360,6 +369,14 @@ const ModelCard = ({
             }}
           />
         </div>
+        {descriptorMeta !== null && descriptorMeta !== undefined && descriptorMeta.requiresZarr !== null && (item.isZarrWorkflow || false) !== descriptorMeta.requiresZarr && (
+          <div className="text-orange-500 text-xs mt-1 flex items-center gap-1">
+            <Icon icon="warning-sign" size={10} />
+            {descriptorMeta.requiresZarr
+              ? 'Descriptor declares ZARR required — consider enabling'
+              : 'Descriptor does not declare ZARR requirement'}
+          </div>
+        )}
       </FormGroup>
 
       <FormGroup

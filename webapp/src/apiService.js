@@ -425,7 +425,7 @@ export const slugify = (name) => name.toLowerCase().replace(/[\s-]+/g, '_').repl
 // In-memory cache for workflow metadata (session-scoped, keyed by repo URL).
 const _metadataCache = new Map();
 
-const fetchWorkflowMetadataCached = async (repoUrl) => {
+export const fetchWorkflowMetadataCached = async (repoUrl) => {
   if (_metadataCache.has(repoUrl)) return _metadataCache.get(repoUrl);
   const result = await fetchWorkflowMetadata(null, repoUrl);
   _metadataCache.set(repoUrl, result);

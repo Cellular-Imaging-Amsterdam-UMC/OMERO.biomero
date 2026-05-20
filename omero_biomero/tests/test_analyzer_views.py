@@ -164,7 +164,7 @@ class AnalyzerViewsTests(TestCase):
     # --- get_workflow_metadata ---
     def test_get_workflow_metadata_missing(self):
         view = _raw("get_workflow_metadata")
-        request = SimpleNamespace(method="GET")
+        request = SimpleNamespace(method="GET", GET={}, headers={})
         resp = view(request)
         self.assertEqual(resp.status_code, 400)
 
@@ -174,7 +174,7 @@ class AnalyzerViewsTests(TestCase):
 
         with patch("omero_biomero.analyzer_views.SlurmClient", StubSlurm):
             view = _raw("get_workflow_metadata")
-            request = SimpleNamespace(method="GET")
+            request = SimpleNamespace(method="GET", GET={}, headers={})
             resp = view(request, name="wfA")
         self.assertEqual(resp.status_code, 404)
 
@@ -187,7 +187,7 @@ class AnalyzerViewsTests(TestCase):
 
         with patch("omero_biomero.analyzer_views.SlurmClient", StubSlurm):
             view = _raw("get_workflow_metadata")
-            request = SimpleNamespace(method="GET")
+            request = SimpleNamespace(method="GET", GET={}, headers={})
             resp = view(request, name="wfA")
         self.assertEqual(resp.status_code, 200)
         data = json.loads(resp.content)
