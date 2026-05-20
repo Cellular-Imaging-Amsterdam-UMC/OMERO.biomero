@@ -26,7 +26,7 @@ import WorkflowOutput from "./WorkflowOutput";
 import WorkflowInput from "./WorkflowInput";
 import InputOptions from "./InputOptions";
 import PlateWorkflowDialog from "./plate/PlateWorkflowDialog";
-import WorkflowFileInputStep, { getFileInputParams } from "./WorkflowFileInputStep";
+import WorkflowFileInputStep, { getFileInputParams, isFileInputStepValid } from "./WorkflowFileInputStep";
 
 const DescriptionWithToggle = ({ description }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -82,6 +82,7 @@ const RunPanel = ({ onWorkflowError }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isNextDisabled, setIsNextDisabled] = useState(true);
   const [isRunDisabled, setIsRunDisabled] = useState(false);
+  const [isFileInputNextDisabled, setIsFileInputNextDisabled] = useState(false);
   const [activeWorkflowTab, setActiveWorkflowTab] = useState("images"); // "images" or "plates"
   const [customStepIndex, setCustomStepIndex] = useState(0); // Track current step for custom navigation
 
@@ -199,6 +200,12 @@ const RunPanel = ({ onWorkflowError }) => {
   useEffect(() => {
     setIsNextDisabled(state.formData?.IDs?.length === 0 || apiLoading);
   }, [state.formData?.IDs, apiLoading]);
+
+  useEffect(() => {
+    setIsFileInputNextDisabled(
+      !isFileInputStepValid(state.selectedWorkflow?.metadata, state.formData)
+    );
+  }, [state.formData, state.selectedWorkflow?.metadata]);
 
   // Auto-switch to tab with results only when search term changes (not when user manually clicks tab)
   useEffect(() => {
@@ -645,6 +652,18 @@ const RunPanel = ({ onWorkflowError }) => {
             />
           )}
 
+          {/* Conditionally show File Inputs step for workflows with non-image file params */}
+          {getFileInputParams(state.selectedWorkflow?.metadata).length > 0 && (
+            <DialogStep
+              id="step2b"
+              title="File Inputs"
+              panel={<WorkflowFileInputStep />}
+              nextButtonProps={{
+                disabled: isFileInputNextDisabled,
+              }}
+            />
+          )}
+
           <DialogStep
             id="step2"
             title="Workflow Parameters"
@@ -655,15 +674,6 @@ const RunPanel = ({ onWorkflowError }) => {
               </DialogBody>
             }
           />
-
-          {/* Conditionally show File Inputs step for workflows with non-image file params */}
-          {getFileInputParams(state.selectedWorkflow?.metadata).length > 0 && (
-            <DialogStep
-              id="step2b"
-              title="File Inputs"
-              panel={<WorkflowFileInputStep />}
-            />
-          )}
 
           <DialogStep
             id="step3"

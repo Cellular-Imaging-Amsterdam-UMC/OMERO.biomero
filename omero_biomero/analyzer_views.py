@@ -610,6 +610,8 @@ def get_attachments(request, conn=None, **kwargs):
             ]
         }
     """
+    import omero.sys as ome_sys
+
     formats = [f.lower() for f in request.GET.getlist("format") if f]
     search = (request.GET.get("search") or "").strip().lower()
     group_id = request.GET.get("group")
@@ -626,7 +628,8 @@ def get_attachments(request, conn=None, **kwargs):
         if current_group is not None:
             params["group"] = current_group
 
-        attachments = []
+        # First pass: collect and filter annotations (without loading parents yet)
+        filtered = []
         for ann in conn.getObjects("FileAnnotation", opts=params):
             orig_file = ann.getFile()
             if orig_file is None:
@@ -635,37 +638,55 @@ def get_attachments(request, conn=None, **kwargs):
             name = orig_file.getName() or ""
             ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
 
-            # Format filter
             if formats and ext not in formats:
                 continue
-
-            # Search filter
             if search and search not in name.lower():
                 continue
 
-            # Collect parent objects this annotation is linked to
-            parents = []
-            for obj_type in ("Image", "Dataset", "Project", "Plate", "Screen"):
-                try:
-                    for link in ann.getParentLinks(f"{obj_type}AnnotationLink"):
-                        parent = link.getParent()
-                        if parent is not None:
-                            parents.append({
-                                "type": obj_type,
-                                "id": parent.getId(),
-                                "name": parent.getName() or "",
-                            })
-                except Exception:
-                    # Not all annotation types have all parent link types
-                    pass
+            filtered.append(ann)
 
+        if not filtered:
+            return JsonResponse({"attachments": []})
+
+        # Second pass: bulk-fetch parent links via HQL — one query per object type,
+        # covering all annotation IDs at once (avoids N×5 round-trips).
+        ann_ids = [ann.getId() for ann in filtered]
+        parent_map = {}  # ann_id -> [{"type": ..., "id": ..., "name": ...}]
+
+        qs = conn.getQueryService()
+        for obj_type in ("Image", "Dataset", "Project", "Plate", "Screen"):
+            try:
+                p = ome_sys.ParametersI()
+                p.addIds(ann_ids)
+                hql = (
+                    f"select link from {obj_type}AnnotationLink link "
+                    f"join fetch link.parent "
+                    f"where link.child.id in (:ids)"
+                )
+                for link in qs.findAllByQuery(hql, p):
+                    a_id = link.child.id.val
+                    parent = link.parent
+                    p_name = parent.name.val if parent.name is not None else ""
+                    parent_map.setdefault(a_id, []).append({
+                        "type": obj_type,
+                        "id": parent.id.val,
+                        "name": p_name,
+                    })
+            except Exception:
+                pass  # object type may not support annotation links
+
+        attachments = []
+        for ann in filtered:
+            orig_file = ann.getFile()
+            name = orig_file.getName() or ""
+            ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
             attachments.append({
                 "id": ann.getId(),
                 "name": name,
                 "size": orig_file.getSize(),
                 "mimetype": orig_file.getMimetype() or "",
                 "extension": ext,
-                "parents": parents,
+                "parents": parent_map.get(ann.getId(), []),
             })
 
         return JsonResponse({"attachments": attachments})

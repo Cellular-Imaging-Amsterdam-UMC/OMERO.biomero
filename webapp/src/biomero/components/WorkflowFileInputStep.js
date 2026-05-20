@@ -1,5 +1,13 @@
-import React from "react";
-import { DialogBody, H6, Divider, Callout } from "@blueprintjs/core";
+import React, { useState } from "react";
+import {
+  DialogBody,
+  Collapse,
+  Button,
+  Icon,
+  Tag,
+  Callout,
+  Intent,
+} from "@blueprintjs/core";
 import { useAppContext } from "../../AppContext";
 import OmeroAttachmentBrowser from "./OmeroAttachmentBrowser";
 
@@ -22,70 +30,171 @@ export function getFileInputParams(workflowMetadata) {
 }
 
 /**
- * A dialog step panel that shows one OmeroAttachmentBrowser per file-type
- * workflow input parameter.  Selections are stored in formData keyed by
- * param id, as an array of OMERO annotation IDs.
- *
- * Rendered as a <DialogBody> so it drops directly into a <DialogStep panel={…}>.
+ * Returns true when all required (non-optional) file params have a selection.
+ * Optional params are always considered satisfied regardless of selection.
  */
+export function isFileInputStepValid(workflowMetadata, formData) {
+  const params = getFileInputParams(workflowMetadata);
+  return params
+    .filter((p) => !p.optional)
+    .every((p) => {
+      const sel = Array.isArray(formData?.[p.id]) ? formData[p.id] : [];
+      return sel.length > 0;
+    });
+}
+
+/**
+ * A "param is done" when:
+ *   - single file-count → exactly 1 selected
+ *   - multiple / unspecified → at least 1 selected
+ */
+function isParamDone(param, selection) {
+  if (selection.length === 0) return false;
+  if (param["file-count"] === "single") return selection.length >= 1;
+  return selection.length >= 1;
+}
+
 const WorkflowFileInputStep = () => {
   const { state, updateState } = useAppContext();
   const workflowMetadata = state.selectedWorkflow?.metadata;
   const fileParams = getFileInputParams(workflowMetadata);
+  const hasRequired = fileParams.some((p) => !p.optional);
 
-  const handleSelect = (paramId, ids) => {
+  // Track which param's panel is open — only one at a time
+  const [openParamId, setOpenParamId] = useState(
+    fileParams.length > 0 ? fileParams[0].id : null
+  );
+
+  const handleSelect = (param, ids) => {
     updateState({
       formData: {
         ...state.formData,
-        [paramId]: ids,
+        [param.id]: ids,
       },
     });
+
+    // Auto-advance to the next uncompleted param when this one is done
+    if (isParamDone(param, ids)) {
+      const currentIndex = fileParams.findIndex((p) => p.id === param.id);
+      const nextIncomplete = fileParams.slice(currentIndex + 1).find((p) => {
+        const sel = Array.isArray(state.formData?.[p.id])
+          ? state.formData[p.id]
+          : [];
+        return !isParamDone(p, sel);
+      });
+      if (nextIncomplete) {
+        setOpenParamId(nextIncomplete.id);
+      }
+    }
   };
 
   if (fileParams.length === 0) {
     return (
       <DialogBody>
-        <Callout intent="primary" icon="info-sign">
+        <p className="text-gray-500 text-sm">
           This workflow has no file attachment inputs.
-        </Callout>
+        </p>
       </DialogBody>
     );
   }
 
   return (
     <DialogBody>
-      {fileParams.map((param, idx) => {
-        const formats = Array.isArray(param.format)
-          ? param.format
-          : param.format
-          ? [param.format]
-          : [];
-        const fileCount = param["file-count"] || null;
-        const currentSelection = Array.isArray(state.formData[param.id])
-          ? state.formData[param.id]
-          : [];
+      {/* Info callout — mirrors the Batch Processing style */}
+      <Callout className="mb-3">
+        <p className="text-sm font-semibold mb-0.5">
+          File Inputs {!hasRequired && "(Optional)"}
+        </p>
+        <p className="text-xs text-gray-600">
+          {hasRequired
+            ? "Select the required OMERO file attachments below before continuing."
+            : "These settings are optional. You can safely click \"Next\" without selecting anything."}
+        </p>
+      </Callout>
 
-        return (
-          <React.Fragment key={param.id}>
-            {idx > 0 && <Divider className="my-4" />}
-            <H6>
-              {param.name || param.id}
-              {!param.optional && (
-                <span className="text-red-500 ml-1" title="Required">*</span>
-              )}
-            </H6>
-            {param.description && (
-              <p className="text-sm text-gray-500 mb-2">{param.description}</p>
-            )}
-            <OmeroAttachmentBrowser
-              formats={formats}
-              fileCount={fileCount}
-              selectedIds={currentSelection}
-              onSelect={(ids) => handleSelect(param.id, ids)}
-            />
-          </React.Fragment>
-        );
-      })}
+      <div className="flex flex-col gap-2">
+        {fileParams.map((param) => {
+          const formats = Array.isArray(param.format)
+            ? param.format
+            : param.format
+            ? [param.format]
+            : [];
+          const currentSelection = Array.isArray(state.formData[param.id])
+            ? state.formData[param.id]
+            : [];
+          const done = isParamDone(param, currentSelection);
+          const isOpen = openParamId === param.id;
+
+          return (
+            <div
+              key={param.id}
+              className={`border rounded transition-colors ${
+                done
+                  ? "border-green-400 bg-green-50"
+                  : "border-gray-200"
+              }`}
+            >
+              {/* Collapsible header */}
+              <Button
+                minimal
+                fill
+                alignText="left"
+                onClick={() => setOpenParamId(isOpen ? null : param.id)}
+                className="px-3 py-2"
+                intent={done ? Intent.SUCCESS : Intent.NONE}
+                rightIcon={isOpen ? "chevron-up" : "chevron-down"}
+              >
+                <div className="flex items-center gap-2 w-full">
+                  <Icon
+                    icon={done ? "tick-circle" : "paperclip"}
+                    size={14}
+                    className={done ? "text-green-600" : "text-gray-400"}
+                  />
+                  <span className="font-medium text-sm">
+                    {param.name || param.id}
+                  </span>
+                  {param.optional ? (
+                    <span className="text-xs text-gray-400">(Optional)</span>
+                  ) : (
+                    <span className="text-red-500 text-xs" title="Required">*</span>
+                  )}
+                  {formats.length > 0 &&
+                    formats.map((f) => (
+                      <Tag key={f} minimal round className="text-xs">
+                        {f}
+                      </Tag>
+                    ))}
+                  {currentSelection.length > 0 && (
+                    <Tag
+                      intent={done ? Intent.SUCCESS : Intent.PRIMARY}
+                      round
+                      className="text-xs ml-auto"
+                    >
+                      {currentSelection.length} selected
+                    </Tag>
+                  )}
+                </div>
+              </Button>
+
+              <Collapse isOpen={isOpen}>
+                <div className="px-3 pb-3">
+                  {param.description && (
+                    <p className="text-xs text-gray-500 mb-2">
+                      {param.description}
+                    </p>
+                  )}
+                  <OmeroAttachmentBrowser
+                    formats={formats}
+                    fileCount={param["file-count"] || null}
+                    selectedIds={currentSelection}
+                    onSelect={(ids) => handleSelect(param, ids)}
+                  />
+                </div>
+              </Collapse>
+            </div>
+          );
+        })}
+      </div>
     </DialogBody>
   );
 };

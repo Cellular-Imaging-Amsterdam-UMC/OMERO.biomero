@@ -110,13 +110,37 @@ export const fetchSlurmStatus = async () => {
  * @param {number}   groupId - Optional OMERO group ID to scope the query
  * @returns {Promise<{attachments: Array}>}
  */
-export const fetchAttachments = async (formats = [], search = "", groupId = null) => {
+
+// Module-level cache so multiple OmeroAttachmentBrowser instances that render
+// at the same time (one per file-type param) share a single HTTP request.
+// Keyed by group ID, expires after 60 s.
+const _attachmentsCache = {}; // { [groupKey]: { ts, promise } }
+const ATTACHMENTS_TTL_MS = 60_000;
+
+export const fetchAttachments = (groupId = null) => {
   const { urls, user } = getDjangoConstants();
-  const params = { _: new Date().getTime() };
-  if (formats.length > 0) params.format = formats;
-  if (search) params.search = search;
-  params.group = groupId !== null ? groupId : user.active_group_id;
-  return apiRequest(urls.api_attachments, "GET", null, { params });
+  const resolvedGroup = groupId !== null ? groupId : user.active_group_id;
+  const key = String(resolvedGroup);
+  const now = Date.now();
+  const cached = _attachmentsCache[key];
+  if (cached && now - cached.ts < ATTACHMENTS_TTL_MS) {
+    return cached.promise;
+  }
+  const promise = apiRequest(
+    `${urls.api_attachments}?group=${resolvedGroup}&_=${now}`,
+    "GET"
+  );
+  _attachmentsCache[key] = { ts: now, promise };
+  return promise;
+};
+
+/** Invalidate the attachment cache (call when user manually refreshes). */
+export const invalidateAttachmentsCache = (groupId = null) => {
+  if (groupId !== null) {
+    delete _attachmentsCache[String(groupId)];
+  } else {
+    Object.keys(_attachmentsCache).forEach((k) => delete _attachmentsCache[k]);
+  }
 };
 
 // Fetch metadata for a specific workflow, or descriptor info for an unsaved repo URL.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   InputGroup,
   Button,
@@ -10,14 +10,14 @@ import {
   NonIdealState,
   Tooltip,
 } from "@blueprintjs/core";
-import { fetchAttachments } from "../../apiService";
+import { fetchAttachments, invalidateAttachmentsCache } from "../../apiService";
 import { useAppContext } from "../../AppContext";
 
 /**
  * Browse OMERO file annotations (attachments) and select one or more.
  *
  * Props:
- *   formats    {string[]}  File extensions to pre-filter, e.g. ["csv", "parquet"].
+ *   formats    {string[]}  File extensions to pre-filter server-side, e.g. ["csv", "parquet"].
  *                          Empty means no filter.
  *   fileCount  {"single"|"multiple"|null}
  *                          "single" = only one attachment can be selected at a time.
@@ -32,39 +32,54 @@ const OmeroAttachmentBrowser = ({
   onSelect,
 }) => {
   const { state } = useAppContext();
-  const [attachments, setAttachments] = useState([]);
+  // All attachments from the server (filtered by format+group, not by search)
+  const [allAttachments, setAllAttachments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [viewMode, setViewMode] = useState("list");
 
-  // Debounce search input
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  const loadAttachments = useCallback(
-    async (searchTerm) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const groupId = state.user?.active_group_id ?? null;
-        const resp = await fetchAttachments(formats, searchTerm, groupId);
-        setAttachments(resp.attachments || []);
-      } catch (e) {
-        setError(e?.response?.data?.error || e?.message || "Failed to load attachments");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [formats, state.user?.active_group_id]
+  // formats and group are fixed for the lifetime of this instance:
+  // formats come from the workflow descriptor (never change in a session),
+  // and each param gets its own browser mount.
+  const formatsSet = useMemo(
+    () => new Set(formats.map((f) => f.toLowerCase())),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [] // capture once at mount — formats are descriptor-static
   );
+  const groupIdRef = useRef(state.user?.active_group_id ?? null);
 
+  const loadAttachments = useCallback(async (forceRefresh = false) => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (forceRefresh) invalidateAttachmentsCache(groupIdRef.current);
+      const resp = await fetchAttachments(groupIdRef.current);
+      setAllAttachments(resp.attachments || []);
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || "Failed to load attachments");
+    } finally {
+      setLoading(false);
+    }
+  }, []); // stable — fetchAttachments handles caching
+
+  // Fetch once on mount.
   useEffect(() => {
-    loadAttachments(debouncedSearch);
-  }, [loadAttachments, debouncedSearch]);
+    loadAttachments();
+  }, [loadAttachments]);
+
+  // In-memory filters: format (from prop, stable) + search (typed by user)
+  const attachments = useMemo(() => {
+    let list = allAttachments;
+    if (formatsSet.size > 0) {
+      list = list.filter((a) => formatsSet.has((a.extension || "").toLowerCase()));
+    }
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter((a) => a.name.toLowerCase().includes(q));
+    }
+    return list;
+  }, [allAttachments, formatsSet, search]);
 
   const handleSelect = (id) => {
     const isMulti = fileCount !== "single";
@@ -86,9 +101,10 @@ const OmeroAttachmentBrowser = ({
         att.parents.length > 0
           ? `${att.parents[0].type}-${att.parents[0].id}`
           : "unlinked";
+      const p = att.parents[0];
       const label =
-        att.parents.length > 0
-          ? `${att.parents[0].type}: ${att.parents[0].name}`
+        p
+          ? `${p.type}: ${p.name} (ID: ${p.id})`
           : "Unlinked";
       if (!map[key]) map[key] = { label, items: [] };
       map[key].items.push(att);
@@ -105,10 +121,13 @@ const OmeroAttachmentBrowser = ({
           selected ? "bg-blue-50 ring-1 ring-blue-400" : ""
         }`}
         onClick={() => handleSelect(att.id)}
-        title={att.name}
+        title={`${att.name} (ID: ${att.id})`}
       >
         <Icon icon="paperclip" size={14} className="text-gray-400 shrink-0" />
-        <span className="flex-1 text-sm truncate">{att.name}</span>
+        <span className="flex-1 text-sm truncate min-w-0">
+          {att.name}
+          <span className="text-gray-400 ml-1">(ID: {att.id})</span>
+        </span>
         {att.extension && (
           <Tag minimal round className="shrink-0 text-xs">
             {att.extension}
@@ -131,7 +150,9 @@ const OmeroAttachmentBrowser = ({
       icon="document"
       title="No attachments found"
       description={
-        formats.length > 0
+        search
+          ? `No files matching "${search}".`
+          : formats.length > 0
           ? `No files with extension ${formats.join(", ")} found in this group.`
           : "No file attachments found in this group."
       }
@@ -160,13 +181,23 @@ const OmeroAttachmentBrowser = ({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Search + refresh bar */}
+      {/* Search bar with inline clear button */}
       <div className="flex items-center gap-2">
         <InputGroup
           leftIcon="search"
           placeholder="Search by filename…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          rightElement={
+            search ? (
+              <Button
+                minimal
+                icon="cross"
+                small
+                onClick={() => setSearch("")}
+              />
+            ) : undefined
+          }
           className="flex-1"
           small
         />
@@ -176,7 +207,7 @@ const OmeroAttachmentBrowser = ({
             icon="refresh"
             small
             loading={loading}
-            onClick={() => loadAttachments(debouncedSearch)}
+            onClick={() => loadAttachments(true)}
           />
         </Tooltip>
       </div>

@@ -10,7 +10,7 @@ import PlateWorkflowInput from "./PlateWorkflowInput";
 import PlateWorkflowOutput from "./PlateWorkflowOutput";
 import WorkflowForm from "../WorkflowForm";
 import InputOptions from "../InputOptions";
-import WorkflowFileInputStep, { getFileInputParams } from "../WorkflowFileInputStep";
+import WorkflowFileInputStep, { getFileInputParams, isFileInputStepValid } from "../WorkflowFileInputStep";
 
 const PlateWorkflowDialog = ({ 
   workflow, 
@@ -22,6 +22,7 @@ const PlateWorkflowDialog = ({
   const { state, runWorkflowData } = useAppContext();
   const [isNextDisabled, setIsNextDisabled] = useState(true);
   const [isRunDisabled, setIsRunDisabled] = useState(true);
+  const [isFileInputNextDisabled, setIsFileInputNextDisabled] = useState(false);
 
   // Utility to beautify names
   const beautifyName = (name) => {
@@ -35,6 +36,12 @@ const PlateWorkflowDialog = ({
     const hasPlateSelected = state.formData?.IDs?.length > 0;
     setIsNextDisabled(!hasPlateSelected);
   }, [state.formData?.IDs]);
+
+  useEffect(() => {
+    setIsFileInputNextDisabled(
+      !isFileInputStepValid(workflow?.metadata, state.formData)
+    );
+  }, [state.formData, workflow?.metadata]);
 
   // Handle final submit
   const handleFinalSubmit = () => {
@@ -92,6 +99,18 @@ const PlateWorkflowDialog = ({
         />
       )}
 
+      {/* Conditionally show File Inputs step for workflows with non-image file params */}
+      {getFileInputParams(workflow?.metadata).length > 0 && (
+        <DialogStep
+          id="file-inputs"
+          title="File Inputs"
+          panel={<WorkflowFileInputStep />}
+          nextButtonProps={{
+            disabled: isFileInputNextDisabled,
+          }}
+        />
+      )}
+
       {/* Step 2/3: Configure Workflow */}
       <DialogStep
         id="workflow-config"
@@ -103,15 +122,6 @@ const PlateWorkflowDialog = ({
           </DialogBody>
         }
       />
-
-      {/* Conditionally show File Inputs step for workflows with non-image file params */}
-      {getFileInputParams(workflow?.metadata).length > 0 && (
-        <DialogStep
-          id="file-inputs"
-          title="File Inputs"
-          panel={<WorkflowFileInputStep />}
-        />
-      )}
 
       {/* Step 3: Output to Screen */}
       <DialogStep
