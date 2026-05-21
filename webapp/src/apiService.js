@@ -143,6 +143,22 @@ export const invalidateAttachmentsCache = (groupId = null) => {
   }
 };
 
+/**
+ * Fetch file annotations attached to a single OMERO object.
+ * Used by the By-Parent tree browser to lazily load attachments per node.
+ *
+ * @param {string} objectType - "Project" | "Dataset" | "Image" | "Plate" | "Screen"
+ * @param {number} objectId
+ * @returns {Promise<{annotations: Array}>}
+ */
+export const fetchObjectAnnotations = async (objectType, objectId) => {
+  const { urls } = getDjangoConstants();
+  return apiRequest(
+    `${urls.api_object_annotations}?object_type=${encodeURIComponent(objectType)}&object_id=${objectId}`,
+    "GET"
+  );
+};
+
 // Fetch metadata for a specific workflow, or descriptor info for an unsaved repo URL.
 // - fetchWorkflowMetadata(workflowName)  → GET /api/analyzer/workflows/<name>/
 // - fetchWorkflowMetadata(null, repoUrl) → GET /api/analyzer/workflows/_/?repo=<url>  (urls.workflow_metadata)

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Tree, Icon, ContextMenu, Menu, MenuItem } from "@blueprintjs/core";
+import { Tree, Icon, Tooltip, ContextMenu, Menu, MenuItem } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 import { iconMeta } from "../../constants";
 
@@ -66,7 +66,13 @@ const FileTree = ({
       !item.isFolder || !expandedItems.includes(item.index);
 
     const itemLabel = isOmeroItem ? (
-      <span className="text-sm relative top-[2px]">{item.data}</span>
+      item.tooltip ? (
+        <Tooltip content={item.tooltip} placement="right" hoverOpenDelay={350}>
+          <span className="text-sm relative top-[2px]">{item.data}</span>
+        </Tooltip>
+      ) : (
+        <span className="text-sm relative top-[2px]">{item.data}</span>
+      )
     ) : (
       <div className="relative">
         <ContextMenu

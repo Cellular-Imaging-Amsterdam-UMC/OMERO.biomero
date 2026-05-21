@@ -37,7 +37,10 @@ const INFRA_PARAMS = new Set([
 
 const MAX_INPUT_IDS_SHOWN = 20;
 
-const WorkflowSubmitToast = ({ workflowName, startedAt, params }) => {
+// File-type param types (mirrors WorkflowFileInputStep)
+const FILE_INPUT_TYPES_SET = new Set(["file", "array", "measurement", "executable"]);
+
+const WorkflowSubmitToast = ({ workflowName, startedAt, params, metadata }) => {
   const [openSection, setOpenSection] = React.useState(null);
   const toggle = (key) => setOpenSection((prev) => (prev === key ? null : key));
 
@@ -54,9 +57,35 @@ const WorkflowSubmitToast = ({ workflowName, startedAt, params }) => {
   if (params.attachToOriginalImages) outputLines.push("Attached to input images");
   if (params.receiveEmail) outputLines.push("E-mail on completion");
 
-  const wfParams = Object.entries(params).filter(([k]) => !INFRA_PARAMS.has(k));
+  // Build lookup from descriptor so we can classify each param
+  const inputById = {};
+  (metadata?.inputs || []).forEach((inp) => { inputById[inp.id] = inp; });
+
+  // File attachment params (set-by-server + file type) → shown in Input section
+  const fileAttachmentEntries = Object.entries(params).filter(([k]) => {
+    const inp = inputById[k];
+    return inp && inp["set-by-server"] && FILE_INPUT_TYPES_SET.has(inp.type);
+  });
+
+  // True workflow params: not infra, not set-by-server, not output-dir-set.
+  // Falls back to old behaviour (show everything non-infra) when metadata is absent.
+  const wfParams = Object.entries(params).filter(([k]) => {
+    if (INFRA_PARAMS.has(k)) return false;
+    if (!metadata) return true;
+    const inp = inputById[k];
+    if (!inp) return false;            // not in descriptor — skip
+    if (inp["set-by-server"]) return false;  // handled elsewhere
+    if (inp["output-dir-set"]) return false; // internal dir — not user-facing
+    return true;
+  });
+
   const inputCount = params.IDs?.length || 0;
   const dataType = params.Data_Type || "Image";
+  // Count non-empty file attachment slots for the Input section label
+  const attachmentCount = fileAttachmentEntries.reduce((sum, [, v]) => {
+    const ids = Array.isArray(v) ? v.filter((x) => x != null && x !== "") : (v != null && v !== "" ? [v] : []);
+    return sum + ids.length;
+  }, 0);
   const batchInfo = params.batchEnabled
     ? `${params.batchCount} jobs × ${params.batchSize} ${dataType}s`
     : null;
@@ -87,15 +116,21 @@ const WorkflowSubmitToast = ({ workflowName, startedAt, params }) => {
         </SectionRow>
       )}
 
-      <SectionRow label={`Input: ${inputCount} ${dataType}${inputCount !== 1 ? "s" : ""}`} sectionKey="input">
+      <SectionRow label={`Input: ${inputCount} ${dataType}${inputCount !== 1 ? "s" : ""}${attachmentCount > 0 ? ` + ${attachmentCount} file${attachmentCount !== 1 ? "s" : ""}` : ""}`} sectionKey="input">
         {params.IDs?.slice(0, MAX_INPUT_IDS_SHOWN).map((id) => <div key={id}>• {dataType} #{id}</div>)}
         {inputCount > MAX_INPUT_IDS_SHOWN && <div className="opacity-60">…and {inputCount - MAX_INPUT_IDS_SHOWN} more</div>}
         {params.useZarrFormat && <div>• Format: ZARR</div>}
         {batchInfo && <div>• Batch: {batchInfo}</div>}
+        {fileAttachmentEntries.flatMap(([k, v]) => {
+          const ids = Array.isArray(v) ? v.filter((x) => x != null && x !== "") : (v != null && v !== "" ? [v] : []);
+          if (!ids.length) return [];
+          const label = inputById[k]?.name || k;
+          return ids.map((id) => <div key={`${k}-${id}`}>• {label}: Attachment #{id}</div>);
+        })}
       </SectionRow>
 
-      {wfParams.length > 0 && (
-        <SectionRow label={`Parameters (${wfParams.length})`} sectionKey="params">
+      {(wfParams.length > 0 || params.version) && (
+        <SectionRow label={`Parameters (${wfParams.length + (params.version ? 1 : 0)})`} sectionKey="params">
           {params.version && <div>• version: <strong>{params.version}</strong></div>}
           {wfParams.map(([k, v]) => (
             <div key={k}>• {k}: <strong>{String(v)}</strong></div>
@@ -365,7 +400,7 @@ export const AppProvider = ({ children }) => {
       toaster.show({
         intent: "success",
         icon: "tick-circle",
-        message: <WorkflowSubmitToast workflowName={workflowName} startedAt={startedAt} params={params} />,
+        message: <WorkflowSubmitToast workflowName={workflowName} startedAt={startedAt} params={params} metadata={state.selectedWorkflow?.metadata} />,
         timeout: 0,
       });
     } catch (err) {

@@ -7,6 +7,7 @@ import {
   Tag,
   Callout,
   Intent,
+  Tooltip,
 } from "@blueprintjs/core";
 import { useAppContext } from "../../AppContext";
 import OmeroAttachmentBrowser from "./OmeroAttachmentBrowser";
@@ -64,14 +65,17 @@ const WorkflowFileInputStep = () => {
   const [openParamId, setOpenParamId] = useState(
     fileParams.length > 0 ? fileParams[0].id : null
   );
+  // id→name metadata for the current selection of each param (for accordion bar display)
+  const [selectionMeta, setSelectionMeta] = useState({});
 
-  const handleSelect = (param, ids) => {
+  const handleSelect = (param, ids, metas = []) => {
     updateState({
       formData: {
         ...state.formData,
         [param.id]: ids,
       },
     });
+    setSelectionMeta((prev) => ({ ...prev, [param.id]: metas }));
 
     // Auto-advance to the next uncompleted param when this one is done
     if (isParamDone(param, ids)) {
@@ -113,7 +117,7 @@ const WorkflowFileInputStep = () => {
       </Callout>
 
       <div className="flex flex-col gap-2">
-        {fileParams.map((param) => {
+        {fileParams.map((param, index) => {
           const formats = Array.isArray(param.format)
             ? param.format
             : param.format
@@ -144,39 +148,64 @@ const WorkflowFileInputStep = () => {
                 intent={done ? Intent.SUCCESS : Intent.NONE}
                 rightIcon={isOpen ? "chevron-up" : "chevron-down"}
               >
-                <div className="flex items-center gap-2 w-full">
-                  <Icon
-                    icon={done ? "tick-circle" : "paperclip"}
-                    size={14}
-                    className={done ? "text-green-600" : "text-gray-400"}
-                  />
-                  <span className="font-medium text-sm">
-                    {param.name || param.id}
-                  </span>
-                  {param.optional ? (
-                    <span className="text-xs text-gray-400">(Optional)</span>
-                  ) : (
-                    <span className="text-red-500 text-xs" title="Required">*</span>
-                  )}
-                  {formats.length > 0 &&
-                    formats.map((f) => (
-                      <Tag key={f} minimal round className="text-xs">
-                        {f}
-                      </Tag>
-                    ))}
-                  {currentSelection.length > 0 && (
-                    <Tag
-                      intent={done ? Intent.SUCCESS : Intent.PRIMARY}
-                      round
-                      className="text-xs ml-auto"
-                    >
-                      {currentSelection.length} selected
-                    </Tag>
+                <div className="flex flex-col w-full">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-gray-400 shrink-0">#{index + 1}</span>
+                    <Icon
+                      icon={done ? "tick-circle" : "paperclip"}
+                      size={14}
+                      className={done ? "text-green-600" : "text-gray-400"}
+                    />
+                    {param.description ? (
+                      <Tooltip content={param.description} placement="top" hoverOpenDelay={300}>
+                        <span className="font-medium text-sm cursor-help border-b border-dashed border-gray-400">
+                          {param.name || param.id}
+                        </span>
+                      </Tooltip>
+                    ) : (
+                      <span className="font-medium text-sm">
+                        {param.name || param.id}
+                      </span>
+                    )}
+                    {param.optional ? (
+                      <span className="text-xs text-gray-400">(Optional)</span>
+                    ) : (
+                      <span className="text-red-500 text-xs" title="Required">*</span>
+                    )}
+                    {formats.length > 0 &&
+                      formats.map((f) => (
+                        <Tag key={f} minimal round className="text-xs">
+                          {f}
+                        </Tag>
+                      ))}
+                    {currentSelection.length > 0 && (
+                      <span
+                        className={`ml-auto text-xs rounded-full px-2 py-0.5 shrink min-w-0 flex items-center gap-1 max-w-[220px] overflow-hidden ${
+                          done ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-600"
+                        }`}
+                      >
+                        <span className="shrink-0">{currentSelection.length} selected</span>
+                        {selectionMeta[param.id]?.[0]?.name && (
+                          <>
+                            <span className="shrink-0">:</span>
+                            <span className="truncate">
+                              {selectionMeta[param.id][0].name}
+                              {currentSelection.length > 1 ? " …" : ""}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  {param.description && !isOpen && (
+                    <p className="text-xs text-gray-400 truncate mt-0.5 pl-8 max-w-xs">
+                      {param.description}
+                    </p>
                   )}
                 </div>
               </Button>
 
-              <Collapse isOpen={isOpen}>
+              <Collapse isOpen={isOpen} keepChildrenMounted>
                 <div className="px-3 pb-3">
                   {param.description && (
                     <p className="text-xs text-gray-500 mb-2">
@@ -187,7 +216,7 @@ const WorkflowFileInputStep = () => {
                     formats={formats}
                     fileCount={param["file-count"] || null}
                     selectedIds={currentSelection}
-                    onSelect={(ids) => handleSelect(param, ids)}
+                    onSelect={(ids, metas) => handleSelect(param, ids, metas)}
                   />
                 </div>
               </Collapse>

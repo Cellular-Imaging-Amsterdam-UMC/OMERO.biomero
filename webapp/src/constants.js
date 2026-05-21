@@ -51,6 +51,7 @@ export const getDjangoConstants = () => {
     get_workflows: "/omero_biomero/api/analyzer/scripts/",
     api_slurm_status: "/omero_biomero/api/analyzer/slurm/status/",
     api_attachments: "/omero_biomero/api/analyzer/attachments/",
+    api_object_annotations: "/omero_biomero/api/analyzer/object-annotations/",
   };
 
   const ui = {
@@ -81,5 +82,10 @@ export const iconMeta = {
     icon: "image",
     tooltip: "Image",
     color: "#393939",
+  },
+  attachment: {
+    icon: "paperclip",
+    tooltip: "Attachment",
+    color: "#777777",
   },
 };
