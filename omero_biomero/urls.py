@@ -55,6 +55,11 @@ urlpatterns = [
         analyzer_views.get_attachments,  # GET: browse OMERO file annotations
         name="analyzer_attachments",
     ),
+    path(
+        "api/analyzer/object-annotations/",
+        analyzer_views.get_object_annotations,  # GET: file annotations for one OMERO object
+        name="analyzer_object_annotations",
+    ),
     # Main Biomero URL
     path(
         "biomero/",

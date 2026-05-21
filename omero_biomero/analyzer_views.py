@@ -11,6 +11,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from omeroweb.webclient.decorators import login_required
 from omero.rtypes import unwrap, rbool, wrap, rlong
+import omero.model
 
 logger = logging.getLogger(__name__)
 
@@ -177,11 +178,18 @@ def run_workflow_script(request, conn=None, **kwargs):
             "batchCount",     # Frontend calculated (not sent to script)
             "batchSize",      # Converted to Batch_Size for script
         ]
+        # File-attachment params arrive as FILE_{param_id}: int annotation ID.
+        # Must be rlong — wrap() would give rstring if the value is a string.
         inputs = {
             f"{workflow_name}_|_{key}": wrap(value)
             for key, value in params.items()
-            if key not in known_params
+            if key not in known_params and not key.startswith("FILE_")
         }
+        inputs.update({
+            f"{workflow_name}_|_FILE_{key[5:]}": rlong(int(value))
+            for key, value in params.items()
+            if key.startswith("FILE_") and value is not None
+        })
         inputs.update(
             {
                 workflow_name: rbool(True),
@@ -610,8 +618,6 @@ def get_attachments(request, conn=None, **kwargs):
             ]
         }
     """
-    import omero.sys as ome_sys
-
     formats = [f.lower() for f in request.GET.getlist("format") if f]
     search = (request.GET.get("search") or "").strip().lower()
     group_id = request.GET.get("group")
@@ -623,14 +629,12 @@ def get_attachments(request, conn=None, **kwargs):
             except Exception as e:
                 logger.warning(f"get_attachments: could not switch to group {group_id}: {e}")
 
-        params = {}
-        current_group = conn.getEventContext().groupId
-        if current_group is not None:
-            params["group"] = current_group
-
-        # First pass: collect and filter annotations (without loading parents yet)
+        # listFileAnnotations() uses loadSpecifiedAnnotations which:
+        # - loads OriginalFile objects (so getName/getSize work without lazy loading)
+        # - excludes companion files and original metadata by default
+        # - respects the current group session set above
         filtered = []
-        for ann in conn.getObjects("FileAnnotation", opts=params):
+        for ann in conn.listFileAnnotations():
             orig_file = ann.getFile()
             if orig_file is None:
                 continue
@@ -648,49 +652,134 @@ def get_attachments(request, conn=None, **kwargs):
         if not filtered:
             return JsonResponse({"attachments": []})
 
-        # Second pass: bulk-fetch parent links via HQL — one query per object type,
-        # covering all annotation IDs at once (avoids N×5 round-trips).
+        # Bulk-fetch parent links using conn.getAnnotationLinks() — the built-in
+        # omero-py gateway method that properly passes SERVICE_OPTS (including group
+        # context) and wraps IDs as rlong. One call per object type.
         ann_ids = [ann.getId() for ann in filtered]
-        parent_map = {}  # ann_id -> [{"type": ..., "id": ..., "name": ...}]
+        parent_map = {}   # ann_id -> [{"type": ..., "id": ..., "name": ...}]
+        linked_by_map = {}  # ann_id -> full name of the person who created the first link found
 
-        qs = conn.getQueryService()
         for obj_type in ("Image", "Dataset", "Project", "Plate", "Screen"):
             try:
-                p = ome_sys.ParametersI()
-                p.addIds(ann_ids)
-                hql = (
-                    f"select link from {obj_type}AnnotationLink link "
-                    f"join fetch link.parent "
-                    f"where link.child.id in (:ids)"
-                )
-                for link in qs.findAllByQuery(hql, p):
-                    a_id = link.child.id.val
-                    parent = link.parent
-                    p_name = parent.name.val if parent.name is not None else ""
-                    parent_map.setdefault(a_id, []).append({
+                for link in conn.getAnnotationLinks(obj_type, ann_ids=ann_ids):
+                    child = link.getChild()
+                    parent = link.getParent()
+                    if child is None or parent is None:
+                        continue
+                    cid = child.getId()
+                    parent_map.setdefault(cid, []).append({
                         "type": obj_type,
-                        "id": parent.id.val,
-                        "name": p_name,
+                        "id": parent.getId(),
+                        "name": parent.getName() or "",
                     })
+                    if cid not in linked_by_map:
+                        lowner = link.getOwner()
+                        linked_by_map[cid] = lowner.getFullName() if lowner else None
             except Exception:
-                pass  # object type may not support annotation links
+                pass  # object type may not expose annotation links
 
         attachments = []
         for ann in filtered:
             orig_file = ann.getFile()
             name = orig_file.getName() or ""
             ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+            ann_id = ann.getId()
+            ann_date = ann.getDate()
+            ann_owner = ann.getOwner()
             attachments.append({
-                "id": ann.getId(),
+                "id": ann_id,
+                "file_id": orig_file.getId(),
                 "name": name,
                 "size": orig_file.getSize(),
                 "mimetype": orig_file.getMimetype() or "",
                 "extension": ext,
-                "parents": parent_map.get(ann.getId(), []),
+                "ns": ann.getNs() or "",
+                "description": ann.getDescription() or "",
+                "date": ann_date.isoformat() if ann_date else None,
+                "owner": ann_owner.getFullName() if ann_owner else None,
+                "linked_by": linked_by_map.get(ann_id),
+                "parents": parent_map.get(ann_id, []),
             })
 
         return JsonResponse({"attachments": attachments})
 
     except Exception as e:
         logger.exception("get_attachments failed")
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@login_required()
+@require_http_methods(["GET"])
+def get_object_annotations(request, conn=None, **kwargs):
+    """
+    Return file annotations attached to a specific OMERO object.
+    Used by the "By Parent" tree browser to lazily load annotations per node.
+
+    Query params:
+        object_type  — one of: Project, Dataset, Image, Plate, Screen
+        object_id    — integer ID of the object
+
+    Response shape:
+        {"annotations": [{"id", "name", "size", "mimetype", "extension"}, ...]}
+    """
+    ALLOWED_TYPES = {"Project", "Dataset", "Image", "Plate", "Screen"}
+
+    object_type = (request.GET.get("object_type") or "").strip()
+    if object_type not in ALLOWED_TYPES:
+        return JsonResponse({"error": f"Invalid object_type. Must be one of: {', '.join(sorted(ALLOWED_TYPES))}"}, status=400)
+
+    try:
+        object_id = int(request.GET.get("object_id", ""))
+    except (ValueError, TypeError):
+        return JsonResponse({"error": "object_id must be an integer"}, status=400)
+
+    try:
+        obj = conn.getObject(object_type, object_id)
+        if obj is None:
+            return JsonResponse({"error": f"{object_type} {object_id} not found"}, status=404)
+
+        annotations = []
+        for ann in obj.listAnnotations():
+            # Only file annotations
+            if ann.OMERO_TYPE != omero.model.FileAnnotationI:
+                continue
+            orig_file = ann.getFile()
+            if orig_file is None:
+                continue
+            name = orig_file.getName() or ""
+            ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+            ann_date = ann.getDate()
+            ann_owner = ann.getOwner()
+            annotations.append({
+                "id": ann.getId(),
+                "file_id": orig_file.getId(),
+                "name": name,
+                "size": orig_file.getSize(),
+                "mimetype": orig_file.getMimetype() or "",
+                "extension": ext,
+                "ns": ann.getNs() or "",
+                "description": ann.getDescription() or "",
+                "date": ann_date.isoformat() if ann_date else None,
+                "owner": ann_owner.getFullName() if ann_owner else None,
+            })
+
+        # Enrich with linked_by from annotation links
+        if annotations:
+            ann_ids_list = [a["id"] for a in annotations]
+            linked_by_map = {}
+            try:
+                for link in conn.getAnnotationLinks(object_type, ann_ids=ann_ids_list):
+                    child = link.getChild()
+                    if child and child.getId() not in linked_by_map:
+                        lowner = link.getOwner()
+                        linked_by_map[child.getId()] = lowner.getFullName() if lowner else None
+            except Exception:
+                pass
+            for a in annotations:
+                a["linked_by"] = linked_by_map.get(a["id"])
+
+        return JsonResponse({"annotations": annotations})
+
+    except Exception as e:
+        logger.exception("get_object_annotations failed")
         return JsonResponse({"error": str(e)}, status=500)
