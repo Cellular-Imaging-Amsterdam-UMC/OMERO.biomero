@@ -13,21 +13,12 @@ import { useAppContext } from "../../AppContext";
 import OmeroAttachmentBrowser from "./OmeroAttachmentBrowser";
 
 /**
- * File-type parameter types that are fulfilled by selecting OMERO attachments.
- * These params have set-by-server=True in the schema (the server will ultimately
- * inject the HPC path), but the user first chooses which attachment to use here.
- */
-const FILE_INPUT_TYPES = new Set(["file", "array", "measurement", "executable"]);
-
-/**
- * Returns the file-input params from a workflow metadata object, i.e. those
- * with set-by-server=True whose type is a non-image file type.
+ * Returns the file-input params from a workflow metadata object.
+ * Uses the canonical ``file-attachment`` descriptor flag set by the schema parser.
  */
 export function getFileInputParams(workflowMetadata) {
   if (!workflowMetadata?.inputs) return [];
-  return workflowMetadata.inputs.filter(
-    (p) => p["set-by-server"] && FILE_INPUT_TYPES.has(p.type)
-  );
+  return workflowMetadata.inputs.filter((p) => p["file-attachment"] === true);
 }
 
 /**

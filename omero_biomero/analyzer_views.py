@@ -186,7 +186,11 @@ def run_workflow_script(request, conn=None, **kwargs):
             if key not in known_params and not key.startswith("FILE_")
         }
         inputs.update({
-            f"{workflow_name}_|_FILE_{key[5:]}": rlong(int(value))
+            f"{workflow_name}_|_FILE_{key[5:]}": (
+                rlist([rlong(int(v)) for v in value])
+                if isinstance(value, list)
+                else rlong(int(value))
+            )
             for key, value in params.items()
             if key.startswith("FILE_") and value is not None
         })

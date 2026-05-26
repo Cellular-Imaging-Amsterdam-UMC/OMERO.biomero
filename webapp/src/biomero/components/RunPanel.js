@@ -267,7 +267,22 @@ const RunPanel = ({ onWorkflowError }) => {
   };
 
   const submitWorkflow = (workflow_name) => {
-    runWorkflowData(workflow_name, state.formData, onWorkflowError);
+    const metadata = state.selectedWorkflow?.metadata;
+    const fileParams = getFileInputParams(metadata);
+
+    // Rekey file-attachment selections from `param.id` → `FILE_{param.id}` so
+    // the backend (analyzer_views) can recognise them and use rlong().
+    // The original keys are removed to avoid going through the generic wrap() path.
+    const params = { ...state.formData };
+    fileParams.forEach((param) => {
+      const ids = params[param.id];
+      delete params[param.id];
+      if (Array.isArray(ids) && ids.length > 0) {
+        params[`FILE_${param.id}`] = ids;   // keep as array; backend handles list
+      }
+    });
+
+    runWorkflowData(workflow_name, params, onWorkflowError);
   };
   
   // Helper function to determine if Input Options step should be skipped

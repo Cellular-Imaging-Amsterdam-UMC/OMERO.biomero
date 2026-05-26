@@ -37,8 +37,6 @@ const INFRA_PARAMS = new Set([
 
 const MAX_INPUT_IDS_SHOWN = 20;
 
-// File-type param types (mirrors WorkflowFileInputStep)
-const FILE_INPUT_TYPES_SET = new Set(["file", "array", "measurement", "executable"]);
 
 const WorkflowSubmitToast = ({ workflowName, startedAt, params, metadata }) => {
   const [openSection, setOpenSection] = React.useState(null);
@@ -61,10 +59,10 @@ const WorkflowSubmitToast = ({ workflowName, startedAt, params, metadata }) => {
   const inputById = {};
   (metadata?.inputs || []).forEach((inp) => { inputById[inp.id] = inp; });
 
-  // File attachment params (set-by-server + file type) → shown in Input section
+  // File attachment params (file-attachment flag) → shown in Input section
   const fileAttachmentEntries = Object.entries(params).filter(([k]) => {
     const inp = inputById[k];
-    return inp && inp["set-by-server"] && FILE_INPUT_TYPES_SET.has(inp.type);
+    return inp && inp["file-attachment"] === true;
   });
 
   // True workflow params: not infra, not set-by-server, not output-dir-set.
