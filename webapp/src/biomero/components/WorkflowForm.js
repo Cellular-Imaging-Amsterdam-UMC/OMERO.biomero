@@ -87,12 +87,31 @@ const WorkflowForm = () => {
 
   useEffect(() => {
     if (selectedVersion) {
+      const mergedFormData = {
+        ...defaultValues,
+        ...state.formData,
+        version: selectedVersion
+      };
+
+      // Keep choice fields valid even when stale state contains an empty string.
+      (workflowMetadata.inputs || []).forEach((input) => {
+        const choices = input["value-choices"] || [];
+        if (choices.length === 0) return;
+
+        const allowed = choices.map((choice) => String(choice));
+        const defaultChoiceRaw = (input["default-value"] ?? choices[0]);
+        const defaultChoice = String(defaultChoiceRaw);
+        const currentRaw = mergedFormData[input.id];
+        const current = currentRaw ?? "";
+        const currentStr = String(current);
+
+        if (currentStr === "" || !allowed.includes(currentStr)) {
+          mergedFormData[input.id] = allowed.includes(defaultChoice) ? defaultChoice : allowed[0];
+        }
+      });
+
       updateState({ 
-        formData: { 
-          ...defaultValues, 
-          ...state.formData, 
-          version: selectedVersion
-        } 
+        formData: mergedFormData
       });
     }
   }, [selectedVersion]);
