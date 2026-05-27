@@ -85,6 +85,18 @@ const PlateWorkflowDialog = ({
         }}
       />
 
+      {/* Conditionally show File Inputs step for workflows with non-image file params */}
+      {getFileInputParams(workflow?.metadata).length > 0 && (
+        <DialogStep
+          id="file-inputs"
+          title="File Inputs"
+          panel={<WorkflowFileInputStep />}
+          nextButtonProps={{
+            disabled: isFileInputNextDisabled,
+          }}
+        />
+      )}
+
       {/* Step 2 (conditional): Batch Options when >1 plate selected */}
       {(state.formData?.IDs?.length || 0) > 1 && (
         <DialogStep
@@ -96,18 +108,6 @@ const PlateWorkflowDialog = ({
               <InputOptions itemLabel="plates" />
             </DialogBody>
           }
-        />
-      )}
-
-      {/* Conditionally show File Inputs step for workflows with non-image file params */}
-      {getFileInputParams(workflow?.metadata).length > 0 && (
-        <DialogStep
-          id="file-inputs"
-          title="File Inputs"
-          panel={<WorkflowFileInputStep />}
-          nextButtonProps={{
-            disabled: isFileInputNextDisabled,
-          }}
         />
       )}
 

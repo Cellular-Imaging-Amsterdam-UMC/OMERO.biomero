@@ -158,6 +158,27 @@ const RunPanel = ({ onWorkflowError }) => {
     };
   };
 
+  const getWorkflowOutputDefaults = (workflow) => {
+    const outputs = workflow?.metadata?.outputs || [];
+    const byType = (expected) =>
+      outputs.some((output) => String(output?.type || "").toLowerCase() === expected);
+    const hasCsvTableOutput = outputs.some((output) => {
+      const type = String(output?.type || "").toLowerCase();
+      if (!["measurement", "file"].includes(type)) return false;
+      const formats = Array.isArray(output?.format)
+        ? output.format
+        : (output?.format ? [output.format] : []);
+      return formats.map((fmt) => String(fmt).toLowerCase()).includes("csv");
+    });
+
+    return {
+      // Keep legacy defaults; only add opt-in hints for clearly supported output types.
+      attachToOriginalImages: false,
+      importAsZip: byType("file") || byType("array") || byType("executable"),
+      uploadCsv: hasCsvTableOutput,
+    };
+  };
+
   // Utility to beautify names
   const beautifyName = (name) => {
     return name
@@ -241,6 +262,7 @@ const RunPanel = ({ onWorkflowError }) => {
         IDs: [], // Empty or default value
         Data_Type: "Image", // Backend expects "Image" (case sensitive)
         workflowMode: workflowMode, // Set based on workflow config, not tab
+        ...getWorkflowOutputDefaults(workflow),
       },
     });
     setDialogOpen(true); // Open the dialog
@@ -653,6 +675,18 @@ const RunPanel = ({ onWorkflowError }) => {
             }}
           />
 
+          {/* Conditionally show File Inputs step for workflows with non-image file params */}
+          {getFileInputParams(state.selectedWorkflow?.metadata).length > 0 && (
+            <DialogStep
+              id="step2b"
+              title="File Inputs"
+              panel={<WorkflowFileInputStep dialogBodyClassName="flex flex-col min-h-[75vh]" />}
+              nextButtonProps={{
+                disabled: isFileInputNextDisabled,
+              }}
+            />
+          )}
+
           {/* Conditionally show Input Options step */}
           {!shouldSkipInputOptions() && (
             <DialogStep
@@ -664,18 +698,6 @@ const RunPanel = ({ onWorkflowError }) => {
                   <InputOptions />
                 </DialogBody>
               }
-            />
-          )}
-
-          {/* Conditionally show File Inputs step for workflows with non-image file params */}
-          {getFileInputParams(state.selectedWorkflow?.metadata).length > 0 && (
-            <DialogStep
-              id="step2b"
-              title="File Inputs"
-              panel={<WorkflowFileInputStep />}
-              nextButtonProps={{
-                disabled: isFileInputNextDisabled,
-              }}
             />
           )}
 

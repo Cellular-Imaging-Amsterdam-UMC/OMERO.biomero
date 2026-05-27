@@ -9,6 +9,10 @@ import {
   Tab,
   NonIdealState,
   Tooltip,
+  Popover,
+  Menu,
+  MenuItem,
+  MenuDivider,
 } from "@blueprintjs/core";
 import { fetchAttachments, invalidateAttachmentsCache } from "../../apiService";
 import { useAppContext } from "../../AppContext";
@@ -81,11 +85,10 @@ const OmeroAttachmentBrowser = ({
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState("list");
-  const [showAllFilters, setShowAllFilters] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState(new Set());
   const [sortBy, setSortBy] = useState("date");
   const [sortDir, setSortDir] = useState("desc");
-  const [colCount, setColCount] = useState(2);
+  const [colCount, setColCount] = useState(1);
 
   // Derive "dialog 1" context (which OMERO objects the user is working with)
   // once at mount. Used to pre-filter attachments to parents already in scope.
@@ -106,6 +109,17 @@ const OmeroAttachmentBrowser = ({
     () => dialogContextRef.current || []
   );
 
+  // Auto-show the filter tooltip for 3 s on first load when a context filter is pre-applied,
+  // so users immediately understand why the list / tree may appear sparse.
+  const [filterTooltipOpen, setFilterTooltipOpen] = useState(
+    () => (dialogContextRef.current?.length ?? 0) > 0
+  );
+  useEffect(() => {
+    if (!filterTooltipOpen) return;
+    const t = setTimeout(() => setFilterTooltipOpen(false), 3000);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // formats and group are fixed for the lifetime of this instance:
   // formats come from the workflow descriptor (never change in a session),
   // and each param gets its own browser mount.
@@ -115,18 +129,6 @@ const OmeroAttachmentBrowser = ({
     [] // capture once at mount — formats are descriptor-static
   );
   const groupIdRef = useRef(state.user?.active_group_id ?? null);
-
-  // Name lookup built from loaded attachments so chips show "Dataset: My_Results"
-  // rather than just "Dataset #54" before or while data loads.
-  const parentNameLookup = useMemo(() => {
-    const map = {};
-    allAttachments.forEach((att) => {
-      (att.parents || []).forEach((p) => {
-        map[`${p.type}-${p.id}`] = p.name;
-      });
-    });
-    return map;
-  }, [allAttachments]);
 
   const loadAttachments = useCallback(async (forceRefresh = false) => {
     setLoading(true);
@@ -145,7 +147,8 @@ const OmeroAttachmentBrowser = ({
   // Fetch once on mount.
   useEffect(() => {
     loadAttachments();
-  }, [loadAttachments]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-clear the initial context filter on first load if it produces zero results.
   // This saves the user from a dead-end empty state they can't escape without knowing
@@ -177,20 +180,20 @@ const OmeroAttachmentBrowser = ({
         (a.parents || []).some((p) => ctxSet.has(`${p.type}-${p.id}`))
       );
     }
-    // Pinned text filters: every term must match the filename (AND — "search within search")
-    activeContextFilters
-      .filter((f) => f.type === "search")
-      .forEach(({ term }) => {
-        const t = term.toLowerCase();
-        list = list.filter((a) => a.name.toLowerCase().includes(t));
-      });
-    // Live (uncommitted) search
+    // Search
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter((a) => a.name.toLowerCase().includes(q));
     }
     return list;
   }, [allAttachments, formatsSet, activeContextFilters, search]);
+
+  // Tree view ignores list search/context filters for scale, but still enforces
+  // parameter format constraints.
+  const treeAttachments = useMemo(() => {
+    if (formatsSet.size === 0) return allAttachments;
+    return allAttachments.filter((a) => formatsSet.has((a.extension || "").toLowerCase()));
+  }, [allAttachments, formatsSet]);
 
   const handleSelect = (id) => {
     const isMulti = fileCount !== "single";
@@ -247,6 +250,20 @@ const OmeroAttachmentBrowser = ({
     });
     return entries;
   }, [attachments, sortBy, sortDir]);
+
+  const lastGroupSignatureRef = useRef("");
+  useEffect(() => {
+    const signature = grouped
+      .map(({ parent }) => (parent ? `${parent.type}-${parent.id}` : "__unlinked__"))
+      .join("|");
+    if (!signature || signature === lastGroupSignatureRef.current) return;
+
+    const collapsed = new Set(
+      grouped.slice(1).map(({ parent }) => (parent ? `${parent.type}-${parent.id}` : "__unlinked__"))
+    );
+    setCollapsedGroups(collapsed);
+    lastGroupSignatureRef.current = signature;
+  }, [grouped]);
 
   // Map colCount (1-4) to Tailwind grid class — all four strings must be spelled out for JIT
   const gridColsClass = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" }[colCount];
@@ -318,7 +335,7 @@ const OmeroAttachmentBrowser = ({
       title="No attachments found"
       description={
         activeContextFilters.length > 0
-          ? "Nothing matched in the current context. Try removing a filter."
+          ? "No attachments matched your selected input data (datasets, plates, screens, or images)."
           : search
           ? `No files matching "${search}".`
           : formats.length > 0
@@ -329,7 +346,7 @@ const OmeroAttachmentBrowser = ({
         activeContextFilters.length > 0 ? (
           <Button
             small
-            text="Show all attachments"
+            text="Show all attachments (ignore selected input filter)"
             onClick={() => setActiveContextFilters([])}
           />
         ) : undefined
@@ -338,10 +355,78 @@ const OmeroAttachmentBrowser = ({
   );
 
   const listPanel = (
-    <div className="flex flex-col gap-0 mt-1 max-h-64 overflow-y-auto">
-      {attachments.length === 0
-        ? emptyState
-        : grouped.map(({ parent, items }) => {
+    <div className="flex flex-col gap-2 mt-1">
+      <div className="flex items-center gap-1.5">
+        <InputGroup
+          leftIcon="search"
+          placeholder="Search attachments..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          rightElement={search ? <Button minimal icon="cross" small onClick={() => setSearch("")} /> : undefined}
+          className="flex-1"
+          small
+        />
+        {dialogContext.length > 0 && (
+          <Tooltip
+            content={activeContextFilters.length > 0
+              ? "Filtered to your selected input data (datasets, plates, screens, or images). Click to show all attachments."
+              : "Show only attachments linked to your selected input data (datasets, plates, screens, or images)."}
+            hoverOpenDelay={300}
+          >
+            <Button
+              small
+              icon="filter"
+              text={activeContextFilters.length > 0 ? "Input Filter ON" : "Input Filter OFF"}
+              intent={activeContextFilters.length > 0 ? "primary" : "none"}
+              outlined={activeContextFilters.length === 0}
+              active={activeContextFilters.length > 0}
+              onClick={() => {
+                if (activeContextFilters.length > 0) {
+                  setActiveContextFilters([]);
+                } else {
+                  setActiveContextFilters(dialogContext);
+                }
+              }}
+            />
+          </Tooltip>
+        )}
+        <Popover
+          content={
+            <Menu>
+              <MenuDivider title="Sort" />
+              {[["name", "Name"], ["date", "Date"], ["size", "Size"]].map(([field, label]) => (
+                <MenuItem
+                  key={field}
+                  text={`${label}${sortBy === field ? (sortDir === "asc" ? " ↑" : " ↓") : ""}`}
+                  active={sortBy === field}
+                  onClick={() => {
+                    if (sortBy === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                    else { setSortBy(field); setSortDir("asc"); }
+                  }}
+                />
+              ))}
+              <MenuDivider title="Columns" />
+              {[1, 2, 3, 4].map((n) => (
+                <MenuItem
+                  key={n}
+                  text={`${n} column${n > 1 ? "s" : ""}`}
+                  active={colCount === n}
+                  onClick={() => setColCount(n)}
+                />
+              ))}
+            </Menu>
+          }
+          placement="bottom-end"
+        >
+          <Button minimal small icon="settings" />
+        </Popover>
+        <Button minimal icon="refresh" small loading={loading} onClick={() => loadAttachments(true)} />
+      </div>
+
+      <div className="flex flex-col gap-0 max-h-[52vh] overflow-y-auto">
+        {attachments.length === 0
+          ? emptyState
+          : grouped.map(({ parent, items }) => {
             const groupKey = parent
               ? `${parent.type}-${parent.id}`
               : "__unlinked__";
@@ -388,19 +473,17 @@ const OmeroAttachmentBrowser = ({
               </div>
             );
           })}
+      </div>
     </div>
   );
 
   const treePanel = (
     <div className="mt-1">
-      <div className="flex justify-end pb-0.5 mb-1">
-        <Tooltip content="Refresh" placement="left">
-          <Button minimal icon="refresh" small loading={loading} onClick={() => loadAttachments(true)} />
-        </Tooltip>
+      <div className="flex justify-end mb-1">
+        <Button minimal icon="refresh" small loading={loading} onClick={() => loadAttachments(true)} />
       </div>
-      <div className="max-h-80 overflow-y-auto">
+      <div className="max-h-[55vh] overflow-y-auto">
         <OmeroAttachmentTreeBrowser
-          formatsSet={formatsSet}
           selectedIds={selectedIds}
           onSelect={(ids) => {
               const metas = allAttachments
@@ -409,7 +492,7 @@ const OmeroAttachmentBrowser = ({
               onSelect(ids, metas);
             }}
           fileCount={fileCount}
-          allAttachments={allAttachments}
+          allAttachments={treeAttachments}
         />
       </div>
     </div>
@@ -417,151 +500,11 @@ const OmeroAttachmentBrowser = ({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Context filter chips — shown when dialog 1 provided a data context */}
-      {dialogContext.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1 text-xs">
-          {activeContextFilters.length > 0 ? (
-            <>
-              <span className="text-gray-400 shrink-0">Context:</span>
-              {(showAllFilters
-                ? activeContextFilters
-                : activeContextFilters.slice(0, 5)
-              ).map((f) => {
-                const isSearch = f.type === "search";
-                const key = isSearch ? `search-${f.term}` : `${f.type}-${f.id}`;
-                const label = isSearch
-                  ? `"${f.term}"`
-                  : (() => { const n = parentNameLookup[`${f.type}-${f.id}`] || f.name; return n ? `${f.type}: ${n}` : `${f.type} #${f.id}`; })();
-                const icon = isSearch ? "search"
-                  : f.type === "Project" ? "projects"
-                  : f.type === "Dataset" ? "database"
-                  : f.type === "Plate" ? "grid-view"
-                  : f.type === "Screen" ? "layers"
-                  : f.type === "Image" ? "media"
-                  : "folder-close";
-                return (
-                  <Tag
-                    key={key}
-                    minimal
-                    icon={icon}
-                    onRemove={() =>
-                      isSearch
-                        ? setActiveContextFilters((prev) => prev.filter((x) => !(x.type === "search" && x.term === f.term)))
-                        : setActiveContextFilters((prev) => prev.filter((x) => !(x.type === f.type && x.id === f.id)))
-                    }
-                  >
-                    {label}
-                  </Tag>
-                );
-              })}
-              {!showAllFilters && activeContextFilters.length > 5 && (
-                <Tag
-                  minimal
-                  interactive
-                  onClick={() => setShowAllFilters(true)}
-                >
-                  +{activeContextFilters.length - 5} more…
-                </Tag>
-              )}
-              <Button
-                minimal
-                small
-                text="Clear context filter"
-                onClick={() => setActiveContextFilters([])}
-              />
-            </>
-          ) : (
-            <>
-              <span className="text-gray-400">Showing all attachments.</span>
-              <Button
-                minimal
-                small
-                icon="filter"
-                text="Restore context filter"
-                onClick={() => {
-                  setActiveContextFilters(dialogContext);
-                  setShowAllFilters(false);
-                }}
-              />
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Search bar + sort + column selector — list mode only */}
-      {viewMode === "list" && (
-        <>
-          <div className="flex items-center gap-2">
-            <InputGroup
-              leftIcon="search"
-              placeholder="Search… (Enter to pin as filter)"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && search.trim()) {
-                  const term = search.trim();
-                  setActiveContextFilters((prev) =>
-                    prev.some((x) => x.type === "search" && x.term === term)
-                      ? prev
-                      : [...prev, { type: "search", term }]
-                  );
-                  setSearch("");
-                  e.preventDefault();
-                }
-              }}
-              rightElement={
-                search ? (
-                  <Button minimal icon="cross" small onClick={() => setSearch("")} />
-                ) : undefined
-              }
-              className="flex-1"
-              small
-            />
-            <Tooltip content="Refresh" placement="top">
-              <Button minimal icon="refresh" small loading={loading} onClick={() => loadAttachments(true)} />
-            </Tooltip>
-          </div>
-          <div className="flex items-center gap-1 flex-wrap">
-            <span className="text-xs text-gray-400 shrink-0">Sort:</span>
-            {[["name", "Name"], ["date", "Date"], ["size", "Size"]].map(([field, label]) => (
-              <Button
-                key={field}
-                minimal
-                small
-                active={sortBy === field}
-                text={sortBy === field ? `${label} ${sortDir === "asc" ? "↑" : "↓"}` : label}
-                onClick={() => {
-                  if (sortBy === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-                  else { setSortBy(field); setSortDir("asc"); }
-                }}
-              />
-            ))}
-            <span className="text-gray-200 mx-1 shrink-0">|</span>
-            <span className="text-xs text-gray-400 shrink-0">Cols:</span>
-            {[1, 2, 3, 4].map((n) => (
-              <Button key={n} minimal small active={colCount === n} text={String(n)} onClick={() => setColCount(n)} />
-            ))}
-          </div>
-        </>
-      )}
-
       {/* Error */}
       {error && (
         <div className="flex items-center gap-1 text-red-600 text-sm">
           <Icon icon="error" size={14} />
           {error}
-        </div>
-      )}
-
-      {/* Format hint */}
-      {formats.length > 0 && (
-        <div className="flex items-center gap-1 flex-wrap">
-          <span className="text-xs text-gray-500">Accepted formats:</span>
-          {formats.map((f) => (
-            <Tag key={f} minimal round className="text-xs">
-              {f}
-            </Tag>
-          ))}
         </div>
       )}
 
@@ -640,7 +583,7 @@ const OmeroAttachmentBrowser = ({
           id="omero-attachment-browser-tabs"
           selectedTabId={viewMode}
           onChange={(id) => setViewMode(id)}
-          renderActiveTabPanelOnly
+          renderActiveTabPanelOnly={false}
         >
           <Tab
             id="list"

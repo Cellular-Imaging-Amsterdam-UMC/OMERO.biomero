@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Tree, Icon, Tooltip, ContextMenu, Menu, MenuItem } from "@blueprintjs/core";
+import { Tree, Icon, Tooltip, ContextMenu, Menu, MenuItem, Spinner } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 import { iconMeta } from "../../constants";
 
@@ -10,14 +10,16 @@ const FileTree = ({
   onExpandCallback,
   onSelectCallback,
   selectedItems,
+  enableStatusNodes = false,
 }) => {
   const [expandedItems, setExpandedItems] = useState(["root"]);
 
   const handleNodeExpand = async (nodeData) => {
     const nodeId = nodeData.id;
+    const node = dataStructure[nodeId];
+    if (node?.disabled) return; // don't expand greyed-out (filtered) nodes
     if (!expandedItems.includes(nodeId)) {
       setExpandedItems([...expandedItems, nodeId]);
-      const node = dataStructure[nodeId];
       if (node?.isFolder && (!node.children || node.children.length === 0)) {
         const newData = await fetchData(node);
         if (onExpandCallback) {
@@ -47,11 +49,11 @@ const FileTree = ({
     const initialIconName =
       iconMeta[item.category]?.icon || isOmeroItem ? "folder-close" : "media";
 
-    const iconName = item.isFolder
+    const iconName = (enableStatusNodes ? item.iconName : null) || (item.isFolder
       ? isExpanded
         ? "folder-open"
         : "folder-close"
-      : initialIconName;
+      : initialIconName);
 
     // Remove final 's' from category name for iconMeta lookup
     const category = item.category
@@ -68,10 +70,10 @@ const FileTree = ({
     const itemLabel = isOmeroItem ? (
       item.tooltip ? (
         <Tooltip content={item.tooltip} placement="right" hoverOpenDelay={350}>
-          <span className="text-sm relative top-[2px]">{item.data}</span>
+          <span className={`text-sm relative top-[2px] ${(enableStatusNodes && item.isStatus) ? "text-gray-500 italic" : ""}`}>{item.data}</span>
         </Tooltip>
       ) : (
-        <span className="text-sm relative top-[2px]">{item.data}</span>
+        <span className={`text-sm relative top-[2px] ${(enableStatusNodes && item.isStatus) ? "text-gray-500 italic" : ""}`}>{item.data}</span>
       )
     ) : (
       <div className="relative">
@@ -133,11 +135,14 @@ const FileTree = ({
     return {
       id: item.index,
       label: itemLabel,
-      hasCaret: item.isFolder,
+      hasCaret: item.isFolder && !item.disabled,
       isExpanded,
       isSelected,
+      disabled: item.disabled || false,
       childNodes,
-      icon: <Icon icon={iconName} size={18} color={iconMetaData.color} />,
+      icon: (enableStatusNodes && item.isLoading)
+        ? <Spinner size={14} />
+        : <Icon icon={iconName} size={18} color={iconMetaData.color} />,
     };
   };
 

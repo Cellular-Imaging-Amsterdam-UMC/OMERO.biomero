@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
-import { InputGroup, FormGroup, Switch, Callout } from "@blueprintjs/core";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { InputGroup, FormGroup, Switch, Callout, Tooltip, Icon } from "@blueprintjs/core";
 import { useAppContext } from "../../AppContext";
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover.js";
 
 const WorkflowOutput = ({ onSelectionChange }) => {
   const { state, updateState } = useAppContext();
   const [renamePattern, setRenamePattern] = useState("{original_file}_result.{ext}");
-  const [hasOutputSelection, setHasOutputSelection] = useState(true);
   const [renameValidation, setRenameValidation] = useState({ hasError: false, hasWarning: false, message: "" });
   const renameInputRef = useRef(null);
   const outputOptions = [
@@ -26,10 +25,58 @@ const WorkflowOutput = ({ onSelectionChange }) => {
     enableRename: false,
   };
 
-  useEffect(() => {
-    // Merge default values into formData, ensuring missing values are populated
-    updateState({ formData: { ...defaultValues, ...state.formData } });
-  }, [state.formData]);
+  const hasOutputSelection = useMemo(() => outputOptions.some((opt) =>
+    Array.isArray(state.formData?.[opt])
+      ? state.formData[opt].length > 0
+      : !!state.formData?.[opt]
+  ), [state.formData]);
+
+  const outputHints = useMemo(() => {
+    const outputs = state.selectedWorkflow?.metadata?.outputs || [];
+    const isType = (output, expected) => String(output?.type || "").toLowerCase() === expected;
+    const isCsvTableOutput = (output) => {
+      const type = String(output?.type || "").toLowerCase();
+      if (!["measurement", "file"].includes(type)) return false;
+      const formats = Array.isArray(output?.format)
+        ? output.format
+        : (output?.format ? [output.format] : []);
+      return formats.map((fmt) => String(fmt).toLowerCase()).includes("csv");
+    };
+    const imageOutputs = outputs.filter((output) => isType(output, "image"));
+    const measurementOutputs = outputs.filter((output) => isCsvTableOutput(output));
+    const zipOutputs = outputs.filter((output) => ["file", "array", "executable"].includes(String(output?.type || "").toLowerCase()));
+
+    const summarize = (items) => {
+      const names = items.map((o) => o.name || o.id).filter(Boolean);
+      if (names.length === 0) return "";
+      const head = names.slice(0, 2).join(", ");
+      return names.length > 2 ? `${head}, +${names.length - 2} more` : head;
+    };
+
+    return {
+      imageCount: imageOutputs.length,
+      measurementCount: measurementOutputs.length,
+      zipCount: zipOutputs.length,
+      imageLabel: summarize(imageOutputs),
+      measurementLabel: summarize(measurementOutputs),
+      zipLabel: summarize(zipOutputs),
+      importAsZip: zipOutputs.length > 0,
+      uploadCsv: measurementOutputs.length > 0,
+    };
+  }, [state.selectedWorkflow?.metadata]);
+
+  const renderDefaultCue = (enabled, label) => enabled ? (
+    <Tooltip content={`Enabled by default for: ${label}. You can switch it off.`} placement="top">
+      <span className="inline-flex items-center gap-1 text-xs text-sky-700 cursor-help">
+        <Icon icon="info-sign" size={12} />
+        <span>Default for {label}</span>
+      </span>
+    </Tooltip>
+  ) : null;
+
+  const renderDefaultHelper = (enabled, message, fallback) => enabled
+    ? <span className="text-sky-700">{message}</span>
+    : fallback;
 
   useEffect(() => {
     // Sync rename fields - if enableRename is false, ensure pattern gets sent as empty or default
@@ -52,13 +99,9 @@ const WorkflowOutput = ({ onSelectionChange }) => {
     const hasPlate = inputs.some((d) => d?.category === "plates");
     const allDatasets = inputs.every((d) => d?.category === "datasets");
 
-    // If any plate present (alone or mixed), don't auto-populate (and clear existing auto defaults)
-    if (hasPlate || !allDatasets) {
-      if (state.formData.selectedDatasets?.length) {
-        handleFormDataUpdate({ selectedDatasets: [], selectedDatasetId: null });
-      }
-      return;
-    }
+    // Backward compatibility: never clear existing dataset target defaults here.
+    // If inputs are not datasets, keep whatever is already selected.
+    if (hasPlate || !allDatasets) return;
 
     // Only auto-populate when all inputs are datasets and nothing chosen yet
     if (
@@ -74,18 +117,8 @@ const WorkflowOutput = ({ onSelectionChange }) => {
         selectedDatasetId: autoId,
       });
     }
-  }, [state.inputDatasets]);
+  }, [state.inputDatasets, state.formData.selectedDatasets]);
   
-  // Check output selection state whenever formData changes
-  useEffect(() => {
-    const hasSelection = outputOptions.some((opt) =>
-      Array.isArray(state.formData[opt])
-        ? state.formData[opt].length > 0
-        : !!state.formData[opt]
-    );
-    setHasOutputSelection(hasSelection);
-  }, [state.formData]);
-
   const validateRenamePattern = (pattern) => {
     
     if (pattern.trim() === "") {
@@ -126,27 +159,12 @@ const WorkflowOutput = ({ onSelectionChange }) => {
 
     updateState({ formData: updatedFormData });
 
-    if (outputOptions.includes(key)) {
-      // Check if at least one of the output options is still selected
-      const hasSelection = outputOptions.some((opt) =>
-        Array.isArray(updatedFormData[opt])
-          ? updatedFormData[opt].length > 0
-          : !!updatedFormData[opt]
-      );
-      setHasOutputSelection(hasSelection);
-    }
   };
 
   // Atomic multi-key update — avoids stale-closure bug when updating related fields together
   const handleFormDataUpdate = (changes) => {
     const updatedFormData = { ...state.formData, ...changes };
     updateState({ formData: updatedFormData });
-    const hasSelection = outputOptions.some((opt) =>
-      Array.isArray(updatedFormData[opt])
-        ? updatedFormData[opt].length > 0
-        : !!updatedFormData[opt]
-    );
-    setHasOutputSelection(hasSelection);
   };
 
   const handleRenamePatternChange = (e) => {
@@ -183,14 +201,6 @@ const WorkflowOutput = ({ onSelectionChange }) => {
       enableRename: true,
     };
     updateState({ formData: updatedFormData });
-
-    // Recompute output selection with the merged data
-    const hasSelection = outputOptions.some((opt) =>
-      Array.isArray(updatedFormData[opt])
-        ? updatedFormData[opt].length > 0
-        : !!updatedFormData[opt]
-    );
-    setHasOutputSelection(hasSelection);
 
     // Focus the input after clicking example
     if (renameInputRef.current) {
@@ -281,14 +291,30 @@ const WorkflowOutput = ({ onSelectionChange }) => {
       >
         {/* Zip File Option */}
         <FormGroup
-          label="Add results as a zip file archive."
+          label={
+            <span className="inline-flex items-center gap-2">
+              <Tooltip
+                content={outputHints.zipCount > 0
+                  ? `This workflow declares archive/log output(s) (${outputHints.zipLabel}), so zip export is enabled by default.`
+                  : "Archive the output package (e.g., images, CSVs) as a zip file attached to the parent dataset/project."}
+                placement="top"
+              >
+                <span>Add results as a zip file archive.</span>
+              </Tooltip>
+              {renderDefaultCue(outputHints.importAsZip, outputHints.zipLabel)}
+            </span>
+          }
           labelFor="upload-zip-options"
-          helperText="Archive the output package (e.g., images, CSVs) as a zip file attached to the parent dataset/project."
+          helperText={renderDefaultHelper(
+            outputHints.zipCount > 0,
+            `Turned on for workflow output(s): ${outputHints.zipLabel}. Switch it off if you do not want those files attached as a zip archive.`,
+            "Archive the output package (e.g., images, CSVs) as a zip file attached to the parent dataset/project."
+          )}
           intent={hasOutputSelection ? "" : "danger"}
         >
           <Switch
             id="upload-zip-options"
-            checked={state.formData.importAsZip ?? defaultValues.importAsZip}
+            checked={state.formData.importAsZip ?? outputHints.importAsZip ?? defaultValues.importAsZip}
             onChange={(e) => handleInputChange("importAsZip", e.target.checked)}
             intent={hasOutputSelection ? "" : "danger"}
           />
@@ -296,14 +322,30 @@ const WorkflowOutput = ({ onSelectionChange }) => {
 
         {/* OMERO Tables Option */}
         <FormGroup
-          label="Add results as OMERO tables."
+          label={
+            <span className="inline-flex items-center gap-2">
+              <Tooltip
+                content={outputHints.measurementCount > 0
+                  ? `This workflow declares measurement output(s) (${outputHints.measurementLabel}), so CSV table import is enabled by default.`
+                  : "Upload the output CSVs as interactive OMERO tables for further analysis."}
+                placement="top"
+              >
+                <span>Add results as OMERO tables.</span>
+              </Tooltip>
+              {renderDefaultCue(outputHints.uploadCsv, outputHints.measurementLabel)}
+            </span>
+          }
           labelFor="upload-csv-options"
-          helperText="Upload the output CSVs as interactive OMERO tables for further analysis."
+          helperText={renderDefaultHelper(
+            outputHints.measurementCount > 0,
+            `Turned on for workflow output(s): ${outputHints.measurementLabel}. Switch it off if you do not want OMERO tables for those results.`,
+            "Upload CSV results as interactive OMERO tables for further analysis."
+          )}
           intent={hasOutputSelection ? "" : "danger"}
         >
           <Switch
             id="upload-csv-options"
-            checked={state.formData.uploadCsv ?? defaultValues.uploadCsv}
+            checked={state.formData.uploadCsv ?? outputHints.uploadCsv ?? defaultValues.uploadCsv}
             onChange={(e) => handleInputChange("uploadCsv", e.target.checked)}
             intent={hasOutputSelection ? "" : "danger"}
           />
@@ -311,7 +353,18 @@ const WorkflowOutput = ({ onSelectionChange }) => {
 
         {/* Attachments to Original Images */}
         <FormGroup
-          label="Add results as attachments to input images."
+          label={
+            <span className="inline-flex items-center gap-2">
+              <Tooltip
+                content={outputHints.imageCount > 0
+                  ? `This workflow declares image output(s) (${outputHints.imageLabel}).`
+                  : "Attach the output images (e.g., masks) to the original input images to track their provenance."}
+                placement="top"
+              >
+                <span>Add results as attachments to input images.</span>
+              </Tooltip>
+            </span>
+          }
           labelFor="upload-images-options"
           helperText="Attach the output images (e.g., masks) to the original input images to track their provenance."
           intent={hasOutputSelection ? "" : "danger"}
@@ -331,8 +384,24 @@ const WorkflowOutput = ({ onSelectionChange }) => {
 
         {/* Dataset Selection with Popover */}
         <DatasetSelectWithPopover
-          label="Add results to a new or existing dataset."
-          helperText="The output images will be organized in an OMERO dataset for viewing and further analysis."
+          label={
+            <span className="inline-flex items-center gap-2">
+              <Tooltip
+                content={outputHints.imageCount > 0
+                  ? `This workflow declares image output(s) (${outputHints.imageLabel}), which typically belong in a dataset.`
+                  : "The output images will be organized in an OMERO dataset for viewing and further analysis."}
+                placement="top"
+              >
+                <span>Add results to a new or existing dataset.</span>
+              </Tooltip>
+              {renderDefaultCue(outputHints.imageCount > 0, outputHints.imageLabel)}
+            </span>
+          }
+          helperText={renderDefaultHelper(
+            outputHints.imageCount > 0,
+            `Workflow output(s) ${outputHints.imageLabel} fit well with dataset output organization.`,
+            "The output images will be organized in an OMERO dataset for viewing and further analysis."
+          )}
           subLabel="Don't forget to press ENTER if you type a new name!"
           tooltip="Select the OMERO dataset for your workflow results."
           buttonText="Select Dataset"

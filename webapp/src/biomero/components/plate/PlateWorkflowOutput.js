@@ -1,120 +1,131 @@
-import React, { useState, useEffect } from "react";
-import { FormGroup, Switch, Callout, DialogBody } from "@blueprintjs/core";
+import React, { useEffect, useMemo } from "react";
+import { FormGroup, Switch, Callout, DialogBody, Tooltip, Icon } from "@blueprintjs/core";
 import { useAppContext } from "../../../AppContext";
 import DatasetSelectWithPopover from "../DatasetSelectWithPopover.js";
 
 const PlateWorkflowOutput = ({ onSelectionChange }) => {
   const { state, updateState } = useAppContext();
-  const [hasOutputSelection, setHasOutputSelection] = useState(true);
-  const [defaultScreenSet, setDefaultScreenSet] = useState(false);
-  
-  // Check if importer is enabled - plate workflows require it
+
+  const outputOptions = ["importAsZip", "uploadCsv", "selectedScreens"];
+
+  const hasOutputSelection = useMemo(() => outputOptions.some((opt) =>
+    Array.isArray(state.formData?.[opt])
+      ? state.formData[opt].length > 0
+      : !!state.formData?.[opt]
+  ), [state.formData]);
+
   const isImporterEnabled = window.WEBCLIENT?.UI?.IMPORTER_ENABLED || false;
-  
-  // Function to find parent screen of a selected plate
+
   const findParentScreen = (plateId, omeroFileTreeData) => {
     if (!plateId || !omeroFileTreeData) return null;
-    
+
     const plateKey = `plate-${plateId}`;
-    
-    // Search through all nodes for a screen that contains this plate
-    for (const [key, node] of Object.entries(omeroFileTreeData)) {
-      if (node.category === "screens" && 
-          node.children?.includes(plateKey)) {
+    for (const [, node] of Object.entries(omeroFileTreeData)) {
+      if (node.category === "screens" && node.children?.includes(plateKey)) {
         return node;
       }
     }
     return null;
   };
-  
-  const outputOptions = [
-    "importAsZip",
-    "uploadCsv", 
-    "selectedScreens", // Changed from selectedDatasets to selectedScreens for plates
-  ];
+
   const defaultValues = {
     receiveEmail: true,
     importAsZip: false,
     uploadCsv: false,
-    selectedScreens: [], // Changed from selectedDatasets
-    selectedScreenId: null, // OMERO ID when selected from tree (null = typed/new)
+    selectedScreens: [],
+    selectedScreenId: null,
   };
 
-  useEffect(() => {
-    // Merge default values into formData, ensuring missing values are populated
-    updateState({ formData: { ...defaultValues, ...state.formData } });
-  }, [state.formData]);
+  const outputHints = useMemo(() => {
+    const outputs = state.selectedWorkflow?.metadata?.outputs || [];
+    const isType = (output, expected) => String(output?.type || "").toLowerCase() === expected;
+    const isCsvTableOutput = (output) => {
+      const type = String(output?.type || "").toLowerCase();
+      if (!["measurement", "file"].includes(type)) return false;
+      const formats = Array.isArray(output?.format)
+        ? output.format
+        : (output?.format ? [output.format] : []);
+      return formats.map((fmt) => String(fmt).toLowerCase()).includes("csv");
+    };
+    const imageOutputs = outputs.filter((output) => isType(output, "image"));
+    const measurementOutputs = outputs.filter((output) => isCsvTableOutput(output));
+    const zipOutputs = outputs.filter((output) => ["file", "array", "executable"].includes(String(output?.type || "").toLowerCase()));
+
+    const summarize = (items) => {
+      const names = items.map((output) => output.name || output.id).filter(Boolean);
+      if (names.length === 0) return "";
+      const head = names.slice(0, 2).join(", ");
+      return names.length > 2 ? `${head}, +${names.length - 2} more` : head;
+    };
+
+    return {
+      measurementCount: measurementOutputs.length,
+      zipCount: zipOutputs.length,
+      imageCount: imageOutputs.length,
+      imageLabel: summarize(imageOutputs),
+      measurementLabel: summarize(measurementOutputs),
+      zipLabel: summarize(zipOutputs),
+      importAsZip: zipOutputs.length > 0,
+      uploadCsv: measurementOutputs.length > 0,
+      hasImageOutput: imageOutputs.length > 0,
+    };
+  }, [state.selectedWorkflow?.metadata]);
+
+  const renderDefaultCue = (enabled, label) => enabled ? (
+    <Tooltip content={`Enabled by default for: ${label}. You can switch it off.`} placement="top">
+      <span className="inline-flex items-center gap-1 text-xs text-sky-700 cursor-help">
+        <Icon icon="info-sign" size={12} />
+        <span>Default for {label}</span>
+      </span>
+    </Tooltip>
+  ) : null;
+
+  const renderDefaultHelper = (enabled, message, fallback) => enabled
+    ? <span className="text-sky-700">{message}</span>
+    : fallback;
 
   useEffect(() => {
-    // Tell the parent about output selection
     onSelectionChange(hasOutputSelection);
-  }, [hasOutputSelection]);
+  }, [hasOutputSelection, onSelectionChange]);
 
-  // Set default screen when plate is selected in input
   useEffect(() => {
-    if (state.formData?.IDs?.length > 0 && 
-        state.formData?.plateMode && 
-        state.omeroFileTreeData && 
-        !defaultScreenSet &&
-        (!state.formData.selectedScreens || state.formData.selectedScreens.length === 0)) {
-      
+    if (
+      state.formData?.IDs?.length > 0 &&
+      state.formData?.plateMode &&
+      state.omeroFileTreeData &&
+      (!state.formData.selectedScreens || state.formData.selectedScreens.length === 0)
+    ) {
       const plateId = state.formData.IDs[0];
       const parentScreen = findParentScreen(plateId, state.omeroFileTreeData);
-      
+
       if (parentScreen) {
-        console.log("Setting default screen for plate:", plateId, "->", parentScreen.data);
         updateState({
           formData: {
             ...state.formData,
             selectedScreens: [parentScreen.data],
             selectedScreenId: parentScreen.id,
-          }
+          },
         });
-        setDefaultScreenSet(true);
       }
     }
-  }, [state.formData?.IDs, state.formData?.plateMode, state.omeroFileTreeData, defaultScreenSet]);
-
-  // Check output selection state whenever formData changes
-  useEffect(() => {
-    const hasSelection = outputOptions.some((opt) =>
-      Array.isArray(state.formData[opt])
-        ? state.formData[opt].length > 0
-        : !!state.formData[opt]
-    );
-    setHasOutputSelection(hasSelection);
-  }, [state.formData]);
+  }, [state.formData?.IDs, state.formData?.plateMode, state.omeroFileTreeData, state.formData.selectedScreens]);
 
   const handleInputChange = (key, value) => {
-    // Compute new state immediately
-    const updatedFormData = {
-      ...state.formData,
-      [key]: value,
-    };
-
-    updateState({ formData: updatedFormData });
-
-    if (outputOptions.includes(key)) {
-      // Check if at least one of the output options is still selected
-      const hasSelection = outputOptions.some((opt) =>
-        Array.isArray(updatedFormData[opt])
-          ? updatedFormData[opt].length > 0
-          : !!updatedFormData[opt]
-      );
-      setHasOutputSelection(hasSelection);
-    }
+    updateState({
+      formData: {
+        ...state.formData,
+        [key]: value,
+      },
+    });
   };
 
-  // Atomic multi-key update — avoids stale-closure bug when updating related fields together
   const handleFormDataUpdate = (changes) => {
-    const updatedFormData = { ...state.formData, ...changes };
-    updateState({ formData: updatedFormData });
-    const hasSelection = outputOptions.some((opt) =>
-      Array.isArray(updatedFormData[opt])
-        ? updatedFormData[opt].length > 0
-        : !!updatedFormData[opt]
-    );
-    setHasOutputSelection(hasSelection);
+    updateState({
+      formData: {
+        ...state.formData,
+        ...changes,
+      },
+    });
   };
 
   return (
@@ -122,17 +133,15 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
       <form>
         <h2>Output Options</h2>
 
-        {/* Warning if importer is not enabled */}
         {!isImporterEnabled && (
           <Callout intent="danger" className="mb-4">
             <strong>Plate workflows require importer integration</strong>
             <br />
-            Plate workflows with ZARR outputs are only supported when IMPORTER_ENABLED=true. 
+            Plate workflows with ZARR outputs are only supported when IMPORTER_ENABLED=true.
             Please contact your administrator to enable importer integration.
           </Callout>
         )}
 
-        {/* Sticky Validation Messages */}
         <div className="sticky top-0 z-10">
           {!hasOutputSelection && (
             <Callout intent="danger" className="mb-2 bg-red-50 border-red-200">
@@ -141,7 +150,6 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
           )}
         </div>
 
-        {/* Receive Email Option */}
         <FormGroup
           label="Receive E-mail on Completion?"
           labelFor="email-notification"
@@ -154,58 +162,96 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
           />
         </FormGroup>
 
-        {/* Import Options */}
         <FormGroup
           label="How would you like to add the workflow results to OMERO?"
           labelFor="import-options"
           subLabel={
             <span>
-              Select{" "}
-              <strong
-                className={hasOutputSelection ? "" : "font-bold text-red-500"}
-              >
-                one or more
-              </strong>{" "}
-              options below for how you want the data resulting from this workflow
-              imported back into OMERO
+              Select <strong className={hasOutputSelection ? "" : "font-bold text-red-500"}>one or more</strong>{" "}
+              options below for how you want the data resulting from this workflow imported back into OMERO
             </span>
           }
           intent={hasOutputSelection ? "" : "danger"}
         >
-          {/* Zip File Option */}
           <FormGroup
-            label="Add results as a zip file archive."
+            label={
+              <span className="inline-flex items-center gap-2">
+                <Tooltip
+                  content={outputHints.zipCount > 0
+                    ? `This workflow declares archive/log output(s) (${outputHints.zipLabel}), so zip export is enabled by default.`
+                    : "Archive the output package (e.g., images, CSVs) as a zip file attached to the parent screen/project."}
+                  placement="top"
+                >
+                  <span>Add results as a zip file archive.</span>
+                </Tooltip>
+                {renderDefaultCue(outputHints.importAsZip, outputHints.zipLabel)}
+              </span>
+            }
             labelFor="upload-zip-options"
-            helperText="Archive the output package (e.g., images, CSVs) as a zip file attached to the parent screen/project."
+            helperText={renderDefaultHelper(
+              outputHints.zipCount > 0,
+              `Turned on for workflow output(s): ${outputHints.zipLabel}. Switch it off if you do not want those files attached as a zip archive.`,
+              "Archive the output package (e.g., images, CSVs) as a zip file attached to the parent screen/project."
+            )}
             intent={hasOutputSelection ? "" : "danger"}
           >
             <Switch
               id="upload-zip-options"
-              checked={state.formData.importAsZip ?? defaultValues.importAsZip}
+              checked={state.formData.importAsZip ?? outputHints.importAsZip ?? defaultValues.importAsZip}
               onChange={(e) => handleInputChange("importAsZip", e.target.checked)}
               intent={hasOutputSelection ? "" : "danger"}
             />
           </FormGroup>
 
-          {/* OMERO Tables Option */}
           <FormGroup
-            label="Add results as OMERO tables."
+            label={
+              <span className="inline-flex items-center gap-2">
+                <Tooltip
+                  content={outputHints.measurementCount > 0
+                    ? `This workflow declares measurement output(s) (${outputHints.measurementLabel}), so CSV table import is enabled by default.`
+                    : "Upload the output CSVs as interactive OMERO tables for further analysis."}
+                  placement="top"
+                >
+                  <span>Add results as OMERO tables.</span>
+                </Tooltip>
+                {renderDefaultCue(outputHints.uploadCsv, outputHints.measurementLabel)}
+              </span>
+            }
             labelFor="upload-csv-options"
-            helperText="Upload the output CSVs as interactive OMERO tables for further analysis."
+            helperText={renderDefaultHelper(
+              outputHints.measurementCount > 0,
+              `Turned on for workflow output(s): ${outputHints.measurementLabel}. Switch it off if you do not want OMERO tables for those results.`,
+              "Upload CSV results as interactive OMERO tables for further analysis."
+            )}
             intent={hasOutputSelection ? "" : "danger"}
           >
             <Switch
               id="upload-csv-options"
-              checked={state.formData.uploadCsv ?? defaultValues.uploadCsv}
+              checked={state.formData.uploadCsv ?? outputHints.uploadCsv ?? defaultValues.uploadCsv}
               onChange={(e) => handleInputChange("uploadCsv", e.target.checked)}
               intent={hasOutputSelection ? "" : "danger"}
             />
           </FormGroup>
 
-          {/* Screen Selection with Popover */}
           <DatasetSelectWithPopover
-            label="Add results to a new or existing screen."
-            helperText="The output results will be organized in an OMERO screen for viewing and further analysis."
+            label={
+              <span className="inline-flex items-center gap-2">
+                <Tooltip
+                  content={outputHints.hasImageOutput
+                    ? `This workflow declares image output(s) (${outputHints.imageLabel}), so screen output is the default target for plate results.`
+                    : "The output results will be organized in an OMERO screen for viewing and further analysis."}
+                  placement="top"
+                >
+                  <span>Add results to a new or existing screen.</span>
+                </Tooltip>
+                {renderDefaultCue(outputHints.hasImageOutput, outputHints.imageLabel)}
+              </span>
+            }
+            helperText={renderDefaultHelper(
+              outputHints.hasImageOutput,
+              `Turned on for workflow output(s): ${outputHints.imageLabel}. Switch it off if you do not want those image results organized in a screen.`,
+              "The output results will be organized in an OMERO screen for viewing and further analysis."
+            )}
             subLabel="Don't forget to press ENTER if you type a new name!"
             tooltip="Select the OMERO screen for your workflow results."
             buttonText="Select Screen"
@@ -216,11 +262,9 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
             })}
             onChange={(values, type) => {
               if (type === "manual") {
-                // Strip any "(ID: X)" suffix the user may have left in, take the last value
                 const rawName = values.length
                   ? values[values.length - 1].replace(/\s*\(ID:\s*\d+\)$/, '').trim()
                   : '';
-                // Look up this name in the tree — auto-attach ID if it exists
                 const matchedScreen = rawName
                   ? Object.values(state.omeroFileTreeData || {}).find(
                       (n) => n.category === "screens" && n.data === rawName
@@ -231,7 +275,6 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
                   selectedScreenId: matchedScreen ? matchedScreen.id : null,
                 });
               } else {
-                // Selected from tree — extract name and ID
                 const screenNode = state.omeroFileTreeData[values[0]];
                 if (screenNode) {
                   handleFormDataUpdate({
@@ -245,7 +288,6 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
             intent={hasOutputSelection ? "" : "danger"}
             allowedCategories={["screens"]}
             tagProps={(val) => {
-              // Orange warning when the tag value doesn't contain "(ID: X)" — means it's a new screen
               const isKnown = /\(ID:\s*\d+\)/.test(String(val));
               if (isKnown) return {};
               return {

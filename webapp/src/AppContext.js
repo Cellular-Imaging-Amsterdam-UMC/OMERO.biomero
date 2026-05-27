@@ -159,6 +159,7 @@ export const AppProvider = ({ children }) => {
     workflowStatusTooltipShown: false,
     inputDatasets: [],
     omeroFileTreeData: null,
+    omeroAttachmentTreeCache: {},
     localFileTreeData: null,
     omeroFileTreeSelection: [],
     localFileTreeSelection: [],

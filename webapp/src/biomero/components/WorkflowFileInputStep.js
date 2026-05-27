@@ -46,7 +46,7 @@ function isParamDone(param, selection) {
   return selection.length >= 1;
 }
 
-const WorkflowFileInputStep = () => {
+const WorkflowFileInputStep = ({ dialogBodyClassName = "" }) => {
   const { state, updateState } = useAppContext();
   const workflowMetadata = state.selectedWorkflow?.metadata;
   const fileParams = getFileInputParams(workflowMetadata);
@@ -68,8 +68,9 @@ const WorkflowFileInputStep = () => {
     });
     setSelectionMeta((prev) => ({ ...prev, [param.id]: metas }));
 
-    // Auto-advance to the next uncompleted param when this one is done
-    if (isParamDone(param, ids)) {
+    // Auto-advance only for single-file params. Multi-file params stay open
+    // so users can select several files without the panel collapsing.
+    if (param["file-count"] === "single" && isParamDone(param, ids)) {
       const currentIndex = fileParams.findIndex((p) => p.id === param.id);
       const nextIncomplete = fileParams.slice(currentIndex + 1).find((p) => {
         const sel = Array.isArray(state.formData?.[p.id])
@@ -85,124 +86,77 @@ const WorkflowFileInputStep = () => {
 
   if (fileParams.length === 0) {
     return (
-      <DialogBody>
-        <p className="text-gray-500 text-sm">
-          This workflow has no file attachment inputs.
-        </p>
+      <DialogBody className={dialogBodyClassName || undefined}>
+        <p className="text-gray-500 text-sm">This workflow has no file attachment inputs.</p>
       </DialogBody>
     );
   }
 
   return (
-    <DialogBody>
-      {/* Info callout — mirrors the Batch Processing style */}
-      <Callout className="mb-3">
-        <p className="text-sm font-semibold mb-0.5">
-          File Inputs {!hasRequired && "(Optional)"}
-        </p>
-        <p className="text-xs text-gray-600">
-          {hasRequired
-            ? "Select the required OMERO file attachments below before continuing."
-            : "These settings are optional. You can safely click \"Next\" without selecting anything."}
-        </p>
-      </Callout>
+    <DialogBody className={dialogBodyClassName || undefined}>
+      {hasRequired && (
+        <Callout intent={Intent.PRIMARY} icon={null} className="mb-3 py-2 px-3">
+          <span className="text-sm">Select the required file attachments below before continuing.</span>
+        </Callout>
+      )}
 
-      <div className="flex flex-col gap-2">
-        {fileParams.map((param, index) => {
+      <div className="flex flex-col gap-1">
+        {fileParams.map((param) => {
           const formats = Array.isArray(param.format)
             ? param.format
-            : param.format
-            ? [param.format]
-            : [];
+            : param.format ? [param.format] : [];
           const currentSelection = Array.isArray(state.formData[param.id])
-            ? state.formData[param.id]
-            : [];
+            ? state.formData[param.id] : [];
           const done = isParamDone(param, currentSelection);
           const isOpen = openParamId === param.id;
 
+          const infoContent = [
+            param.description,
+            formats.length > 0 && `Accepted formats: ${formats.join(", ")}`,
+          ].filter(Boolean).join("\n\n");
+
           return (
-            <div
-              key={param.id}
-              className={`border rounded transition-colors ${
-                done
-                  ? "border-green-400 bg-green-50"
-                  : "border-gray-200"
-              }`}
-            >
-              {/* Collapsible header */}
+            <div key={param.id} className="border border-gray-200 rounded">
               <Button
                 minimal
                 fill
                 alignText="left"
                 onClick={() => setOpenParamId(isOpen ? null : param.id)}
-                className="px-3 py-2"
                 intent={done ? Intent.SUCCESS : Intent.NONE}
                 rightIcon={isOpen ? "chevron-up" : "chevron-down"}
               >
-                <div className="flex flex-col w-full">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-gray-400 shrink-0">#{index + 1}</span>
-                    <Icon
-                      icon={done ? "tick-circle" : "paperclip"}
-                      size={14}
-                      className={done ? "text-green-600" : "text-gray-400"}
-                    />
-                    {param.description ? (
-                      <Tooltip content={param.description} placement="top" hoverOpenDelay={300}>
-                        <span className="font-medium text-sm cursor-help border-b border-dashed border-gray-400">
-                          {param.name || param.id}
-                        </span>
-                      </Tooltip>
-                    ) : (
-                      <span className="font-medium text-sm">
-                        {param.name || param.id}
-                      </span>
-                    )}
-                    {param.optional ? (
-                      <span className="text-xs text-gray-400">(Optional)</span>
-                    ) : (
-                      <span className="text-red-500 text-xs" title="Required">*</span>
-                    )}
-                    {formats.length > 0 &&
-                      formats.map((f) => (
-                        <Tag key={f} minimal round className="text-xs">
-                          {f}
-                        </Tag>
-                      ))}
-                    {currentSelection.length > 0 && (
-                      <span
-                        className={`ml-auto text-xs rounded-full px-2 py-0.5 shrink min-w-0 flex items-center gap-1 max-w-[220px] overflow-hidden ${
-                          done ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-600"
-                        }`}
-                      >
-                        <span className="shrink-0">{currentSelection.length} selected</span>
-                        {selectionMeta[param.id]?.[0]?.name && (
-                          <>
-                            <span className="shrink-0">:</span>
-                            <span className="truncate">
-                              {selectionMeta[param.id][0].name}
-                              {currentSelection.length > 1 ? " …" : ""}
-                            </span>
-                          </>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  {param.description && !isOpen && (
-                    <p className="text-xs text-gray-400 truncate mt-0.5 pl-8 max-w-xs">
-                      {param.description}
-                    </p>
+                <div className="flex items-center gap-2 w-full pr-1">
+                  <Icon
+                    icon={done ? "tick-circle" : "paperclip"}
+                    size={14}
+                    className={done ? "text-green-500" : "text-gray-400"}
+                  />
+                  <span className="text-sm font-medium flex-1 text-left">
+                    {param.name || param.id}
+                  </span>
+                  {infoContent && (
+                    <Tooltip
+                      content={<span className="block max-w-xs whitespace-pre-wrap text-xs">{infoContent}</span>}
+                      hoverOpenDelay={200}
+                      placement="top"
+                    >
+                      <Icon icon="info-sign" size={12} className="text-gray-300 hover:text-gray-500" />
+                    </Tooltip>
+                  )}
+                  {param.optional
+                    ? <span className="text-xs text-gray-400">(optional)</span>
+                    : !done && <span className="text-xs text-red-400">required</span>
+                  }
+                  {currentSelection.length > 0 && (
+                    <Tag minimal round intent={done ? Intent.SUCCESS : Intent.PRIMARY} className="shrink-0">
+                      {currentSelection.length}
+                    </Tag>
                   )}
                 </div>
               </Button>
 
               <Collapse isOpen={isOpen} keepChildrenMounted>
-                <div className="px-3 pb-3">
-                  {param.description && (
-                    <p className="text-xs text-gray-500 mb-2">
-                      {param.description}
-                    </p>
-                  )}
+                <div className="px-3 pb-3 pt-1 border-t border-gray-100">
                   <OmeroAttachmentBrowser
                     formats={formats}
                     fileCount={param["file-count"] || null}

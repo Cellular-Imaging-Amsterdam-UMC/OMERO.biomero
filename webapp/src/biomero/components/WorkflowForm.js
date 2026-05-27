@@ -80,7 +80,7 @@ const WorkflowForm = () => {
       acc[input.id] =
         defaultValue !== undefined ? Boolean(defaultValue) : false;
     } else {
-      acc[input.id] = defaultValue || "";
+      acc[input.id] = defaultValue ?? "";
     }
     return acc;
   }, {});
@@ -180,7 +180,7 @@ const WorkflowForm = () => {
                 >
                   <HTMLSelect
                     id={id}
-                    value={state.formData[id] !== undefined ? state.formData[id] : (defaultValue || "")}
+                    value={state.formData[id] !== undefined ? state.formData[id] : (defaultValue ?? "")}
                     onChange={(e) => handleInputChange(id, e.target.value)}
                   >
                     {choices.map((choice, i) => {
@@ -200,9 +200,9 @@ const WorkflowForm = () => {
               >
                 <InputGroup
                   id={id}
-                  value={state.formData[id] || ""}
+                  value={state.formData[id] ?? ""}
                   onChange={(e) => handleInputChange(id, e.target.value)}
-                  placeholder={defaultValue || name}
+                  placeholder={defaultValue ?? name}
                 />
               </FormGroup>
             );
