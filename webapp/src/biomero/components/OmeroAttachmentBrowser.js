@@ -89,6 +89,10 @@ const OmeroAttachmentBrowser = ({
   const [sortBy, setSortBy] = useState("date");
   const [sortDir, setSortDir] = useState("desc");
   const [colCount, setColCount] = useState(1);
+  const [colCountMode, setColCountMode] = useState("auto");
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1280
+  );
 
   // Derive "dialog 1" context (which OMERO objects the user is working with)
   // once at mount. Used to pre-filter attachments to parents already in scope.
@@ -109,16 +113,12 @@ const OmeroAttachmentBrowser = ({
     () => dialogContextRef.current || []
   );
 
-  // Auto-show the filter tooltip for 3 s on first load when a context filter is pre-applied,
-  // so users immediately understand why the list / tree may appear sparse.
-  const [filterTooltipOpen, setFilterTooltipOpen] = useState(
-    () => (dialogContextRef.current?.length ?? 0) > 0
-  );
   useEffect(() => {
-    if (!filterTooltipOpen) return;
-    const t = setTimeout(() => setFilterTooltipOpen(false), 3000);
-    return () => clearTimeout(t);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (typeof window === "undefined") return undefined;
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // formats and group are fixed for the lifetime of this instance:
   // formats come from the workflow descriptor (never change in a session),
@@ -149,22 +149,6 @@ const OmeroAttachmentBrowser = ({
     loadAttachments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Auto-clear the initial context filter on first load if it produces zero results.
-  // This saves the user from a dead-end empty state they can't escape without knowing
-  // the "Clear context filter" button exists.
-  const autoFilterClearedRef = useRef(false);
-  useEffect(() => {
-    if (autoFilterClearedRef.current || !allAttachments.length) return;
-    autoFilterClearedRef.current = true;
-    const omeroFilters = activeContextFilters.filter((f) => f.type !== "search");
-    if (!omeroFilters.length) return;
-    const ctxSet = new Set(omeroFilters.map((f) => `${f.type}-${f.id}`));
-    const hasMatch = allAttachments.some((a) =>
-      (a.parents || []).some((p) => ctxSet.has(`${p.type}-${p.id}`))
-    );
-    if (!hasMatch) setActiveContextFilters([]);
-  }, [allAttachments]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // In-memory filters: format (prop, stable) + OMERO parent filters + pinned text filters + live search
   const attachments = useMemo(() => {
@@ -252,21 +236,47 @@ const OmeroAttachmentBrowser = ({
   }, [attachments, sortBy, sortDir]);
 
   const lastGroupSignatureRef = useRef("");
+  const resetGroupCollapseOnNextLoadRef = useRef(false);
   useEffect(() => {
     const signature = grouped
       .map(({ parent }) => (parent ? `${parent.type}-${parent.id}` : "__unlinked__"))
       .join("|");
-    if (!signature || signature === lastGroupSignatureRef.current) return;
+    if (!signature) return;
 
-    const collapsed = new Set(
-      grouped.slice(1).map(({ parent }) => (parent ? `${parent.type}-${parent.id}` : "__unlinked__"))
-    );
-    setCollapsedGroups(collapsed);
+    const isInitialLoad = lastGroupSignatureRef.current === "";
+    const shouldResetCollapse = isInitialLoad || resetGroupCollapseOnNextLoadRef.current;
     lastGroupSignatureRef.current = signature;
-  }, [grouped]);
+
+    if (!shouldResetCollapse) return;
+
+    if (search.trim()) {
+      setCollapsedGroups(new Set());
+    } else {
+      setCollapsedGroups(
+        new Set(
+          grouped.slice(2).map(({ parent }) => (parent ? `${parent.type}-${parent.id}` : "__unlinked__"))
+        )
+      );
+    }
+    resetGroupCollapseOnNextLoadRef.current = false;
+  }, [grouped, search]);
+
+  useEffect(() => {
+    if (!search.trim()) return;
+    setCollapsedGroups(new Set());
+  }, [search]);
+
+  const autoColCount = useMemo(() => {
+    if (viewportWidth < 1024) return 1;
+    if (viewportWidth < 1400) return 2;
+    if (viewportWidth < 1800) return 3;
+    return 4;
+  }, [viewportWidth]);
+
+  const effectiveColCount = colCountMode === "auto" ? autoColCount : colCount;
 
   // Map colCount (1-4) to Tailwind grid class — all four strings must be spelled out for JIT
-  const gridColsClass = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" }[colCount];
+  const gridColsClass = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" }[effectiveColCount];
 
   const renderCard = (att) => {
     const selected = selectedIds.includes(att.id);
@@ -300,7 +310,7 @@ const OmeroAttachmentBrowser = ({
       </table>
     );
     return (
-      <Tooltip key={att.id} content={tooltipContent} placement="right" hoverOpenDelay={350}>
+      <Tooltip key={att.id} content={tooltipContent} placement="auto" hoverOpenDelay={350}>
         <div
           className={`rounded border px-2 py-1.5 cursor-pointer transition-colors ${
             selected
@@ -342,15 +352,6 @@ const OmeroAttachmentBrowser = ({
           ? `No files with extension ${formats.join(", ")} found in this group.`
           : "No file attachments found in this group."
       }
-      action={
-        activeContextFilters.length > 0 ? (
-          <Button
-            small
-            text="Show all attachments (ignore selected input filter)"
-            onClick={() => setActiveContextFilters([])}
-          />
-        ) : undefined
-      }
     />
   );
 
@@ -368,19 +369,26 @@ const OmeroAttachmentBrowser = ({
         />
         {dialogContext.length > 0 && (
           <Tooltip
-            content={activeContextFilters.length > 0
+            content={activeContextFilters.length > 0 && attachments.length === 0
+              ? search.trim()
+                ? "No attachments match the current input filter plus your search. Turn off the input filter to search across attachments from all your projects, datasets, screens, plates, and images."
+                : "No attachments matched the current input filter. Turn off the input filter to see attachments from all your projects, datasets, screens, plates, and images."
+              : activeContextFilters.length > 0
               ? "Filtered to your selected input data (datasets, plates, screens, or images). Click to show all attachments."
               : "Show only attachments linked to your selected input data (datasets, plates, screens, or images)."}
             hoverOpenDelay={300}
+            isOpen={activeContextFilters.length > 0 && attachments.length === 0 ? true : undefined}
+            usePortal={false}
           >
             <Button
               small
               icon="filter"
               text={activeContextFilters.length > 0 ? "Input Filter ON" : "Input Filter OFF"}
-              intent={activeContextFilters.length > 0 ? "primary" : "none"}
+              intent={activeContextFilters.length > 0 && attachments.length === 0 ? "warning" : activeContextFilters.length > 0 ? "primary" : "none"}
               outlined={activeContextFilters.length === 0}
               active={activeContextFilters.length > 0}
               onClick={() => {
+                resetGroupCollapseOnNextLoadRef.current = true;
                 if (activeContextFilters.length > 0) {
                   setActiveContextFilters([]);
                 } else {
@@ -406,12 +414,21 @@ const OmeroAttachmentBrowser = ({
                 />
               ))}
               <MenuDivider title="Columns" />
+              <MenuItem
+                text={`Auto (${autoColCount} by viewport)`}
+                icon="automatic-updates"
+                active={colCountMode === "auto"}
+                onClick={() => setColCountMode("auto")}
+              />
               {[1, 2, 3, 4].map((n) => (
                 <MenuItem
                   key={n}
                   text={`${n} column${n > 1 ? "s" : ""}`}
-                  active={colCount === n}
-                  onClick={() => setColCount(n)}
+                  active={colCountMode === "manual" && colCount === n}
+                  onClick={() => {
+                    setColCountMode("manual");
+                    setColCount(n);
+                  }}
                 />
               ))}
             </Menu>
@@ -423,7 +440,7 @@ const OmeroAttachmentBrowser = ({
         <Button minimal icon="refresh" small loading={loading} onClick={() => loadAttachments(true)} />
       </div>
 
-      <div className="flex flex-col gap-0 max-h-[52vh] overflow-y-auto">
+      <div className="flex flex-col gap-0 max-h-[40vh] overflow-y-auto">
         {attachments.length === 0
           ? emptyState
           : grouped.map(({ parent, items }) => {
@@ -482,7 +499,7 @@ const OmeroAttachmentBrowser = ({
       <div className="flex justify-end mb-1">
         <Button minimal icon="refresh" small loading={loading} onClick={() => loadAttachments(true)} />
       </div>
-      <div className="max-h-[55vh] overflow-y-auto">
+      <div className="max-h-[32vh] overflow-y-auto">
         <OmeroAttachmentTreeBrowser
           selectedIds={selectedIds}
           onSelect={(ids) => {

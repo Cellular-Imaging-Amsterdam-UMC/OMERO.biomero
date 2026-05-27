@@ -110,50 +110,51 @@ const WorkflowFileInputStep = ({ dialogBodyClassName = "" }) => {
           const done = isParamDone(param, currentSelection);
           const isOpen = openParamId === param.id;
 
-          const infoContent = [
+          const headerTooltip = [
             param.description,
+            `Type: ${param.type || "file"}`,
             formats.length > 0 && `Accepted formats: ${formats.join(", ")}`,
+            param["file-count"] && `Selection: ${param["file-count"]}`,
+            param.optional ? "Optional" : "Required",
           ].filter(Boolean).join("\n\n");
 
           return (
             <div key={param.id} className="border border-gray-200 rounded">
-              <Button
-                minimal
-                fill
-                alignText="left"
-                onClick={() => setOpenParamId(isOpen ? null : param.id)}
-                intent={done ? Intent.SUCCESS : Intent.NONE}
-                rightIcon={isOpen ? "chevron-up" : "chevron-down"}
+              <Tooltip
+                content={<span className="block max-w-sm whitespace-pre-wrap text-xs">{headerTooltip}</span>}
+                hoverOpenDelay={250}
+                placement="top"
+                usePortal={false}
               >
-                <div className="flex items-center gap-2 w-full pr-1">
-                  <Icon
-                    icon={done ? "tick-circle" : "paperclip"}
-                    size={14}
-                    className={done ? "text-green-500" : "text-gray-400"}
-                  />
-                  <span className="text-sm font-medium flex-1 text-left">
-                    {param.name || param.id}
-                  </span>
-                  {infoContent && (
-                    <Tooltip
-                      content={<span className="block max-w-xs whitespace-pre-wrap text-xs">{infoContent}</span>}
-                      hoverOpenDelay={200}
-                      placement="top"
-                    >
-                      <Icon icon="info-sign" size={12} className="text-gray-300 hover:text-gray-500" />
-                    </Tooltip>
-                  )}
-                  {param.optional
-                    ? <span className="text-xs text-gray-400">(optional)</span>
-                    : !done && <span className="text-xs text-red-400">required</span>
-                  }
-                  {currentSelection.length > 0 && (
-                    <Tag minimal round intent={done ? Intent.SUCCESS : Intent.PRIMARY} className="shrink-0">
-                      {currentSelection.length}
-                    </Tag>
-                  )}
-                </div>
-              </Button>
+                <Button
+                  minimal
+                  fill
+                  alignText="left"
+                  onClick={() => setOpenParamId(isOpen ? null : param.id)}
+                  intent={done ? Intent.SUCCESS : Intent.NONE}
+                  rightIcon={isOpen ? "chevron-up" : "chevron-down"}
+                >
+                  <div className="flex items-center gap-2 w-full pr-1">
+                    <Icon
+                      icon={done ? "tick-circle" : "paperclip"}
+                      size={14}
+                      className={done ? "text-green-500" : "text-gray-400"}
+                    />
+                    <span className="text-sm font-semibold text-gray-900 flex-1 text-left leading-5">
+                      {param.name || param.id}
+                    </span>
+                    {param.optional
+                      ? <span className="text-xs text-gray-400">(optional)</span>
+                      : !done && <span className="text-xs text-red-400">required</span>
+                    }
+                    {currentSelection.length > 0 && (
+                      <Tag minimal round intent={done ? Intent.SUCCESS : Intent.PRIMARY} className="shrink-0">
+                        {currentSelection.length}
+                      </Tag>
+                    )}
+                  </div>
+                </Button>
+              </Tooltip>
 
               <Collapse isOpen={isOpen} keepChildrenMounted>
                 <div className="px-3 pb-3 pt-1 border-t border-gray-100">

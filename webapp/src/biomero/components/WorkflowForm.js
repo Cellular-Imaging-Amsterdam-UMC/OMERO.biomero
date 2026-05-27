@@ -73,8 +73,12 @@ const WorkflowForm = () => {
 
   const defaultValues = workflowMetadata.inputs.reduce((acc, input) => {
     const defaultValue = input["default-value"];
+    const choices = input["value-choices"] || [];
 
-    if (input.type === "Number" || input.type === "integer" || input.type === "float") {
+    if ((input.type === "string" || input.type === "String") && choices.length > 0) {
+      // Choice fields must be strings for OMERO RString validation.
+      acc[input.id] = String(defaultValue ?? choices[0]);
+    } else if (input.type === "Number" || input.type === "integer" || input.type === "float") {
       acc[input.id] = defaultValue !== undefined ? Number(defaultValue) : 0;
     } else if (input.type === "Boolean" || input.type === "boolean") {
       acc[input.id] =
@@ -107,6 +111,9 @@ const WorkflowForm = () => {
 
         if (currentStr === "" || !allowed.includes(currentStr)) {
           mergedFormData[input.id] = allowed.includes(defaultChoice) ? defaultChoice : allowed[0];
+        } else {
+          // Normalize to string to avoid sending RInt for string choice fields.
+          mergedFormData[input.id] = currentStr;
         }
       });
 
@@ -199,12 +206,12 @@ const WorkflowForm = () => {
                 >
                   <HTMLSelect
                     id={id}
-                    value={state.formData[id] !== undefined ? state.formData[id] : (defaultValue ?? "")}
+                    value={state.formData[id] !== undefined ? String(state.formData[id]) : String(defaultValue ?? choices[0] ?? "")}
                     onChange={(e) => handleInputChange(id, e.target.value)}
                   >
                     {choices.map((choice, i) => {
                       const label = choiceLabels[i] != null ? String(choiceLabels[i]) : String(choice);
-                      return <option key={choice} value={choice}>{label}</option>;
+                      return <option key={String(choice)} value={String(choice)}>{label}</option>;
                     })}
                   </HTMLSelect>
                 </FormGroup>
