@@ -10,7 +10,7 @@ import biomero.constants as constants
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from omeroweb.webclient.decorators import login_required
-from omero.rtypes import unwrap, rbool, wrap, rlong
+from omero.rtypes import unwrap, rbool, wrap, rlong, rlist
 import omero.model
 
 logger = logging.getLogger(__name__)
@@ -142,6 +142,7 @@ def run_workflow_script(request, conn=None, **kwargs):
         rename_enabled = params.get("enableRename", False)
         rename_pt = params.get("renamePattern", "")
         version = params.get("version")
+        attach_file_outputs = params.get("attachFileOutputs", False)
         # EXPERIMENTAL: ZARR format support
         use_zarr = params.get("useZarrFormat", False)
         # Always default to 0.4 so omero-cli-zarr doesn't fall back to 0.5 (Zarr v3)
@@ -177,6 +178,7 @@ def run_workflow_script(request, conn=None, **kwargs):
             "batchEnabled",   # Frontend flag (not sent to script)
             "batchCount",     # Frontend calculated (not sent to script)
             "batchSize",      # Converted to Batch_Size for script
+            "attachFileOutputs",  # Converted to workflow.OUTPUT_ATTACH_FILE_OUTPUTS
         ]
         # File-attachment params arrive as FILE_{param_id}: int annotation ID.
         # Must be rlong — wrap() would give rstring if the value is a string.
@@ -187,12 +189,12 @@ def run_workflow_script(request, conn=None, **kwargs):
         }
         inputs.update({
             f"{workflow_name}_|_FILE_{key[5:]}": (
-                rlist([rlong(int(v)) for v in value])
+                rlist([rlong(int(v)) for v in value if v not in ('', None)])
                 if isinstance(value, list)
                 else rlong(int(value))
             )
             for key, value in params.items()
-            if key.startswith("FILE_") and value is not None
+            if key.startswith("FILE_") and value not in (None, '', [])
         })
         inputs.update(
             {
@@ -224,6 +226,7 @@ def run_workflow_script(request, conn=None, **kwargs):
                     wrap(rename_pt) if (rename_enabled and rename_pt) else wrap(workflow.NO)
                 ),
                 workflow.OUTPUT_CSV_TABLE: rbool(uploadcsv),
+                workflow.OUTPUT_ATTACH_FILE_OUTPUTS: rbool(attach_file_outputs),
             }
         )
         
@@ -439,15 +442,25 @@ def prepare_workflow_parameters(workflow_name, params):
         )
         return params
 
+    # File-attachment types must be routed as OMERO FileAnnotation IDs (rlong),
+    # not wrapped as generic values. Rename them to FILE_{key} so the
+    # inputs-construction block below picks them up via the rlong path.
+    _FILE_ATTACHMENT_TYPES = ('file', 'array', 'measurement', 'executable')
+
     # Coerce each param to the type declared in the descriptor
     inputs_spec = metadata.get("inputs", [])
     coerced = dict(params)
+    keys_to_rename = {}  # file-attachment params: old_key -> FILE_{old_key}
     for inp in inputs_spec:
         key = inp.get("id")
         type_ = inp.get("type", "")
         if key not in coerced:
             continue
         val = coerced[key]
+        # File-attachment params: mark for renaming; skip numeric coercion
+        if type_ in _FILE_ATTACHMENT_TYPES:
+            keys_to_rename[key] = f"FILE_{key}"
+            continue
         try:
             if type_ in ("integer", "Integer"):
                 coerced[key] = int(float(val))  # handle "1.0" -> 1
@@ -466,6 +479,10 @@ def prepare_workflow_parameters(workflow_name, params):
             )
         else:
             logger.info(f"Converted {key}: {val!r} -> {coerced[key]!r} ({type_})")
+    # Apply file-attachment renames so downstream routing uses FILE_ prefix
+    for old_key, new_key in keys_to_rename.items():
+        coerced[new_key] = coerced.pop(old_key)
+        logger.info(f"Routing file-attachment param {old_key!r} -> {new_key!r} (will be sent as rlong IDs)")
     return coerced
 
 

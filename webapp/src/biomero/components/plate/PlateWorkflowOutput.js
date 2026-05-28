@@ -6,7 +6,7 @@ import DatasetSelectWithPopover from "../DatasetSelectWithPopover.js";
 const PlateWorkflowOutput = ({ onSelectionChange }) => {
   const { state, updateState } = useAppContext();
 
-  const outputOptions = ["importAsZip", "uploadCsv", "selectedScreens"];
+  const outputOptions = ["importAsZip", "uploadCsv", "attachFileOutputs", "selectedScreens"];
 
   const hasOutputSelection = useMemo(() => outputOptions.some((opt) =>
     Array.isArray(state.formData?.[opt])
@@ -32,6 +32,7 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
     receiveEmail: true,
     importAsZip: false,
     uploadCsv: false,
+    attachFileOutputs: false,
     selectedScreens: [],
     selectedScreenId: null,
   };
@@ -50,6 +51,19 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
     const imageOutputs = outputs.filter((output) => isType(output, "image"));
     const measurementOutputs = outputs.filter((output) => isCsvTableOutput(output));
     const zipOutputs = outputs.filter((output) => ["file", "array", "executable"].includes(String(output?.type || "").toLowerCase()));
+    // Non-image file outputs: array/file/executable + non-CSV measurement (parquet, feather, etc.)
+    const fileAnnotationOutputs = outputs.filter((output) => {
+      const type = String(output?.type || "").toLowerCase();
+      if (["array", "executable"].includes(type)) return true;
+      if (type === "file") return true;
+      if (type === "measurement") {
+        const formats = Array.isArray(output?.format)
+          ? output.format
+          : (output?.format ? [output.format] : []);
+        return !formats.map((f) => String(f).toLowerCase()).includes("csv");
+      }
+      return false;
+    });
 
     const summarize = (items) => {
       const names = items.map((output) => output.name || output.id).filter(Boolean);
@@ -62,11 +76,14 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
       measurementCount: measurementOutputs.length,
       zipCount: zipOutputs.length,
       imageCount: imageOutputs.length,
+      fileAnnotationCount: fileAnnotationOutputs.length,
       imageLabel: summarize(imageOutputs),
       measurementLabel: summarize(measurementOutputs),
       zipLabel: summarize(zipOutputs),
+      fileAnnotationLabel: summarize(fileAnnotationOutputs),
       importAsZip: zipOutputs.length > 0,
       uploadCsv: measurementOutputs.length > 0,
+      attachFileOutputs: fileAnnotationOutputs.length > 0,
       hasImageOutput: imageOutputs.length > 0,
     };
   }, [state.selectedWorkflow?.metadata]);
@@ -179,10 +196,10 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
                 <Tooltip
                   content={outputHints.zipCount > 0
                     ? `This workflow declares archive/log output(s) (${outputHints.zipLabel}), so zip export is enabled by default.`
-                    : "Archive the output package (e.g., images, CSVs) as a zip file attached to the parent screen/project."}
+                    : "Attach a bulk zip of all results to the parent screen/plate — useful as a backup or to download everything at once."}
                   placement="top"
                 >
-                  <span>Add results as a zip file archive.</span>
+                  <span>Add all results as a bulk zip archive (backup / download-all).</span>
                 </Tooltip>
                 {renderDefaultCue(outputHints.importAsZip, outputHints.zipLabel)}
               </span>
@@ -190,8 +207,8 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
             labelFor="upload-zip-options"
             helperText={renderDefaultHelper(
               outputHints.zipCount > 0,
-              `Turned on for workflow output(s): ${outputHints.zipLabel}. Switch it off if you do not want those files attached as a zip archive.`,
-              "Archive the output package (e.g., images, CSVs) as a zip file attached to the parent screen/project."
+              `Turned on for workflow output(s): ${outputHints.zipLabel}. This is a bulk backup — individual files are better handled via the file-annotations option below.`,
+              "Bulk backup archive: attaches a single zip of all results. Use individual file annotations for finer-grained access."
             )}
             intent={hasOutputSelection ? "" : "danger"}
           >
@@ -229,6 +246,37 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
               id="upload-csv-options"
               checked={state.formData.uploadCsv ?? outputHints.uploadCsv ?? defaultValues.uploadCsv}
               onChange={(e) => handleInputChange("uploadCsv", e.target.checked)}
+              intent={hasOutputSelection ? "" : "danger"}
+            />
+          </FormGroup>
+
+          {/* Non-image file outputs as individual file annotations */}
+          <FormGroup
+            label={
+              <span className="inline-flex items-center gap-2">
+                <Tooltip
+                  content={outputHints.fileAnnotationCount > 0
+                    ? `This workflow declares non-image output(s) (${outputHints.fileAnnotationLabel}) such as arrays, model weights, or configs. Attaching them as individual file annotations is enabled by default.`
+                    : "Attach individual non-image output files (e.g. NumPy arrays, model weights, JSON/YAML configs) directly as OMERO file annotations."}
+                  placement="top"
+                >
+                  <span>Attach individual non-image output files as annotations.</span>
+                </Tooltip>
+                {renderDefaultCue(outputHints.attachFileOutputs, outputHints.fileAnnotationLabel)}
+              </span>
+            }
+            labelFor="attach-file-outputs"
+            helperText={renderDefaultHelper(
+              outputHints.fileAnnotationCount > 0,
+              `Turned on for workflow output(s): ${outputHints.fileAnnotationLabel}. Each file is attached as its own OMERO annotation — no need for the bulk zip just to access these files.`,
+              "Attach non-image, non-CSV output files (arrays, configs, model weights) as individual OMERO file annotations."
+            )}
+            intent={hasOutputSelection ? "" : "danger"}
+          >
+            <Switch
+              id="attach-file-outputs"
+              checked={state.formData.attachFileOutputs ?? outputHints.attachFileOutputs ?? defaultValues.attachFileOutputs}
+              onChange={(e) => handleInputChange("attachFileOutputs", e.target.checked)}
               intent={hasOutputSelection ? "" : "danger"}
             />
           </FormGroup>
