@@ -46,12 +46,28 @@ const WorkflowOutput = ({ onSelectionChange }) => {
     };
     const imageOutputs = outputs.filter((output) => isType(output, "image"));
     const measurementOutputs = outputs.filter((output) => isCsvTableOutput(output));
-    const zipOutputs = outputs.filter((output) => ["file", "array", "executable"].includes(String(output?.type || "").toLowerCase()));
+    // Zip hint: only for .log-format file outputs — the backend explicitly skips .log files
+    // in process_non_image_file_outputs (they live in the bulk zip; array/executable/etc.
+    // are covered by the file annotations option and don't need zip promotion).
+    const zipOutputs = outputs.filter((output) => {
+      if (String(output?.type || "").toLowerCase() !== "file") return false;
+      const formats = Array.isArray(output?.format)
+        ? output.format
+        : (output?.format ? [output.format] : []);
+      return formats.map((f) => String(f).toLowerCase()).includes("log");
+    });
     // Non-image file outputs: array/file/executable + non-CSV measurement (parquet, feather, etc.)
+    // .log-format file outputs are excluded: the backend skips them in process_non_image_file_outputs
+    // (the SLURM job log is always uploaded separately; workflow .log outputs live in the bulk zip).
     const fileAnnotationOutputs = outputs.filter((output) => {
       const type = String(output?.type || "").toLowerCase();
       if (["array", "executable"].includes(type)) return true;
-      if (type === "file") return true;
+      if (type === "file") {
+        const formats = Array.isArray(output?.format)
+          ? output.format
+          : (output?.format ? [output.format] : []);
+        return !formats.map((f) => String(f).toLowerCase()).includes("log");
+      }
       if (type === "measurement") {
         // Non-CSV measurement (parquet, feather, etc.) → file annotation, not table
         const formats = Array.isArray(output?.format)

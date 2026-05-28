@@ -28,7 +28,7 @@ import { OverlayToaster, Position, Collapse, Divider, Icon } from "@blueprintjs/
 // Fields that are infrastructure/output config, not workflow-specific parameters
 const INFRA_PARAMS = new Set([
   'IDs', 'Data_Type', 'workflowMode', 'plateMode', 'useZarrFormat', 'Format',
-  'active_group_id', 'receiveEmail', 'importAsZip', 'uploadCsv',
+  'active_group_id', 'receiveEmail', 'importAsZip', 'uploadCsv', 'attachFileOutputs',
   'attachToOriginalImages', 'selectedDatasets', 'selectedDatasetId', 'selectedScreens', 'selectedScreenId', 'renamePattern', 'enableRename',
   'batchEnabled', 'batchCount', 'batchSize', 'version',
   'cytomine_host', 'cytomine_public_key', 'cytomine_private_key',
@@ -52,6 +52,7 @@ const WorkflowSubmitToast = ({ workflowName, startedAt, params, metadata }) => {
   }
   if (params.importAsZip) outputLines.push("Zip archive");
   if (params.uploadCsv) outputLines.push("OMERO tables (CSV)");
+  if (params.attachFileOutputs) outputLines.push("File annotations");
   if (params.attachToOriginalImages) outputLines.push("Attached to input images");
   if (params.receiveEmail) outputLines.push("E-mail on completion");
 

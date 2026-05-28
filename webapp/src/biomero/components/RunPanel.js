@@ -160,8 +160,6 @@ const RunPanel = ({ onWorkflowError }) => {
 
   const getWorkflowOutputDefaults = (workflow) => {
     const outputs = workflow?.metadata?.outputs || [];
-    const byType = (expected) =>
-      outputs.some((output) => String(output?.type || "").toLowerCase() === expected);
     const hasCsvTableOutput = outputs.some((output) => {
       const type = String(output?.type || "").toLowerCase();
       if (!["measurement", "file"].includes(type)) return false;
@@ -170,12 +168,38 @@ const RunPanel = ({ onWorkflowError }) => {
         : (output?.format ? [output.format] : []);
       return formats.map((fmt) => String(fmt).toLowerCase()).includes("csv");
     });
+    // Zip default: only for .log-format file outputs (backend skips them in file-annotations).
+    const hasLogOutput = outputs.some((output) => {
+      if (String(output?.type || "").toLowerCase() !== "file") return false;
+      const formats = Array.isArray(output?.format)
+        ? output.format
+        : (output?.format ? [output.format] : []);
+      return formats.map((f) => String(f).toLowerCase()).includes("log");
+    });
+    // File annotation default: array/executable/non-log file/non-csv measurement.
+    const hasFileAnnotationOutput = outputs.some((output) => {
+      const type = String(output?.type || "").toLowerCase();
+      if (["array", "executable"].includes(type)) return true;
+      if (type === "file") {
+        const formats = Array.isArray(output?.format)
+          ? output.format
+          : (output?.format ? [output.format] : []);
+        return !formats.map((f) => String(f).toLowerCase()).includes("log");
+      }
+      if (type === "measurement") {
+        const formats = Array.isArray(output?.format)
+          ? output.format
+          : (output?.format ? [output.format] : []);
+        return !formats.map((f) => String(f).toLowerCase()).includes("csv");
+      }
+      return false;
+    });
 
     return {
-      // Keep legacy defaults; only add opt-in hints for clearly supported output types.
       attachToOriginalImages: false,
-      importAsZip: byType("file") || byType("array") || byType("executable"),
+      importAsZip: hasLogOutput,
       uploadCsv: hasCsvTableOutput,
+      attachFileOutputs: hasFileAnnotationOutput,
     };
   };
 
