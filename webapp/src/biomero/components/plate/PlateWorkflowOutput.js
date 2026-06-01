@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { FormGroup, Switch, Callout, DialogBody, Tooltip, Icon } from "@blueprintjs/core";
 import { useAppContext } from "../../../AppContext";
 import DatasetSelectWithPopover from "../DatasetSelectWithPopover.js";
@@ -13,6 +13,21 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
       ? state.formData[opt].length > 0
       : !!state.formData?.[opt]
   ), [state.formData]);
+
+  // Orange warning: zip is on alongside other import options, causing duplicate storage.
+  const hasOtherOutputsAlongWithZip = useMemo(() => {
+    if (!state.formData.importAsZip) return false;
+    return !!(
+      state.formData.uploadCsv ||
+      state.formData.attachFileOutputs ||
+      (state.formData.selectedScreens?.length > 0)
+    );
+  }, [
+    state.formData.importAsZip,
+    state.formData.uploadCsv,
+    state.formData.attachFileOutputs,
+    state.formData.selectedScreens,
+  ]);
 
   const isImporterEnabled = window.WEBCLIENT?.UI?.IMPORTER_ENABLED || false;
 
@@ -73,6 +88,9 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
       const head = names.slice(0, 2).join(", ");
       return names.length > 2 ? `${head}, +${names.length - 2} more` : head;
     };
+    // Full list — used in tooltips where there is space to show every item
+    const summarizeFull = (items) =>
+      items.map((o) => o.name || o.id).filter(Boolean).join(", ");
 
     return {
       measurementCount: measurementOutputs.length,
@@ -80,9 +98,12 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
       imageCount: imageOutputs.length,
       fileAnnotationCount: fileAnnotationOutputs.length,
       imageLabel: summarize(imageOutputs),
+      imageLabelFull: summarizeFull(imageOutputs),
       measurementLabel: summarize(measurementOutputs),
+      measurementLabelFull: summarizeFull(measurementOutputs),
       zipLabel: summarize(zipOutputs),
       fileAnnotationLabel: summarize(fileAnnotationOutputs),
+      fileAnnotationLabelFull: summarizeFull(fileAnnotationOutputs),
       importAsZip: zipOutputs.length > 0,
       uploadCsv: measurementOutputs.length > 0,
       attachFileOutputs: fileAnnotationOutputs.length > 0,
@@ -90,44 +111,78 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
     };
   }, [state.selectedWorkflow?.metadata]);
 
-  const renderDefaultCue = (enabled, label) => enabled ? (
-    <Tooltip content={`Enabled by default for: ${label}. You can switch it off.`} placement="top">
-      <span className="inline-flex items-center gap-1 text-xs text-sky-700 cursor-help">
-        <Icon icon="info-sign" size={12} />
-        <span>Default for {label}</span>
-      </span>
-    </Tooltip>
-  ) : null;
+  // suggested: workflow hint recommends this option on
+  // label: short badge text (may be truncated with "+N more")
+  // currentValue: current form state — undefined = untouched, false = explicitly disabled
+  // labelFull: full untruncated list used in the tooltip (defaults to label)
+  const renderDefaultCue = (suggested, label, currentValue = undefined, labelFull = label) => {
+    if (!suggested) return null;
+    // When the overall form has a validation error (nothing selected), suppress
+    // suggestion indicators so the red error message has clear visual priority.
+    if (!hasOutputSelection) return null;
+    const overridden = currentValue === false;
+    return (
+      <Tooltip
+        content={overridden
+          ? `This option is suggested for: ${labelFull}. You have turned it off.`
+          : `Suggested for: ${labelFull}. You can switch it off.`}
+        placement="top"
+      >
+        <span className={`inline-flex items-center gap-1 text-xs cursor-help ${overridden ? "text-orange-600" : "text-sky-700"}`}>
+          <Icon icon={overridden ? "warning-sign" : "info-sign"} size={12} />
+          <span>{overridden ? "Suggestion overridden" : `Suggested for ${label}`}</span>
+        </span>
+      </Tooltip>
+    );
+  };
 
-  const renderDefaultHelper = (enabled, message, fallback) => enabled
-    ? <span className="text-sky-700">{message}</span>
-    : fallback;
+  // currentValue: current form state — undefined = untouched, false = explicitly disabled
+  const renderDefaultHelper = (suggested, suggestedMsg, fallback, currentValue = undefined) => {
+    if (!suggested) return fallback;
+    // When the overall form has a validation error, fall back to neutral text so
+    // Blueprint's danger intent (red) has clear visual priority.
+    if (!hasOutputSelection) return fallback;
+    if (currentValue === false) {
+      return <span className="text-orange-600">This is suggested for this workflow — re-enable to include these results.</span>;
+    }
+    return <span className="text-sky-700">{suggestedMsg}</span>;
+  };
 
   useEffect(() => {
     onSelectionChange(hasOutputSelection);
   }, [hasOutputSelection, onSelectionChange]);
 
-  useEffect(() => {
-    if (
-      state.formData?.IDs?.length > 0 &&
-      state.formData?.plateMode &&
-      state.omeroFileTreeData &&
-      (!state.formData.selectedScreens || state.formData.selectedScreens.length === 0)
-    ) {
-      const plateId = state.formData.IDs[0];
-      const parentScreen = findParentScreen(plateId, state.omeroFileTreeData);
+  // Track whether we have already auto-filled the screen for the current plate, so the
+  // user can clear the selection without it bouncing back immediately.
+  const autoFilledForPlateId = useRef(null);
 
-      if (parentScreen) {
-        updateState({
-          formData: {
-            ...state.formData,
-            selectedScreens: [parentScreen.data],
-            selectedScreenId: parentScreen.id,
-          },
-        });
-      }
+  useEffect(() => {
+    const plateId = state.formData?.IDs?.[0];
+    if (!plateId || !state.formData?.plateMode || !state.omeroFileTreeData) return;
+
+    // Only auto-fill once per plate ID — respect user-cleared selections after that
+    if (autoFilledForPlateId.current === plateId) return;
+
+    if (state.formData.selectedScreens?.length > 0) {
+      // Selection already exists; mark this plate as handled and stop
+      autoFilledForPlateId.current = plateId;
+      return;
     }
-  }, [state.formData?.IDs, state.formData?.plateMode, state.omeroFileTreeData, state.formData.selectedScreens]);
+
+    const parentScreen = findParentScreen(plateId, state.omeroFileTreeData);
+    if (parentScreen) {
+      autoFilledForPlateId.current = plateId;
+      updateState({
+        formData: {
+          ...state.formData,
+          selectedScreens: [parentScreen.data],
+          selectedScreenId: parentScreen.id,
+        },
+      });
+    }
+  // NOTE: selectedScreens intentionally omitted from deps — including it would cause
+  // the effect to re-run and re-fill after the user clears the selection.
+  }, [state.formData?.IDs, state.formData?.plateMode, state.omeroFileTreeData]);
 
   const handleInputChange = (key, value) => {
     updateState({
@@ -207,11 +262,11 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
               </span>
             }
             labelFor="upload-zip-options"
-            helperText={renderDefaultHelper(
-              outputHints.zipCount > 0,
-              `Turned on for workflow output(s): ${outputHints.zipLabel}. This is a bulk backup — individual files are better handled via the file-annotations option below.`,
-              "Bulk backup archive: attaches a single zip of all results. Use individual file annotations for finer-grained access."
-            )}
+            helperText={
+              hasOtherOutputsAlongWithZip
+                ? <span className="text-orange-600">Other output options are also active — the zip will contain all those files too, duplicating storage. Use it as a standalone backup, or disable the other options if you only need the archive.</span>
+                : "Bulk backup archive: attaches a single zip of all results. Use individual file annotations for finer-grained access."
+            }
             intent={hasOutputSelection ? "" : "danger"}
           >
             <Switch
@@ -227,20 +282,21 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
               <span className="inline-flex items-center gap-2">
                 <Tooltip
                   content={outputHints.measurementCount > 0
-                    ? `This workflow declares measurement output(s) (${outputHints.measurementLabel}), so CSV table import is enabled by default.`
-                    : "Upload the output CSVs as interactive OMERO tables for further analysis."}
+                    ? `This workflow declares CSV measurement output(s): ${outputHints.measurementLabelFull}. Importing them as OMERO tables is suggested.`
+                    : "Upload CSV measurement results as interactive OMERO tables for further analysis."}
                   placement="top"
                 >
-                  <span>Add results as OMERO tables.</span>
+                  <span>Add CSV measurement results as OMERO tables.</span>
                 </Tooltip>
-                {renderDefaultCue(outputHints.uploadCsv, outputHints.measurementLabel)}
+                {renderDefaultCue(outputHints.uploadCsv, outputHints.measurementLabel, state.formData.uploadCsv, outputHints.measurementLabelFull)}
               </span>
             }
             labelFor="upload-csv-options"
             helperText={renderDefaultHelper(
               outputHints.measurementCount > 0,
-              `Turned on for workflow output(s): ${outputHints.measurementLabel}. Switch it off if you do not want OMERO tables for those results.`,
-              "Upload CSV results as interactive OMERO tables for further analysis."
+              `Suggested for workflow output(s): ${outputHints.measurementLabel}. Switch it off if you do not need OMERO tables for those results.`,
+              "Upload CSV measurement results as interactive OMERO tables for further analysis.",
+              state.formData.uploadCsv
             )}
             intent={hasOutputSelection ? "" : "danger"}
           >
@@ -258,20 +314,21 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
               <span className="inline-flex items-center gap-2">
                 <Tooltip
                   content={outputHints.fileAnnotationCount > 0
-                    ? `This workflow declares non-image output(s) (${outputHints.fileAnnotationLabel}) such as arrays, model weights, or configs. Attaching them as individual file annotations is enabled by default.`
-                    : "Attach individual non-image output files (e.g. NumPy arrays, model weights, JSON/YAML configs) directly as OMERO file annotations."}
+                    ? `This workflow declares non-image output(s): ${outputHints.fileAnnotationLabelFull}. Each is attached as an individual OMERO file annotation.`
+                    : "Attach individual non-image, non-CSV output files (e.g. NumPy arrays, model weights, JSON configs, log files) as OMERO file annotations."}
                   placement="top"
                 >
                   <span>Attach individual non-image output files as annotations.</span>
                 </Tooltip>
-                {renderDefaultCue(outputHints.attachFileOutputs, outputHints.fileAnnotationLabel)}
+                {renderDefaultCue(outputHints.attachFileOutputs, outputHints.fileAnnotationLabel, state.formData.attachFileOutputs, outputHints.fileAnnotationLabelFull)}
               </span>
             }
             labelFor="attach-file-outputs"
             helperText={renderDefaultHelper(
               outputHints.fileAnnotationCount > 0,
-              `Turned on for workflow output(s): ${outputHints.fileAnnotationLabel}. Each file is attached as its own OMERO annotation — no need for the bulk zip just to access these files.`,
-              "Attach non-image, non-CSV output files (arrays, configs, model weights) as individual OMERO file annotations."
+              `Suggested for workflow output(s): ${outputHints.fileAnnotationLabel}. Each file is attached as its own OMERO annotation. CSV outputs are handled separately by the OMERO tables option above and are not attached here.`,
+              "Attach non-image, non-CSV output files (arrays, configs, model weights, log files) as individual OMERO file annotations. CSV files are handled by the OMERO tables option above.",
+              state.formData.attachFileOutputs
             )}
             intent={hasOutputSelection ? "" : "danger"}
           >
@@ -288,21 +345,27 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
               <span className="inline-flex items-center gap-2">
                 <Tooltip
                   content={outputHints.hasImageOutput
-                    ? `This workflow declares image output(s) (${outputHints.imageLabel}), so screen output is the default target for plate results.`
-                    : "The output results will be organized in an OMERO screen for viewing and further analysis."}
+                    ? `This workflow declares image/mask output(s): ${outputHints.imageLabelFull}. Organizing them in a screen is suggested.`
+                    : "Organize output images and masks in an OMERO screen for viewing and further analysis."}
                   placement="top"
                 >
-                  <span>Add results to a new or existing screen.</span>
+                  <span>Add image/mask results to a new or existing screen.</span>
                 </Tooltip>
-                {renderDefaultCue(outputHints.hasImageOutput, outputHints.imageLabel)}
+                {renderDefaultCue(
+                  outputHints.hasImageOutput,
+                  outputHints.imageLabel,
+                  state.formData.selectedScreens?.length > 0 ? true : false,
+                  outputHints.imageLabelFull
+                )}
               </span>
             }
             helperText={renderDefaultHelper(
               outputHints.hasImageOutput,
-              `Turned on for workflow output(s): ${outputHints.imageLabel}. Switch it off if you do not want those image results organized in a screen.`,
-              "The output results will be organized in an OMERO screen for viewing and further analysis."
+              `Suggested for workflow output(s): ${outputHints.imageLabel}.`,
+              "Organize output images and masks in an OMERO screen for viewing and further analysis.",
+              state.formData.selectedScreens?.length > 0 ? true : false
             )}
-            subLabel="Don't forget to press ENTER if you type a new name!"
+            subLabel="Type a new screen name and press Enter, or pick an existing one from the menu."
             tooltip="Select the OMERO screen for your workflow results."
             buttonText="Select Screen"
             placeholder="Add new screen name or select..."
@@ -342,7 +405,8 @@ const PlateWorkflowOutput = ({ onSelectionChange }) => {
               if (isKnown) return {};
               return {
                 intent: "warning",
-                title: "No matching screen found — a new screen will be created with this name.",
+                rightIcon: "help",
+                title: "New name — OMERO will create a new screen with this name when the workflow runs. To use an existing screen instead, select it from the menu.",
               };
             }}
           />
