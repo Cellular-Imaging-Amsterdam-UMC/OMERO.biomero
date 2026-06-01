@@ -168,24 +168,12 @@ const RunPanel = ({ onWorkflowError }) => {
         : (output?.format ? [output.format] : []);
       return formats.map((fmt) => String(fmt).toLowerCase()).includes("csv");
     });
-    // Zip default: only for .log-format file outputs (backend skips them in file-annotations).
-    const hasLogOutput = outputs.some((output) => {
-      if (String(output?.type || "").toLowerCase() !== "file") return false;
-      const formats = Array.isArray(output?.format)
-        ? output.format
-        : (output?.format ? [output.format] : []);
-      return formats.map((f) => String(f).toLowerCase()).includes("log");
-    });
-    // File annotation default: array/executable/non-log file/non-csv measurement.
+    // File annotation default: array/executable/any file (incl. .log)/non-csv measurement.
+    // .log outputs are now handled by the backend without double-attachment — the SLURM
+    // job log is excluded via skip_paths; workflow .log outputs attach normally.
     const hasFileAnnotationOutput = outputs.some((output) => {
       const type = String(output?.type || "").toLowerCase();
-      if (["array", "executable"].includes(type)) return true;
-      if (type === "file") {
-        const formats = Array.isArray(output?.format)
-          ? output.format
-          : (output?.format ? [output.format] : []);
-        return !formats.map((f) => String(f).toLowerCase()).includes("log");
-      }
+      if (["array", "executable", "file"].includes(type)) return true;
       if (type === "measurement") {
         const formats = Array.isArray(output?.format)
           ? output.format
@@ -197,7 +185,7 @@ const RunPanel = ({ onWorkflowError }) => {
 
     return {
       attachToOriginalImages: false,
-      importAsZip: hasLogOutput,
+      importAsZip: false,  // Zip is opt-in only; no output type auto-enables it
       uploadCsv: hasCsvTableOutput,
       attachFileOutputs: hasFileAnnotationOutput,
     };
