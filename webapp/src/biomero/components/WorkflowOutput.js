@@ -3,29 +3,48 @@ import { InputGroup, FormGroup, Switch, Callout, Tooltip, Icon } from "@blueprin
 import { useAppContext } from "../../AppContext";
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover.js";
 
-const WorkflowOutput = ({ onSelectionChange }) => {
+const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   const { state, updateState } = useAppContext();
   const [renamePattern, setRenamePattern] = useState("{original_file}_result.{ext}");
   const [renameValidation, setRenameValidation] = useState({ hasError: false, hasWarning: false, message: "" });
   const renameInputRef = useRef(null);
-  const outputOptions = [
-    "importAsZip",
-    "uploadCsv", 
-    "attachToOriginalImages",
-    "attachFileOutputs",
-    "selectedDatasets",
-  ];
-  const defaultValues = {
-    receiveEmail: true,
-    importAsZip: false,
-    uploadCsv: false,
-    attachToOriginalImages: false,
-    attachFileOutputs: false,
-    selectedDatasets: [],
-    selectedDatasetId: null, // OMERO ID when selected from tree (null = typed/new)
-    renamePattern: "{original_file}_result.{ext}",
-    enableRename: false,
+
+  // Plate-mode helpers: auto-fill screen tracking, importer check, parent-screen finder
+  const autoFilledForPlateId = useRef(null);
+  const isImporterEnabled = !plateMode || (window.WEBCLIENT?.UI?.IMPORTER_ENABLED || false);
+  const findParentScreen = (plateId, treeData) => {
+    if (!plateId || !treeData) return null;
+    const plateKey = `plate-${plateId}`;
+    for (const [, node] of Object.entries(treeData)) {
+      if (node.category === "screens" && node.children?.includes(plateKey)) return node;
+    }
+    return null;
   };
+
+  const outputOptions = plateMode
+    ? ["importAsZip", "uploadCsv", "attachFileOutputs", "selectedScreens"]
+    : ["importAsZip", "uploadCsv", "attachToOriginalImages", "attachFileOutputs", "selectedDatasets"];
+
+  const defaultValues = plateMode
+    ? {
+        receiveEmail: true,
+        importAsZip: false,
+        uploadCsv: false,
+        attachFileOutputs: false,
+        selectedScreens: [],
+        selectedScreenId: null,
+      }
+    : {
+        receiveEmail: true,
+        importAsZip: false,
+        uploadCsv: false,
+        attachToOriginalImages: false,
+        attachFileOutputs: false,
+        selectedDatasets: [],
+        selectedDatasetId: null,
+        renamePattern: "{original_file}_result.{ext}",
+        enableRename: false,
+      };
 
   const hasOutputSelection = useMemo(() => outputOptions.some((opt) =>
     Array.isArray(state.formData?.[opt])
@@ -36,6 +55,13 @@ const WorkflowOutput = ({ onSelectionChange }) => {
   // Orange warning: zip is on alongside other import options, causing duplicate storage.
   const hasOtherOutputsAlongWithZip = useMemo(() => {
     if (!state.formData.importAsZip) return false;
+    if (plateMode) {
+      return !!(
+        state.formData.uploadCsv ||
+        state.formData.attachFileOutputs ||
+        (state.formData.selectedScreens?.length > 0)
+      );
+    }
     return !!(
       state.formData.uploadCsv ||
       state.formData.attachFileOutputs ||
@@ -43,11 +69,13 @@ const WorkflowOutput = ({ onSelectionChange }) => {
       (state.formData.selectedDatasets?.length > 0)
     );
   }, [
+    plateMode,
     state.formData.importAsZip,
     state.formData.uploadCsv,
     state.formData.attachFileOutputs,
     state.formData.attachToOriginalImages,
     state.formData.selectedDatasets,
+    state.formData.selectedScreens,
   ]);
 
   const outputHints = useMemo(() => {
@@ -106,6 +134,7 @@ const WorkflowOutput = ({ onSelectionChange }) => {
       importAsZip: zipOutputs.length > 0,
       uploadCsv: measurementOutputs.length > 0,
       attachFileOutputs: fileAnnotationOutputs.length > 0,
+      hasImageOutput: imageOutputs.length > 0,
     };
   }, [state.selectedWorkflow?.metadata]);
 
@@ -147,6 +176,7 @@ const WorkflowOutput = ({ onSelectionChange }) => {
   };
 
   useEffect(() => {
+    if (plateMode) return;
     // Sync rename fields - if enableRename is false, ensure pattern gets sent as empty or default
     if (state.formData.enableRename === false) {
       // When rename is disabled, still keep the pattern but the boolean will control usage
@@ -155,13 +185,17 @@ const WorkflowOutput = ({ onSelectionChange }) => {
   }, [state.formData.enableRename]);
 
   useEffect(() => {
-    // Tell the parent about output selection AND rename validation errors
-    const hasValidationError = state.formData.enableRename && renameValidation.hasError;
-    const canProceed = hasOutputSelection && !hasValidationError;
-    onSelectionChange(canProceed);
-  }, [hasOutputSelection, renameValidation, state.formData.enableRename]);
+    if (plateMode) {
+      // Plate mode: no rename validation — selection state is the only gate
+      onSelectionChange?.(hasOutputSelection);
+    } else {
+      const hasValidationError = state.formData.enableRename && renameValidation.hasError;
+      onSelectionChange?.(hasOutputSelection && !hasValidationError);
+    }
+  }, [plateMode, hasOutputSelection, renameValidation, state.formData.enableRename]);
 
   useEffect(() => {
+    if (plateMode) return;
     const inputs = state.inputDatasets || [];
     if (inputs.length === 0) return;
     const hasPlate = inputs.some((d) => d?.category === "plates");
@@ -186,7 +220,25 @@ const WorkflowOutput = ({ onSelectionChange }) => {
       });
     }
   }, [state.inputDatasets, state.formData.selectedDatasets]);
-  
+
+  // Plate-mode: auto-fill the parent screen once per plate ID
+  useEffect(() => {
+    if (!plateMode) return;
+    const plateId = state.formData?.IDs?.[0];
+    if (!plateId || !state.formData?.plateMode || !state.omeroFileTreeData) return;
+    if (autoFilledForPlateId.current === plateId) return;
+    if (state.formData.selectedScreens?.length > 0) {
+      autoFilledForPlateId.current = plateId;
+      return;
+    }
+    const parentScreen = findParentScreen(plateId, state.omeroFileTreeData);
+    if (parentScreen) {
+      autoFilledForPlateId.current = plateId;
+      updateState({ formData: { ...state.formData, selectedScreens: [parentScreen.data], selectedScreenId: parentScreen.id } });
+    }
+  // NOTE: selectedScreens intentionally omitted — including it causes bounce-back when user clears.
+  }, [plateMode, state.formData?.IDs, state.formData?.plateMode, state.omeroFileTreeData]);
+
   const validateRenamePattern = (pattern) => {
     
     if (pattern.trim() === "") {
@@ -304,9 +356,51 @@ const WorkflowOutput = ({ onSelectionChange }) => {
     }
   };
 
+  // Container (dataset / screen) selection helpers — shared across both modes
+  const selectedContainers = plateMode ? state.formData.selectedScreens : state.formData.selectedDatasets;
+  const selectedContainerId = plateMode ? state.formData.selectedScreenId : state.formData.selectedDatasetId;
+  const containerCategory = plateMode ? "screens" : "datasets";
+  const containerType = plateMode ? "screen" : "dataset";
+
+  const handleContainerChange = (values, type) => {
+    if (type === "manual") {
+      const rawName = values.length
+        ? values[values.length - 1].replace(/\s*\(ID:\s*\d+\)$/, "").trim()
+        : "";
+      const matchedNode = rawName
+        ? Object.values(state.omeroFileTreeData || {}).find(
+            (n) => n.category === containerCategory && n.data === rawName
+          )
+        : null;
+      handleFormDataUpdate(
+        plateMode
+          ? { selectedScreens: rawName ? [rawName] : [], selectedScreenId: matchedNode?.id ?? null }
+          : { selectedDatasets: rawName ? [rawName] : [], selectedDatasetId: matchedNode?.id ?? null }
+      );
+    } else {
+      const node = state.omeroFileTreeData[values[0]];
+      if (node) {
+        handleFormDataUpdate(
+          plateMode
+            ? { selectedScreens: [node.data], selectedScreenId: node.id }
+            : { selectedDatasets: [node.data], selectedDatasetId: node.id }
+        );
+      }
+    }
+  };
+
   return (
     <form>
       <h2>Output Options</h2>
+
+      {plateMode && !isImporterEnabled && (
+        <Callout intent="danger" className="mb-4">
+          <strong>Plate workflows require importer integration</strong>
+          <br />
+          Plate workflows with ZARR outputs are only supported when IMPORTER_ENABLED=true.
+          Please contact your administrator to enable importer integration.
+        </Callout>
+      )}
 
       {/* Sticky Validation Messages */}
       <div className="sticky top-0 z-10">
@@ -316,7 +410,7 @@ const WorkflowOutput = ({ onSelectionChange }) => {
           </Callout>
         )}
 
-        {state.formData.enableRename && renameValidation.message && (
+        {!plateMode && state.formData.enableRename && renameValidation.message && (
           <Callout 
             intent={renameValidation.hasError ? "danger" : "warning"} 
             className={`mb-2 ${renameValidation.hasError ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'}`}
@@ -420,36 +514,38 @@ const WorkflowOutput = ({ onSelectionChange }) => {
           />
         </FormGroup>
 
-        {/* Attachments to Original Images */}
-        <FormGroup
-          label={
-            <span className="inline-flex items-center gap-2">
-              <Tooltip
-                content={outputHints.imageCount > 0
-                  ? `This workflow declares image output(s) (${outputHints.imageLabel}).`
-                  : "Attach the output images (e.g., masks) to the original input images to track their provenance."}
-                placement="top"
-              >
-                <span>Add results as attachments to input images.</span>
-              </Tooltip>
-            </span>
-          }
-          labelFor="upload-images-options"
-          helperText="Attach the output images (e.g., masks) to the original input images to track their provenance."
-          intent={hasOutputSelection ? "" : "danger"}
-        >
-          <Switch
-            id="upload-images-options"
-            checked={
-              state.formData.attachToOriginalImages ??
-              defaultValues.attachToOriginalImages
+        {/* Attachments to Original Images — dataset mode only */}
+        {!plateMode && (
+          <FormGroup
+            label={
+              <span className="inline-flex items-center gap-2">
+                <Tooltip
+                  content={outputHints.imageCount > 0
+                    ? `This workflow declares image output(s) (${outputHints.imageLabel}).`
+                    : "Attach the output images (e.g., masks) to the original input images to track their provenance."}
+                  placement="top"
+                >
+                  <span>Add results as attachments to input images.</span>
+                </Tooltip>
+              </span>
             }
-            onChange={(e) =>
-              handleInputChange("attachToOriginalImages", e.target.checked)
-            }
+            labelFor="upload-images-options"
+            helperText="Attach the output images (e.g., masks) to the original input images to track their provenance."
             intent={hasOutputSelection ? "" : "danger"}
-          />
-        </FormGroup>
+          >
+            <Switch
+              id="upload-images-options"
+              checked={
+                state.formData.attachToOriginalImages ??
+                defaultValues.attachToOriginalImages
+              }
+              onChange={(e) =>
+                handleInputChange("attachToOriginalImages", e.target.checked)
+              }
+              intent={hasOutputSelection ? "" : "danger"}
+            />
+          </FormGroup>
+        )}
 
         {/* Non-image file outputs as individual file annotations */}
         <FormGroup
@@ -483,101 +579,76 @@ const WorkflowOutput = ({ onSelectionChange }) => {
           />
         </FormGroup>
 
-        {/* Dataset Selection with Popover */}
+        {/* Container (dataset / screen) selection */}
         <DatasetSelectWithPopover
           label={
             <span className="inline-flex items-center gap-2">
               <Tooltip
-                content={outputHints.imageCount > 0
-                  ? `This workflow declares image/mask output(s): ${outputHints.imageLabelFull}. Organizing them in a dataset is suggested.`
-                  : "Organize output images and masks in an OMERO dataset for viewing and further analysis."}
+                content={outputHints.hasImageOutput
+                  ? `This workflow declares image/mask output(s): ${outputHints.imageLabelFull}. Organizing them in a ${containerType} is suggested.`
+                  : `Organize output images and masks in an OMERO ${containerType} for viewing and further analysis.`}
                 placement="top"
               >
-                <span>Add image/mask results to a new or existing dataset.</span>
+                <span>Add image/mask results to a new or existing {containerType}.</span>
               </Tooltip>
               {renderDefaultCue(
-                outputHints.imageCount > 0,
+                outputHints.hasImageOutput,
                 outputHints.imageLabel,
-                state.formData.selectedDatasets?.length > 0 ? true : false,
+                (selectedContainers?.length ?? 0) > 0 ? true : false,
                 outputHints.imageLabelFull
               )}
             </span>
           }
           helperText={renderDefaultHelper(
-            outputHints.imageCount > 0,
+            outputHints.hasImageOutput,
             `Suggested for workflow output(s): ${outputHints.imageLabel}.`,
-            "Organize output images and masks in an OMERO dataset for viewing and further analysis.",
-            state.formData.selectedDatasets?.length > 0 ? true : false
+            `Organize output images and masks in an OMERO ${containerType} for viewing and further analysis.`,
+            (selectedContainers?.length ?? 0) > 0 ? true : false
           )}
-          subLabel="Type a new dataset name and press Enter, or pick an existing one from the menu."
-          tooltip="Select the OMERO dataset for your workflow results."
-          buttonText="Select Dataset"
-          value={(state.formData.selectedDatasets || []).map((name) => {
-            const id = state.formData.selectedDatasetId;
-            return id ? `${name} (ID: ${id})` : name;
+          subLabel={`Type a new ${containerType} name and press Enter, or pick an existing one from the menu.`}
+          tooltip={`Select the OMERO ${containerType} for your workflow results.`}
+          buttonText={plateMode ? "Select Screen" : "Select Dataset"}
+          placeholder={`Add new ${containerType} name or select...`}
+          value={(selectedContainers || []).map((name) => {
+            return selectedContainerId ? `${name} (ID: ${selectedContainerId})` : name;
           })}
-          onChange={(values, type) => {
-            if (type === "manual") {
-              // Strip any "(ID: X)" suffix, take the last value
-              const rawName = values.length
-                ? values[values.length - 1].replace(/\s*\(ID:\s*\d+\)$/, '').trim()
-                : '';
-              // Look up this name in the tree — auto-attach ID if it exists
-              const matchedDataset = rawName
-                ? Object.values(state.omeroFileTreeData || {}).find(
-                    (n) => n.category === "datasets" && n.data === rawName
-                  )
-                : null;
-              handleFormDataUpdate({
-                selectedDatasets: rawName ? [rawName] : [],
-                selectedDatasetId: matchedDataset ? matchedDataset.id : null,
-              });
-            } else {
-              // Selected from tree — extract name and ID
-              const datasetNode = state.omeroFileTreeData[values[0]];
-              if (datasetNode) {
-                handleFormDataUpdate({
-                  selectedDatasets: [datasetNode.data],
-                  selectedDatasetId: datasetNode.id,
-                });
-              }
-            }
-          }}
+          onChange={handleContainerChange}
           multiSelect={false}
           intent={hasOutputSelection ? "" : "danger"}
-          allowedCategories={["datasets"]}
+          allowedCategories={[containerCategory]}
           tagProps={(val) => {
-            // Orange warning when the tag value doesn't contain "(ID: X)" — means it's a new dataset
             const isKnown = /\(ID:\s*\d+\)/.test(String(val));
             if (isKnown) return {};
             return {
               intent: "warning",
               rightIcon: "help",
-              title: "New name — OMERO will create a new dataset with this name when the workflow runs. To use an existing dataset instead, select it from the menu.",
+              title: `New name — OMERO will create a new ${containerType} with this name when the workflow runs. To use an existing ${containerType} instead, select it from the menu.`,
             };
           }}
         />
 
-        {/* Optional Image File Renamer */}
-        <FormGroup
-          label="Rename result images?"
-          labelFor="image-renaming-switch"
-          helperText="Enable custom naming patterns for imported result images."
-          intent={hasOutputSelection ? "" : "danger"}
-        >
-          <Switch
-            id="image-renaming-switch"
-            checked={state.formData.enableRename ?? defaultValues.enableRename}
-            onChange={(e) => handleRenameEnableChange(e.target.checked)}
-            intent={hasOutputSelection ? "" : "danger"}
-            disabled={
-              !state.formData.selectedDatasets ||
-              state.formData.selectedDatasets.length === 0
-            }
-          />
-        </FormGroup>
+        {!plateMode && (
+          <>
+            {/* Optional Image File Renamer */}
+            <FormGroup
+              label="Rename result images?"
+              labelFor="image-renaming-switch"
+              helperText="Enable custom naming patterns for imported result images."
+              intent={hasOutputSelection ? "" : "danger"}
+            >
+              <Switch
+                id="image-renaming-switch"
+                checked={state.formData.enableRename ?? defaultValues.enableRename}
+                onChange={(e) => handleRenameEnableChange(e.target.checked)}
+                intent={hasOutputSelection ? "" : "danger"}
+                disabled={
+                  !state.formData.selectedDatasets ||
+                  state.formData.selectedDatasets.length === 0
+                }
+              />
+            </FormGroup>
 
-        {/* Rename Pattern Input */}
+            {/* Rename Pattern Input */}
         <FormGroup
           label="Rename pattern"
           labelFor="image-renaming-pattern"
@@ -642,6 +713,8 @@ const WorkflowOutput = ({ onSelectionChange }) => {
           />
           {/* Validation now appears in sticky header above */}
         </FormGroup>
+          </>
+        )}
       </FormGroup>
     </form>
   );
