@@ -691,7 +691,7 @@ const RunPanel = ({ onWorkflowError }) => {
           {getFileInputParams(state.selectedWorkflow?.metadata).length > 0 && (
             <DialogStep
               id="step2b"
-              title="File Inputs"
+              title="Attach Files"
               panel={<WorkflowFileInputStep dialogBodyClassName="flex flex-col min-h-[75vh]" />}
               nextButtonProps={{
                 disabled: isFileInputNextDisabled,

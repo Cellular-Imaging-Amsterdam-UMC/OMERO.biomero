@@ -94,11 +94,17 @@ const WorkflowFileInputStep = ({ dialogBodyClassName = "" }) => {
 
   return (
     <DialogBody className={dialogBodyClassName || undefined}>
-      {hasRequired && (
-        <Callout intent={Intent.PRIMARY} icon={null} className="mb-3 py-2 px-3">
-          <span className="text-sm">Select the required file attachments below before continuing.</span>
-        </Callout>
-      )}
+      <Callout
+        intent={hasRequired ? Intent.PRIMARY : Intent.NONE}
+        icon={hasRequired ? "info-sign" : null}
+        className="mb-3 py-2 px-3"
+      >
+        <span className="text-sm">
+          {hasRequired
+            ? "Select attachment files from OMERO to send along with this workflow. Required items must be filled in before you can continue — check each description for details."
+            : "Optionally select attachment files from OMERO to send along with this workflow. All items here are optional — check each description for details on what each one does."}
+        </span>
+      </Callout>
 
       <div className="flex flex-col gap-1">
         {fileParams.map((param) => {
@@ -134,23 +140,38 @@ const WorkflowFileInputStep = ({ dialogBodyClassName = "" }) => {
                   intent={done ? Intent.SUCCESS : Intent.NONE}
                   rightIcon={isOpen ? "chevron-up" : "chevron-down"}
                 >
-                  <div className="flex items-center gap-2 w-full pr-1">
-                    <Icon
-                      icon={done ? "tick-circle" : "paperclip"}
-                      size={14}
-                      className={done ? "text-green-500" : "text-gray-400"}
-                    />
-                    <span className="text-sm font-semibold text-gray-900 flex-1 text-left leading-5">
-                      {param.name || param.id}
-                    </span>
-                    {param.optional
-                      ? <span className="text-xs text-gray-400">(optional)</span>
-                      : !done && <span className="text-xs text-red-400">required</span>
-                    }
-                    {currentSelection.length > 0 && (
-                      <Tag minimal round intent={done ? Intent.SUCCESS : Intent.PRIMARY} className="shrink-0">
-                        {currentSelection.length}
-                      </Tag>
+                  <div className="flex flex-col w-full pr-1 py-0.5 gap-0.5">
+                    <div className="flex items-center gap-2">
+                      <Icon
+                        icon={done ? "tick-circle" : "paperclip"}
+                        size={14}
+                        className={done ? "text-green-500" : "text-gray-400"}
+                      />
+                      <span className="text-sm font-semibold text-gray-900 flex-1 text-left leading-5">
+                        {param.name || param.id}
+                      </span>
+                      {param.optional
+                        ? <span className="text-xs text-gray-400">(optional)</span>
+                        : !done && <span className="text-xs text-red-400">required</span>
+                      }
+                      {currentSelection.length > 0 && (
+                        <Tag minimal round intent={done ? Intent.SUCCESS : Intent.PRIMARY} className="shrink-0">
+                          {currentSelection.length}
+                        </Tag>
+                      )}
+                    </div>
+                    {(param.description || formats.length > 0 || param["file-count"]) && (
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 ml-5">
+                        {param.description && (
+                          <span className="text-xs text-gray-500 text-left">{param.description}</span>
+                        )}
+                        {formats.length > 0 && (
+                          <span className="text-xs text-gray-400 italic">Formats: {formats.join(", ")}</span>
+                        )}
+                        {param["file-count"] === "single" && (
+                          <span className="text-xs text-gray-400 italic">Single file</span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </Button>

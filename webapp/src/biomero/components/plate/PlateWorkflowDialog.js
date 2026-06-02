@@ -89,7 +89,7 @@ const PlateWorkflowDialog = ({
       {getFileInputParams(workflow?.metadata).length > 0 && (
         <DialogStep
           id="file-inputs"
-          title="File Inputs"
+          title="Attach Files"
           panel={<WorkflowFileInputStep />}
           nextButtonProps={{
             disabled: isFileInputNextDisabled,
