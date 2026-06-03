@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { InputGroup, FormGroup, Switch, Callout, Tooltip, Icon } from "@blueprintjs/core";
+import { InputGroup, FormGroup, Switch, Callout, Tooltip, Icon, Divider, Tag } from "@blueprintjs/core";
 import { useAppContext } from "../../AppContext";
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover.js";
 
@@ -144,21 +144,22 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   // labelFull: full untruncated list used in the tooltip (defaults to label)
   const renderDefaultCue = (suggested, label, currentValue = undefined, labelFull = label) => {
     if (!suggested) return null;
-    // When the overall form has a validation error (nothing selected), suppress
-    // suggestion indicators so the red error message has clear visual priority.
-    if (!hasOutputSelection) return null;
     const overridden = currentValue === false;
     return (
       <Tooltip
         content={overridden
-          ? `This option is suggested for: ${labelFull}. You have turned it off.`
-          : `Suggested for: ${labelFull}. You can switch it off.`}
+          ? `Suggested for: ${labelFull}. You have turned this off.`
+          : `Suggested for: ${labelFull}`}
         placement="top"
       >
-        <span className={`inline-flex items-center gap-1 text-xs cursor-help ${overridden ? "text-orange-600" : "text-sky-700"}`}>
-          <Icon icon={overridden ? "warning-sign" : "info-sign"} size={12} />
-          <span>{overridden ? "Suggestion overridden" : `Suggested for ${label}`}</span>
-        </span>
+        <Tag
+          minimal
+          round
+          intent={overridden ? "warning" : "primary"}
+          className="text-xs cursor-help"
+        >
+          {overridden ? "Suggested (off)" : "Suggested"}
+        </Tag>
       </Tooltip>
     );
   };
@@ -185,6 +186,14 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   }, [state.formData.enableRename]);
 
   useEffect(() => {
+    if (plateMode) return;
+    // Auto-disable rename when the dataset destination is cleared
+    if ((state.formData.selectedDatasets?.length ?? 0) === 0 && state.formData.enableRename) {
+      handleFormDataUpdate({ enableRename: false });
+    }
+  }, [state.formData.selectedDatasets, plateMode]);
+
+  useEffect(() => {
     if (plateMode) {
       // Plate mode: no rename validation — selection state is the only gate
       onSelectionChange?.(hasOutputSelection);
@@ -194,8 +203,11 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
     }
   }, [plateMode, hasOutputSelection, renameValidation, state.formData.enableRename]);
 
+  const autoFilledDatasets = useRef(false);
+
   useEffect(() => {
     if (plateMode) return;
+    if (autoFilledDatasets.current) return;
     const inputs = state.inputDatasets || [];
     if (inputs.length === 0) return;
     const hasPlate = inputs.some((d) => d?.category === "plates");
@@ -205,7 +217,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
     // If inputs are not datasets, keep whatever is already selected.
     if (hasPlate || !allDatasets) return;
 
-    // Only auto-populate when all inputs are datasets and nothing chosen yet
+    // Only auto-populate once when all inputs are datasets and nothing chosen yet
     if (
       allDatasets &&
       (!state.formData.selectedDatasets ||
@@ -214,12 +226,13 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
       const inputDatasetNames = inputs.map((dataset) => dataset.data);
       // Also carry the OMERO ID when there is exactly one input dataset
       const autoId = inputs.length === 1 ? (inputs[0].id ?? null) : null;
+      autoFilledDatasets.current = true;
       handleFormDataUpdate({
         selectedDatasets: inputDatasetNames,
         selectedDatasetId: autoId,
       });
     }
-  }, [state.inputDatasets, state.formData.selectedDatasets]);
+  }, [state.inputDatasets, plateMode]);
 
   // Plate-mode: auto-fill the parent screen once per plate ID
   useEffect(() => {
@@ -391,7 +404,19 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
 
   return (
     <form>
-      <h2>Output Options</h2>
+      {/* ── Intro ────────────────────────────────────── */}
+      <Callout
+        className="mb-3 py-2 px-3"
+      >
+        <span className="text-sm">
+          Choose how your workflow results are imported back into OMERO.
+            You must select <strong>at least one output option</strong> below.
+            <br />
+            <Tag minimal round intent="primary" className="px-1">Suggested</Tag>
+              options are recommended based on this workflow's declared outputs — you can always override them.
+        </span>
+      </Callout>
+
 
       {plateMode && !isImporterEnabled && (
         <Callout intent="danger" className="mb-4">
@@ -411,8 +436,8 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         )}
 
         {!plateMode && state.formData.enableRename && renameValidation.message && (
-          <Callout 
-            intent={renameValidation.hasError ? "danger" : "warning"} 
+          <Callout
+            intent={renameValidation.hasError ? "danger" : "warning"}
             className={`mb-2 ${renameValidation.hasError ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'}`}
           >
             <strong>Rename Pattern:</strong> {renameValidation.message}
@@ -420,302 +445,358 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         )}
       </div>
 
-      {/* Receive Email Option */}
-      <FormGroup
-        label="Receive E-mail on Completion?"
-        labelFor="email-notification"
-        helperText="Receive an email from SLURM when one or more jobs finish (completed or failed)."
-      >
-        <Switch
-          id="email-notification"
-          checked={state.formData.receiveEmail ?? defaultValues.receiveEmail}
-          onChange={(e) => handleInputChange("receiveEmail", e.target.checked)}
-        />
-      </FormGroup>
-
-      {/* Import Options */}
-      <FormGroup
-        label="How would you like to add the workflow results to OMERO?"
-        labelFor="import-options"
-        subLabel={
-          <span>
-            Select{" "}
-            <strong
-              className={hasOutputSelection ? "" : "font-bold text-red-500"}
-            >
-              one or more
-            </strong>{" "}
-            options below for how you want the data resulting from this workflow
-            imported back into OMERO
-          </span>
-        }
-        intent={hasOutputSelection ? "" : "danger"}
-      >
-        {/* Zip File Option */}
-        <FormGroup
-          label={
-            <span className="inline-flex items-center gap-2">
-              <Tooltip
-                content={outputHints.zipCount > 0
-                  ? `This workflow declares archive/log output(s) (${outputHints.zipLabel}), so zip export is enabled by default.`
-                  : "Attach a bulk zip of all results to the parent dataset/project — useful as a backup or to download everything at once."}
-                placement="top"
-              >
-                <span>Add all results as a bulk zip archive (backup / download-all).</span>
-              </Tooltip>
-              {renderDefaultCue(outputHints.importAsZip, outputHints.zipLabel)}
-            </span>
-          }
-          labelFor="upload-zip-options"
-          helperText={
-            hasOtherOutputsAlongWithZip
-              ? <span className="text-orange-600">Other output options are also active — the zip will contain all those files too, duplicating storage. Use it as a standalone backup, or disable the other options if you only need the archive.</span>
-              : "Bulk backup archive: attaches a single zip of all results. Use individual file annotations for finer-grained access."
-          }
-          intent={hasOutputSelection ? "" : "danger"}
-        >
-          <Switch
-            id="upload-zip-options"
-            checked={state.formData.importAsZip ?? outputHints.importAsZip ?? defaultValues.importAsZip}
-            onChange={(e) => handleInputChange("importAsZip", e.target.checked)}
-            intent={hasOutputSelection ? "" : "danger"}
-          />
-        </FormGroup>
-
-        {/* OMERO Tables Option */}
-        <FormGroup
-          label={
-            <span className="inline-flex items-center gap-2">
-              <Tooltip
-                content={outputHints.measurementCount > 0
-                  ? `This workflow declares CSV measurement output(s): ${outputHints.measurementLabelFull}. Importing them as OMERO tables is suggested.`
-                  : "Upload CSV measurement results as interactive OMERO tables for further analysis."}
-                placement="top"
-              >
-                <span>Add CSV measurement results as OMERO tables.</span>
-              </Tooltip>
-              {renderDefaultCue(outputHints.uploadCsv, outputHints.measurementLabel, state.formData.uploadCsv, outputHints.measurementLabelFull)}
-            </span>
-          }
-          labelFor="upload-csv-options"
-          helperText={renderDefaultHelper(
-            outputHints.measurementCount > 0,
-            `Suggested for workflow output(s): ${outputHints.measurementLabel}. Switch it off if you do not need OMERO tables for those results.`,
-            "Upload CSV measurement results as interactive OMERO tables for further analysis.",
-            state.formData.uploadCsv
-          )}
-          intent={hasOutputSelection ? "" : "danger"}
-        >
-          <Switch
-            id="upload-csv-options"
-            checked={state.formData.uploadCsv ?? outputHints.uploadCsv ?? defaultValues.uploadCsv}
-            onChange={(e) => handleInputChange("uploadCsv", e.target.checked)}
-            intent={hasOutputSelection ? "" : "danger"}
-          />
-        </FormGroup>
-
-        {/* Attachments to Original Images — dataset mode only */}
-        {!plateMode && (
-          <FormGroup
-            label={
-              <span className="inline-flex items-center gap-2">
-                <Tooltip
-                  content={outputHints.imageCount > 0
-                    ? `This workflow declares image output(s) (${outputHints.imageLabel}).`
-                    : "Attach the output images (e.g., masks) to the original input images to track their provenance."}
-                  placement="top"
-                >
-                  <span>Add results as attachments to input images.</span>
-                </Tooltip>
-              </span>
-            }
-            labelFor="upload-images-options"
-            helperText="Attach the output images (e.g., masks) to the original input images to track their provenance."
-            intent={hasOutputSelection ? "" : "danger"}
-          >
+      {/* ── Notifications ─────────────────────────────── */}
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 mt-2">Notifications</p>
+      {(() => {
+        const _emailChecked = state.formData.receiveEmail ?? defaultValues.receiveEmail;
+        return (
+          <div className={`flex items-start justify-between gap-3 border rounded p-3 mb-4 transition-colors ${_emailChecked ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+            <div className="flex items-start gap-2">
+              <Icon icon="envelope" size={16} className={`mt-0.5 shrink-0 ${_emailChecked ? 'text-blue-600' : 'text-gray-400'}`} />
+              <div>
+                <span className="text-sm font-semibold">Email on completion</span>
+                <p className="text-xs text-gray-500 mt-0.5">Receive an email from SLURM when one or more jobs finish (completed or failed).</p>
+              </div>
+            </div>
             <Switch
-              id="upload-images-options"
-              checked={
-                state.formData.attachToOriginalImages ??
-                defaultValues.attachToOriginalImages
-              }
-              onChange={(e) =>
-                handleInputChange("attachToOriginalImages", e.target.checked)
-              }
-              intent={hasOutputSelection ? "" : "danger"}
+              id="email-notification"
+              checked={_emailChecked}
+              onChange={(e) => handleInputChange("receiveEmail", e.target.checked)}
+              className="shrink-0 mt-0.5"
             />
-          </FormGroup>
-        )}
+          </div>
+        );
+      })()}
 
-        {/* Non-image file outputs as individual file annotations */}
-        <FormGroup
-          label={
-            <span className="inline-flex items-center gap-2">
-              <Tooltip
-                content={outputHints.fileAnnotationCount > 0
-                  ? `This workflow declares non-image output(s): ${outputHints.fileAnnotationLabelFull}. Each is attached as an individual OMERO file annotation.`
-                  : "Attach individual non-image, non-CSV output files (e.g. NumPy arrays, model weights, JSON configs, log files) as OMERO file annotations."}
-                placement="top"
-              >
-                <span>Attach individual non-image output files as annotations.</span>
-              </Tooltip>
-              {renderDefaultCue(outputHints.attachFileOutputs, outputHints.fileAnnotationLabel, state.formData.attachFileOutputs, outputHints.fileAnnotationLabelFull)}
-            </span>
-          }
-          labelFor="attach-file-outputs"
-          helperText={renderDefaultHelper(
-            outputHints.fileAnnotationCount > 0,
-            `Suggested for workflow output(s): ${outputHints.fileAnnotationLabel}. Each file is attached as its own OMERO annotation. CSV outputs are handled separately by the OMERO tables option above and are not attached here.`,
-            "Attach non-image, non-CSV output files (arrays, configs, model weights, log files) as individual OMERO file annotations. CSV files are handled by the OMERO tables option above.",
-            state.formData.attachFileOutputs
-          )}
-          intent={hasOutputSelection ? "" : "danger"}
-        >
-          <Switch
-            id="attach-file-outputs"
-            checked={state.formData.attachFileOutputs ?? outputHints.attachFileOutputs ?? defaultValues.attachFileOutputs}
-            onChange={(e) => handleInputChange("attachFileOutputs", e.target.checked)}
-            intent={hasOutputSelection ? "" : "danger"}
-          />
-        </FormGroup>
+      <Divider className="my-3" />
 
-        {/* Container (dataset / screen) selection */}
-        <DatasetSelectWithPopover
-          label={
-            <span className="inline-flex items-center gap-2">
-              <Tooltip
-                content={outputHints.hasImageOutput
-                  ? `This workflow declares image/mask output(s): ${outputHints.imageLabelFull}. Organizing them in a ${containerType} is suggested.`
-                  : `Organize output images and masks in an OMERO ${containerType} for viewing and further analysis.`}
-                placement="top"
-              >
-                <span>Add image/mask results to a new or existing {containerType}.</span>
-              </Tooltip>
-              {renderDefaultCue(
-                outputHints.hasImageOutput,
-                outputHints.imageLabel,
-                (selectedContainers?.length ?? 0) > 0 ? true : false,
-                outputHints.imageLabelFull
-              )}
-            </span>
-          }
-          helperText={renderDefaultHelper(
-            outputHints.hasImageOutput,
-            `Suggested for workflow output(s): ${outputHints.imageLabel}.`,
-            `Organize output images and masks in an OMERO ${containerType} for viewing and further analysis.`,
-            (selectedContainers?.length ?? 0) > 0 ? true : false
-          )}
-          subLabel={`Type a new ${containerType} name and press Enter, or pick an existing one from the menu.`}
-          tooltip={`Select the OMERO ${containerType} for your workflow results.`}
-          buttonText={plateMode ? "Select Screen" : "Select Dataset"}
-          placeholder={`Add new ${containerType} name or select...`}
-          value={(selectedContainers || []).map((name) => {
-            return selectedContainerId ? `${name} (ID: ${selectedContainerId})` : name;
-          })}
-          onChange={handleContainerChange}
-          multiSelect={false}
-          intent={hasOutputSelection ? "" : "danger"}
-          allowedCategories={[containerCategory]}
-          tagProps={(val) => {
-            const isKnown = /\(ID:\s*\d+\)/.test(String(val));
-            if (isKnown) return {};
-            return {
-              intent: "warning",
-              rightIcon: "help",
-              title: `New name — OMERO will create a new ${containerType} with this name when the workflow runs. To use an existing ${containerType} instead, select it from the menu.`,
-            };
-          }}
-        />
+      {/* ── Workflow Results ───────────────────────────── */}
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Workflow Results</p>
+      <p className="text-xs text-gray-500 mb-3">
+        Select <strong className={hasOutputSelection ? "" : "text-red-500"}>one or more</strong> options for how
+        the workflow output is imported into OMERO.
+      </p>
 
-        {!plateMode && (
-          <>
-            {/* Optional Image File Renamer */}
-            <FormGroup
-              label="Rename result images?"
-              labelFor="image-renaming-switch"
-              helperText="Enable custom naming patterns for imported result images."
-              intent={hasOutputSelection ? "" : "danger"}
+      <div className="flex flex-col gap-2">
+        {/* ① Bulk ZIP */}
+        {(() => {
+          const _checked = state.formData.importAsZip ?? outputHints.importAsZip ?? defaultValues.importAsZip;
+          const _border = !hasOutputSelection ? 'border-red-300 bg-white' : _checked ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300';
+          return (
+            <div
+              className={`border rounded p-3 transition-colors cursor-pointer ${_border}`}
+              onClick={() => handleInputChange("importAsZip", !_checked)}
             >
-              <Switch
-                id="image-renaming-switch"
-                checked={state.formData.enableRename ?? defaultValues.enableRename}
-                onChange={(e) => handleRenameEnableChange(e.target.checked)}
-                intent={hasOutputSelection ? "" : "danger"}
-                disabled={
-                  !state.formData.selectedDatasets ||
-                  state.formData.selectedDatasets.length === 0
-                }
-              />
-            </FormGroup>
+              <div className="flex items-start gap-3">
+                <Icon icon="compressed" size={16} className={`mt-0.5 shrink-0 ${_checked ? 'text-blue-600' : 'text-gray-400'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold">Bulk ZIP archive</span>
+                      {renderDefaultCue(outputHints.importAsZip, outputHints.zipLabel)}
+                    </div>
+                    <Tooltip
+                      content={outputHints.zipCount > 0
+                        ? `This workflow declares archive output(s): ${outputHints.zipLabel}. Zip export is suggested.`
+                        : "Attach a bulk zip of all results — useful as a backup or for bulk download."}
+                      placement="top"
+                    >
+                      <Switch
+                        id="upload-zip-options"
+                        checked={_checked}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => handleInputChange("importAsZip", e.target.checked)}
+                        className="shrink-0 mt-0"
+                        intent={hasOutputSelection ? "" : "danger"}
+                      />
+                    </Tooltip>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Attaches a single zip of all results to the parent dataset/project.
+                    {hasOtherOutputsAlongWithZip && (
+                      <span className="block mt-1 text-orange-600">
+                        ⚠ Other output options are also active — the zip will contain all those files too, duplicating storage.
+                        Use it as a standalone backup or disable the other options if you only need the archive.
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
-            {/* Rename Pattern Input */}
-        <FormGroup
-          label="Rename pattern"
-          labelFor="image-renaming-pattern"
-          helperText={
-            <>
-              <div>
-                <strong>Original input variables:</strong> <code>{"{original_file}"}</code> (filename without extension), <code>{"{original_ext}"}</code> (full extension)
+        {/* ② CSV → OMERO Tables */}
+        {(() => {
+          const _checked = state.formData.uploadCsv ?? outputHints.uploadCsv ?? defaultValues.uploadCsv;
+          const _border = !hasOutputSelection ? 'border-red-300 bg-white' : _checked ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300';
+          return (
+            <div
+              className={`border rounded p-3 transition-colors cursor-pointer ${_border}`}
+              onClick={() => handleInputChange("uploadCsv", !_checked)}
+            >
+              <div className="flex items-start gap-3">
+                <Icon icon="th" size={16} className={`mt-0.5 shrink-0 ${_checked ? 'text-blue-600' : 'text-gray-400'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold">CSV → OMERO Tables</span>
+                      {renderDefaultCue(outputHints.uploadCsv, outputHints.measurementLabel, state.formData.uploadCsv, outputHints.measurementLabelFull)}
+                    </div>
+                    <Switch
+                      id="upload-csv-options"
+                      checked={_checked}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => handleInputChange("uploadCsv", e.target.checked)}
+                      className="shrink-0 mt-0"
+                      intent={hasOutputSelection ? "" : "danger"}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {renderDefaultHelper(
+                      outputHints.measurementCount > 0,
+                      `Suggested for: ${outputHints.measurementLabel}. Uploads CSV measurements as interactive OMERO tables.`,
+                      "Upload CSV measurement results as interactive OMERO tables for further analysis.",
+                      state.formData.uploadCsv
+                    )}
+                  </p>
+                </div>
               </div>
-              <div>
-                <strong>Result file variables:</strong> <code>{"{file}"}</code> (workflow result filename without extension), <code>{"{ext}"}</code> (full extension from result file)
+            </div>
+          );
+        })()}
+
+        {/* ③ Attach to input images (dataset mode only) */}
+        {!plateMode && (() => {
+          const _checked = state.formData.attachToOriginalImages ?? defaultValues.attachToOriginalImages;
+          const _border = !hasOutputSelection ? 'border-red-300 bg-white' : _checked ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300';
+          const hasDestination = (selectedContainers?.length ?? 0) > 0;
+          const hasDuplicateImages = _checked && hasDestination;
+          return (
+            <div
+              className={`border rounded p-3 transition-colors cursor-pointer ${_border}`}
+              onClick={() => handleInputChange("attachToOriginalImages", !_checked)}
+            >
+              <div className="flex items-start gap-3">
+                <Icon icon="link" size={16} className={`mt-0.5 shrink-0 ${_checked ? 'text-blue-600' : 'text-gray-400'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold">Attach to input images</span>
+                      {renderDefaultCue(outputHints.imageCount > 0, outputHints.imageLabel, state.formData.attachToOriginalImages, outputHints.imageLabelFull)}
+                    </div>
+                    <Switch
+                      id="upload-images-options"
+                      checked={_checked}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => handleInputChange("attachToOriginalImages", e.target.checked)}
+                      className="shrink-0 mt-0"
+                      intent={hasOutputSelection ? "" : "danger"}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Attach output images (e.g. masks) to the original input images to track their provenance.
+                  </p>
+                  {hasDuplicateImages && (
+                    <p className="mt-1 text-xs text-orange-600">
+                      ⚠ A {containerType} destination is also selected — image results will be imported twice.
+                      Consider using only the {containerType} destination below instead.
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="mt-2">
-                <strong>Examples:</strong>
+            </div>
+          );
+        })()}
+
+        {/* ④ Individual file annotations */}
+        {(() => {
+          const _checked = state.formData.attachFileOutputs ?? outputHints.attachFileOutputs ?? defaultValues.attachFileOutputs;
+          const _border = !hasOutputSelection ? 'border-red-300 bg-white' : _checked ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300';
+          return (
+            <div
+              className={`border rounded p-3 transition-colors cursor-pointer ${_border}`}
+              onClick={() => handleInputChange("attachFileOutputs", !_checked)}
+            >
+              <div className="flex items-start gap-3">
+                <Icon icon="paperclip" size={16} className={`mt-0.5 shrink-0 ${_checked ? 'text-blue-600' : 'text-gray-400'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold">Individual file annotations</span>
+                      {renderDefaultCue(outputHints.attachFileOutputs, outputHints.fileAnnotationLabel, state.formData.attachFileOutputs, outputHints.fileAnnotationLabelFull)}
+                    </div>
+                    <Switch
+                      id="attach-file-outputs"
+                      checked={_checked}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => handleInputChange("attachFileOutputs", e.target.checked)}
+                      className="shrink-0 mt-0"
+                      intent={hasOutputSelection ? "" : "danger"}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {renderDefaultHelper(
+                      outputHints.fileAnnotationCount > 0,
+                      `Suggested for: ${outputHints.fileAnnotationLabel}. Each non-image, non-CSV file is attached as its own OMERO annotation. CSV outputs go to OMERO Tables above.`,
+                      "Attach non-image, non-CSV output files (arrays, configs, model weights, log files) as individual OMERO file annotations. CSV files are handled by the OMERO tables option above.",
+                      state.formData.attachFileOutputs
+                    )}
+                  </p>
+                </div>
               </div>
-              <ul className="list-disc list-inside mt-1 text-xs ml-4">
-                <li>
-                  <code 
-                    className="cursor-pointer hover:bg-blue-100 px-1 rounded"
-                    onClick={() => handleExampleClick("{original_file}_mask.{ext}")}
-                    title="Click to use this pattern"
-                  >
-                    {"{original_file}_mask.{ext}"}
-                  </code> → Use original name + result extension
-                </li>
-                <li>
-                  <code 
-                    className="cursor-pointer hover:bg-blue-100 px-1 rounded"
-                    onClick={() => handleExampleClick("{file}_processed.{original_ext}")}
-                    title="Click to use this pattern"
-                  >
-                    {"{file}_processed.{original_ext}"}
-                  </code> → Use result name + original extension
-                </li>
-                <li>
-                  <code 
-                    className="cursor-pointer hover:bg-blue-100 px-1 rounded"
-                    onClick={() => handleExampleClick("analysis_{original_file}.tif")}
-                    title="Click to use this pattern"
-                  >
-                    {"analysis_{original_file}.tif"}
-                  </code> → Custom prefix + original name + specific extension
-                </li>
-              </ul>
-            </>
-          }
-          disabled={
-            !state.formData.selectedDatasets ||
-            state.formData.selectedDatasets.length === 0
-          }
-        >
-          <InputGroup
-            id="image-renaming-pattern"
-            inputRef={renameInputRef}
-            value={renamePattern}
-            onChange={handleRenamePatternChange}
-            fill={true}
-            disabled={
-              !state.formData.selectedDatasets ||
-              state.formData.selectedDatasets.length === 0
-            }
-            intent={renameValidation.hasError ? "danger" : (renameValidation.hasWarning ? "warning" : "none")}
-          />
-          {/* Validation now appears in sticky header above */}
-        </FormGroup>
-          </>
-        )}
-      </FormGroup>
+            </div>
+          );
+        })()}
+        {/* ⑤ Dataset / Screen destination */}
+        {(() => {
+          const hasDestination = (selectedContainers?.length ?? 0) > 0;
+          const _border = !hasOutputSelection
+            ? 'border-red-300 bg-white'
+            : hasDestination
+              ? 'border-blue-400 bg-blue-50'
+              : 'border-gray-200 bg-white hover:border-gray-300';
+          return (
+            <div className={`border rounded p-3 transition-colors ${_border}`}>
+              <div className="flex items-start gap-3 mb-2">
+                <Icon icon="media" size={16} className={`mt-0.5 shrink-0 ${hasDestination ? 'text-blue-600' : 'text-gray-400'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold">Add (mask) image results to a {containerType}</span>
+                    {renderDefaultCue(
+                      outputHints.hasImageOutput || (plateMode ? autoFilledForPlateId.current !== null : autoFilledDatasets.current),
+                      outputHints.imageLabel || containerType,
+                      hasDestination ? undefined : false,
+                      outputHints.imageLabelFull || `${containerType} destination`
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Organizes output images and masks in an OMERO {containerType} for viewing and further analysis.
+                  </p>
+                </div>
+              </div>
+              <DatasetSelectWithPopover
+                label={null}
+                helperText={`Type a new ${containerType} name and press Enter, or pick an existing one from the menu.`}
+                subLabel={null}
+                tooltip={`Select the OMERO ${containerType} for your workflow results.`}
+                buttonText={plateMode ? "Select Screen" : "Select Dataset"}
+                placeholder={`Add new ${containerType} name or select...`}
+                value={(selectedContainers || []).map((name) => {
+                  return selectedContainerId ? `${name} (ID: ${selectedContainerId})` : name;
+                })}
+                onChange={handleContainerChange}
+                multiSelect={false}
+                intent={hasOutputSelection ? "" : "danger"}
+                allowedCategories={[containerCategory]}
+                tagProps={(val) => {
+                  const isKnown = /\(ID:\s*\d+\)/.test(String(val));
+                  if (isKnown) return {};
+                  return {
+                    intent: "warning",
+                    rightIcon: "help",
+                    title: `New name — OMERO will create a new ${containerType} with this name when the workflow runs. To use an existing ${containerType} instead, select it from the menu.`,
+                  };
+                }}
+              />
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* ── Rename result images (dataset mode only) ───── */}
+      {!plateMode && (() => {
+        const _enabled = state.formData.enableRename ?? defaultValues.enableRename;
+        const _hasDataset = (state.formData.selectedDatasets?.length ?? 0) > 0;
+        const _disabled = !_hasDataset;
+        const _hasError = _enabled && renameValidation.hasError;
+        const _border = _hasError
+          ? 'border-red-400 bg-red-50'
+          : _enabled
+            ? 'border-blue-400 bg-blue-50'
+            : 'border-gray-200 bg-white hover:border-gray-300';
+        return (
+          <div className="mt-1 ml-5 border-l-2 border-blue-100 pl-3">
+            <div
+              className={`border rounded p-3 transition-colors ${_border} ${_disabled ? 'opacity-50' : ''}`}
+            >
+          <div className="flex items-start gap-3">
+            <Icon icon="edit" size={16} className={`mt-0.5 shrink-0 ${_enabled ? (_hasError ? 'text-red-500' : 'text-blue-600') : 'text-gray-400'}`} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div>
+                  <span className="text-sm font-semibold">Rename result images</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Apply a custom naming pattern to imported result images.</p>
+                </div>
+                <Switch
+                  id="image-renaming-switch"
+                  checked={_enabled}
+                  onChange={(e) => handleRenameEnableChange(e.target.checked)}
+                  disabled={_disabled}
+                  className="shrink-0 mt-0"
+                />
+              </div>
+              <FormGroup
+                label="Pattern"
+                labelFor="image-renaming-pattern"
+                helperText={
+                  <>
+                    <div>
+                      <strong>Input variables:</strong> <code>{"{original_file}"}</code> (filename without extension), <code>{"{original_ext}"}</code> (extension)
+                    </div>
+                    <div>
+                      <strong>Result variables:</strong> <code>{"{file}"}</code> (result filename without extension), <code>{"{ext}"}</code> (result extension)
+                    </div>
+                    <div className="mt-2"><strong>Examples — click to use:</strong></div>
+                    <ul className="list-disc list-inside mt-1 text-xs ml-4">
+                      <li>
+                        <code
+                          className="cursor-pointer hover:bg-blue-100 px-1 rounded"
+                          onClick={() => handleExampleClick("{original_file}_mask.{ext}")}
+                          title="Click to use this pattern"
+                        >
+                          {"{original_file}_mask.{ext}"}
+                        </code> → original name + result extension
+                      </li>
+                      <li>
+                        <code
+                          className="cursor-pointer hover:bg-blue-100 px-1 rounded"
+                          onClick={() => handleExampleClick("{file}_processed.{original_ext}")}
+                          title="Click to use this pattern"
+                        >
+                          {"{file}_processed.{original_ext}"}
+                        </code> → result name + original extension
+                      </li>
+                      <li>
+                        <code
+                          className="cursor-pointer hover:bg-blue-100 px-1 rounded"
+                          onClick={() => handleExampleClick("analysis_{original_file}.tif")}
+                          title="Click to use this pattern"
+                        >
+                          {"analysis_{original_file}.tif"}
+                        </code> → custom prefix + original name + fixed extension
+                      </li>
+                    </ul>
+                  </>
+                }
+                disabled={_disabled}
+              >
+                <InputGroup
+                  id="image-renaming-pattern"
+                  inputRef={renameInputRef}
+                  value={renamePattern}
+                  onChange={handleRenamePatternChange}
+                  fill={true}
+                  disabled={_disabled}
+                  intent={renameValidation.hasError ? "danger" : (renameValidation.hasWarning ? "warning" : "none")}
+                />
+              </FormGroup>
+            </div>
+          </div>
+            </div>
+          </div>
+        );
+      })()}
     </form>
   );
 };
