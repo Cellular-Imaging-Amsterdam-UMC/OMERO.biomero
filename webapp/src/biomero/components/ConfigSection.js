@@ -17,6 +17,7 @@ const ConfigSection = ({
   versionCheckLoading, // Version check loading state
   config, // Config for workflow type detection
   onRepoBlur, // Repo blur handler
+  descriptorMetadata, // Descriptor flags keyed by index
 }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [editableIndex, setEditableIndex] = useState(null);
@@ -64,23 +65,45 @@ const ConfigSection = ({
         </div>
       )}
       <div className="space-y-4">
-        {items.map((item, index) => (
+        {items.map((item, index) => {
+          const dmeta = descriptorMetadata ? descriptorMetadata[index] : null;
+          const hasDescriptorMismatch = dmeta && (
+            (dmeta.requiresPlate !== null && (item.isPlateWorkflow || false) !== dmeta.requiresPlate) ||
+            (dmeta.requiresZarr !== null && (item.isZarrWorkflow || false) !== dmeta.requiresZarr)
+          );
+          const descriptorMismatchTooltip = dmeta && (() => {
+            const parts = [];
+            if (dmeta.requiresPlate !== null && (item.isPlateWorkflow || false) !== dmeta.requiresPlate)
+              parts.push(dmeta.requiresPlate ? 'Descriptor requires plate — consider enabling' : 'Descriptor does not declare plate requirement');
+            if (dmeta.requiresZarr !== null && (item.isZarrWorkflow || false) !== dmeta.requiresZarr)
+              parts.push(dmeta.requiresZarr ? 'Descriptor requires ZARR — consider enabling' : 'Descriptor does not declare ZARR requirement');
+            return parts.join(' · ');
+          })();
+          const isVersionOutdated = versionStatus && versionStatus[index] &&
+            (versionStatus[index].status === 'outdated' || (versionStatus[index].status === 'unknown' && versionStatus[index].latestVersion)) &&
+            !versionStatus[index].justUpdated;
+          return (
           <div key={index}>
             <div className="flex items-center justify-between">
               <H4 className={`font-semibold flex items-center cursor-pointer ${
-                versionStatus && versionStatus[index] && versionStatus[index].status === 'outdated' && !versionStatus[index].justUpdated
-                  ? 'text-orange-600' 
-                  : ''
+                errors && errors[index] ? 'text-red-600' :
+                isVersionOutdated || hasDescriptorMismatch ? 'text-orange-600' : ''
               }`}
                 onClick={() => toggleItem(index)}
               >
                 {item.name || item.key || `${title} ${index + 1}`}
+                {/* Validation error indicator — first, highest priority */}
+                {errors && errors[index] && (
+                  <Tooltip content={Object.values(errors[index]).filter(Boolean).join(' · ')}>
+                    <Icon icon="error" size={12} intent="danger" className="ml-2" />
+                  </Tooltip>
+                )}
                 {/* Add icons for different version statuses */}
                 {(() => {
                   const status = versionStatus && versionStatus[index];
                   
                   if (status) {
-                    const isOutdated = status.status === 'outdated' && !status.justUpdated;
+                    const isOutdated = (status.status === 'outdated' || (status.status === 'unknown' && status.latestVersion)) && !status.justUpdated;
                     const isRateLimited = status.status === 'rate-limited';
                     const isStale = status.isStale || status.status?.includes('-stale');
                     
@@ -96,7 +119,7 @@ const ConfigSection = ({
                     } else if (isStale) {
                       return (
                         <Tooltip content="Version data is stale due to rate limiting">
-                        <Icon icon="outdated" size={12} className="ml-2 text-orange-500" />
+                          <Icon icon="outdated" size={12} className="ml-2 text-orange-500" />
                         </Tooltip>
                       );
                     } else if (isOutdated) {
@@ -107,6 +130,12 @@ const ConfigSection = ({
                   }
                   return null;
                 })()}
+                {/* Descriptor mismatch indicator */}
+                {hasDescriptorMismatch && (
+                  <Tooltip content={descriptorMismatchTooltip}>
+                    <Icon icon="warning-sign" size={12} intent="warning" className="ml-2" />
+                  </Tooltip>
+                )}
               </H4>
               <div className="flex items-center">
                 {/* Workflow type indicators - right aligned */}
@@ -149,10 +178,13 @@ const ConfigSection = ({
                 validateField={validateField} // Pass validation function
                 versionStatus={versionStatus ? versionStatus[index] : null} // Pass version status for this item
                 versionCheckLoading={versionCheckLoading} // Pass loading state
+                descriptorMeta={descriptorMetadata ? descriptorMetadata[index] ?? null : null}
+                config={config}
               />
             </Collapse>
           </div>
-        ))}
+          );
+        })}
       </div>
       <Button
         icon="add"

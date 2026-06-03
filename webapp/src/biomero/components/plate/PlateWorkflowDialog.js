@@ -10,6 +10,7 @@ import PlateWorkflowInput from "./PlateWorkflowInput";
 import PlateWorkflowOutput from "./PlateWorkflowOutput";
 import WorkflowForm from "../WorkflowForm";
 import InputOptions from "../InputOptions";
+import WorkflowFileInputStep, { getFileInputParams, isFileInputStepValid } from "../WorkflowFileInputStep";
 
 const PlateWorkflowDialog = ({ 
   workflow, 
@@ -21,6 +22,7 @@ const PlateWorkflowDialog = ({
   const { state, runWorkflowData } = useAppContext();
   const [isNextDisabled, setIsNextDisabled] = useState(true);
   const [isRunDisabled, setIsRunDisabled] = useState(true);
+  const [isFileInputNextDisabled, setIsFileInputNextDisabled] = useState(false);
 
   // Utility to beautify names
   const beautifyName = (name) => {
@@ -34,6 +36,12 @@ const PlateWorkflowDialog = ({
     const hasPlateSelected = state.formData?.IDs?.length > 0;
     setIsNextDisabled(!hasPlateSelected);
   }, [state.formData?.IDs]);
+
+  useEffect(() => {
+    setIsFileInputNextDisabled(
+      !isFileInputStepValid(workflow?.metadata, state.formData)
+    );
+  }, [state.formData, workflow?.metadata]);
 
   // Handle final submit
   const handleFinalSubmit = () => {
@@ -76,6 +84,18 @@ const PlateWorkflowDialog = ({
           disabled: isNextDisabled,
         }}
       />
+
+      {/* Conditionally show File Inputs step for workflows with non-image file params */}
+      {getFileInputParams(workflow?.metadata).length > 0 && (
+        <DialogStep
+          id="file-inputs"
+          title="Attach Files"
+          panel={<WorkflowFileInputStep />}
+          nextButtonProps={{
+            disabled: isFileInputNextDisabled,
+          }}
+        />
+      )}
 
       {/* Step 2 (conditional): Batch Options when >1 plate selected */}
       {(state.formData?.IDs?.length || 0) > 1 && (

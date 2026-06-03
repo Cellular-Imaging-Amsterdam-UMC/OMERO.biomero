@@ -103,11 +103,75 @@ export const fetchSlurmStatus = async () => {
   return apiRequest(urls.api_slurm_status, "GET");
 };
 
-// Fetch metadata for a specific workflow
-export const fetchWorkflowMetadata = async (workflow) => {
+/**
+ * Fetch OMERO file annotations (attachments) accessible to the current user.
+ * @param {string[]} formats - Optional list of file extensions to filter by (e.g. ["csv", "parquet"])
+ * @param {string}   search  - Optional substring to filter by filename
+ * @param {number}   groupId - Optional OMERO group ID to scope the query
+ * @returns {Promise<{attachments: Array}>}
+ */
+
+// Module-level cache so multiple OmeroAttachmentBrowser instances that render
+// at the same time (one per file-type param) share a single HTTP request.
+// Keyed by group ID, expires after 60 s.
+const _attachmentsCache = {}; // { [groupKey]: { ts, promise } }
+const ATTACHMENTS_TTL_MS = 60_000;
+
+export const fetchAttachments = (groupId = null) => {
+  const { urls, user } = getDjangoConstants();
+  const resolvedGroup = groupId !== null ? groupId : user.active_group_id;
+  const key = String(resolvedGroup);
+  const now = Date.now();
+  const cached = _attachmentsCache[key];
+  if (cached && now - cached.ts < ATTACHMENTS_TTL_MS) {
+    return cached.promise;
+  }
+  const promise = apiRequest(
+    `${urls.api_attachments}?group=${resolvedGroup}&_=${now}`,
+    "GET"
+  );
+  _attachmentsCache[key] = { ts: now, promise };
+  return promise;
+};
+
+/** Invalidate the attachment cache (call when user manually refreshes). */
+export const invalidateAttachmentsCache = (groupId = null) => {
+  if (groupId !== null) {
+    delete _attachmentsCache[String(groupId)];
+  } else {
+    Object.keys(_attachmentsCache).forEach((k) => delete _attachmentsCache[k]);
+  }
+};
+
+/**
+ * Fetch file annotations attached to a single OMERO object.
+ * Used by the By-Parent tree browser to lazily load attachments per node.
+ *
+ * @param {string} objectType - "Project" | "Dataset" | "Image" | "Plate" | "Screen"
+ * @param {number} objectId
+ * @returns {Promise<{annotations: Array}>}
+ */
+export const fetchObjectAnnotations = async (objectType, objectId) => {
   const { urls } = getDjangoConstants();
-  const workflowMetadataUrl = `${urls.workflows}${workflow}/`; // analyzer detail includes metadata
-  return apiRequest(workflowMetadataUrl, "GET");
+  return apiRequest(
+    `${urls.api_object_annotations}?object_type=${encodeURIComponent(objectType)}&object_id=${objectId}`,
+    "GET"
+  );
+};
+
+// Fetch metadata for a specific workflow, or descriptor info for an unsaved repo URL.
+// - fetchWorkflowMetadata(workflowName)  → GET /api/analyzer/workflows/<name>/
+// - fetchWorkflowMetadata(null, repoUrl) → GET /api/analyzer/workflows/_/?repo=<url>  (urls.workflow_metadata)
+//   Returns the full biomero-schema descriptor dict including 'requires-zarr',
+//   'requires-plate', and 'name' (tool name from descriptor).
+export const fetchWorkflowMetadata = async (workflow, repoUrl = null) => {
+  const { urls } = getDjangoConstants();
+  if (repoUrl) {
+    return apiRequest(
+      `${urls.workflow_metadata}?repo=${encodeURIComponent(repoUrl)}`, "GET"
+    );
+  }
+  return apiRequest(`${urls.workflows}${workflow}/`, "GET");
 };
 
 // GitHub URL is included in fetchWorkflowMetadata().githubUrl
@@ -412,26 +476,27 @@ export const extractGitHubInfo = (repoUrl) => {
   };
 };
 
+export const slugify = (name) => name.toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '');
+
+// In-memory cache for workflow metadata (session-scoped, keyed by repo URL).
+const _metadataCache = new Map();
+
+export const fetchWorkflowMetadataCached = async (repoUrl) => {
+  if (_metadataCache.has(repoUrl)) return _metadataCache.get(repoUrl);
+  const result = await fetchWorkflowMetadata(null, repoUrl);
+  _metadataCache.set(repoUrl, result);
+  return result;
+};
+
 /**
- * Fetches the name field from a descriptor.json in a GitHub repository.
- * Uses raw.githubusercontent.com (no API rate limits).
- * @param {string} repoUrl - GitHub repository URL (e.g., https://github.com/owner/repo/tree/v1.0.0)
- * @returns {Promise<string|null>} The name field from descriptor.json, lowercased and slugified, or null
+ * Fetches the container image reference via the backend (cached).
+ * Returns the full image string e.g. "cellularimagingcf/w_cellpose:v1.0.0", or null.
  */
-export const fetchDescriptorName = async (repoUrl) => {
-  const info = extractGitHubInfo(repoUrl);
-  if (!info?.owner || !info?.repo) return null;
-
-  const ref = info.currentVersion || 'main';
-  const rawUrl = `https://raw.githubusercontent.com/${info.owner}/${info.repo}/${ref}/descriptor.json`;
-
+export const fetchContainerImage = async (repoUrl) => {
+  if (!repoUrl) return null;
   try {
-    const response = await fetch(rawUrl);
-    if (!response.ok) return null;
-    const descriptor = await response.json();
-    if (!descriptor?.name) return null;
-    // Slugify: lowercase, spaces/hyphens → underscores, strip non-alphanumeric except _
-    return descriptor.name.toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '');
+    const metadata = await fetchWorkflowMetadataCached(repoUrl);
+    return metadata?.['container-image']?.image ?? null;
   } catch {
     return null;
   }

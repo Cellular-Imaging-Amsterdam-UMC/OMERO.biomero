@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Card,
   FormGroup,
@@ -17,7 +17,7 @@ import CollapsibleSection from "./CollapsibleSection";
 import ConfigSection from "./ConfigSection";
 import ModelCard from "./ModelCard.js";
 import ConverterCard from "./ConverterCard.js";
-import { checkModelVersions, clearGitHubCache, fetchDescriptorName } from "../../apiService";
+import { checkModelVersions, clearGitHubCache, slugify, fetchWorkflowMetadata } from "../../apiService";
 
 const SettingsForm = () => {
   const { 
@@ -38,7 +38,24 @@ const SettingsForm = () => {
 
   const [converters, setConverters] = useState([]);
   const [errors, setErrors] = useState({});
+  const [modelErrors, setModelErrors] = useState({});
   
+  // Descriptor flags derived from already-fetched state.workflows (populated by Run tab on load)
+  const descriptorMetadata = useMemo(() => {
+    if (!settingsForm?.MODELS || !state.workflows) return {};
+    const result = {};
+    settingsForm.MODELS.forEach((model, index) => {
+      const wf = state.workflows.find((w) => w.name === model.name);
+      if (wf?.metadata) {
+        result[index] = {
+          requiresZarr: wf.metadata['requires-zarr'] ?? null,
+          requiresPlate: wf.metadata['requires-plate'] ?? null,
+        };
+      }
+    });
+    return result;
+  }, [settingsForm?.MODELS, state.workflows]);
+
   // Version checking state
   const [versionStatus, setVersionStatus] = useState({});
   const [versionCheckLoading, setVersionCheckLoading] = useState(false);
@@ -59,7 +76,30 @@ const SettingsForm = () => {
   };
   
   const hasValidationErrors = () => {
-    return getMaxBatchJobsError() !== null || Object.keys(errors).length > 0;
+    return getMaxBatchJobsError() !== null || Object.keys(errors).length > 0 || Object.keys(modelErrors).length > 0;
+  };
+
+  const validateModelFields = (models, scriptRepo) => {
+    const newErrors = {};
+    models.forEach((model, index) => {
+      // Duplicate name check
+      if (model.name) {
+        const hasDupeName = models.some((m, i) => i !== index && m.name === model.name);
+        if (hasDupeName) {
+          if (!newErrors[index]) newErrors[index] = {};
+          newErrors[index].name = `Duplicate name "${model.name}" — each workflow must have a unique name`;
+        }
+      }
+      // Duplicate job script check (always relevant — duplicate paths cause conflicts regardless)
+      if (model.job) {
+        const hasDupeJob = models.some((m, i) => i !== index && m.job && m.job === model.job);
+        if (hasDupeJob) {
+          if (!newErrors[index]) newErrors[index] = {};
+          newErrors[index].job = `Duplicate job script "${model.job}" — each workflow must have a unique script path`;
+        }
+      }
+    });
+    setModelErrors(newErrors);
   };
 
   useEffect(() => {
@@ -147,6 +187,13 @@ const SettingsForm = () => {
     }
   }, [state.config, isInitialized]); // Only run when config loads and form isn't initialized
 
+  // Validate model fields whenever MODELS changes
+  useEffect(() => {
+    if (settingsForm?.MODELS) {
+      validateModelFields(settingsForm.MODELS, settingsForm?.SLURM?.slurm_script_repo);
+    }
+  }, [settingsForm?.MODELS, settingsForm?.SLURM?.slurm_script_repo]);
+
   // Trigger version check when admin panel opens for the first time
   useEffect(() => {
     if (settingsForm?.MODELS?.length > 0 && !versionCheckCompleted) {
@@ -231,6 +278,8 @@ const SettingsForm = () => {
         upToDate++;
       } else if (status.status === 'outdated') {
         outdated++;
+      } else if (status.status === 'unknown' && status.latestVersion) {
+        outdated++; // unversioned URLs count as needing an update
       } else if (status.status === 'up-to-date-stale' || status.status === 'outdated-stale') {
         stale++;
         if (status.status === 'up-to-date-stale') upToDate++;
@@ -255,22 +304,45 @@ const SettingsForm = () => {
     
     const model = settingsForm.MODELS[modelIndex];
 
-    // Auto-populate name from descriptor.json if the name field is still empty
-    if (!model.name) {
-      const descriptorName = await fetchDescriptorName(model.repo);
-      if (descriptorName) {
-        // Ensure uniqueness among existing model names (excluding this slot)
-        const existingNames = (settingsForm.MODELS || [])
-          .filter((_, i) => i !== modelIndex)
-          .map((m) => m.name)
-          .filter(Boolean);
-        let uniqueName = descriptorName;
-        let counter = 2;
-        while (existingNames.includes(uniqueName)) {
-          uniqueName = `${descriptorName}_${counter++}`;
+    // Fetch the descriptor once — gets us the tool name AND zarr/plate flags
+    // in a single Django→GitHub round-trip (server-side caching applies).
+    const metadata = await fetchWorkflowMetadata(null, model.repo);
+
+    if (metadata) {
+      setSettingsForm((prev) => {
+        const updatedModels = structuredClone(prev.MODELS);
+        const m = updatedModels[modelIndex];
+
+        // Auto-populate name from descriptor if the name field is still empty
+        if (!m.name && metadata.name) {
+          const descriptorName = slugify(metadata.name);
+          if (descriptorName) {
+            const existingNames = updatedModels
+              .filter((_, i) => i !== modelIndex)
+              .map((n) => n.name)
+              .filter(Boolean);
+            let uniqueName = descriptorName;
+            let counter = 2;
+            while (existingNames.includes(uniqueName)) {
+              uniqueName = `${descriptorName}_${counter++}`;
+            }
+            m.name = uniqueName;
+            if (!prev.SLURM.slurm_script_repo) {
+              m.job = `jobs/${uniqueName}.sh`;
+            }
+          }
         }
-        handleModelChange(modelIndex, "name", uniqueName);
-      }
+
+        // Auto-detect zarr/plate flags from the descriptor
+        if (metadata['requires-plate'] && !m.isPlateWorkflow) {
+          m.isPlateWorkflow = true;
+          m.isZarrWorkflow = true; // plate implies zarr
+        } else if (metadata['requires-zarr'] && !m.isZarrWorkflow) {
+          m.isZarrWorkflow = true;
+        }
+
+        return { ...prev, MODELS: updatedModels };
+      });
     }
 
     recheckModelVersion(modelIndex, model);
@@ -281,20 +353,22 @@ const SettingsForm = () => {
   };
 
   const handleModelChange = (index, field, value, options = {}) => {
-    const updatedModels = structuredClone(settingsForm.MODELS);
-    updatedModels[index][field] = value;
+    setSettingsForm((prev) => {
+      const updatedModels = structuredClone(prev.MODELS);
+      updatedModels[index][field] = value;
 
-    if (field === "name" && settingsForm.SLURM.slurm_script_repo === "") {
-      updatedModels[index]["job"] = `jobs/${value}.sh`;
-    }
+      if (field === "name" && !prev.SLURM.slurm_script_repo) {
+        updatedModels[index]["job"] = `jobs/${value}.sh`;
+      }
 
-    // Special handling for plate/zarr workflow coupling
-    if (field === "isPlateWorkflow" && value === true) {
-      // When enabling plate workflow, also enable ZARR
-      updatedModels[index]["isZarrWorkflow"] = true;
-    }
+      // Special handling for plate/zarr workflow coupling
+      if (field === "isPlateWorkflow" && value === true) {
+        // When enabling plate workflow, also enable ZARR
+        updatedModels[index]["isZarrWorkflow"] = true;
+      }
 
-    setSettingsForm((prev) => ({ ...prev, MODELS: updatedModels }));
+      return { ...prev, MODELS: updatedModels };
+    });
 
     // Clear version status when repo URL changes - we'll check on blur
     if (field === "repo" && !options.skipVersionCheck) {
@@ -745,7 +819,7 @@ const SettingsForm = () => {
           "danger"
         )}
       </CollapsibleSection>
-      <CollapsibleSection title="UI Settings">
+      <CollapsibleSection title="UI Settings" errorCount={getMaxBatchJobsError() ? 1 : 0}>
         <div className="bp5-form-group">
           <div className="bp5-form-content">
             <div className="bp5-form-helper-text">
@@ -1000,6 +1074,7 @@ const SettingsForm = () => {
         versionSummary={getVersionSummary()}
         versionCheckLoading={versionCheckLoading}
         onRefresh={manualRefreshVersions}
+        errorCount={Object.keys(modelErrors).length}
       >
         <ConfigSection
           items={settingsForm.MODELS}
@@ -1043,12 +1118,13 @@ const SettingsForm = () => {
             "Model names have to be unique, and require a GitHub repository as well.",
             "Versions for the GitHub repository are highly encouraged! Latest/master can change and cause issues with reproducability! BIOMERO picks up the container version based on the version of the repository. If you provide no version, BIOMERO will pick up the generic latest container.",
           ]}
-          errors={null} // No error handling for models yet
-          validateField={null} // No validation for models yet
+          errors={modelErrors}
+          validateField={null} // Per-field live validation not needed; duplicate check runs via useEffect
           versionStatus={versionStatus} // Pass version check results
           versionCheckLoading={versionCheckLoading} // Pass loading state
           config={state.config} // Pass config for workflow type detection
           onRepoBlur={handleRepoUrlBlur} // Pass repo blur handler
+          descriptorMetadata={descriptorMetadata} // Descriptor flags from already-fetched workflow metadata
         />
       </CollapsibleSection>
       <H5>Note on saving BIOMERO settings</H5>

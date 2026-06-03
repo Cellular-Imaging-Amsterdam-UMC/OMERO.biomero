@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAppContext } from "../../AppContext";
 import {
   Card,
@@ -26,13 +26,63 @@ import WorkflowOutput from "./WorkflowOutput";
 import WorkflowInput from "./WorkflowInput";
 import InputOptions from "./InputOptions";
 import PlateWorkflowDialog from "./plate/PlateWorkflowDialog";
+import WorkflowFileInputStep, { getFileInputParams, isFileInputStepValid } from "./WorkflowFileInputStep";
+
+const DescriptionWithToggle = ({ description }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const textRef = useRef(null);
+
+  // Check real DOM overflow while clamped — re-runs on every resize (column changes, window resize)
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+    const checkOverflow = () => setIsOverflowing(el.scrollHeight > el.clientHeight);
+    const observer = new ResizeObserver(checkOverflow);
+    observer.observe(el);
+    checkOverflow();
+    return () => observer.disconnect();
+  }, [description]);
+
+  // Re-check after collapsing so the button reappears correctly
+  useEffect(() => {
+    if (!isExpanded) {
+      requestAnimationFrame(() => {
+        if (textRef.current)
+          setIsOverflowing(textRef.current.scrollHeight > textRef.current.clientHeight);
+      });
+    }
+  }, [isExpanded]);
+
+  return (
+    <div>
+      <p ref={textRef} className={`text-sm text-gray-600 ${!isExpanded ? 'line-clamp-5' : ''}`}>
+        {description}
+      </p>
+      {(isOverflowing || isExpanded) && (
+        <div className="flex justify-end mt-1">
+          <Button
+            minimal
+            small
+            text={isExpanded ? "Show less" : "Show more"}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded((prev) => !prev);
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
 
 const RunPanel = ({ onWorkflowError }) => {
-  const { state, updateState, toaster, runWorkflowData } = useAppContext();
+  const { state, updateState, toaster, runWorkflowData, apiLoading } = useAppContext();
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isNextDisabled, setIsNextDisabled] = useState(true);
   const [isRunDisabled, setIsRunDisabled] = useState(false);
+  const [isFileInputNextDisabled, setIsFileInputNextDisabled] = useState(false);
   const [activeWorkflowTab, setActiveWorkflowTab] = useState("images"); // "images" or "plates"
   const [customStepIndex, setCustomStepIndex] = useState(0); // Track current step for custom navigation
 
@@ -42,19 +92,27 @@ const RunPanel = ({ onWorkflowError }) => {
   // Check if importer is enabled - only show plate features if it is
   const isImporterEnabled = window.WEBCLIENT?.UI?.IMPORTER_ENABLED || false;
 
-  // Helper function to check if a workflow has specific flags from config
+  // Helper function to check if a workflow has specific flags from config or schema
   const getWorkflowFlags = (workflowName) => {
     const config = state.config;
-    if (!config || !config.UI) return { isPlateWorkflow: false, isZarrWorkflow: false };
-    
-    const plateWorkflows = config.UI.plate_workflows ? 
-      JSON.parse(config.UI.plate_workflows || '[]') : [];
-    const isPlateWorkflow = plateWorkflows.includes(workflowName);
-    
-    const zarrWorkflows = config.UI.zarr_workflows ? 
-      JSON.parse(config.UI.zarr_workflows || '[]') : [];
-    const isZarrWorkflow = zarrWorkflows.includes(workflowName);
-    
+    let isPlateWorkflow = false;
+    let isZarrWorkflow = false;
+
+    // Admin-configured overrides (zarr_workflows / plate_workflows lists)
+    if (config?.UI) {
+      const plateWorkflows = config.UI.plate_workflows ?
+        JSON.parse(config.UI.plate_workflows || '[]') : [];
+      const zarrWorkflows = config.UI.zarr_workflows ?
+        JSON.parse(config.UI.zarr_workflows || '[]') : [];
+      isPlateWorkflow = plateWorkflows.includes(workflowName);
+      isZarrWorkflow = zarrWorkflows.includes(workflowName);
+    }
+
+    // Schema-level flags auto-detected from the descriptor (bilayers)
+    const wfData = state.workflows?.find(w => w.name === workflowName);
+    isZarrWorkflow = isZarrWorkflow || (wfData?.metadata?.['requires-zarr'] ?? false);
+    isPlateWorkflow = isPlateWorkflow || (wfData?.metadata?.['requires-plate'] ?? false);
+
     return { isPlateWorkflow, isZarrWorkflow };
   };
   
@@ -100,6 +158,39 @@ const RunPanel = ({ onWorkflowError }) => {
     };
   };
 
+  const getWorkflowOutputDefaults = (workflow) => {
+    const outputs = workflow?.metadata?.outputs || [];
+    const hasCsvTableOutput = outputs.some((output) => {
+      const type = String(output?.type || "").toLowerCase();
+      if (!["measurement", "file"].includes(type)) return false;
+      const formats = Array.isArray(output?.format)
+        ? output.format
+        : (output?.format ? [output.format] : []);
+      return formats.map((fmt) => String(fmt).toLowerCase()).includes("csv");
+    });
+    // File annotation default: array/executable/any file (incl. .log)/non-csv measurement.
+    // .log outputs are now handled by the backend without double-attachment — the SLURM
+    // job log is excluded via skip_paths; workflow .log outputs attach normally.
+    const hasFileAnnotationOutput = outputs.some((output) => {
+      const type = String(output?.type || "").toLowerCase();
+      if (["array", "executable", "file"].includes(type)) return true;
+      if (type === "measurement") {
+        const formats = Array.isArray(output?.format)
+          ? output.format
+          : (output?.format ? [output.format] : []);
+        return !formats.map((f) => String(f).toLowerCase()).includes("csv");
+      }
+      return false;
+    });
+
+    return {
+      attachToOriginalImages: false,
+      importAsZip: false,  // Zip is opt-in only; no output type auto-enables it
+      uploadCsv: hasCsvTableOutput,
+      attachFileOutputs: hasFileAnnotationOutput,
+    };
+  };
+
   // Utility to beautify names
   const beautifyName = (name) => {
     return name
@@ -140,8 +231,14 @@ const RunPanel = ({ onWorkflowError }) => {
   });
 
   useEffect(() => {
-    setIsNextDisabled(state.formData?.IDs?.length === 0);
-  }, [state.formData?.IDs]);
+    setIsNextDisabled(state.formData?.IDs?.length === 0 || apiLoading);
+  }, [state.formData?.IDs, apiLoading]);
+
+  useEffect(() => {
+    setIsFileInputNextDisabled(
+      !isFileInputStepValid(state.selectedWorkflow?.metadata, state.formData)
+    );
+  }, [state.formData, state.selectedWorkflow?.metadata]);
 
   // Auto-switch to tab with results only when search term changes (not when user manually clicks tab)
   useEffect(() => {
@@ -177,6 +274,7 @@ const RunPanel = ({ onWorkflowError }) => {
         IDs: [], // Empty or default value
         Data_Type: "Image", // Backend expects "Image" (case sensitive)
         workflowMode: workflowMode, // Set based on workflow config, not tab
+        ...getWorkflowOutputDefaults(workflow),
       },
     });
     setDialogOpen(true); // Open the dialog
@@ -203,7 +301,22 @@ const RunPanel = ({ onWorkflowError }) => {
   };
 
   const submitWorkflow = (workflow_name) => {
-    runWorkflowData(workflow_name, state.formData, onWorkflowError);
+    const metadata = state.selectedWorkflow?.metadata;
+    const fileParams = getFileInputParams(metadata);
+
+    // Rekey file-attachment selections from `param.id` → `FILE_{param.id}` so
+    // the backend (analyzer_views) can recognise them and use rlong().
+    // The original keys are removed to avoid going through the generic wrap() path.
+    const params = { ...state.formData };
+    fileParams.forEach((param) => {
+      const ids = params[param.id];
+      delete params[param.id];
+      if (Array.isArray(ids) && ids.length > 0) {
+        params[`FILE_${param.id}`] = ids;   // keep as array; backend handles list
+      }
+    });
+
+    runWorkflowData(workflow_name, params, onWorkflowError);
   };
   
   // Helper function to determine if Input Options step should be skipped
@@ -376,8 +489,30 @@ const RunPanel = ({ onWorkflowError }) => {
                         title="View Container Image"
                         onClick={(e) => {
                           e.stopPropagation();
+                          const image = workflow.metadata["container-image"].image;
+                          // Version lives in githubUrl (e.g. /tree/v1.0.1), not in the image string
+                          const versionMatch = workflow.githubUrl?.match(/\/tree\/(v[\d.]+)/);
+                          const imageTag = versionMatch?.[1] || '';
+                          const tagsUrl = imageTag
+                            ? `https://hub.docker.com/r/${image}/tags?name=${imageTag}`
+                            : `https://hub.docker.com/r/${image}`;
+                          window.open(tagsUrl, "_blank", "noopener,noreferrer");
+                        }}
+                      />
+                    )}
+
+                    {/* DOI / Citation Icon */}
+                    {workflow.metadata?.citations?.find(c => c.doi) && (
+                      <Button
+                        icon="manual"
+                        minimal
+                        intent="primary"
+                        title={`View citation: ${workflow.metadata.citations.find(c => c.doi).name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const doi = workflow.metadata.citations.find(c => c.doi).doi;
                           window.open(
-                            `https://hub.docker.com/r/${workflow.metadata["container-image"].image}`,
+                            `https://doi.org/${doi}`,
                             "_blank",
                             "noopener,noreferrer"
                           );
@@ -388,7 +523,7 @@ const RunPanel = ({ onWorkflowError }) => {
                   </div>
 
                 {/* Description Section */}
-                <p className="text-sm text-gray-600">{workflow.description}</p>
+                <DescriptionWithToggle description={workflow.description} />
               </Card>
               );
               
@@ -546,8 +681,23 @@ const RunPanel = ({ onWorkflowError }) => {
             }
             nextButtonProps={{
               disabled: isNextDisabled,
+              icon: apiLoading ? <Spinner size={14} /> : undefined,
+              text: apiLoading ? "Loading images…" : "Next",
+              title: apiLoading ? "Wait for all images to finish loading" : undefined,
             }}
           />
+
+          {/* Conditionally show File Inputs step for workflows with non-image file params */}
+          {getFileInputParams(state.selectedWorkflow?.metadata).length > 0 && (
+            <DialogStep
+              id="step2b"
+              title="Attach Files"
+              panel={<WorkflowFileInputStep dialogBodyClassName="flex flex-col min-h-[75vh]" />}
+              nextButtonProps={{
+                disabled: isFileInputNextDisabled,
+              }}
+            />
+          )}
 
           {/* Conditionally show Input Options step */}
           {!shouldSkipInputOptions() && (

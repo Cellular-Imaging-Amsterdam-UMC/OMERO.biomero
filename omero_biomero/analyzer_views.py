@@ -10,7 +10,8 @@ import biomero.constants as constants
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from omeroweb.webclient.decorators import login_required
-from omero.rtypes import unwrap, rbool, wrap, rlong
+from omero.rtypes import unwrap, rbool, wrap, rlong, rlist
+import omero.model
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +142,7 @@ def run_workflow_script(request, conn=None, **kwargs):
         rename_enabled = params.get("enableRename", False)
         rename_pt = params.get("renamePattern", "")
         version = params.get("version")
+        attach_file_outputs = params.get("attachFileOutputs", False)
         # EXPERIMENTAL: ZARR format support
         use_zarr = params.get("useZarrFormat", False)
         # Always default to 0.4 so omero-cli-zarr doesn't fall back to 0.5 (Zarr v3)
@@ -176,12 +178,24 @@ def run_workflow_script(request, conn=None, **kwargs):
             "batchEnabled",   # Frontend flag (not sent to script)
             "batchCount",     # Frontend calculated (not sent to script)
             "batchSize",      # Converted to Batch_Size for script
+            "attachFileOutputs",  # Converted to workflow.OUTPUT_ATTACH_FILE_OUTPUTS
         ]
+        # File-attachment params arrive as FILE_{param_id}: int annotation ID.
+        # Must be rlong — wrap() would give rstring if the value is a string.
         inputs = {
             f"{workflow_name}_|_{key}": wrap(value)
             for key, value in params.items()
-            if key not in known_params
+            if key not in known_params and not key.startswith("FILE_")
         }
+        inputs.update({
+            f"{workflow_name}_|_FILE_{key[5:]}": (
+                rlist([rlong(int(v)) for v in value if v not in ('', None)])
+                if isinstance(value, list)
+                else rlong(int(value))
+            )
+            for key, value in params.items()
+            if key.startswith("FILE_") and value not in (None, '', [])
+        })
         inputs.update(
             {
                 workflow_name: rbool(True),
@@ -212,6 +226,7 @@ def run_workflow_script(request, conn=None, **kwargs):
                     wrap(rename_pt) if (rename_enabled and rename_pt) else wrap(workflow.NO)
                 ),
                 workflow.OUTPUT_CSV_TABLE: rbool(uploadcsv),
+                workflow.OUTPUT_ATTACH_FILE_OUTPUTS: rbool(attach_file_outputs),
             }
         )
         
@@ -259,9 +274,7 @@ def run_workflow_script(request, conn=None, **kwargs):
 @login_required()
 @require_http_methods(["GET"])
 def list_workflows(request, conn=None, **kwargs):
-    """
-    List available workflows using SlurmClient.
-    """
+    """GET /api/analyzer/workflows/ → {"workflows": [name, ...]}"""
     try:
         with SlurmClient.from_config(config_only=True) as sc:
             workflows = list(sc.slurm_model_images.keys())
@@ -275,29 +288,49 @@ def list_workflows(request, conn=None, **kwargs):
 @require_http_methods(["GET"])
 def get_workflow_metadata(request, conn=None, **kwargs):
     """
-    Get metadata for a specific workflow.
-    Also includes the GitHub repository URL for the workflow.
+    GET /api/analyzer/workflows/<name>/   → descriptor for a configured workflow.
+    GET /api/analyzer/workflows/?repo=URL → descriptor fetched directly from GitHub.
+
+    Returns the biomero-schema descriptor dict enriched with ``githubUrl``.
+    Results are cached for 1 hour (versioned URLs won't change within a version).
     """
-    # workflow_name = request.GET.get("workflow", None)
     workflow_name = kwargs.get("name")
-    if not workflow_name:
-        return JsonResponse({"error": "Workflow name is required"}, status=400)
+    repo_url = request.GET.get("repo", "").strip()
+
+    if not workflow_name and not repo_url:
+        return JsonResponse(
+            {"error": "Workflow name (URL segment) or ?repo= parameter required"},
+            status=400,
+        )
+
+    cache_key = f"workflow_metadata:{repo_url or workflow_name}"
+    no_cache = "no-cache" in request.headers.get("Cache-Control", "")
+    cached = None if no_cache else cache.get(cache_key)
+    if cached is not None:
+        response = JsonResponse(cached)
+        response["X-Cache"] = "HIT"
+        return response
 
     try:
         with SlurmClient.from_config(config_only=True) as sc:
-            if workflow_name not in sc.slurm_model_images:
-                return JsonResponse(
-                    {"error": "Workflow not found"}, status=404
-                )
-
-            metadata = sc.pull_descriptor_from_github(workflow_name)
-            github_url = sc.slurm_model_repos.get(workflow_name)
-    # Keep description/inputs at top-level for backward compatibility
-        enriched = {**metadata, "name": workflow_name, "githubUrl": github_url}
-        return JsonResponse(enriched)
+            if repo_url:
+                metadata = sc.generic_descriptor_from_github(repo_url)
+                enriched = {**metadata, "githubUrl": repo_url}
+            else:
+                if workflow_name not in sc.slurm_model_images:
+                    return JsonResponse(
+                        {"error": "Workflow not found"}, status=404
+                    )
+                metadata = sc.generic_descriptor_from_github(workflow_name)
+                github_url = sc.slurm_model_repos.get(workflow_name)
+                enriched = {**metadata, "name": workflow_name, "githubUrl": github_url}
+        cache.set(cache_key, enriched, 3600)
+        response = JsonResponse(enriched)
+        response["X-Cache"] = "MISS"
+        return response
     except Exception as e:
         logger.error(
-            f"Error fetching metadata for workflow {workflow_name}: {str(e)}"
+            f"Error fetching metadata for workflow {workflow_name or repo_url}: {str(e)}"
         )
         return JsonResponse({"error": str(e)}, status=500)
 
@@ -387,9 +420,11 @@ def get_workflows(request, conn=None, **kwargs):
 
 def prepare_workflow_parameters(workflow_name, params):
     """
-    Apply BIOMERO's exact type conversion logic to ensure correct parameter
-    types.
-    This reuses the same logic that BIOMERO uses in convert_cytype_to_omtype.
+    Coerce numeric workflow params to the correct Python type before wrap().
+
+    Blueprint's NumericInput can store a mid-edit string (e.g. "0.", "1.0")
+    in formData; wrap() would produce the wrong OMERO rtype for those.
+    int(float(val)) handles "1.0" -> 1 since int("1.0") raises ValueError.
     """
     try:
         # Get the workflow descriptor using SlurmClient
@@ -400,51 +435,55 @@ def prepare_workflow_parameters(workflow_name, params):
                 )
                 return params
 
-            metadata = sc.pull_descriptor_from_github(workflow_name)
+            metadata = sc.generic_descriptor_from_github(workflow_name)
     except Exception as e:
         logger.warning(
             f"Could not fetch workflow metadata for {workflow_name}: {e}"
         )
         return params
 
-    # Create a lookup for parameter types based on default values
-    # This replicates the exact logic from convert_cytype_to_omtype
-    param_type_map = {}
-    for input_param in metadata.get("inputs", []):
-        if input_param.get("type") == "Number":
-            param_id = input_param["id"]
-            default_val = input_param.get("default-value")
+    # File-attachment types must be routed as OMERO FileAnnotation IDs (rlong),
+    # not wrapped as generic values. Rename them to FILE_{key} so the
+    # inputs-construction block below picks them up via the rlong path.
+    _FILE_ATTACHMENT_TYPES = ('file', 'array', 'measurement', 'executable')
 
-            # BIOMERO rule: isinstance(default, float) determines the type
-            if isinstance(default_val, float):
-                param_type_map[param_id] = "float"
-            else:
-                param_type_map[param_id] = "int"
-
-    # Convert params to correct types
-    converted_params = {}
-    for key, value in params.items():
-        if key in param_type_map:
-            try:
-                if param_type_map[key] == "float":
-                    converted_params[key] = float(value)
+    # Coerce each param to the type declared in the descriptor
+    inputs_spec = metadata.get("inputs", [])
+    coerced = dict(params)
+    keys_to_rename = {}  # file-attachment params: old_key -> FILE_{old_key}
+    for inp in inputs_spec:
+        key = inp.get("id")
+        type_ = inp.get("type", "")
+        if key not in coerced:
+            continue
+        val = coerced[key]
+        # File-attachment params: mark for renaming; skip numeric coercion
+        if type_ in _FILE_ATTACHMENT_TYPES:
+            keys_to_rename[key] = f"FILE_{key}"
+            continue
+        try:
+            if type_ in ("integer", "Integer"):
+                coerced[key] = int(float(val))  # handle "1.0" -> 1
+            elif type_ in ("float", "Float"):
+                coerced[key] = float(val)
+            elif type_ in ("Number", "number"):
+                # Use the default-value's Python type to decide int vs float
+                default_val = inp.get("default-value")
+                if isinstance(default_val, float):
+                    coerced[key] = float(val)
                 else:
-                    converted_params[key] = int(
-                        float(value)
-                    )  # Handle string floats like "1.0" -> 1
-                logger.info(
-                    f"Converted {key}: {value} -> {converted_params[key]} "
-                    f"({param_type_map[key]})"
-                )
-            except (ValueError, TypeError):
-                logger.warning(
-                    f"Could not convert {key}={value} to {param_type_map[key]}"
-                )
-                converted_params[key] = value
+                    coerced[key] = int(float(val))
+        except (ValueError, TypeError) as coerce_err:
+            logger.warning(
+                f"Could not coerce param {key}={val!r} to {type_}: {coerce_err}"
+            )
         else:
-            converted_params[key] = value
-
-    return converted_params
+            logger.info(f"Converted {key}: {val!r} -> {coerced[key]!r} ({type_})")
+    # Apply file-attachment renames so downstream routing uses FILE_ prefix
+    for old_key, new_key in keys_to_rename.items():
+        coerced[new_key] = coerced.pop(old_key)
+        logger.info(f"Routing file-attachment param {old_key!r} -> {new_key!r} (will be sent as rlong IDs)")
+    return coerced
 
 
 @login_required()
@@ -540,23 +579,228 @@ def get_slurm_status(request, conn=None, **kwargs):
     except Exception as e:
         error_msg = str(e)
         logger.error(f"SLURM status check failed: {error_msg}", exc_info=True)
-        if "Can't find params" in error_msg or "NoValidConnectionsError" in error_msg:
+        if "NoValidConnectionsError" in error_msg or "Connection refused" in error_msg or "timed out" in error_msg.lower():
             status = {
-                "status": "offline", 
+                "status": "offline",
                 "message": "SLURM cluster is offline or unreachable",
                 "last_checked": datetime.datetime.now().isoformat(),
                 "icon": "error",
                 "intent": "danger",
                 "workflow_versions": {}
             }
+        elif "Can't find params" in error_msg or "ValidationException" in error_msg:
+            # Script crashed on load — SLURM may be fine but the script has an error
+            status = {
+                "status": "unknown",
+                "message": "Run-workflow script failed to load — check script logs for details",
+                "last_checked": datetime.datetime.now().isoformat(),
+                "icon": "warning-sign",
+                "intent": "warning",
+                "workflow_versions": {}
+            }
         else:
             status = {
                 "status": "unknown",
                 "message": f"SLURM status check failed: {error_msg}",
-                "last_checked": datetime.datetime.now().isoformat(), 
+                "last_checked": datetime.datetime.now().isoformat(),
                 "icon": "warning-sign",
                 "intent": "warning",
                 "workflow_versions": {}
             }
     
     return JsonResponse(status)
+
+
+@login_required()
+@require_http_methods(["GET"])
+def get_attachments(request, conn=None, **kwargs):
+    """
+    Return OMERO file annotations (attachments) accessible to the current user.
+
+    Query params:
+        format   (repeatable) — filter by file extension, e.g. ?format=csv&format=parquet
+        search   — substring match on file name (case-insensitive)
+        group    — OMERO group ID to query in; defaults to the user's active group
+
+    Response shape:
+        {
+            "attachments": [
+                {
+                    "id": 42,
+                    "name": "measurements.csv",
+                    "size": 1234,
+                    "mimetype": "text/csv",
+                    "extension": "csv",
+                    "parents": [
+                        {"type": "Image", "id": 7, "name": "my_image.tif"}
+                    ]
+                },
+                ...
+            ]
+        }
+    """
+    formats = [f.lower() for f in request.GET.getlist("format") if f]
+    search = (request.GET.get("search") or "").strip().lower()
+    group_id = request.GET.get("group")
+
+    try:
+        if group_id is not None:
+            try:
+                conn.setGroupForSession(int(group_id))
+            except Exception as e:
+                logger.warning(f"get_attachments: could not switch to group {group_id}: {e}")
+
+        # listFileAnnotations() uses loadSpecifiedAnnotations which:
+        # - loads OriginalFile objects (so getName/getSize work without lazy loading)
+        # - excludes companion files and original metadata by default
+        # - respects the current group session set above
+        filtered = []
+        for ann in conn.listFileAnnotations():
+            orig_file = ann.getFile()
+            if orig_file is None:
+                continue
+
+            name = orig_file.getName() or ""
+            ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+
+            if formats and ext not in formats:
+                continue
+            if search and search not in name.lower():
+                continue
+
+            filtered.append(ann)
+
+        if not filtered:
+            return JsonResponse({"attachments": []})
+
+        # Bulk-fetch parent links using conn.getAnnotationLinks() — the built-in
+        # omero-py gateway method that properly passes SERVICE_OPTS (including group
+        # context) and wraps IDs as rlong. One call per object type.
+        ann_ids = [ann.getId() for ann in filtered]
+        parent_map = {}   # ann_id -> [{"type": ..., "id": ..., "name": ...}]
+        linked_by_map = {}  # ann_id -> full name of the person who created the first link found
+
+        for obj_type in ("Image", "Dataset", "Project", "Plate", "Screen"):
+            try:
+                for link in conn.getAnnotationLinks(obj_type, ann_ids=ann_ids):
+                    child = link.getChild()
+                    parent = link.getParent()
+                    if child is None or parent is None:
+                        continue
+                    cid = child.getId()
+                    parent_map.setdefault(cid, []).append({
+                        "type": obj_type,
+                        "id": parent.getId(),
+                        "name": parent.getName() or "",
+                    })
+                    if cid not in linked_by_map:
+                        lowner = link.getOwner()
+                        linked_by_map[cid] = lowner.getFullName() if lowner else None
+            except Exception:
+                pass  # object type may not expose annotation links
+
+        attachments = []
+        for ann in filtered:
+            orig_file = ann.getFile()
+            name = orig_file.getName() or ""
+            ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+            ann_id = ann.getId()
+            ann_date = ann.getDate()
+            ann_owner = ann.getOwner()
+            attachments.append({
+                "id": ann_id,
+                "file_id": orig_file.getId(),
+                "name": name,
+                "size": orig_file.getSize(),
+                "mimetype": orig_file.getMimetype() or "",
+                "extension": ext,
+                "ns": ann.getNs() or "",
+                "description": ann.getDescription() or "",
+                "date": ann_date.isoformat() if ann_date else None,
+                "owner": ann_owner.getFullName() if ann_owner else None,
+                "linked_by": linked_by_map.get(ann_id),
+                "parents": parent_map.get(ann_id, []),
+            })
+
+        return JsonResponse({"attachments": attachments})
+
+    except Exception as e:
+        logger.exception("get_attachments failed")
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@login_required()
+@require_http_methods(["GET"])
+def get_object_annotations(request, conn=None, **kwargs):
+    """
+    Return file annotations attached to a specific OMERO object.
+    Used by the "By Parent" tree browser to lazily load annotations per node.
+
+    Query params:
+        object_type  — one of: Project, Dataset, Image, Plate, Screen
+        object_id    — integer ID of the object
+
+    Response shape:
+        {"annotations": [{"id", "name", "size", "mimetype", "extension"}, ...]}
+    """
+    ALLOWED_TYPES = {"Project", "Dataset", "Image", "Plate", "Screen"}
+
+    object_type = (request.GET.get("object_type") or "").strip()
+    if object_type not in ALLOWED_TYPES:
+        return JsonResponse({"error": f"Invalid object_type. Must be one of: {', '.join(sorted(ALLOWED_TYPES))}"}, status=400)
+
+    try:
+        object_id = int(request.GET.get("object_id", ""))
+    except (ValueError, TypeError):
+        return JsonResponse({"error": "object_id must be an integer"}, status=400)
+
+    try:
+        obj = conn.getObject(object_type, object_id)
+        if obj is None:
+            return JsonResponse({"error": f"{object_type} {object_id} not found"}, status=404)
+
+        annotations = []
+        for ann in obj.listAnnotations():
+            # Only file annotations
+            if ann.OMERO_TYPE != omero.model.FileAnnotationI:
+                continue
+            orig_file = ann.getFile()
+            if orig_file is None:
+                continue
+            name = orig_file.getName() or ""
+            ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+            ann_date = ann.getDate()
+            ann_owner = ann.getOwner()
+            annotations.append({
+                "id": ann.getId(),
+                "file_id": orig_file.getId(),
+                "name": name,
+                "size": orig_file.getSize(),
+                "mimetype": orig_file.getMimetype() or "",
+                "extension": ext,
+                "ns": ann.getNs() or "",
+                "description": ann.getDescription() or "",
+                "date": ann_date.isoformat() if ann_date else None,
+                "owner": ann_owner.getFullName() if ann_owner else None,
+            })
+
+        # Enrich with linked_by from annotation links
+        if annotations:
+            ann_ids_list = [a["id"] for a in annotations]
+            linked_by_map = {}
+            try:
+                for link in conn.getAnnotationLinks(object_type, ann_ids=ann_ids_list):
+                    child = link.getChild()
+                    if child and child.getId() not in linked_by_map:
+                        lowner = link.getOwner()
+                        linked_by_map[child.getId()] = lowner.getFullName() if lowner else None
+            except Exception:
+                pass
+            for a in annotations:
+                a["linked_by"] = linked_by_map.get(a["id"])
+
+        return JsonResponse({"annotations": annotations})
+
+    except Exception as e:
+        logger.exception("get_object_annotations failed")
+        return JsonResponse({"error": str(e)}, status=500)

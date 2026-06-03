@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ProgressBar, Spinner, Icon, Tooltip, Intent, Button } from "@blueprintjs/core";
 import { fetchSlurmStatus } from "../../apiService";
 import { useAppContext } from "../../AppContext";
 
 const SlurmStatusIndicator = ({ onTabChange, onWorkflowError }) => {
   const { updateState } = useAppContext();
+  // Store the tab value present on mount so the tab-change effect can ignore it
+  const initialTabRef = useRef(null);
   const [status, setStatus] = useState({
     status: "checking",
     message: "Checking SLURM status...",
@@ -61,14 +63,14 @@ const SlurmStatusIndicator = ({ onTabChange, onWorkflowError }) => {
 
   // Check on mount and when Run tab is accessed
   useEffect(() => {
+    initialTabRef.current = onTabChange; // record tab value at mount
     checkStatus();
   }, []);
 
-  // React to tab changes
+  // React to tab changes — skip if this is the same value that was present on mount
   useEffect(() => {
-    if (onTabChange === 'Run') {
-      checkStatus();
-    }
+    if (onTabChange === initialTabRef.current) return; // same as mount value, already handled
+    if (onTabChange === 'Run') checkStatus();
   }, [onTabChange]);
 
   // React to workflow submission errors
