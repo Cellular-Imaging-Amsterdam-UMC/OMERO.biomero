@@ -458,7 +458,8 @@ export const importUploadedFile = async (
     group,
     groupId,
   });
-  
+};
+
 export const fetchPlateGridData = async (plateId) => {
   try {
     // Use the same endpoint as OMERO webclient for plate grid data
