@@ -8,11 +8,12 @@ import {
   MenuItem,
   Tag,
   Icon,
+  Switch,
 } from "@blueprintjs/core";
 import { Select } from "@blueprintjs/select";
 
 const AdminPanel = () => {
-  const { state, saveGroupMappings } = useAppContext();
+  const { state, saveGroupMappings, loadBiomeroConfig, saveConfigData } = useAppContext();
   const [folderMappings, setFolderMappings] = useState(state.groupFolderMappings || {});
   
   // Update local state when global state changes
@@ -20,8 +21,40 @@ const AdminPanel = () => {
     setFolderMappings(state.groupFolderMappings || {});
   }, [state.groupFolderMappings]);
 
+  React.useEffect(() => {
+    loadBiomeroConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [selectedGroup, setSelectedGroup] = useState("");
   const [selectedFolder, setSelectedFolder] = useState("");
+
+  const uploaderEnabled = state.config?.UPLOADER?.enabled === true || state.config?.UPLOADER?.enabled === "True";
+  const uploadToGroupFolderEnabled =
+    state.config?.UPLOADER?.upload_to_group_folder === true ||
+    state.config?.UPLOADER?.upload_to_group_folder === "True";
+
+  const saveUploaderConfig = async (updates) => {
+    const newConfig = {
+      ...state.config,
+      UPLOADER: {
+        ...state.config?.UPLOADER,
+        ...updates,
+      },
+    };
+    await saveConfigData(newConfig);
+    loadBiomeroConfig();
+  };
+
+  const handleUploaderToggle = async () => {
+    await saveUploaderConfig({ enabled: !uploaderEnabled });
+  };
+
+  const handleUploadToGroupFolderToggle = async () => {
+    await saveUploaderConfig({
+      upload_to_group_folder: !uploadToGroupFolderEnabled,
+    });
+  };
 
   // Create items array for folder select
   const folderItems = state.localFileTreeData ? 
@@ -94,6 +127,29 @@ const AdminPanel = () => {
     <div className="h-full overflow-y-auto p-4">
       <H4>Admin Settings</H4>
       
+      <Card elevation={Elevation.TWO} className="mt-4 max-w-[800px]">
+        <h3 className="text-lg font-semibold mb-4">General Settings</h3>
+        <Switch
+          checked={uploaderEnabled}
+          label="Enable Web Uploader"
+          onChange={handleUploaderToggle}
+          large={true}
+        />
+        <Switch
+          checked={uploadToGroupFolderEnabled}
+          label="Upload to group folder"
+          onChange={handleUploadToGroupFolderToggle}
+          large={true}
+          className="mt-4"
+        />
+        <div className="text-gray-500 text-sm mt-2">
+          When enabled, the "Upload images" tab will be visible to all users.
+        </div>
+        <div className="text-gray-500 text-sm mt-2">
+          When enabled, uploaded files are assembled under the active group's mapped folder in uploads/username instead of the shared uploader destination.
+        </div>
+      </Card>
+
       <Card elevation={Elevation.TWO} className="mt-4 max-w-[800px]">
         <h3 className="text-lg font-semibold mb-4">Group Folder Mappings</h3>
         

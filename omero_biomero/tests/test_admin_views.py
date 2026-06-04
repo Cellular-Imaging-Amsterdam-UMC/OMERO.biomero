@@ -198,6 +198,42 @@ class AdminConfigTests(TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertIn("Invalid configuration format", json.loads(resp.content)["error"])
 
+    def test_post_uploader_settings_saved_to_json_config(self):
+        SlurmClient = sys.modules["biomero"].SlurmClient
+        cfg_path = Path(self._create_tempfile("[GENERAL]\nfoo=bar\n"))
+        json_cfg = self._tmpdir / "biomero-config.json"
+
+        class StubSlurm:
+            _DEFAULT_CONFIG_PATH_1 = "unused"
+            _DEFAULT_CONFIG_PATH_2 = "unused"
+            _DEFAULT_CONFIG_PATH_3 = str(cfg_path)
+
+        with patch("omero_biomero.admin_views.SlurmClient", StubSlurm), patch(
+            "omero_biomero.admin_views.CONFIG_FILE_PATH", str(json_cfg)
+        ):
+            payload = {
+                "config": {
+                    "UPLOADER": {
+                        "enabled": True,
+                        "upload_to_group_folder": True,
+                    }
+                }
+            }
+            request = SimpleNamespace(method="POST", body=json.dumps(payload).encode())
+            view = _raw_admin_config()
+            resp = view(request, conn=_fake_conn())
+
+            self.assertEqual(resp.status_code, 200)
+            self.assertTrue(json_cfg.exists())
+            saved = json.loads(json_cfg.read_text())
+            self.assertEqual(
+                saved["UPLOADER"],
+                {
+                    "enabled": True,
+                    "upload_to_group_folder": True,
+                },
+            )
+
     # Helper to create temporary files in the per-test directory
     def _create_tempfile(self, content: str) -> str:
         f = self._tmpdir / "temp.ini"

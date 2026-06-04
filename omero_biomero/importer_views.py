@@ -14,21 +14,63 @@ from biomero_importer.utils.ingest_tracker import (
 )
 
 from .settings import (
+    CONFIG_FILE_PATH,
     SUPPORTED_FILE_EXTENSIONS,
     EXTENSION_TO_FILE_BROWSER,
     FILE_OR_EXTENSION_PATTERNS_EXCLUSIVE,
     PREPROCESSING_EXTENSION_MAP,
+    UPLOADER_NESTED_FILE_EXTENSIONS,
     FOLDER_EXTENSIONS_NON_BROWSABLE,
     BASE_DIR,
     PREPROCESSING_CONFIG,
-    CONFIG_FILE_PATH,
+    GROUP_MAPPINGS_FILE_PATH,
+    UPLOADER_DESTINATION_DIR,
 )
-from .utils import build_extra_params
+from .utils import (
+    build_extra_params,
+    get_uploaded_file_candidates,
+    get_all_group_mappings,
+)
+from .leica_file_browser.ci_leica_converters_helpers import extract_nested_leica_items
 
 logger = logging.getLogger(__name__)
 
 
 _INGEST_INITIALIZED = False
+
+
+def expand_nested_selected_items(selected_items):
+    """Expand a single selected Leica container into per-image items."""
+    if len(selected_items) != 1:
+        return selected_items
+
+    selected_item = selected_items[0]
+    if isinstance(selected_item, dict):
+        local_path = selected_item.get("localPath")
+        existing_uuid = selected_item.get("uuid")
+    else:
+        local_path = selected_item
+        existing_uuid = None
+
+    if not local_path or existing_uuid:
+        return selected_items
+
+    file_ext = os.path.splitext(local_path)[1].lower()
+    if file_ext not in UPLOADER_NESTED_FILE_EXTENSIONS:
+        return selected_items
+
+    absolute_path = os.path.abspath(os.path.join(BASE_DIR, local_path))
+    nested_items = extract_nested_leica_items(absolute_path)
+    if not nested_items:
+        return selected_items
+
+    return [
+        {
+            "localPath": local_path,
+            "uuid": nested_item["uuid"],
+        }
+        for nested_item in nested_items
+    ]
 
 
 def initialize_biomero_importer():
@@ -323,21 +365,7 @@ def group_mappings(request, conn=None, **kwargs):
     """GET returns current group mappings; POST updates them (admin only)."""
     try:
         if request.method == "GET":
-            mappings = {}
-            if os.path.exists(CONFIG_FILE_PATH):
-                try:
-                    with open(CONFIG_FILE_PATH, "r") as f:
-                        data = json.load(f) or {}
-                    if isinstance(data, dict):
-                        gm = data.get("group_mappings")
-                        if isinstance(gm, dict):
-                            mappings = gm
-                except Exception:
-                    logger.warning(
-                        "Failed reading group mappings from %s",
-                        CONFIG_FILE_PATH,
-                        exc_info=True,
-                    )
+            mappings = get_all_group_mappings()
             return JsonResponse({"mappings": mappings})
 
         # POST
@@ -360,19 +388,21 @@ def group_mappings(request, conn=None, **kwargs):
             return JsonResponse({"error": "'mappings' must be an object"}, status=400)
 
         existing = {}
-        if os.path.exists(CONFIG_FILE_PATH):
+        if os.path.exists(GROUP_MAPPINGS_FILE_PATH):
             try:
-                with open(CONFIG_FILE_PATH, "r") as f:
+                with open(GROUP_MAPPINGS_FILE_PATH, "r") as f:
                     existing = json.load(f) or {}
                 if not isinstance(existing, dict):
                     existing = {}
             except Exception:
                 existing = {}
 
-        existing["group_mappings"] = mappings
+        # The whole file is just mappings now
+        existing = mappings
+
         # Ensure parent directory exists (handle cases where path includes
         # ~ which we expanded earlier).
-        config_dir = os.path.dirname(CONFIG_FILE_PATH)
+        config_dir = os.path.dirname(GROUP_MAPPINGS_FILE_PATH)
         if config_dir and not os.path.exists(config_dir):
             try:
                 os.makedirs(config_dir, exist_ok=True)
@@ -387,7 +417,7 @@ def group_mappings(request, conn=None, **kwargs):
                     status=500,
                 )
         try:
-            with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+            with open(GROUP_MAPPINGS_FILE_PATH, "w", encoding="utf-8") as f:
                 json.dump(existing, f, indent=2)
         except Exception as e:
             logger.error("Failed writing group mappings: %s", e)
@@ -405,6 +435,8 @@ def process_files(selected_items, selected_destinations, group, username):
     Process selected files & destinations to create upload orders with
     appropriate preprocessing.
     """
+    selected_items = expand_nested_selected_items(selected_items)
+
     # Group files by preprocessing config
     files_by_preprocessing = defaultdict(list)
 
@@ -537,3 +569,159 @@ def process_files(selected_items, selected_destinations, group, username):
 def create_upload_order(order_dict):
     # Log the new order using the original attributes.
     log_ingestion_step(order_dict, STAGE_NEW_ORDER)
+
+
+@login_required()
+@require_http_methods(["POST"])
+def import_uploaded_file(request, conn=None, **kwargs):
+    """
+    Trigger import for a file uploaded via TUS.
+
+    Files are stored either in per-user subdirectories under
+    UPLOADER_DESTINATION_DIR or, when configured, inside the active group's
+    mapped folder under uploads/<username>/.
+    """
+    initialize_biomero_importer()
+
+    try:
+        data = json.loads(request.body)
+        filename = data.get("filename")
+        dataset_id = data.get("datasetId")
+        dataset_type = data.get("datasetType", "Dataset")
+        selected_group = data.get("group")
+        selected_group_id = data.get("groupId")
+
+        if not filename:
+            return JsonResponse({"error": "No filename provided"}, status=400)
+        if not dataset_id:
+            return JsonResponse({"error": "No dataset ID provided"}, status=400)
+
+        # Get user info
+        current_user = conn.getUser()
+        user_id = current_user.getId()
+        username = current_user.getName()
+
+        # Validate group if provided, else use current context
+        resolved_group_id = None
+        groups_member_of = list(conn.getGroupsMemberOf())
+
+        if selected_group_id not in (None, ""):
+            try:
+                selected_group_id = int(selected_group_id)
+            except (TypeError, ValueError):
+                return JsonResponse({"error": "Invalid groupId provided"}, status=400)
+
+            group_match = next(
+                (
+                    group
+                    for group in groups_member_of
+                    if group.getId() == selected_group_id
+                ),
+                None,
+            )
+            if group_match is None:
+                return JsonResponse(
+                    {"error": f"User is not a member of group ID: {selected_group_id}"},
+                    status=403,
+                )
+            resolved_group_id = group_match.getId()
+            selected_group = group_match.getName()
+            conn.setGroupForSession(resolved_group_id)
+        elif selected_group:
+            available_groups = [g.getName() for g in groups_member_of]
+            if selected_group not in available_groups:
+                return JsonResponse(
+                    {"error": f"User is not a member of group: {selected_group}"},
+                    status=403,
+                )
+            for group in groups_member_of:
+                if group.getName() == selected_group:
+                    resolved_group_id = group.getId()
+                    conn.setGroupForSession(resolved_group_id)
+                    break
+        else:
+            current_group = conn.getGroupFromContext()
+            if current_group is not None:
+                selected_group = current_group.getName()
+                resolved_group_id = current_group.getId()
+            if resolved_group_id is None:
+                for group in groups_member_of:
+                    if selected_group and group.getName() == selected_group:
+                        resolved_group_id = group.getId()
+                        break
+
+        candidate_paths = get_uploaded_file_candidates(
+            filename,
+            user_id,
+            username=username,
+            group_id=resolved_group_id,
+            base_dir=BASE_DIR,
+            config_file_path=CONFIG_FILE_PATH,
+            group_mappings_file_path=GROUP_MAPPINGS_FILE_PATH,
+            uploader_destination_dir=UPLOADER_DESTINATION_DIR,
+        )
+        file_path = next(
+            (path for path in candidate_paths if os.path.exists(path)), None
+        )
+
+        if file_path is None:
+            return JsonResponse({"error": f"File not found: {filename}"}, status=404)
+
+        # Verify user has write access to the target dataset
+        if dataset_type == "Dataset":
+            dataset = conn.getObject("Dataset", dataset_id)
+            if dataset is None:
+                return JsonResponse(
+                    {"error": f"Dataset {dataset_id} not found or not accessible"},
+                    status=404,
+                )
+            # Check if user can link (add images) to this dataset
+            if not dataset.canLink():
+                return JsonResponse(
+                    {
+                        "error": f"You do not have permission to import to dataset {dataset_id}"
+                    },
+                    status=403,
+                )
+        elif dataset_type == "Project":
+            project = conn.getObject("Project", dataset_id)
+            if project is None:
+                return JsonResponse(
+                    {"error": f"Project {dataset_id} not found or not accessible"},
+                    status=404,
+                )
+            # Check if user can link (add datasets) to this project
+            if not project.canLink():
+                return JsonResponse(
+                    {
+                        "error": f"You do not have permission to import to project {dataset_id}"
+                    },
+                    status=403,
+                )
+
+        # Log the import attempt
+        logger.info(
+            f"User {username} (ID: {current_user.getId()}, group: {selected_group}) "
+            f"attempting to import uploaded file {filename}"
+        )
+
+        # Prepare arguments for process_files
+        # We pass the absolute path. process_files uses os.path.join(BASE_DIR, path),
+        # but os.path.join handles absolute paths correctly (ignoring BASE_DIR).
+        selected_items = [file_path]
+        selected_destinations = [[dataset_type, dataset_id]]
+
+        process_files(selected_items, selected_destinations, selected_group, username)
+
+        return JsonResponse(
+            {
+                "status": "success",
+                "message": f"Successfully queued {filename} for import",
+            }
+        )
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON data"}, status=400)
+    except Exception as e:
+        logger.error(f"Import uploaded file error: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)

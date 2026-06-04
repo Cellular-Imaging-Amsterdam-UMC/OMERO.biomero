@@ -11,6 +11,7 @@ from .utils import (
 )
 from .settings import (
     BASE_DIR,
+    UPLOADER_ALLOWED_FILE_EXTENSIONS,
 )
 
 logger = logging.getLogger(__name__)
@@ -87,5 +88,6 @@ def biomero(request, conn=None, **kwargs):
         "app_name": "biomero",
         "importer_enabled": importer_enabled,
         "analyzer_enabled": analyzer_enabled,
+        "uploader_allowed_file_extensions": UPLOADER_ALLOWED_FILE_EXTENSIONS,
     }
     return context

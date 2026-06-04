@@ -35,7 +35,7 @@
         }
     };
     var WEBCLIENT = {};
-    WEBCLIENT.USER = {'id': {{ ome.user.id }}, 'fullName': "{{ ome.user.getFullName }}"};
+    WEBCLIENT.USER = {'id': {{ ome.user.id }}, 'fullName': "{{ ome.user.getFullName }}", 'username': "{{ user_name }}"};
     WEBCLIENT.active_user = {'id': {{ ome.active_user }}, 'fullName': "{{ active_user.getFullName }}"};
     WEBCLIENT.member_of_groups = {{ member_of_groups|json_dumps|safe }};
     WEBCLIENT.isAdmin = {% if ome.user.isAdmin %}true{% else %}false{% endif %};
@@ -84,6 +84,7 @@
     WEBCLIENT.UI.TREE.type_order = "{{ui.tree.type_order}}".toLowerCase().split(",").filter(function(e){return e});
     WEBCLIENT.UI.IMPORTER_ENABLED = {{ importer_enabled|yesno:"true,false" }};
     WEBCLIENT.UI.ANALYZER_ENABLED = {{ analyzer_enabled|yesno:"true,false" }};
+    WEBCLIENT.UI.UPLOADER_ALLOWED_FILE_EXTENSIONS = {{ uploader_allowed_file_extensions|json_dumps|safe }};
 
 
     {% if page_size %}

@@ -7,6 +7,11 @@ EXTENSION_TO_FILE_BROWSER = {
     ".xlef": read_leica_file,
 }
 
+UPLOADER_NESTED_FILE_EXTENSIONS = [
+    ".lif",
+    ".xlef",
+]
+
 # FILE_OR_EXTENSION_PATTERNS_EXCLUSIVE defines patterns that, when
 # present in a directory, cause ONLY that matching file to be shown while
 # every other sibling entry (files & folders) is hidden from the UI.
@@ -42,7 +47,11 @@ FOLDER_EXTENSIONS_NON_BROWSABLE = [
 BASE_DIR = os.getenv("IMPORT_MOUNT_PATH", "/data")
 
 CONFIG_FILE_PATH = os.path.expanduser(
-    os.getenv("OMERO_BIOMERO_CONFIG_FILE", "~/.biomero/config.json")
+    os.getenv("OMERO_BIOMERO_CONFIG_FILE", "~/.biomero/biomero-config.json")
+)
+
+GROUP_MAPPINGS_FILE_PATH = os.path.expanduser(
+    os.getenv("OMERO_BIOMERO_GROUP_MAPPINGS_FILE", "~/.biomero/group-mappings.json")
 )
 
 
@@ -278,3 +287,21 @@ SUPPORTED_FILE_EXTENSIONS = [
     ".zfr",
     ".zvi",
 ]
+
+UPLOADER_ALLOWED_FILE_EXTENSIONS = [
+    ext for ext in SUPPORTED_FILE_EXTENSIONS if ext != ".xlef"
+]
+
+# Uploader settings
+# Directory where intermediate chunks are stored
+UPLOADER_CHUNKS_DIR = os.getenv("UPLOADER_CHUNKS_DIR", os.path.join(BASE_DIR, "tus_upload"))
+# Directory where the final file is assembled
+UPLOADER_DESTINATION_DIR = os.getenv(
+    "UPLOADER_DESTINATION_DIR", os.path.join(BASE_DIR, "tus_destination")
+)
+# How to name the file if it already exists
+TUS_FILE_NAME_FORMAT = "increment"
+# What to do if the file exists (we use error to let the uploader handle it or increment to avoid overwrite)
+# Actually, if we use 'increment' for format, we might not need this, but let's stick to defaults or safe options.
+# django-tus docs say TUS_EXISTING_FILE defaults to 'error'.
+TUS_EXISTING_FILE = "error"

@@ -3,6 +3,7 @@ export const getDjangoConstants = () => {
   const user = {
     USER: WEBCLIENT.USER,
     active_user: WEBCLIENT.active_user,
+    username: WEBCLIENT.USER.username,
     member_of_groups: WEBCLIENT.member_of_groups,
     isAdmin: WEBCLIENT.isAdmin,
     CAN_CREATE: WEBCLIENT.CAN_CREATE,
@@ -44,6 +45,7 @@ export const getDjangoConstants = () => {
     api_get_folder_contents: "/omero_biomero/api/importer/get_folder_contents/",
     api_group_mappings: "/omero_biomero/api/importer/group_mappings/",
     api_import_selected: "/omero_biomero/api/importer/import_selected/",
+    api_import_uploaded_file: "/omero_biomero/api/importer/import_uploaded_file/",
     workflows: "/omero_biomero/api/analyzer/workflows/",
     workflow_metadata: "/omero_biomero/api/analyzer/workflows/_/",
     api_config: "/omero_biomero/api/biomero/admin/config/",
@@ -57,6 +59,8 @@ export const getDjangoConstants = () => {
   const ui = {
     importer_enabled: WEBCLIENT.UI.IMPORTER_ENABLED,
     analyzer_enabled: WEBCLIENT.UI.ANALYZER_ENABLED,
+    uploader_allowed_file_extensions:
+      WEBCLIENT.UI.UPLOADER_ALLOWED_FILE_EXTENSIONS || [],
   };
 
   return { user, urls, ui };

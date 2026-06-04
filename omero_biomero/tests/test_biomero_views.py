@@ -79,6 +79,8 @@ class BiomeroViewTests(TestCase):
         self.assertFalse(ctx["analyzer_enabled"])  # false parsed
         self.assertEqual(ctx["main_js"], "hashed-main.js")
         self.assertEqual(ctx["main_css"], "hashed-main.css")
+        self.assertIn(".lif", ctx["uploader_allowed_file_extensions"])
+        self.assertNotIn(".xlef", ctx["uploader_allowed_file_extensions"])
         self.assertIsInstance(ctx["metabase_token_monitor_workflows"], str)
         self.assertIsInstance(ctx["metabase_token_imports"], str)
         decoded = jwt.decode(

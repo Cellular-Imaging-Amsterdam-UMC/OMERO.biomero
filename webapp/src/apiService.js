@@ -9,10 +9,21 @@ export const apiRequest = async (
   options = {}
 ) => {
   try {
+    // Include CSRF token for methods that modify data
+    const csrfToken = window.csrftoken;
+    const headers = options.headers || {};
+    if (
+      ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase()) &&
+      csrfToken
+    ) {
+      headers["X-CSRFToken"] = csrfToken;
+    }
+
     const response = await axios({
       url: `${window.location.origin}${endpoint}`,
       method,
       data,
+      headers,
       ...options,
     });
     return response.data;
@@ -244,9 +255,9 @@ export const runWorkflow = async (workflowName, params = {}) => {
     const csrfToken = window.csrftoken;
 
     // Prepare the payload with script_name and optional params
-  const payload = { workflow_name: workflowName, params };
-  const endpoint = `${urls.api_run_workflow}${workflowName}/jobs/`;
-  const response = await apiRequest(endpoint, "POST", payload, {
+    const payload = { workflow_name: workflowName, params };
+    const endpoint = `${urls.api_run_workflow}${workflowName}/jobs/`;
+    const response = await apiRequest(endpoint, "POST", payload, {
       headers: {
         "X-CSRFToken": csrfToken, // Include CSRF token in request headers
       },
@@ -425,6 +436,29 @@ export const fetchPlateImages = async (plateId) => {
   return allImages;
 };
 
+export const importUploadedFile = async (
+  filename,
+  datasetId,
+  datasetType,
+  group,
+  groupId
+) => {
+  const { urls } = getDjangoConstants();
+  console.log("importUploadedFile calling:", urls.api_import_uploaded_file, {
+    filename,
+    datasetId,
+    datasetType,
+    group,
+    groupId,
+  });
+  return apiRequest(urls.api_import_uploaded_file, "POST", {
+    filename,
+    datasetId,
+    datasetType,
+    group,
+    groupId,
+  });
+  
 export const fetchPlateGridData = async (plateId) => {
   try {
     // Use the same endpoint as OMERO webclient for plate grid data

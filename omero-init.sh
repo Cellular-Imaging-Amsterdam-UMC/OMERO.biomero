@@ -7,6 +7,7 @@ CONTAINER_NAME="nl-biomero-omeroweb-1"
 # Command to execute inside the container
 # COMMAND1="/usr/local/bin/entrypoint.sh"
 COMMAND0="chmod a+w /opt/omero/web/OMERO.web/var/static"
+COMMAND0B="git config --global --add safe.directory /opt/omero/web/OMERO.biomero"
 
 COMMAND1="/opt/omero/web/venv3/bin/python -m pip install --no-cache-dir -e /opt/omero/web/OMERO.biomero --force-reinstall --no-deps ; /opt/omero/web/venv3/bin/python -m pip install --no-cache-dir --force-reinstall 'biomero-schema @ git+https://github.com/BioImageTools/biomero-schema.git@dev-bilayers' 'biomero @ git+https://github.com/NL-BioImaging/biomero.git@dev-bilayers'"
 COMMAND2="/opt/omero/web/venv3/bin/omero-biomero-setup"
@@ -15,6 +16,7 @@ COMMAND3="/opt/omero/web/venv3/bin/omero web stop || true; rm -f /opt/omero/web/
 COMMAND4="/opt/omero/web/OMERO.biomero/startup.sh"
 
 docker exec --user root "$CONTAINER_NAME" sh -c "$COMMAND0"
+docker exec --user root "$CONTAINER_NAME" sh -c "$COMMAND0B"
 docker exec --user root "$CONTAINER_NAME" sh -c "$COMMAND1"
 docker exec --user root "$CONTAINER_NAME" sh -c "$COMMAND2"
 docker exec --user omero-web "$CONTAINER_NAME" sh -c "$COMMAND3"
