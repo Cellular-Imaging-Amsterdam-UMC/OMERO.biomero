@@ -26,9 +26,14 @@ from .utils import get_upload_storage_dir
 logger = logging.getLogger(__name__)
 
 
+def ensure_chunk_directory():
+    """Ensure the temporary chunk storage directory exists."""
+    Path(UPLOADER_CHUNKS_DIR).mkdir(parents=True, exist_ok=True)
+
+
 def ensure_directories():
     """Ensure TUS directories exist."""
-    Path(UPLOADER_CHUNKS_DIR).mkdir(parents=True, exist_ok=True)
+    ensure_chunk_directory()
     Path(UPLOADER_DESTINATION_DIR).mkdir(parents=True, exist_ok=True)
 
 
@@ -160,7 +165,7 @@ class TusUploadView(View):
         if auth_error:
             return auth_error
 
-        ensure_directories()
+        ensure_chunk_directory()
 
         # Store the user ID with the upload for later verification
         user_id = self._get_user_id(request)

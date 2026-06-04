@@ -311,6 +311,21 @@ class TusOwnershipTests(TusViewsTestCase):
 
 
 class TusDestinationTests(TusViewsTestCase):
+    def test_create_upload_does_not_require_shared_destination_when_group_folder_enabled(self):
+        self._write_uploader_config(upload_to_group_folder=True)
+        shutil.rmtree(self.tmp_dest_dir)
+
+        resource_id = self._create_upload(
+            filename="grouped.tif",
+            size=4,
+            user_id=123,
+            metadata={"groupId": "17", "username": "alice"},
+        )
+
+        self.assertIsNotNone(resource_id)
+        self.assertTrue(os.path.isdir(self.tmp_upload_dir))
+        self.assertFalse(os.path.exists(self.tmp_dest_dir))
+
     def test_completed_upload_uses_group_folder_when_enabled(self):
         self._write_uploader_config(upload_to_group_folder=True)
         self._write_group_mappings({"17": {"folder": "grpA", "groupName": "Group A"}})
