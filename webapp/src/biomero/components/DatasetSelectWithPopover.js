@@ -19,8 +19,11 @@ const DatasetSelectWithPopover = ({
   subLabel = "",
   tooltip = "",
   buttonText = "Add Dataset",
+  placeholder = "Add new dataset name or select...",
   intent = "",
   allowedCategories = ["datasets", "plates", "screens"], // default: allow most except projects
+  tagProps = undefined, // optional: (value, index) => TagProps for per-tag styling
+  onClear = null, // optional: called when user clicks the clear-all X button
 }) => {
   const { state, updateState, toaster, loadOmeroTreeData, apiLoading } = useAppContext();
   const [isPopoverOpen, setPopoverOpen] = useState(false);
@@ -50,22 +53,34 @@ const DatasetSelectWithPopover = ({
     if (isDisallowed(nodeId, nodeData)) {
       const category = nodeData?.category || getCategoryFromId(nodeId);
       let message;
+      
+      // Helper function to get suggested alternatives based on allowedCategories
+      const getSuggestedText = () => {
+        const suggestions = [];
+        if (allowedCategories.includes("datasets")) suggestions.push("dataset");
+        if (allowedCategories.includes("plates")) suggestions.push("plate"); 
+        if (allowedCategories.includes("screens")) suggestions.push("screen");
+        
+        if (suggestions.length === 0) return "an allowed item";
+        if (suggestions.length === 1) return suggestions[0];
+        if (suggestions.length === 2) return `${suggestions[0]} or ${suggestions[1]}`;
+        return suggestions.slice(0, -1).join(", ") + `, or ${suggestions[suggestions.length - 1]}`;
+      };
+      
       if (category === "projects") {
-        message =
-          "Projects cannot be selected. Expand the project and choose a dataset or plate.";
+        message = `Projects cannot be selected. Select a ${getSuggestedText()}.`;
+      } else if (category === "datasets") {
+        message = `Datasets cannot be selected for this output. Select a ${getSuggestedText()}.`;
       } else if (category === "screens") {
-        message =
-          allowedCategories.includes("plates")
-            ? "Screens cannot be selected directly. Expand and select a plate."
-            : "Screens cannot be selected for this output. Select or create a dataset.";
+        message = allowedCategories.includes("plates")
+          ? "Screens cannot be selected directly. Expand and select a plate."
+          : `Screens cannot be selected for this output. Select or create a ${getSuggestedText()}.`;
       } else if (category === "plates") {
-        message =
-          allowedCategories.includes("plates")
-            ? "Plate selection currently disabled."
-            : "Plates cannot be selected for this output. Select a dataset.";
+        message = allowedCategories.includes("plates")
+          ? "Plate selection currently disabled."
+          : `Plates cannot be selected for this output. Select a ${getSuggestedText()}.`;
       } else if (category === "orphaned") {
-        message =
-          "Orphaned images container cannot be selected. Choose a dataset.";
+        message = `Orphaned images container cannot be selected. Choose a ${getSuggestedText()}.`;
       } else {
         message = "This item cannot be selected here.";
       }
@@ -158,12 +173,25 @@ const DatasetSelectWithPopover = ({
       intent={intent}
     >
       <TagInput
-        placeholder="Add new dataset name or select..."
+        placeholder={placeholder}
         values={value || []}
         onChange={handleManualInputChange}
         onKeyDown={handleKeyDown}
         intent={intent}
+        tagProps={tagProps}
         rightElement={
+          <div style={{ display: "flex", alignItems: "center" }}>
+            {onClear && value?.length > 0 && (
+              <Tooltip content="Clear all">
+                <Button
+                  minimal
+                  small
+                  icon="cross"
+                  intent="danger"
+                  onClick={onClear}
+                />
+              </Tooltip>
+            )}
           <Popover
             interactionKind={PopoverInteractionKind.CLICK}
             isOpen={isPopoverOpen}
@@ -215,6 +243,7 @@ const DatasetSelectWithPopover = ({
               <Button icon="folder-open" text={buttonText} />
             </Tooltip>
           </Popover>
+          </div>
         }
       />
     </FormGroup>

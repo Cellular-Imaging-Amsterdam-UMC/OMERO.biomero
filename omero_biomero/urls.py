@@ -36,7 +36,7 @@ urlpatterns = [
     # Analyzer API under /api/analyzer/
     path(
         "api/analyzer/workflows/",
-        analyzer_views.list_workflows,  # GET
+        analyzer_views.list_workflows,  # GET: returns {"workflows": [name, ...]}
         name="analyzer_workflows_list",
     ),
     path(
@@ -58,6 +58,16 @@ urlpatterns = [
         "api/analyzer/slurm/status/",
         analyzer_views.get_slurm_status,  # GET: SLURM cluster status
         name="analyzer_slurm_status",
+    ),
+    path(
+        "api/analyzer/attachments/",
+        analyzer_views.get_attachments,  # GET: browse OMERO file annotations
+        name="analyzer_attachments",
+    ),
+    path(
+        "api/analyzer/object-annotations/",
+        analyzer_views.get_object_annotations,  # GET: file annotations for one OMERO object
+        name="analyzer_object_annotations",
     ),
     # Main Biomero URL
     path(

@@ -15,6 +15,7 @@ import {
   fetchThumbnails,
   fetchImages,
   fetchPlateImages,
+  fetchPlateGridData,
   createContainer,
   fetchGroupMappings,
   postGroupMappings,
@@ -22,7 +23,127 @@ import {
 } from "./apiService";
 import { getDjangoConstants } from "./constants";
 import { transformStructure, extractGroups } from "./utils";
-import { OverlayToaster, Position } from "@blueprintjs/core";
+import { OverlayToaster, Position, Collapse, Divider, Icon } from "@blueprintjs/core";
+
+// Fields that are infrastructure/output config, not workflow-specific parameters
+const INFRA_PARAMS = new Set([
+  'IDs', 'Data_Type', 'workflowMode', 'plateMode', 'useZarrFormat', 'Format',
+  'active_group_id', 'receiveEmail', 'importAsZip', 'uploadCsv', 'attachFileOutputs',
+  'attachToOriginalImages', 'selectedDatasets', 'selectedDatasetId', 'selectedScreens', 'selectedScreenId', 'renamePattern', 'enableRename',
+  'batchEnabled', 'batchCount', 'batchSize', 'version',
+  'cytomine_host', 'cytomine_public_key', 'cytomine_private_key',
+  'cytomine_id_project', 'cytomine_id_software',
+]);
+
+const MAX_INPUT_IDS_SHOWN = 20;
+
+
+const WorkflowSubmitToast = ({ workflowName, startedAt, params, metadata }) => {
+  const [openSection, setOpenSection] = React.useState(null);
+  const toggle = (key) => setOpenSection((prev) => (prev === key ? null : key));
+
+  const outputLines = [];
+  if (params.selectedDatasets?.length) {
+    const pattern = params.enableRename && params.renamePattern ? ` as "${params.renamePattern}"` : "";
+    outputLines.push(`Dataset: ${params.selectedDatasets.join(", ")}${pattern}`);
+  }
+  if (params.selectedScreens?.length) {
+    outputLines.push(`Screen: ${params.selectedScreens.join(", ")}`);
+  }
+  if (params.importAsZip) outputLines.push("Zip archive");
+  if (params.uploadCsv) outputLines.push("OMERO tables (CSV)");
+  if (params.attachFileOutputs) outputLines.push("File annotations");
+  if (params.attachToOriginalImages) outputLines.push("Attached to input images");
+  if (params.receiveEmail) outputLines.push("E-mail on completion");
+
+  // Build lookup from descriptor so we can classify each param
+  const inputById = {};
+  (metadata?.inputs || []).forEach((inp) => { inputById[inp.id] = inp; });
+
+  // File attachment params (file-attachment flag) → shown in Input section
+  const fileAttachmentEntries = Object.entries(params).filter(([k]) => {
+    const inp = inputById[k];
+    return inp && inp["file-attachment"] === true;
+  });
+
+  // True workflow params: not infra, not set-by-server, not output-dir-set.
+  // Falls back to old behaviour (show everything non-infra) when metadata is absent.
+  const wfParams = Object.entries(params).filter(([k]) => {
+    if (INFRA_PARAMS.has(k)) return false;
+    if (!metadata) return true;
+    const inp = inputById[k];
+    if (!inp) return false;            // not in descriptor — skip
+    if (inp["set-by-server"]) return false;  // handled elsewhere
+    if (inp["output-dir-set"]) return false; // internal dir — not user-facing
+    return true;
+  });
+
+  const inputCount = params.IDs?.length || 0;
+  const dataType = params.Data_Type || "Image";
+  // Count non-empty file attachment slots for the Input section label
+  const attachmentCount = fileAttachmentEntries.reduce((sum, [, v]) => {
+    const ids = Array.isArray(v) ? v.filter((x) => x != null && x !== "") : (v != null && v !== "" ? [v] : []);
+    return sum + ids.length;
+  }, 0);
+  const batchInfo = params.batchEnabled
+    ? `${params.batchCount} jobs × ${params.batchSize} ${dataType}s`
+    : null;
+
+  const SectionRow = ({ label, sectionKey, children }) => (
+    <div className="mt-1">
+      <div
+        className="flex items-center gap-1 cursor-pointer select-none"
+        onClick={() => toggle(sectionKey)}
+      >
+        <Icon icon={openSection === sectionKey ? "chevron-down" : "chevron-right"} size={11} />
+        <span className="bp5-text-small font-semibold">{label}</span>
+      </div>
+      <Collapse isOpen={openSection === sectionKey}>
+        <div className="ml-3 mt-0.5 bp5-text-small opacity-80">{children}</div>
+      </Collapse>
+    </div>
+  );
+
+  return (
+    <div className="min-w-64">
+      <div><strong>{workflowName}</strong> submitted successfully</div>
+      {startedAt && <div className="bp5-text-small mt-0.5 opacity-80">Started at {startedAt}</div>}
+
+      {outputLines.length > 0 && (
+        <SectionRow label={`Output (${outputLines.length})`} sectionKey="output">
+          {outputLines.map((l, i) => <div key={i}>• {l}</div>)}
+        </SectionRow>
+      )}
+
+      <SectionRow label={`Input: ${inputCount} ${dataType}${inputCount !== 1 ? "s" : ""}${attachmentCount > 0 ? ` + ${attachmentCount} file${attachmentCount !== 1 ? "s" : ""}` : ""}`} sectionKey="input">
+        {params.IDs?.slice(0, MAX_INPUT_IDS_SHOWN).map((id) => <div key={id}>• {dataType} #{id}</div>)}
+        {inputCount > MAX_INPUT_IDS_SHOWN && <div className="opacity-60">…and {inputCount - MAX_INPUT_IDS_SHOWN} more</div>}
+        {params.useZarrFormat && <div>• Format: ZARR</div>}
+        {batchInfo && <div>• Batch: {batchInfo}</div>}
+        {fileAttachmentEntries.flatMap(([k, v]) => {
+          const ids = Array.isArray(v) ? v.filter((x) => x != null && x !== "") : (v != null && v !== "" ? [v] : []);
+          if (!ids.length) return [];
+          const label = inputById[k]?.name || k;
+          return ids.map((id) => <div key={`${k}-${id}`}>• {label}: Attachment #{id}</div>);
+        })}
+      </SectionRow>
+
+      {(wfParams.length > 0 || params.version) && (
+        <SectionRow label={`Parameters (${wfParams.length + (params.version ? 1 : 0)})`} sectionKey="params">
+          {params.version && <div>• version: <strong>{params.version}</strong></div>}
+          {wfParams.map(([k, v]) => (
+            <div key={k}>• {k}: <strong>{String(v)}</strong></div>
+          ))}
+        </SectionRow>
+      )}
+
+      <Divider className="my-1" />
+      <div className="bp5-text-small">
+        <strong>⚠ Do not log out or close this browser tab.</strong> Your OMERO session must stay active for results to be automatically imported. Logging out risks data loss and wastes compute time.
+      </div>
+    </div>
+  );
+};
 
 // Create the context
 const AppContext = createContext();
@@ -39,10 +160,19 @@ export const AppProvider = ({ children }) => {
     workflowStatusTooltipShown: false,
     inputDatasets: [],
     omeroFileTreeData: null,
+    omeroAttachmentTreeCache: {},
     localFileTreeData: null,
     omeroFileTreeSelection: [],
     localFileTreeSelection: [],
     groupFolderMappings: {},
+    // Persisted UI state for the workflow input step (survives Back/Next navigation)
+    workflowInputState: {
+      selectedImageIds: [],
+      searchQuery: "",
+      activeTab: "grid",
+      zoom: 7,
+      selectedPlates: [],
+    },
     // Admin state tracking
     hasUnsavedSettingsChanges: false,
     lastSettingsSaveTime: null,
@@ -120,7 +250,6 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   const loadThumbnails = async (imageIds) => {
-    setLoading(true);
     setError(null);
 
     try {
@@ -134,14 +263,13 @@ export const AppProvider = ({ children }) => {
         Object.assign(thumbnailsMap, fetchedThumbnails); // Merge batch results into the thumbnailsMap
       }
 
-      // Update state with the merged thumbnails map
-      updateState({
-        thumbnails: { ...state.thumbnails, ...thumbnailsMap }, // Merge with existing thumbnails
-      });
+      // Update state with the merged thumbnails map (functional update to avoid race condition)
+      setState(prev => ({
+        ...prev,
+        thumbnails: { ...prev.thumbnails, ...thumbnailsMap },
+      }));
     } catch (err) {
       setError(err.message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -183,6 +311,24 @@ export const AppProvider = ({ children }) => {
           if (images.length > 0) {
             allImages = [...allImages, ...imagesWithSource];
 
+            // Flush each page into state immediately so thumbnails can start loading
+            // for the first page while remaining pages are still in flight.
+            setState(prev => ({
+              ...prev,
+              omeroFileTreeData: {
+                ...prev.omeroFileTreeData,
+                [index]: {
+                  ...dataset,
+                  children: allImages,
+                },
+              },
+              images: [
+                ...new Map(
+                  [...(prev.images || []), ...allImages].map((img) => [img.id, img])
+                ).values(),
+              ],
+            }));
+
             // Check if we have fetched enough images
             if (allImages.length >= childCount) {
               keepFetching = false; // We fetched enough images
@@ -193,18 +339,6 @@ export const AppProvider = ({ children }) => {
             keepFetching = false; // No more images to fetch
           }
         }
-
-        // Store images in the parent structure in state.omeroFileTreeData
-        updateState({
-          omeroFileTreeData: {
-            ...state.omeroFileTreeData,
-            [index]: {
-              ...dataset,
-              children: allImages, // Attach fetched images to the dataset
-            },
-          },
-          images: [...(state.images || []), ...allImages],
-        });
       } else if (type === "plate") {
         const plateId = parseInt(id, 10);
         // Use our existing API service functions
@@ -217,16 +351,21 @@ export const AppProvider = ({ children }) => {
         }));
 
         // Store images in state the same way as datasets
-        updateState({
+        setState(prev => ({
+          ...prev,
           omeroFileTreeData: {
-            ...state.omeroFileTreeData,
+            ...prev.omeroFileTreeData,
             [index]: {
               ...dataset,
               children: imagesWithSource,
             },
           },
-          images: [...(state.images || []), ...imagesWithSource],
-        });
+          images: [
+            ...new Map(
+              [...(prev.images || []), ...imagesWithSource].map((img) => [img.id, img])
+            ).values(),
+          ],
+        }));
 
         // Load thumbnails for these images
         const imageIds = imagesWithSource.map((img) => img.id);
@@ -255,10 +394,13 @@ export const AppProvider = ({ children }) => {
 
       const message = response?.message || "Workflow executed successfully.";
 
+      // Use local browser time with timezone label (server time is UTC, browser clock may differ)
+      const startedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
+
       toaster.show({
         intent: "success",
         icon: "tick-circle",
-        message: `${workflowName}: ${message}`,
+        message: <WorkflowSubmitToast workflowName={workflowName} startedAt={startedAt} params={params} metadata={state.selectedWorkflow?.metadata} />,
         timeout: 0,
       });
     } catch (err) {
@@ -496,6 +638,34 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const loadPlateGridData = async (plateId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const plateData = await fetchPlateGridData(plateId);
+      
+      // Calculate well information from grid
+      const totalPositions = plateData.rowlabels.length * plateData.collabels.length;
+      const wellsWithImages = plateData.grid.flat().filter(cell => cell !== null).length;
+      
+      // Format well count info
+      const plateFormat = `${plateData.rowlabels.length}×${plateData.collabels.length}`;
+      const wellCount = wellsWithImages === totalPositions 
+        ? `${totalPositions} wells (${plateFormat})`
+        : `${wellsWithImages}/${totalPositions} wells (${plateFormat})`;
+
+      return {
+        plateData,
+        wellCount,
+      };
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadGroups = async () => {
     setLoading(true);
     setError(null);
@@ -680,6 +850,7 @@ export const AppProvider = ({ children }) => {
         needsSlurmCheck,
         loadOmeroTreeData,
         loadFolderData,
+        loadPlateGridData,
         loadGroups,
         loadScripts,
         fetchScriptDetails,

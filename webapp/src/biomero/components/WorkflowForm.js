@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { FormGroup, InputGroup, NumericInput, Switch, HTMLSelect, Intent, Tag, Callout, Divider, Tooltip } from "@blueprintjs/core";
+import { FormGroup, InputGroup, NumericInput, Switch, HTMLSelect, Intent, Tag, Callout, Divider, Tooltip, Icon, Collapse, Button } from "@blueprintjs/core";
 import { useAppContext } from "../../AppContext";
 
 const WorkflowForm = () => {
   const { state, updateState } = useAppContext();
   const [selectedVersion, setSelectedVersion] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const ghURL = state.selectedWorkflow?.githubUrl;
   const versionMatch = ghURL?.match(/\/tree\/(v[\d.]+)/);
@@ -30,6 +31,29 @@ const WorkflowForm = () => {
     return { intent: Intent.SUCCESS, message: "Version available" };
   };
 
+  // Helper function to check workflow flags from config and from schema metadata
+  const getWorkflowFlags = (workflowName) => {
+    const config = state.config;
+    let isPlateWorkflow = false;
+    let isZarrWorkflow = false;
+
+    // Admin-configured overrides (zarr_workflows / plate_workflows lists)
+    if (config?.UI) {
+      const plateWorkflows = config.UI.plate_workflows ?
+        JSON.parse(config.UI.plate_workflows || '[]') : [];
+      const zarrWorkflows = config.UI.zarr_workflows ?
+        JSON.parse(config.UI.zarr_workflows || '[]') : [];
+      isPlateWorkflow = plateWorkflows.includes(workflowName);
+      isZarrWorkflow = zarrWorkflows.includes(workflowName);
+    }
+
+    // Schema-level flags auto-detected from the descriptor (bilayers)
+    isZarrWorkflow = isZarrWorkflow || (workflowMetadata?.['requires-zarr'] ?? false);
+    isPlateWorkflow = isPlateWorkflow || (workflowMetadata?.['requires-plate'] ?? false);
+
+    return { isPlateWorkflow, isZarrWorkflow };
+  };
+
   // Initialize selected version
   useEffect(() => {
     if (!selectedVersion) {
@@ -49,29 +73,73 @@ const WorkflowForm = () => {
 
   const defaultValues = workflowMetadata.inputs.reduce((acc, input) => {
     const defaultValue = input["default-value"];
+    const choices = input["value-choices"] || [];
 
-    if (input.type === "Number") {
+    if ((input.type === "string" || input.type === "String") && choices.length > 0) {
+      // Choice fields must be strings for OMERO RString validation.
+      acc[input.id] = String(defaultValue ?? choices[0]);
+    } else if (input.type === "Number" || input.type === "integer" || input.type === "float") {
       acc[input.id] = defaultValue !== undefined ? Number(defaultValue) : 0;
-    } else if (input.type === "Boolean") {
+    } else if (input.type === "Boolean" || input.type === "boolean") {
       acc[input.id] =
         defaultValue !== undefined ? Boolean(defaultValue) : false;
     } else {
-      acc[input.id] = defaultValue || "";
+      acc[input.id] = defaultValue ?? "";
     }
     return acc;
   }, {});
 
   useEffect(() => {
     if (selectedVersion) {
+      const mergedFormData = {
+        ...defaultValues,
+        ...state.formData,
+        version: selectedVersion
+      };
+
+      // Keep choice fields valid even when stale state contains an empty string.
+      (workflowMetadata.inputs || []).forEach((input) => {
+        const choices = input["value-choices"] || [];
+        if (choices.length === 0) return;
+
+        const allowed = choices.map((choice) => String(choice));
+        const defaultChoiceRaw = (input["default-value"] ?? choices[0]);
+        const defaultChoice = String(defaultChoiceRaw);
+        const currentRaw = mergedFormData[input.id];
+        const current = currentRaw ?? "";
+        const currentStr = String(current);
+
+        if (currentStr === "" || !allowed.includes(currentStr)) {
+          mergedFormData[input.id] = allowed.includes(defaultChoice) ? defaultChoice : allowed[0];
+        } else {
+          // Normalize to string to avoid sending RInt for string choice fields.
+          mergedFormData[input.id] = currentStr;
+        }
+      });
+
       updateState({ 
-        formData: { 
-          ...defaultValues, 
-          ...state.formData, 
-          version: selectedVersion
-        } 
+        formData: mergedFormData
       });
     }
   }, [selectedVersion]);
+
+  // Force ZARR format when workflow requires it (plate workflows or admin-configured ZARR workflows)
+  useEffect(() => {
+    if (workflowName) {
+      const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflowName);
+      
+      if (isPlateWorkflow || isZarrWorkflow) {
+        // Force ZARR for plate workflows or admin-configured ZARR workflows
+        updateState({
+          formData: {
+            ...state.formData,
+            Format: "ZARR", // Force zarr format for configured workflows
+            useZarrFormat: true, // Force zarr backend flag for configured workflows
+          },
+        });
+      }
+    }
+  }, [workflowName, state.config, workflowMetadata]);
 
   const handleInputChange = (id, value) => {
     updateState({
@@ -83,14 +151,72 @@ const WorkflowForm = () => {
   };
 
   const renderFormFields = () => {
-    return workflowMetadata.inputs
-      .filter((input) => !input.id.startsWith("cytomine")) // Ignore fields starting with "cytomine"
-      .map((input) => {
-        const { id, name, description, type, optional } = input;
-        const defaultValue = input["default-value"];
+    const visibleInputs = workflowMetadata.inputs
+      .filter((input) => !input.id.startsWith("cytomine"))
+      .filter((input) => !input["set-by-server"])
+      .filter((input) => !input["output-dir-set"]);
+
+    const beginnerInputs = visibleInputs.filter((inp) => inp.mode !== "advanced");
+    const advancedInputs = visibleInputs.filter((inp) => inp.mode === "advanced");
+
+    const renderOne = (input) => {
+      const { id, name, description, type, optional } = input;
+      const defaultValue = input["default-value"];
+      const choices = input["value-choices"] || [];
+      const choiceLabels = input["value-choices-labels"] || [];
+      const isFormatField = id === "Format";
+      const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflowName);
+      const requiresZarr = isPlateWorkflow || isZarrWorkflow;
 
         switch (type) {
+          case "string":
           case "String":
+            // Special handling for Format field when workflow requires ZARR
+            if (isFormatField && requiresZarr) {
+              return (
+                <FormGroup
+                  key={id}
+                  label={name}
+                  labelFor={id}
+                  helperText="Format is locked to ZARR for admin-configured workflows"
+                >
+                  <InputGroup
+                    id={id}
+                    value="ZARR"
+                    readOnly={true}
+                    disabled={true}
+                    intent="primary"
+                    rightElement={
+                      <Tooltip content="This workflow requires ZARR format (admin-configured)">
+                        <Icon icon="lock" intent="primary" />
+                      </Tooltip>
+                    }
+                  />
+                </FormGroup>
+              );
+            }
+            // Dropdown when value-choices are provided
+            if (choices.length > 0) {
+              return (
+                <FormGroup
+                  key={id}
+                  label={name}
+                  labelFor={id}
+                  helperText={description || ""}
+                >
+                  <HTMLSelect
+                    id={id}
+                    value={state.formData[id] !== undefined ? String(state.formData[id]) : String(defaultValue ?? choices[0] ?? "")}
+                    onChange={(e) => handleInputChange(id, e.target.value)}
+                  >
+                    {choices.map((choice, i) => {
+                      const label = choiceLabels[i] != null ? String(choiceLabels[i]) : String(choice);
+                      return <option key={String(choice)} value={String(choice)}>{label}</option>;
+                    })}
+                  </HTMLSelect>
+                </FormGroup>
+              );
+            }
             return (
               <FormGroup
                 key={id}
@@ -100,9 +226,96 @@ const WorkflowForm = () => {
               >
                 <InputGroup
                   id={id}
-                  value={state.formData[id] || ""}
+                  value={state.formData[id] ?? ""}
                   onChange={(e) => handleInputChange(id, e.target.value)}
-                  placeholder={defaultValue || name}
+                  placeholder={defaultValue ?? name}
+                />
+              </FormGroup>
+            );
+          case "integer":
+            return (
+              <FormGroup
+                key={id}
+                label={name}
+                labelFor={id}
+                helperText={description || ""}
+              >
+                <NumericInput
+                  id={id}
+                  value={
+                    state.formData[id] !== undefined
+                      ? state.formData[id]
+                      : defaultValue !== undefined
+                      ? defaultValue
+                      : 0
+                  }
+                  stepSize={1}
+                  minorStepSize={null}
+                  onValueChange={(valueAsNumber, valueAsString) => {
+                    if (isNaN(valueAsNumber) || valueAsNumber === null) {
+                      handleInputChange(id, valueAsString);
+                    } else {
+                      handleInputChange(id, Math.trunc(valueAsNumber));
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const finalValue = parseInt(e.target.value, 10);
+                    handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const finalValue = parseInt(e.currentTarget.value, 10);
+                      handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
+                    }
+                  }}
+                  placeholder={optional ? `Optional ${name}` : name}
+                  allowNumericCharactersOnly={true}
+                />
+              </FormGroup>
+            );
+          case "float":
+            return (
+              <FormGroup
+                key={id}
+                label={name}
+                labelFor={id}
+                helperText={description || ""}
+              >
+                <NumericInput
+                  id={id}
+                  value={
+                    state.formData[id] !== undefined
+                      ? state.formData[id]
+                      : defaultValue !== undefined
+                      ? defaultValue
+                      : 0
+                  }
+                  stepSize={0.01}
+                  minorStepSize={0.001}
+                  onValueChange={(valueAsNumber, valueAsString) => {
+                    if (
+                      valueAsString.endsWith(".") ||
+                      valueAsString.includes("e") ||
+                      isNaN(valueAsNumber) ||
+                      valueAsNumber === null
+                    ) {
+                      handleInputChange(id, valueAsString);
+                    } else {
+                      handleInputChange(id, valueAsNumber);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const finalValue = parseFloat(e.target.value);
+                    handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const finalValue = parseFloat(e.currentTarget.value);
+                      handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
+                    }
+                  }}
+                  placeholder={optional ? `Optional ${name}` : name}
+                  allowNumericCharactersOnly={false}
                 />
               </FormGroup>
             );
@@ -124,8 +337,6 @@ const WorkflowForm = () => {
                       : 0
                   }
                   onValueChange={(valueAsNumber, valueAsString) => {
-                    // Use string value if it contains a decimal point at the end (partial input)
-                    // or if it's invalid (like "1e")
                     if (
                       valueAsString.endsWith(".") ||
                       valueAsString.includes("e") ||
@@ -134,17 +345,14 @@ const WorkflowForm = () => {
                     ) {
                       handleInputChange(id, valueAsString);
                     } else {
-                      // Use the number value for complete valid numbers
                       handleInputChange(id, valueAsNumber);
                     }
                   }}
                   onBlur={(e) => {
-                    // Convert to final number on blur, fallback to 0 if invalid
                     const finalValue = parseFloat(e.target.value);
                     handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
                   }}
                   onKeyDown={(e) => {
-                    // Also handle Enter key like the example
                     if (e.key === "Enter") {
                       const finalValue = parseFloat(e.currentTarget.value);
                       handleInputChange(id, isNaN(finalValue) ? 0 : finalValue);
@@ -155,6 +363,7 @@ const WorkflowForm = () => {
                 />
               </FormGroup>
             );
+          case "boolean":
           case "Boolean":
             return (
               <FormGroup
@@ -178,12 +387,35 @@ const WorkflowForm = () => {
           default:
             return null;
         }
-      });
+      };
+
+    return (
+      <>
+        {beginnerInputs.map(renderOne)}
+        {advancedInputs.length > 0 && (
+          <>
+            <Divider />
+            <Button
+              minimal
+              small
+              rightIcon={advancedOpen ? "chevron-up" : "chevron-down"}
+              onClick={() => setAdvancedOpen((o) => !o)}
+              className="text-gray-500 mb-2"
+            >
+              Advanced ({advancedInputs.length})
+            </Button>
+            <Collapse isOpen={advancedOpen}>
+              {advancedInputs.map(renderOne)}
+            </Collapse>
+          </>
+        )}
+      </>
+    );
   };
 
   return (
     <form>
-      <h2>{workflowMetadata.workflow}</h2>
+      <h2>{workflowMetadata.name || workflowMetadata.workflow}</h2>
       
       {/* Version Selection */}
       <FormGroup

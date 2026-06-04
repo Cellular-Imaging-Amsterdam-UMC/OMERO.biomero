@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { FormGroup, Switch, Slider, Divider, Tooltip, Intent, Callout, Button } from "@blueprintjs/core";
 import { useAppContext } from "../../AppContext";
 
-const InputOptions = () => {
+const InputOptions = ({ itemLabel = "images" }) => {
   const { state, updateState } = useAppContext();
   const [batchEnabled, setBatchEnabled] = useState(false);
   const [unlockDangerousJobs, setUnlockDangerousJobs] = useState(false);
@@ -89,19 +89,19 @@ const InputOptions = () => {
   const getProcessingRecommendation = (imageCount) => {
     if (imageCount <= 100) {
       return { 
-        text: `Default: Process all ${imageCount} images in a single SLURM job`,
+        text: `Default: Process all ${imageCount} ${itemLabel} in a single SLURM job`,
         shouldRecommendBatch: false,
         intent: Intent.NONE 
       };
     } else if (imageCount <= 400) {
       return { 
-        text: `Default: Process all ${imageCount} images in a single SLURM job (batching available for better performance)`,
+        text: `Default: Process all ${imageCount} ${itemLabel} in a single SLURM job (batching available for better performance)`,
         shouldRecommendBatch: false,
         intent: Intent.NONE 
       };
     } else {
       return { 
-        text: `${imageCount} images is a large dataset - consider batch processing to avoid timeouts`,
+        text: `${imageCount} ${itemLabel} is a large dataset - consider batch processing to avoid timeouts`,
         shouldRecommendBatch: true,
         intent: Intent.WARNING 
       };
@@ -119,7 +119,7 @@ const InputOptions = () => {
       {/* Show recommendation callout for large datasets */}
       {recommendation.shouldRecommendBatch && !batchEnabled && (
         <Callout intent={Intent.WARNING} className="mb-4">
-          <strong>Large Dataset Detected:</strong> With {totalImages} images, batch processing is recommended 
+          <strong>Large Dataset Detected:</strong> With {totalImages} {itemLabel}, batch processing is recommended 
           to avoid SLURM timeouts and improve reliability. Consider enabling batch processing below.
         </Callout>
       )}
@@ -128,7 +128,7 @@ const InputOptions = () => {
       <FormGroup
         label="Batch Processing Options"
         helperText={batchEnabled ? 
-          `Split ${totalImages} images across ${selectedJobCount} parallel SLURM jobs` :
+          `Split ${totalImages} ${itemLabel} across ${selectedJobCount} parallel SLURM jobs` :
           recommendation.text
         }
       >
@@ -152,7 +152,7 @@ const InputOptions = () => {
             <FormGroup>
               <div className="flex items-center justify-between mb-2">
                 <span className="font-bold">
-                  {selectedJobCount} parallel jobs ({batchSize} images each)
+                  {selectedJobCount} parallel jobs ({batchSize} {itemLabel} each)
                 </span>
                 
                 {totalImages > 10 && allowDangerousJobs && (
@@ -233,10 +233,18 @@ const InputOptions = () => {
               }
               
               // Performance suggestions
-              if (batchSize === 1) {
+              if (batchSize === 1 && itemLabel === "images") {
                 return (
                   <Callout intent={Intent.WARNING} className="mt-2">
                     One image per job creates maximum overhead. Consider fewer jobs for better efficiency.
+                  </Callout>
+                );
+              }
+
+              if (batchSize === 1 && itemLabel !== "images") {
+                return (
+                  <Callout intent={Intent.PRIMARY} className="mt-2">
+                    One {itemLabel.replace(/s$/, '')} per job — each {itemLabel.replace(/s$/, '')} runs independently.
                   </Callout>
                 );
               }
@@ -244,7 +252,7 @@ const InputOptions = () => {
               if (totalImages > 64 && jobCount >= 4 && jobCount <= 6) {
                 return (
                   <Callout intent={Intent.SUCCESS} className="mt-2">
-                    Excellent choice! {jobCount} jobs is optimal for {totalImages} images - good balance of speed and reliability.
+                    Excellent choice! {jobCount} jobs is optimal for {totalImages} {itemLabel} - good balance of speed and reliability.
                   </Callout>
                 );
               }
@@ -252,7 +260,7 @@ const InputOptions = () => {
               if (totalImages > 64 && jobCount <= 3) {
                 return (
                   <Callout intent={Intent.SUCCESS} className="mt-2">
-                    Conservative choice! For {totalImages} images, you might try 4-6 jobs for better performance.
+                    Conservative choice! For {totalImages} {itemLabel}, you might try 4-6 jobs for better performance.
                   </Callout>
                 );
               }
@@ -262,37 +270,7 @@ const InputOptions = () => {
           </div>
         )}
       </FormGroup>
-      
-      <Divider />
-      
-      {/* ZARR Format Option - Moved to bottom as experimental */}
-      <FormGroup
-        label="Experimental Input Format"
-        helperText="⚠️ Advanced users only - can break your workflow if used incorrectly"
-      >
-        <Switch
-          id="useZarrFormat"
-          checked={state.formData?.useZarrFormat || false}
-          onChange={(e) => handleInputChange('useZarrFormat', e.target.checked)}
-          label={
-            <Tooltip
-              content="Skip TIFF conversion and use ZARR format directly. Only use if your workflow explicitly supports ZARR input and you understand the implications."
-              placement="top"
-              intent={Intent.DANGER}
-            >
-              <span>Use ZARR Format (Experimental) ⚠️</span>
-            </Tooltip>
-          }
-        />
-        
-        {state.formData?.useZarrFormat && (
-          <Callout intent={Intent.DANGER} className="mt-2">
-            <strong>EXPERIMENTAL FEATURE:</strong> You are bypassing standard TIFF conversion. 
-            This may cause workflow failures if your selected workflow doesn't support ZARR input. 
-            Only proceed if you know your workflow explicitly supports ZARR format.
-          </Callout>
-        )}
-      </FormGroup>
+
     </form>
   );
 };

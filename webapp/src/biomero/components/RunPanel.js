@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAppContext } from "../../AppContext";
 import {
   Card,
@@ -16,23 +16,106 @@ import {
   Tag,
   Tooltip,
   Intent,
+  Tabs,
+  Tab,
+  Icon,
 } from "@blueprintjs/core";
 import { FaDocker } from "react-icons/fa6";
 import WorkflowForm from "./WorkflowForm";
 import WorkflowOutput from "./WorkflowOutput";
 import WorkflowInput from "./WorkflowInput";
 import InputOptions from "./InputOptions";
+import PlateWorkflowDialog from "./plate/PlateWorkflowDialog";
+import WorkflowFileInputStep, { getFileInputParams, isFileInputStepValid } from "./WorkflowFileInputStep";
+
+const DescriptionWithToggle = ({ description }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const textRef = useRef(null);
+
+  // Check real DOM overflow while clamped — re-runs on every resize (column changes, window resize)
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+    const checkOverflow = () => setIsOverflowing(el.scrollHeight > el.clientHeight);
+    const observer = new ResizeObserver(checkOverflow);
+    observer.observe(el);
+    checkOverflow();
+    return () => observer.disconnect();
+  }, [description]);
+
+  // Re-check after collapsing so the button reappears correctly
+  useEffect(() => {
+    if (!isExpanded) {
+      requestAnimationFrame(() => {
+        if (textRef.current)
+          setIsOverflowing(textRef.current.scrollHeight > textRef.current.clientHeight);
+      });
+    }
+  }, [isExpanded]);
+
+  return (
+    <div>
+      <p ref={textRef} className={`text-sm text-gray-600 ${!isExpanded ? 'line-clamp-5' : ''}`}>
+        {description}
+      </p>
+      {(isOverflowing || isExpanded) && (
+        <div className="flex justify-end mt-1">
+          <Button
+            minimal
+            small
+            text={isExpanded ? "Show less" : "Show more"}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded((prev) => !prev);
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
 
 const RunPanel = ({ onWorkflowError }) => {
-  const { state, updateState, toaster, runWorkflowData } = useAppContext();
+  const { state, updateState, toaster, runWorkflowData, apiLoading } = useAppContext();
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isNextDisabled, setIsNextDisabled] = useState(true);
   const [isRunDisabled, setIsRunDisabled] = useState(false);
+  const [isFileInputNextDisabled, setIsFileInputNextDisabled] = useState(false);
+  const [activeWorkflowTab, setActiveWorkflowTab] = useState("images"); // "images" or "plates"
+  const [customStepIndex, setCustomStepIndex] = useState(0); // Track current step for custom navigation
 
   // Get workflow versions from SLURM status
   const workflowVersions = state.workflowVersions || {};
+  
+  // Check if importer is enabled - only show plate features if it is
+  const isImporterEnabled = window.WEBCLIENT?.UI?.IMPORTER_ENABLED || false;
 
+  // Helper function to check if a workflow has specific flags from config or schema
+  const getWorkflowFlags = (workflowName) => {
+    const config = state.config;
+    let isPlateWorkflow = false;
+    let isZarrWorkflow = false;
+
+    // Admin-configured overrides (zarr_workflows / plate_workflows lists)
+    if (config?.UI) {
+      const plateWorkflows = config.UI.plate_workflows ?
+        JSON.parse(config.UI.plate_workflows || '[]') : [];
+      const zarrWorkflows = config.UI.zarr_workflows ?
+        JSON.parse(config.UI.zarr_workflows || '[]') : [];
+      isPlateWorkflow = plateWorkflows.includes(workflowName);
+      isZarrWorkflow = zarrWorkflows.includes(workflowName);
+    }
+
+    // Schema-level flags auto-detected from the descriptor (bilayers)
+    const wfData = state.workflows?.find(w => w.name === workflowName);
+    isZarrWorkflow = isZarrWorkflow || (wfData?.metadata?.['requires-zarr'] ?? false);
+    isPlateWorkflow = isPlateWorkflow || (wfData?.metadata?.['requires-plate'] ?? false);
+
+    return { isPlateWorkflow, isZarrWorkflow };
+  };
+  
   // Helper to get SLURM status intent for version tags
   const getSlurmIntent = () => {
     if (state.slurmStatus === "online") return Intent.SUCCESS;
@@ -75,6 +158,39 @@ const RunPanel = ({ onWorkflowError }) => {
     };
   };
 
+  const getWorkflowOutputDefaults = (workflow) => {
+    const outputs = workflow?.metadata?.outputs || [];
+    const hasCsvTableOutput = outputs.some((output) => {
+      const type = String(output?.type || "").toLowerCase();
+      if (!["measurement", "file"].includes(type)) return false;
+      const formats = Array.isArray(output?.format)
+        ? output.format
+        : (output?.format ? [output.format] : []);
+      return formats.map((fmt) => String(fmt).toLowerCase()).includes("csv");
+    });
+    // File annotation default: array/executable/any file (incl. .log)/non-csv measurement.
+    // .log outputs are now handled by the backend without double-attachment — the SLURM
+    // job log is excluded via skip_paths; workflow .log outputs attach normally.
+    const hasFileAnnotationOutput = outputs.some((output) => {
+      const type = String(output?.type || "").toLowerCase();
+      if (["array", "executable", "file"].includes(type)) return true;
+      if (type === "measurement") {
+        const formats = Array.isArray(output?.format)
+          ? output.format
+          : (output?.format ? [output.format] : []);
+        return !formats.map((f) => String(f).toLowerCase()).includes("csv");
+      }
+      return false;
+    });
+
+    return {
+      attachToOriginalImages: false,
+      importAsZip: false,  // Zip is opt-in only; no output type auto-enables it
+      uploadCsv: hasCsvTableOutput,
+      attachFileOutputs: hasFileAnnotationOutput,
+    };
+  };
+
   // Utility to beautify names
   const beautifyName = (name) => {
     return name
@@ -82,25 +198,83 @@ const RunPanel = ({ onWorkflowError }) => {
       .replace(/\b\w/g, (char) => char.toUpperCase());
   };
 
-  // Filter workflows based on search term
-  const filteredWorkflows = state.workflows?.filter(
-    (workflow) =>
-      workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      workflow.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter all workflows by search term first (before tab filtering)
+  const searchFilteredWorkflows = state.workflows?.filter((workflow) => {
+    return workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           workflow.description.toLowerCase().includes(searchTerm.toLowerCase());
+  }) || [];
+
+  // Count workflows for each tab after search filtering
+  // Only show plate workflows if importer is enabled
+  const imageWorkflowCount = searchFilteredWorkflows.filter((workflow) => {
+    const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflow.name);
+    // Exclude plate workflows always, and also exclude ZARR workflows if importer is disabled
+    return !isPlateWorkflow && (!isZarrWorkflow || isImporterEnabled);
+  }).length;
+
+  const plateWorkflowCount = isImporterEnabled ? searchFilteredWorkflows.filter((workflow) => {
+    const { isPlateWorkflow } = getWorkflowFlags(workflow.name);
+    return isPlateWorkflow;
+  }).length : 0;
+
+  // Filter workflows based on active tab from the search results
+  const filteredWorkflows = searchFilteredWorkflows.filter((workflow) => {
+    if (activeWorkflowTab === "plates") {
+      // Check if workflow is marked as plate workflow in config AND importer is enabled
+      const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflow.name);
+      return isImporterEnabled && isPlateWorkflow;
+    } else {
+      // Images tab: exclude workflows marked as plate-only, and exclude ZARR workflows if importer is disabled
+      const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflow.name);
+      return !isPlateWorkflow && (!isZarrWorkflow || isImporterEnabled);
+    }
+  });
 
   useEffect(() => {
-    setIsNextDisabled(state.formData?.IDs?.length === 0);
-  }, [state.formData?.IDs]);
+    setIsNextDisabled(state.formData?.IDs?.length === 0 || apiLoading);
+  }, [state.formData?.IDs, apiLoading]);
+
+  useEffect(() => {
+    setIsFileInputNextDisabled(
+      !isFileInputStepValid(state.selectedWorkflow?.metadata, state.formData)
+    );
+  }, [state.formData, state.selectedWorkflow?.metadata]);
+
+  // Auto-switch to tab with results only when search term changes (not when user manually clicks tab)
+  useEffect(() => {
+    // Only auto-switch if there's a search term (user is actively filtering)
+    if (!searchTerm) return;
+    
+    const currentTabCount = activeWorkflowTab === "images" ? imageWorkflowCount : plateWorkflowCount;
+    const otherTabCount = activeWorkflowTab === "images" ? plateWorkflowCount : imageWorkflowCount;
+    
+    // Switch to other tab if current tab is empty but other tab has workflows
+    if (currentTabCount === 0 && otherTabCount > 0) {
+      setActiveWorkflowTab(activeWorkflowTab === "images" ? "plates" : "images");
+    }
+  }, [searchTerm, imageWorkflowCount, plateWorkflowCount]); // Only trigger on search term or count changes
+
+  // Ensure plates tab is only accessible when importer is enabled
+  useEffect(() => {
+    if (!isImporterEnabled && activeWorkflowTab === "plates") {
+      setActiveWorkflowTab("images");
+    }
+  }, [isImporterEnabled, activeWorkflowTab]);
 
   // Handle workflow click
   const handleWorkflowClick = (workflow) => {
+    // Determine workflow mode based on config flags instead of tab
+    const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflow.name);
+    const workflowMode = isPlateWorkflow ? "plates" : "images";
+    
     // Set selected workflow in the global state context
     updateState({
       selectedWorkflow: workflow, // Set selectedWorkflow in context
       formData: {
         IDs: [], // Empty or default value
-        Data_Type: "Image", // Empty or default value
+        Data_Type: "Image", // Backend expects "Image" (case sensitive)
+        workflowMode: workflowMode, // Set based on workflow config, not tab
+        ...getWorkflowOutputDefaults(workflow),
       },
     });
     setDialogOpen(true); // Open the dialog
@@ -127,10 +301,53 @@ const RunPanel = ({ onWorkflowError }) => {
   };
 
   const submitWorkflow = (workflow_name) => {
-    runWorkflowData(workflow_name, state.formData, onWorkflowError);
-  };
+    const metadata = state.selectedWorkflow?.metadata;
+    const fileParams = getFileInputParams(metadata);
 
+    // Rekey file-attachment selections from `param.id` → `FILE_{param.id}` so
+    // the backend (analyzer_views) can recognise them and use rlong().
+    // The original keys are removed to avoid going through the generic wrap() path.
+    const params = { ...state.formData };
+    fileParams.forEach((param) => {
+      const ids = params[param.id];
+      delete params[param.id];
+      if (Array.isArray(ids) && ids.length > 0) {
+        params[`FILE_${param.id}`] = ids;   // keep as array; backend handles list
+      }
+    });
+
+    runWorkflowData(workflow_name, params, onWorkflowError);
+  };
+  
+  // Helper function to determine if Input Options step should be skipped
+  const shouldSkipInputOptions = () => {
+    if (!state.selectedWorkflow) return false;
+    
+    const { isPlateWorkflow } = getWorkflowFlags(state.selectedWorkflow.name);
+    const selectedCount = state.formData?.IDs?.length || 0;
+    
+    // Skip if it's a plate workflow (only 1 plate) or only 1 image selected
+    return isPlateWorkflow || selectedCount === 1;
+  };
+  
+  // Custom step navigation logic
+  const getNextStepIndex = (currentStepIndex) => {
+    // Step mapping: 0 = Input Data, 1 = Input Options, 2 = Workflow Parameters, 3 = Output Data
+    if (currentStepIndex === 0 && shouldSkipInputOptions()) {
+      return 2; // Skip from Input Data directly to Workflow Parameters
+    }
+    return currentStepIndex + 1;
+  };
+  
+  const getPreviousStepIndex = (currentStepIndex) => {
+    if (currentStepIndex === 2 && shouldSkipInputOptions()) {
+      return 0; // Skip back from Workflow Parameters directly to Input Data
+    }
+    return currentStepIndex - 1;
+  };  
+  
   const handleStepChange = (stepIndex) => {
+    setCustomStepIndex(stepIndex);
     if (stepIndex === "step2") {
       // Handle any specific form submission if necessary
     }
@@ -139,33 +356,89 @@ const RunPanel = ({ onWorkflowError }) => {
   return (
     <div>
       <div className="p-4">
-        {/* Search Box */}
+        {/* Unified Workflow Search */}
         <div className="mb-4">
           <InputGroup
             leftIcon="search"
-            placeholder="Search workflows..."
+            placeholder="Search workflows (segment, count, etc.)..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)} // Update search term on input change
+            onChange={(e) => setSearchTerm(e.target.value)}
+            rightElement={
+              searchTerm && (
+                <Button
+                  minimal
+                  icon="cross"
+                  onClick={() => setSearchTerm("")}
+                />
+              )
+            }
           />
         </div>
 
+        {/* Workflow Type Tabs */}
+        <div className="mb-4">
+          <Tabs
+            id="workflow-type-tabs"
+            selectedTabId={activeWorkflowTab}
+            onChange={(newTabId) => setActiveWorkflowTab(newTabId)}
+            large={true}
+          >
+            <Tab
+              id="images"
+              title="Image Workflows"
+              tagContent={imageWorkflowCount}
+              tagProps={{
+                round: true,
+                intent: imageWorkflowCount === 0 ? "danger" : undefined
+              }}
+            />
+            {isImporterEnabled && (
+              <Tab
+                id="plates"
+                title="Plate Workflows"
+                tagContent={plateWorkflowCount}
+                tagProps={{
+                  round: true,
+                  intent: plateWorkflowCount === 0 ? "danger" : undefined
+                }}
+              />
+            )}
+          </Tabs>
+          
+          {/* Active Tab Description */}
+          <div className="mt-2">
+            {activeWorkflowTab === "images" && (
+              <p className="text-sm text-gray-500">
+                For analyzing individual images from datasets or plates
+              </p>
+            )}
+            {activeWorkflowTab === "plates" && isImporterEnabled && (
+              <p className="text-sm text-gray-500">
+                For analyzing entire plates as single units (requires importer integration)
+              </p>
+            )}
+          </div>
+        </div>
+
         {filteredWorkflows?.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredWorkflows.map((workflow) => {
-              const workflowStatus = getWorkflowStatus(workflow.name);
-              const isReady = workflowStatus.intent === Intent.NONE;
-              
-              const cardContent = (
-                <Card
-                  key={workflow.name} // Use the workflow name as the key
-                  interactive={isReady}
-                  elevation={Elevation.TWO}
-                  className={`flex flex-col gap-2 p-4 ${
-                    workflowStatus.intent === Intent.WARNING ? 'bp4-intent-warning' :
-                    workflowStatus.intent === Intent.DANGER ? 'bp4-intent-danger' : ''
-                  } ${!isReady ? 'opacity-75 cursor-not-allowed' : ''}`}
-                  onClick={isReady ? () => handleWorkflowClick(workflow) : undefined}
-                >
+          // Only render grid after SLURM status is determined to prevent height jumping
+          state.slurmStatus ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredWorkflows.map((workflow) => {
+                const workflowStatus = getWorkflowStatus(workflow.name);
+                const isReady = workflowStatus.intent === Intent.NONE;
+                
+                const cardContent = (
+                  <Card
+                    key={workflow.name} // Use the workflow name as the key
+                    interactive={isReady}
+                    elevation={Elevation.TWO}
+                    className={`flex flex-col gap-2 p-4 h-full ${
+                      workflowStatus.intent === Intent.WARNING ? 'bp4-intent-warning' :
+                      workflowStatus.intent === Intent.DANGER ? 'bp4-intent-danger' : ''
+                    } ${!isReady ? 'opacity-75 cursor-not-allowed' : ''}`}
+                    onClick={isReady ? () => handleWorkflowClick(workflow) : undefined}
+                  >
                 {/* Header Section with Title and Icons */}
                 <div className="flex justify-between items-center">
                   <H5 className="mb-0">{beautifyName(workflow.name)}</H5>
@@ -216,8 +489,30 @@ const RunPanel = ({ onWorkflowError }) => {
                         title="View Container Image"
                         onClick={(e) => {
                           e.stopPropagation();
+                          const image = workflow.metadata["container-image"].image;
+                          // Version lives in githubUrl (e.g. /tree/v1.0.1), not in the image string
+                          const versionMatch = workflow.githubUrl?.match(/\/tree\/(v[\d.]+)/);
+                          const imageTag = versionMatch?.[1] || '';
+                          const tagsUrl = imageTag
+                            ? `https://hub.docker.com/r/${image}/tags?name=${imageTag}`
+                            : `https://hub.docker.com/r/${image}`;
+                          window.open(tagsUrl, "_blank", "noopener,noreferrer");
+                        }}
+                      />
+                    )}
+
+                    {/* DOI / Citation Icon */}
+                    {workflow.metadata?.citations?.find(c => c.doi) && (
+                      <Button
+                        icon="manual"
+                        minimal
+                        intent="primary"
+                        title={`View citation: ${workflow.metadata.citations.find(c => c.doi).name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const doi = workflow.metadata.citations.find(c => c.doi).doi;
                           window.open(
-                            `https://hub.docker.com/r/${workflow.metadata["container-image"].image}`,
+                            `https://doi.org/${doi}`,
                             "_blank",
                             "noopener,noreferrer"
                           );
@@ -228,7 +523,7 @@ const RunPanel = ({ onWorkflowError }) => {
                   </div>
 
                 {/* Description Section */}
-                <p className="text-sm text-gray-600">{workflow.description}</p>
+                <DescriptionWithToggle description={workflow.description} />
               </Card>
               );
               
@@ -250,20 +545,114 @@ const RunPanel = ({ onWorkflowError }) => {
             elevation={Elevation.ONE}
             className="flex flex-col items-center justify-center p-6 text-center"
           >
-            <Spinner intent="primary" size={SpinnerSize.SMALL} />
-            <p className="text-sm text-gray-600 mt-4">Loading workflows...</p>
+            {!state.workflows ? (
+              // Still loading workflows from server
+              <>
+                <Spinner intent="primary" size={SpinnerSize.SMALL} />
+                <p className="text-sm text-gray-600 mt-4">Loading workflows...</p>
+              </>
+            ) : !state.slurmStatus ? (
+              // Workflows loaded but SLURM status still checking
+              <>
+                <Spinner intent="primary" size={SpinnerSize.SMALL} />
+                <p className="text-sm text-gray-600 mt-4">Checking workflow availability...</p>
+              </>
+            ) : (
+              // Workflows loaded but no results match current filters
+              <>
+                <Icon icon="search" size={40} color="#718096" />
+                <H6 className="mt-4 text-gray-600">No workflows found</H6>
+                <p className="text-sm text-gray-500">
+                  {searchTerm ? 
+                    `No workflows match "${searchTerm}" in the ${activeWorkflowTab} category.` :
+                    `No ${activeWorkflowTab} workflows have been configured yet.`
+                  }
+                </p>
+                {searchTerm && (
+                  <Button 
+                    minimal 
+                    intent="primary" 
+                    onClick={() => setSearchTerm("")}
+                    className="mt-2"
+                  >
+                    Clear search
+                  </Button>
+                )}
+              </>
+            )}
+          </Card>
+        )
+        ) : (
+          // No workflows found after filtering
+          <Card
+            elevation={Elevation.ONE}
+            className="flex flex-col items-center justify-center p-6 text-center"
+          >
+            {!state.workflows ? (
+              // Still loading workflows from server
+              <>
+                <Spinner intent="primary" size={SpinnerSize.SMALL} />
+                <p className="text-sm text-gray-600 mt-4">Loading workflows...</p>
+              </>
+            ) : !state.slurmStatus ? (
+              // Workflows loaded but SLURM status still checking - don't show "no workflows" yet
+              <>
+                <Spinner intent="primary" size={SpinnerSize.SMALL} />
+                <p className="text-sm text-gray-600 mt-4">Checking workflow availability...</p>
+              </>
+            ) : (
+              // SLURM checked and truly no workflows match filters
+              <>
+                <Icon icon="search" size={40} color="#718096" />
+                <H6 className="mt-4 text-gray-600">No workflows found</H6>
+                <p className="text-sm text-gray-500">
+                  {searchTerm ? 
+                    `No workflows match "${searchTerm}" in the ${activeWorkflowTab} category.` :
+                    `No ${activeWorkflowTab} workflows have been configured yet.`
+                  }
+                </p>
+                {searchTerm && (
+                  <Button 
+                    minimal 
+                    intent="primary" 
+                    onClick={() => setSearchTerm("")}
+                    className="mt-2"
+                  >
+                    Clear search
+                  </Button>
+                )}
+              </>
+            )}
           </Card>
         )}
       </div>
 
-      {/* BlueprintJS Multistep Dialog for Workflow Details */}
-      {state.selectedWorkflow && (
+      {/* Conditional Dialog for Workflow Details */}
+      {state.selectedWorkflow && (() => {
+        const { isPlateWorkflow } = getWorkflowFlags(state.selectedWorkflow.name);
+        
+        // Use PlateWorkflowDialog for plate workflows (only if importer is enabled)
+        if (isPlateWorkflow && isImporterEnabled) {
+          return (
+            <PlateWorkflowDialog
+              workflow={state.selectedWorkflow}
+              dialogOpen={dialogOpen}
+              setDialogOpen={setDialogOpen}
+              onWorkflowError={onWorkflowError}
+              onFinalSubmit={handleFinalSubmit}
+            />
+          );
+        }
+        
+        // Use existing MultistepDialog for image workflows (or plate workflows when importer is disabled)
+        return (
         <MultistepDialog
           isOpen={dialogOpen}
           onClose={() => {
             setDialogOpen(false);
+            setCustomStepIndex(0); // Reset step index on close
           }}
-          initialStepIndex={0} // Start on Step 2 (Workflow Form)
+          initialStepIndex={0}
           title={beautifyName(state.selectedWorkflow.name)}
           onChange={handleStepChange}
           navigationPosition={"top"}
@@ -292,19 +681,37 @@ const RunPanel = ({ onWorkflowError }) => {
             }
             nextButtonProps={{
               disabled: isNextDisabled,
+              icon: apiLoading ? <Spinner size={14} /> : undefined,
+              text: apiLoading ? "Loading images…" : "Next",
+              title: apiLoading ? "Wait for all images to finish loading" : undefined,
             }}
           />
 
-          <DialogStep
-            id="step1b"
-            title="Input Options"
-            panel={
-              <DialogBody>
-                <H6>Advanced Input Options (Optional)</H6>
-                <InputOptions />
-              </DialogBody>
-            }
-          />
+          {/* Conditionally show File Inputs step for workflows with non-image file params */}
+          {getFileInputParams(state.selectedWorkflow?.metadata).length > 0 && (
+            <DialogStep
+              id="step2b"
+              title="Attach Files"
+              panel={<WorkflowFileInputStep dialogBodyClassName="flex flex-col min-h-[75vh]" />}
+              nextButtonProps={{
+                disabled: isFileInputNextDisabled,
+              }}
+            />
+          )}
+
+          {/* Conditionally show Input Options step */}
+          {!shouldSkipInputOptions() && (
+            <DialogStep
+              id="step1b"
+              title="Input Options"
+              panel={
+                <DialogBody>
+                  <H6>Advanced Input Options (Optional)</H6>
+                  <InputOptions />
+                </DialogBody>
+              }
+            />
+          )}
 
           <DialogStep
             id="step2"
@@ -331,7 +738,8 @@ const RunPanel = ({ onWorkflowError }) => {
             }
           />
         </MultistepDialog>
-      )}
+        );
+      })()}
     </div>
   );
 };
