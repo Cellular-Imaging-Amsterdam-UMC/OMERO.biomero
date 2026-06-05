@@ -24,6 +24,8 @@ from unittest.mock import MagicMock, patch
 from django.test import TestCase, RequestFactory
 from django.http import HttpResponse
 
+from omero_biomero import settings as biomero_settings
+
 
 def _ensure_stubs():
     """Set up stub modules for OMERO web dependencies."""
@@ -204,6 +206,17 @@ class TusViewsTestCase(TestCase):
             resource_id = location.split("/")[-1]
             return resource_id
         return None
+
+
+class TusSettingsTests(TestCase):
+    def test_default_chunk_dir_uses_system_tempdir(self):
+        self.assertEqual(
+            biomero_settings.UPLOADER_CHUNKS_DIR,
+            os.getenv(
+                "UPLOADER_CHUNKS_DIR",
+                os.path.join(tempfile.gettempdir(), "omero_biomero_tus_upload"),
+            ),
+        )
 
 
 class TusAuthenticationTests(TusViewsTestCase):

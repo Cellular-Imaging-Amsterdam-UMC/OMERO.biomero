@@ -1,5 +1,6 @@
 import os
 import json
+import tempfile
 from .leica_file_browser.ci_leica_converters_helpers import read_leica_file
 
 EXTENSION_TO_FILE_BROWSER = {
@@ -294,7 +295,10 @@ UPLOADER_ALLOWED_FILE_EXTENSIONS = [
 
 # Uploader settings
 # Directory where intermediate chunks are stored
-UPLOADER_CHUNKS_DIR = os.getenv("UPLOADER_CHUNKS_DIR", os.path.join(BASE_DIR, "tus_upload"))
+UPLOADER_CHUNKS_DIR = os.getenv(
+    "UPLOADER_CHUNKS_DIR",
+    os.path.join(tempfile.gettempdir(), "omero_biomero_tus_upload"),
+)
 # Directory where the final file is assembled
 UPLOADER_DESTINATION_DIR = os.getenv(
     "UPLOADER_DESTINATION_DIR", os.path.join(BASE_DIR, "tus_destination")
