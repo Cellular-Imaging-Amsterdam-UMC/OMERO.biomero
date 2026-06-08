@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, useTransition } from "react";
 import {
+  Callout,
   DialogBody,
   H6,
   InputGroup,
@@ -546,6 +547,10 @@ const WorkflowInput = () => {
 
   return (
     <DialogBody className="flex flex-col min-h-[75vh]">
+      <Callout intent="primary" icon="info-sign" className="mb-4">
+        Choose the OMERO data this workflow should process. Start by selecting one or more datasets or plates, then review the images that will be included.
+      </Callout>
+
       <div className="w-full">
         <H6 className="mb-2">
           {inputMode === "plates" ? "Select Input Plate" : "Select Input Images"}
@@ -558,10 +563,10 @@ const WorkflowInput = () => {
             value={state.inputDatasets.map((dataset) =>
               dataset?.id ? `${dataset.data} (ID: ${dataset.id})` : dataset?.data
             ) || []}
-            label="Select datasets"
-            placeholder="Add new dataset name or select..."
-            buttonText="Add Datasets"
-            tooltip="Select the OMERO datasets as workflow input."
+            label="Select dataset(s) or plate(s)"
+            placeholder="Select one or more datasets or plates..."
+            buttonText="Select Datasets or Plates"
+            tooltip="Select one or more OMERO datasets or plates as workflow input."
             onChange={(datasets, type) => {
               if (type === "manual") {
                 // datasets are remaining display strings like "name (ID: 56)"

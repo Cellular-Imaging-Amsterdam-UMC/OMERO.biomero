@@ -94,15 +94,17 @@ const WorkflowFileInputStep = ({ dialogBodyClassName = "" }) => {
 
   return (
     <DialogBody className={dialogBodyClassName || undefined}>
-      <Callout
-        intent={hasRequired ? Intent.PRIMARY : Intent.NONE}
-        icon={hasRequired ? "info-sign" : null}
-        className="mb-3 py-2 px-3"
-      >
+      <Callout intent="primary" icon="info-sign" className="mb-4">
         <span className="text-sm">
           {hasRequired
-            ? "Select attachment files from OMERO to send along with this workflow. Required items must be filled in before you can continue — check each description for details."
-            : "Optionally select attachment files from OMERO to send along with this workflow. All items here are optional — check each description for details on what each one does."}
+            ? "Select the OMERO file attachments required by this workflow. Each field is defined by the workflow, and the browser is pre-filtered to the expected file type for that input."
+            : "Select any optional OMERO file attachments offered by this workflow. Each field is defined by the workflow, and the browser is pre-filtered to the expected file type for that input."}
+        </span>
+      </Callout>
+
+      <Callout intent="primary" compact minimal className="mb-4">
+        <span className="text-sm">
+          <strong>Input Filter ON</strong> limits browsing to attachments near the data selected in the first step. Turn it off if the file you want to reuse lives elsewhere in OMERO.
         </span>
       </Callout>
 
@@ -154,6 +156,9 @@ const WorkflowFileInputStep = ({ dialogBodyClassName = "" }) => {
                         ? <span className="text-xs text-gray-400">(optional)</span>
                         : !done && <span className="text-xs text-red-400">required</span>
                       }
+                      <Tag minimal round intent="none" className="shrink-0">
+                        {param["file-count"] === "single" ? "Select 1" : "Select 1+"}
+                      </Tag>
                       {currentSelection.length > 0 && (
                         <Tag minimal round intent={done ? Intent.SUCCESS : Intent.PRIMARY} className="shrink-0">
                           {currentSelection.length}
@@ -168,9 +173,9 @@ const WorkflowFileInputStep = ({ dialogBodyClassName = "" }) => {
                         {formats.length > 0 && (
                           <span className="text-xs text-gray-400 italic">Formats: {formats.join(", ")}</span>
                         )}
-                        {param["file-count"] === "single" && (
-                          <span className="text-xs text-gray-400 italic">Single file</span>
-                        )}
+                        <span className="text-xs text-gray-400 italic">
+                          {param["file-count"] === "single" ? "Select exactly one file" : "Select one or more files"}
+                        </span>
                       </div>
                     )}
                   </div>

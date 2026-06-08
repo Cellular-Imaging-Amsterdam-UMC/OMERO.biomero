@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { InputGroup, FormGroup, Switch, Callout, Tooltip, Icon, Divider, Tag } from "@blueprintjs/core";
+import { Alignment, Card, CardList, FormGroup, InputGroup, Switch, SwitchCard, Callout, Tooltip, Icon, Divider, Tag } from "@blueprintjs/core";
 import { useAppContext } from "../../AppContext";
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover.js";
 
@@ -76,6 +76,16 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
     state.formData.attachToOriginalImages,
     state.formData.selectedDatasets,
     state.formData.selectedScreens,
+  ]);
+
+  const hasImageOutputDuplication = useMemo(() => {
+    if (plateMode || !state.formData.attachToOriginalImages) return false;
+    return (state.formData.selectedDatasets?.length ?? 0) > 0 || !!state.formData.importAsZip;
+  }, [
+    plateMode,
+    state.formData.attachToOriginalImages,
+    state.formData.selectedDatasets,
+    state.formData.importAsZip,
   ]);
 
   const outputHints = useMemo(() => {
@@ -164,16 +174,28 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
     );
   };
 
-  // currentValue: current form state — undefined = untouched, false = explicitly disabled
-  const renderDefaultHelper = (suggested, suggestedMsg, fallback, currentValue = undefined) => {
-    if (!suggested) return fallback;
-    // When the overall form has a validation error, fall back to neutral text so
-    // Blueprint's danger intent (red) has clear visual priority.
-    if (!hasOutputSelection) return fallback;
+  const getSuggestedState = (suggested, hasSelection, currentValue = undefined) => {
+    if (!suggested) return "none";
+    if (!hasSelection) return "danger";
+    if (suggested && currentValue === false) return "warning";
+    if (suggested && hasSelection) return "success";
+    return "none";
+  };
+
+  const renderDefaultHelperCallout = (suggested, suggestedMsg, currentValue = undefined) => {
+    if (!suggested) return null;
     if (currentValue === false) {
-      return <span className="text-orange-600">This is suggested for this workflow — re-enable to include these results.</span>;
+      return (
+        <Callout intent="warning" compact minimal className="mt-2">
+          This is suggested for this workflow — re-enable to include these results.
+        </Callout>
+      );
     }
-    return <span className="text-sky-700">{suggestedMsg}</span>;
+    return (
+      <Callout intent="success" compact minimal className="mt-2">
+        Suggested for this workflow.
+      </Callout>
+    );
   };
 
   useEffect(() => {
@@ -223,13 +245,11 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
       (!state.formData.selectedDatasets ||
         state.formData.selectedDatasets.length === 0)
     ) {
-      const inputDatasetNames = inputs.map((dataset) => dataset.data);
-      // Also carry the OMERO ID when there is exactly one input dataset
-      const autoId = inputs.length === 1 ? (inputs[0].id ?? null) : null;
+      const firstInputDataset = inputs[0];
       autoFilledDatasets.current = true;
       handleFormDataUpdate({
-        selectedDatasets: inputDatasetNames,
-        selectedDatasetId: autoId,
+        selectedDatasets: firstInputDataset?.data ? [firstInputDataset.data] : [],
+        selectedDatasetId: firstInputDataset?.id ?? null,
       });
     }
   }, [state.inputDatasets, plateMode]);
@@ -237,17 +257,30 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   // Plate-mode: auto-fill the parent screen once per plate ID
   useEffect(() => {
     if (!plateMode) return;
-    const plateId = state.formData?.IDs?.[0];
-    if (!plateId || !state.formData?.plateMode || !state.omeroFileTreeData) return;
-    if (autoFilledForPlateId.current === plateId) return;
+    const plateIds = state.formData?.IDs || [];
+    if (plateIds.length === 0 || !state.formData?.plateMode || !state.omeroFileTreeData) return;
+    const autoFillKey = plateIds.join(",");
+    if (autoFilledForPlateId.current === autoFillKey) return;
     if (state.formData.selectedScreens?.length > 0) {
-      autoFilledForPlateId.current = plateId;
+      autoFilledForPlateId.current = autoFillKey;
       return;
     }
-    const parentScreen = findParentScreen(plateId, state.omeroFileTreeData);
-    if (parentScreen) {
-      autoFilledForPlateId.current = plateId;
-      updateState({ formData: { ...state.formData, selectedScreens: [parentScreen.data], selectedScreenId: parentScreen.id } });
+    const parentScreens = plateIds
+      .map((plateId) => findParentScreen(plateId, state.omeroFileTreeData))
+      .filter(Boolean);
+    const uniqueParentScreens = parentScreens.filter(
+      (screen, index, screens) => screens.findIndex((candidate) => candidate.id === screen.id) === index
+    );
+    const firstParentScreen = uniqueParentScreens[0];
+    if (firstParentScreen) {
+      autoFilledForPlateId.current = autoFillKey;
+      updateState({
+        formData: {
+          ...state.formData,
+          selectedScreens: [firstParentScreen.data],
+          selectedScreenId: firstParentScreen.id,
+        },
+      });
     }
   // NOTE: selectedScreens intentionally omitted — including it causes bounce-back when user clears.
   }, [plateMode, state.formData?.IDs, state.formData?.plateMode, state.omeroFileTreeData]);
@@ -405,9 +438,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   return (
     <form>
       {/* ── Intro ────────────────────────────────────── */}
-      <Callout
-        className="mb-3 py-2 px-3"
-      >
+      <Callout intent="primary" icon="info-sign" className="mb-4">
         <span className="text-sm">
           Choose how your workflow results are imported back into OMERO.
             You must select <strong>at least one output option</strong> below.
@@ -430,7 +461,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
       {/* Sticky Validation Messages */}
       <div className="sticky top-0 z-10">
         {!hasOutputSelection && (
-          <Callout intent="danger" className="mb-2 bg-red-50 border-red-200">
+          <Callout intent="danger" className="mb-2">
             <strong>Please select at least one output option below</strong>
           </Callout>
         )}
@@ -438,7 +469,8 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         {!plateMode && state.formData.enableRename && renameValidation.message && (
           <Callout
             intent={renameValidation.hasError ? "danger" : "warning"}
-            className={`mb-2 ${renameValidation.hasError ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'}`}
+            compact
+            className="mb-2"
           >
             <strong>Rename Pattern:</strong> {renameValidation.message}
           </Callout>
@@ -447,26 +479,15 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
 
       {/* ── Notifications ─────────────────────────────── */}
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 mt-2">Notifications</p>
-      {(() => {
-        const _emailChecked = state.formData.receiveEmail ?? defaultValues.receiveEmail;
-        return (
-          <div className={`flex items-start justify-between gap-3 border rounded p-3 mb-4 transition-colors ${_emailChecked ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-            <div className="flex items-start gap-2">
-              <Icon icon="envelope" size={16} className={`mt-0.5 shrink-0 ${_emailChecked ? 'text-blue-600' : 'text-gray-400'}`} />
-              <div>
-                <span className="text-sm font-semibold">Email on completion</span>
-                <p className="text-xs text-gray-500 mt-0.5">Receive an email from SLURM when one or more jobs finish (completed or failed).</p>
-              </div>
-            </div>
-            <Switch
-              id="email-notification"
-              checked={_emailChecked}
-              onChange={(e) => handleInputChange("receiveEmail", e.target.checked)}
-              className="shrink-0 mt-0.5"
-            />
-          </div>
-        );
-      })()}
+      <SwitchCard
+        alignIndicator={Alignment.END}
+        checked={state.formData.receiveEmail ?? defaultValues.receiveEmail}
+        onChange={(e) => handleInputChange("receiveEmail", e.target.checked)}
+        className="mb-4"
+      >
+        <p className="text-sm font-semibold">Email on completion</p>
+        <p className="text-xs font-normal text-gray-500 mb-2">Receive an email from SLURM when one or more jobs finish (completed or failed).</p>
+      </SwitchCard>
 
       <Divider className="my-3" />
 
@@ -477,214 +498,119 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         the workflow output is imported into OMERO.
       </p>
 
-      <div className="flex flex-col gap-2">
-        {/* ① Bulk ZIP */}
-        {(() => {
-          const _checked = state.formData.importAsZip ?? outputHints.importAsZip ?? defaultValues.importAsZip;
-          const _border = !hasOutputSelection ? 'border-red-300 bg-white' : _checked ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300';
-          return (
-            <div
-              className={`border rounded p-3 transition-colors cursor-pointer ${_border}`}
-              onClick={() => handleInputChange("importAsZip", !_checked)}
-            >
-              <div className="flex items-start gap-3">
-                <Icon icon="compressed" size={16} className={`mt-0.5 shrink-0 ${_checked ? 'text-blue-600' : 'text-gray-400'}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold">Bulk ZIP archive</span>
-                      {renderDefaultCue(outputHints.importAsZip, outputHints.zipLabel)}
-                    </div>
-                    <Tooltip
-                      content={outputHints.zipCount > 0
-                        ? `This workflow declares archive output(s): ${outputHints.zipLabel}. Zip export is suggested.`
-                        : "Attach a bulk zip of all results — useful as a backup or for bulk download."}
-                      placement="top"
-                    >
-                      <Switch
-                        id="upload-zip-options"
-                        checked={_checked}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => handleInputChange("importAsZip", e.target.checked)}
-                        className="shrink-0 mt-0"
-                        intent={hasOutputSelection ? "" : "danger"}
-                      />
-                    </Tooltip>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Attaches a single zip of all results to the parent dataset/project.
-                    {hasOtherOutputsAlongWithZip && (
-                      <span className="block mt-1 text-orange-600">
-                        ⚠ Other output options are also active — the zip will contain all those files too, duplicating storage.
-                        Use it as a standalone backup or disable the other options if you only need the archive.
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+      {/* ① Bulk ZIP */}
+      <SwitchCard
+        alignIndicator={Alignment.END}
+        checked={state.formData.importAsZip ?? outputHints.importAsZip ?? defaultValues.importAsZip}
+        onChange={(e) => handleInputChange("importAsZip", e.target.checked)}
+        className="mt-2"
+      >
+        <p className="text-sm font-semibold">Bulk ZIP archive</p>
+        <p className="text-xs font-normal text-gray-500">Attaches a single zip of all results to the parent dataset/project.</p>
+        {hasOtherOutputsAlongWithZip && (
+          <Callout intent="warning" compact minimal className="mt-2">
+            Other output options are also active — the zip will contain all those files too, duplicating storage.
+            Use it as a standalone backup or disable the other options if you only need the archive.
+          </Callout>
+        )}
+      </SwitchCard>
 
-        {/* ② CSV → OMERO Tables */}
-        {(() => {
-          const _checked = state.formData.uploadCsv ?? outputHints.uploadCsv ?? defaultValues.uploadCsv;
-          const _border = !hasOutputSelection ? 'border-red-300 bg-white' : _checked ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300';
-          return (
-            <div
-              className={`border rounded p-3 transition-colors cursor-pointer ${_border}`}
-              onClick={() => handleInputChange("uploadCsv", !_checked)}
-            >
-              <div className="flex items-start gap-3">
-                <Icon icon="th" size={16} className={`mt-0.5 shrink-0 ${_checked ? 'text-blue-600' : 'text-gray-400'}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold">CSV → OMERO Tables</span>
-                      {renderDefaultCue(outputHints.uploadCsv, outputHints.measurementLabel, state.formData.uploadCsv, outputHints.measurementLabelFull)}
-                    </div>
-                    <Switch
-                      id="upload-csv-options"
-                      checked={_checked}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => handleInputChange("uploadCsv", e.target.checked)}
-                      className="shrink-0 mt-0"
-                      intent={hasOutputSelection ? "" : "danger"}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {renderDefaultHelper(
-                      outputHints.measurementCount > 0,
-                      `Suggested for: ${outputHints.measurementLabel}. Uploads CSV measurements as interactive OMERO tables.`,
-                      "Upload CSV measurement results as interactive OMERO tables for further analysis.",
-                      state.formData.uploadCsv
-                    )}
-                  </p>
-                </div>
-              </div>
+      {/* ② CSV → OMERO Tables */}
+      {(() => {
+        const _checked = state.formData.uploadCsv ?? outputHints.uploadCsv ?? defaultValues.uploadCsv;
+        return (
+          <SwitchCard
+            alignIndicator={Alignment.END}
+            checked={_checked}
+            onChange={(e) => handleInputChange("uploadCsv", e.target.checked)}
+            className="mt-2"
+          >
+            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+              <span className="text-sm font-semibold">CSV → OMERO Tables</span>
+              {renderDefaultCue(outputHints.uploadCsv, outputHints.measurementLabel, state.formData.uploadCsv, outputHints.measurementLabelFull)}
             </div>
-          );
-        })()}
+            <p className="text-xs font-normal text-gray-500">Upload CSV measurement results as interactive OMERO tables for further analysis.</p>
+            {renderDefaultHelperCallout(outputHints.measurementCount > 0, `Suggested for: ${outputHints.measurementLabel}.`, state.formData.uploadCsv)}
+          </SwitchCard>
+        );
+      })()}
 
-        {/* ③ Attach to input images (dataset mode only) */}
-        {!plateMode && (() => {
-          const _checked = state.formData.attachToOriginalImages ?? defaultValues.attachToOriginalImages;
-          const _border = !hasOutputSelection ? 'border-red-300 bg-white' : _checked ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300';
-          const hasDestination = (selectedContainers?.length ?? 0) > 0;
-          const hasDuplicateImages = _checked && hasDestination;
-          return (
-            <div
-              className={`border rounded p-3 transition-colors cursor-pointer ${_border}`}
-              onClick={() => handleInputChange("attachToOriginalImages", !_checked)}
-            >
-              <div className="flex items-start gap-3">
-                <Icon icon="link" size={16} className={`mt-0.5 shrink-0 ${_checked ? 'text-blue-600' : 'text-gray-400'}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold">Attach to input images</span>
-                      {renderDefaultCue(outputHints.imageCount > 0, outputHints.imageLabel, state.formData.attachToOriginalImages, outputHints.imageLabelFull)}
-                    </div>
-                    <Switch
-                      id="upload-images-options"
-                      checked={_checked}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => handleInputChange("attachToOriginalImages", e.target.checked)}
-                      className="shrink-0 mt-0"
-                      intent={hasOutputSelection ? "" : "danger"}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Attach output images (e.g. masks) to the original input images to track their provenance.
-                  </p>
-                  {hasDuplicateImages && (
-                    <p className="mt-1 text-xs text-orange-600">
-                      ⚠ A {containerType} destination is also selected — image results will be imported twice.
-                      Consider using only the {containerType} destination below instead.
-                    </p>
-                  )}
-                </div>
-              </div>
+      {/* ③ Attach to input images (dataset mode only) */}
+      {!plateMode && (() => {
+        const _checked = state.formData.attachToOriginalImages ?? defaultValues.attachToOriginalImages;
+        const hasDestination = (selectedContainers?.length ?? 0) > 0;
+        return (
+          <SwitchCard
+            alignIndicator={Alignment.END}
+            checked={_checked}
+            onChange={(e) => handleInputChange("attachToOriginalImages", e.target.checked)}
+            className="mt-2"
+          >
+            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+              <span className="text-sm font-semibold">Attach to input images</span>
+              {renderDefaultCue(outputHints.imageCount > 0, outputHints.imageLabel, state.formData.attachToOriginalImages, outputHints.imageLabelFull)}
             </div>
-          );
-        })()}
+            <p className="text-xs font-normal text-gray-500">Attach output images (e.g. masks) to the original input images to track their provenance.</p>
+            {hasImageOutputDuplication && (
+              <Callout intent="warning" compact minimal className="mt-2">
+                {hasDestination
+                  ? `A ${containerType} destination is also selected — image results will be imported twice. Consider using only the ${containerType} destination below instead.`
+                  : "Bulk ZIP is also selected — image results will be duplicated there as well. Consider disabling one of these outputs if you do not need both."}
+              </Callout>
+            )}
+          </SwitchCard>
+        );
+      })()}
 
-        {/* ④ Individual file annotations */}
-        {(() => {
-          const _checked = state.formData.attachFileOutputs ?? outputHints.attachFileOutputs ?? defaultValues.attachFileOutputs;
-          const _border = !hasOutputSelection ? 'border-red-300 bg-white' : _checked ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300';
-          return (
-            <div
-              className={`border rounded p-3 transition-colors cursor-pointer ${_border}`}
-              onClick={() => handleInputChange("attachFileOutputs", !_checked)}
-            >
-              <div className="flex items-start gap-3">
-                <Icon icon="paperclip" size={16} className={`mt-0.5 shrink-0 ${_checked ? 'text-blue-600' : 'text-gray-400'}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold">Individual file annotations</span>
-                      {renderDefaultCue(outputHints.attachFileOutputs, outputHints.fileAnnotationLabel, state.formData.attachFileOutputs, outputHints.fileAnnotationLabelFull)}
-                    </div>
-                    <Switch
-                      id="attach-file-outputs"
-                      checked={_checked}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => handleInputChange("attachFileOutputs", e.target.checked)}
-                      className="shrink-0 mt-0"
-                      intent={hasOutputSelection ? "" : "danger"}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {renderDefaultHelper(
-                      outputHints.fileAnnotationCount > 0,
-                      `Suggested for: ${outputHints.fileAnnotationLabel}. Each non-image, non-CSV file is attached as its own OMERO annotation. CSV outputs go to OMERO Tables above.`,
-                      "Attach non-image, non-CSV output files (arrays, configs, model weights, log files) as individual OMERO file annotations. CSV files are handled by the OMERO tables option above.",
-                      state.formData.attachFileOutputs
-                    )}
-                  </p>
-                </div>
-              </div>
+      {/* ④ Individual file annotations */}
+      {(() => {
+        const _checked = state.formData.attachFileOutputs ?? outputHints.attachFileOutputs ?? defaultValues.attachFileOutputs;
+        return (
+          <SwitchCard
+            alignIndicator={Alignment.END}
+            checked={_checked}
+            onChange={(e) => handleInputChange("attachFileOutputs", e.target.checked)}
+            className="mt-2"
+          >
+            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+              <span className="text-sm font-semibold">Individual file annotations</span>
+              {renderDefaultCue(outputHints.attachFileOutputs, outputHints.fileAnnotationLabel, state.formData.attachFileOutputs, outputHints.fileAnnotationLabelFull)}
             </div>
-          );
-        })()}
-        {/* ⑤ Dataset / Screen destination */}
-        {(() => {
-          const hasDestination = (selectedContainers?.length ?? 0) > 0;
-          const _border = !hasOutputSelection
-            ? 'border-red-300 bg-white'
-            : hasDestination
-              ? 'border-blue-400 bg-blue-50'
-              : 'border-gray-200 bg-white hover:border-gray-300';
-          return (
-            <div className={`border rounded p-3 transition-colors ${_border}`}>
-              <div className="flex items-start gap-3 mb-2">
-                <Icon icon="media" size={16} className={`mt-0.5 shrink-0 ${hasDestination ? 'text-blue-600' : 'text-gray-400'}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold">Add (mask) image results to a {containerType}</span>
-                    {renderDefaultCue(
-                      outputHints.hasImageOutput || (plateMode ? autoFilledForPlateId.current !== null : autoFilledDatasets.current),
-                      outputHints.imageLabel || containerType,
-                      hasDestination ? undefined : false,
-                      outputHints.imageLabelFull || `${containerType} destination`
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Organizes output images and masks in an OMERO {containerType} for viewing and further analysis.
-                  </p>
-                </div>
-              </div>
-              <DatasetSelectWithPopover
+            <p className="text-xs font-normal text-gray-500">Attach non-image, non-CSV output files (arrays, configs, model weights, log files) as individual OMERO file annotations. CSV files are handled by the OMERO tables option above.</p>
+            {renderDefaultHelperCallout(outputHints.fileAnnotationCount > 0, `Suggested for: ${outputHints.fileAnnotationLabel}.`, state.formData.attachFileOutputs)}
+          </SwitchCard>
+        );
+      })()}
+
+      {/* ⑤ Dataset / Screen destination */}
+      {(() => {
+        const hasDestination = (selectedContainers?.length ?? 0) > 0;
+        const _suggested = outputHints.hasImageOutput || (plateMode ? autoFilledForPlateId.current !== null : autoFilledDatasets.current);
+        const _currentValue = hasDestination ? undefined : false;
+        return (
+          <Card interactive selected={hasDestination} className="mt-2">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <span className="text-sm font-semibold">Add (mask) image results to a {containerType}</span>
+                {renderDefaultCue(
+                  _suggested,
+                  outputHints.imageLabel || containerType,
+                  _currentValue,
+                  outputHints.imageLabelFull || `${containerType} destination`
+                )}
+            </div>
+            <p className="text-xs text-gray-500 mb-2">
+              Organizes output images and masks in an OMERO {containerType} for viewing and further analysis.
+            </p>
+            <DatasetSelectWithPopover
                 label={null}
-                helperText={`Type a new ${containerType} name and press Enter, or pick an existing one from the menu.`}
+                helperText={null}
                 subLabel={null}
                 tooltip={`Select the OMERO ${containerType} for your workflow results.`}
                 buttonText={plateMode ? "Select Screen" : "Select Dataset"}
                 placeholder={`Add new ${containerType} name or select...`}
-                value={(selectedContainers || []).map((name) => {
-                  return selectedContainerId ? `${name} (ID: ${selectedContainerId})` : name;
-                })}
+                value={(selectedContainers || []).map((name) =>
+                  selectedContainerId ? `${name} (ID: ${selectedContainerId})` : name
+                )}
                 onChange={handleContainerChange}
                 multiSelect={false}
                 intent={hasOutputSelection ? "" : "danger"}
@@ -699,10 +625,17 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
                   };
                 }}
               />
-            </div>
-          );
-        })()}
-      </div>
+            <Callout intent={hasOutputSelection ? "primary" : "danger"} compact minimal className="mt-2">
+              Type a new {containerType} name and press Enter, or pick an existing one from the menu.
+            </Callout>
+            {renderDefaultHelperCallout(
+              _suggested,
+              `Suggested for: ${outputHints.imageLabelFull || `${containerType} destination`}.`,
+              _currentValue
+            )}
+          </Card>
+        );
+      })()}
 
       {/* ── Rename result images (dataset mode only) ───── */}
       {!plateMode && (() => {
@@ -710,91 +643,88 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         const _hasDataset = (state.formData.selectedDatasets?.length ?? 0) > 0;
         const _disabled = !_hasDataset;
         const _hasError = _enabled && renameValidation.hasError;
-        const _border = _hasError
-          ? 'border-red-400 bg-red-50'
-          : _enabled
-            ? 'border-blue-400 bg-blue-50'
-            : 'border-gray-200 bg-white hover:border-gray-300';
-        return (
-          <div className="mt-1 ml-5 border-l-2 border-blue-100 pl-3">
-            <div
-              className={`border rounded p-3 transition-colors ${_border} ${_disabled ? 'opacity-50' : ''}`}
-            >
-          <div className="flex items-start gap-3">
-            <Icon icon="edit" size={16} className={`mt-0.5 shrink-0 ${_enabled ? (_hasError ? 'text-red-500' : 'text-blue-600') : 'text-gray-400'}`} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div>
-                  <span className="text-sm font-semibold">Rename result images</span>
-                  <p className="text-xs text-gray-500 mt-0.5">Apply a custom naming pattern to imported result images.</p>
-                </div>
-                <Switch
-                  id="image-renaming-switch"
-                  checked={_enabled}
-                  onChange={(e) => handleRenameEnableChange(e.target.checked)}
-                  disabled={_disabled}
-                  className="shrink-0 mt-0"
-                />
+        return _enabled ? (
+          // Expanded: plain Card + explicit Switch so form inputs are fully interactive
+          <Card selected className="mt-2">
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <div>
+                <p className="text-sm font-semibold">Rename result images</p>
+                <p className="text-xs text-gray-500">Apply a custom naming pattern to imported result images.</p>
               </div>
-              <FormGroup
-                label="Pattern"
-                labelFor="image-renaming-pattern"
-                helperText={
-                  <>
-                    <div>
-                      <strong>Input variables:</strong> <code>{"{original_file}"}</code> (filename without extension), <code>{"{original_ext}"}</code> (extension)
-                    </div>
-                    <div>
-                      <strong>Result variables:</strong> <code>{"{file}"}</code> (result filename without extension), <code>{"{ext}"}</code> (result extension)
-                    </div>
-                    <div className="mt-2"><strong>Examples — click to use:</strong></div>
-                    <ul className="list-disc list-inside mt-1 text-xs ml-4">
-                      <li>
-                        <code
-                          className="cursor-pointer hover:bg-blue-100 px-1 rounded"
-                          onClick={() => handleExampleClick("{original_file}_mask.{ext}")}
-                          title="Click to use this pattern"
-                        >
-                          {"{original_file}_mask.{ext}"}
-                        </code> → original name + result extension
-                      </li>
-                      <li>
-                        <code
-                          className="cursor-pointer hover:bg-blue-100 px-1 rounded"
-                          onClick={() => handleExampleClick("{file}_processed.{original_ext}")}
-                          title="Click to use this pattern"
-                        >
-                          {"{file}_processed.{original_ext}"}
-                        </code> → result name + original extension
-                      </li>
-                      <li>
-                        <code
-                          className="cursor-pointer hover:bg-blue-100 px-1 rounded"
-                          onClick={() => handleExampleClick("analysis_{original_file}.tif")}
-                          title="Click to use this pattern"
-                        >
-                          {"analysis_{original_file}.tif"}
-                        </code> → custom prefix + original name + fixed extension
-                      </li>
-                    </ul>
-                  </>
-                }
+              <Switch
+                checked={true}
+                onChange={(e) => handleRenameEnableChange(e.target.checked)}
                 disabled={_disabled}
-              >
-                <InputGroup
-                  id="image-renaming-pattern"
-                  inputRef={renameInputRef}
-                  value={renamePattern}
-                  onChange={handleRenamePatternChange}
-                  fill={true}
-                  disabled={_disabled}
-                  intent={renameValidation.hasError ? "danger" : (renameValidation.hasWarning ? "warning" : "none")}
-                />
-              </FormGroup>
+                className="shrink-0 mt-0.5 mb-0"
+              />
             </div>
-          </div>
-            </div>
-          </div>
+            <FormGroup
+              label="Pattern"
+              labelFor="image-renaming-pattern"
+              className="mt-2 mb-0"
+              helperText={
+                <>
+                  <div>
+                    <strong>Input variables:</strong> <code>{"{original_file}"}</code> (filename without extension), <code>{"{original_ext}"}</code> (extension)
+                  </div>
+                  <div>
+                    <strong>Result variables:</strong> <code>{"{file}"}</code> (result filename without extension), <code>{"{ext}"}</code> (result extension)
+                  </div>
+                  <div className="mt-2"><strong>Examples — click to use:</strong></div>
+                  <ul className="list-disc list-inside mt-1 text-xs ml-4">
+                    <li>
+                      <code
+                        className="cursor-pointer hover:bg-blue-100 px-1 rounded"
+                        onClick={() => handleExampleClick("{original_file}_mask.{ext}")}
+                        title="Click to use this pattern"
+                      >
+                        {"{original_file}_mask.{ext}"}
+                      </code> → original name + result extension
+                    </li>
+                    <li>
+                      <code
+                        className="cursor-pointer hover:bg-blue-100 px-1 rounded"
+                        onClick={() => handleExampleClick("{file}_processed.{original_ext}")}
+                        title="Click to use this pattern"
+                      >
+                        {"{file}_processed.{original_ext}"}
+                      </code> → result name + original extension
+                    </li>
+                    <li>
+                      <code
+                        className="cursor-pointer hover:bg-blue-100 px-1 rounded"
+                        onClick={() => handleExampleClick("analysis_{original_file}.tif")}
+                        title="Click to use this pattern"
+                      >
+                        {"analysis_{original_file}.tif"}
+                      </code> → custom prefix + original name + fixed extension
+                    </li>
+                  </ul>
+                </>
+              }
+            >
+              <InputGroup
+                id="image-renaming-pattern"
+                inputRef={renameInputRef}
+                value={renamePattern}
+                onChange={handleRenamePatternChange}
+                fill={true}
+                intent={_hasError ? "danger" : (renameValidation.hasWarning ? "warning" : "none")}
+              />
+            </FormGroup>
+          </Card>
+        ) : (
+          // Collapsed: SwitchCard — whole card is clickable to enable
+          <SwitchCard
+            alignIndicator={Alignment.END}
+            checked={false}
+            disabled={_disabled}
+            onChange={(e) => handleRenameEnableChange(e.target.checked)}
+            className="mt-2"
+          >
+            <p className="text-sm font-semibold">Rename result images</p>
+            <p className="text-xs font-normal text-gray-500">Apply a custom naming pattern to imported result images.</p>
+          </SwitchCard>
         );
       })()}
     </form>

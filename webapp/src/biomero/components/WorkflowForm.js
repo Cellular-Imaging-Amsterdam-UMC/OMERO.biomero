@@ -416,6 +416,10 @@ const WorkflowForm = () => {
   return (
     <form>
       <h2>{workflowMetadata.name || workflowMetadata.workflow}</h2>
+
+      <Callout intent={Intent.PRIMARY} icon="info-sign" className="mb-4">
+        Review the workflow parameters before launch. Most fields start with sensible defaults, so in many cases you only need to confirm the version and adjust only those settings relevant to your run.
+      </Callout>
       
       {/* Version Selection */}
       <FormGroup

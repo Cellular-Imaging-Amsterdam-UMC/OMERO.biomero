@@ -112,13 +112,13 @@ const InputOptions = ({ itemLabel = "images" }) => {
 
   return (
     <form>
-      <p className="text-sm text-gray-600 mb-4">
-        These settings are optional. You can safely click "Next" without changing anything to use default processing.
-      </p>
+      <Callout intent={Intent.PRIMARY} icon="info-sign" className="mb-4">
+        Batch options control how your selected data is split across SLURM jobs. These settings are optional, and if you are unsure you can keep the defaults and continue.
+      </Callout>
       
       {/* Show recommendation callout for large datasets */}
       {recommendation.shouldRecommendBatch && !batchEnabled && (
-        <Callout intent={Intent.WARNING} className="mb-4">
+        <Callout intent={Intent.WARNING} compact minimal className="mb-4">
           <strong>Large Dataset Detected:</strong> With {totalImages} {itemLabel}, batch processing is recommended 
           to avoid SLURM timeouts and improve reliability. Consider enabling batch processing below.
         </Callout>
@@ -167,11 +167,16 @@ const InputOptions = ({ itemLabel = "images" }) => {
                       }
                     }}
                     label={
-                      <span className={`text-red-600 ${unlockDangerousJobs ? 'font-bold' : 'font-normal'}`}>
-                        Allow >10 jobs (dangerous)
-                      </span>
+                      <Tooltip
+                        content="Allows more than 10 parallel jobs. This increases the risk of failures, resource pressure, and partial result loss."
+                        placement="top"
+                        intent={Intent.DANGER}
+                      >
+                        <span className={`text-red-600 ${unlockDangerousJobs ? "font-bold" : "font-medium"}`}>
+                          Allow {">"}10 jobs (dangerous)
+                        </span>
+                      </Tooltip>
                     }
-                    intent={Intent.DANGER}
                   />
                 )}
                 
@@ -209,7 +214,7 @@ const InputOptions = ({ itemLabel = "images" }) => {
               // Practical warnings about job failure likelihood
               if (jobCount > 50) {
                 return (
-                  <Callout intent={Intent.DANGER} style={{ marginTop: '8px' }}>
+                  <Callout intent={Intent.DANGER} compact minimal className="mt-2">
                     <strong>CRITICAL:</strong> {jobCount} jobs significantly increases likelihood of job failures and data loss. 
                     High server resource usage may affect other users.
                   </Callout>
@@ -218,7 +223,7 @@ const InputOptions = ({ itemLabel = "images" }) => {
               
               if (jobCount > 20) {
                 return (
-                  <Callout intent={Intent.DANGER} className="mt-2">
+                  <Callout intent={Intent.DANGER} compact minimal className="mt-2">
                     <strong>HIGH RISK:</strong> {jobCount} jobs greatly increases chance of job failures and result data loss.
                   </Callout>
                 );
@@ -226,7 +231,7 @@ const InputOptions = ({ itemLabel = "images" }) => {
               
               if (jobCount > 10) {
                 return (
-                  <Callout intent={Intent.WARNING} className="mt-2">
+                  <Callout intent={Intent.WARNING} compact minimal className="mt-2">
                     <strong>CAUTION:</strong> {jobCount} jobs increases likelihood of job failures compared to fewer, larger jobs.
                   </Callout>
                 );
@@ -235,7 +240,7 @@ const InputOptions = ({ itemLabel = "images" }) => {
               // Performance suggestions
               if (batchSize === 1 && itemLabel === "images") {
                 return (
-                  <Callout intent={Intent.WARNING} className="mt-2">
+                  <Callout intent={Intent.WARNING} compact minimal className="mt-2">
                     One image per job creates maximum overhead. Consider fewer jobs for better efficiency.
                   </Callout>
                 );
@@ -243,7 +248,7 @@ const InputOptions = ({ itemLabel = "images" }) => {
 
               if (batchSize === 1 && itemLabel !== "images") {
                 return (
-                  <Callout intent={Intent.PRIMARY} className="mt-2">
+                  <Callout intent={Intent.PRIMARY} compact minimal className="mt-2">
                     One {itemLabel.replace(/s$/, '')} per job — each {itemLabel.replace(/s$/, '')} runs independently.
                   </Callout>
                 );
@@ -251,7 +256,7 @@ const InputOptions = ({ itemLabel = "images" }) => {
               
               if (totalImages > 64 && jobCount >= 4 && jobCount <= 6) {
                 return (
-                  <Callout intent={Intent.SUCCESS} className="mt-2">
+                  <Callout intent={Intent.SUCCESS} compact minimal className="mt-2">
                     Excellent choice! {jobCount} jobs is optimal for {totalImages} {itemLabel} - good balance of speed and reliability.
                   </Callout>
                 );
@@ -259,7 +264,7 @@ const InputOptions = ({ itemLabel = "images" }) => {
               
               if (totalImages > 64 && jobCount <= 3) {
                 return (
-                  <Callout intent={Intent.SUCCESS} className="mt-2">
+                  <Callout intent={Intent.SUCCESS} compact minimal className="mt-2">
                     Conservative choice! For {totalImages} {itemLabel}, you might try 4-6 jobs for better performance.
                   </Callout>
                 );

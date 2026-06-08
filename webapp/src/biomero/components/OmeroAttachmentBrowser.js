@@ -249,15 +249,7 @@ const OmeroAttachmentBrowser = ({
 
     if (!shouldResetCollapse) return;
 
-    if (search.trim()) {
-      setCollapsedGroups(new Set());
-    } else {
-      setCollapsedGroups(
-        new Set(
-          grouped.slice(2).map(({ parent }) => (parent ? `${parent.type}-${parent.id}` : "__unlinked__"))
-        )
-      );
-    }
+    setCollapsedGroups(new Set());
     resetGroupCollapseOnNextLoadRef.current = false;
   }, [grouped, search]);
 
