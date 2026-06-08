@@ -26,6 +26,22 @@ from .utils import get_upload_storage_dir
 logger = logging.getLogger(__name__)
 
 
+def build_upload_location(request, resource_id):
+    """Build the upload resource URL, honoring reverse-proxy scheme headers."""
+    location = request.build_absolute_uri(f"/omero_biomero/upload/{resource_id}")
+    forwarded_proto = request.headers.get("X-Forwarded-Proto")
+    if not forwarded_proto:
+        forwarded_proto = request.META.get("HTTP_X_FORWARDED_PROTO")
+    if not forwarded_proto:
+        return location
+
+    scheme = forwarded_proto.split(",", 1)[0].strip()
+    if not scheme:
+        return location
+
+    return f"{scheme}://{request.get_host()}/omero_biomero/upload/{resource_id}"
+
+
 def ensure_chunk_directory():
     """Ensure the temporary chunk storage directory exists."""
     Path(UPLOADER_CHUNKS_DIR).mkdir(parents=True, exist_ok=True)
@@ -207,7 +223,7 @@ class TusUploadView(View):
         logger.info(f"Created TUS upload resource: {resource_id} for file: {filename}")
 
         # Build location URL
-        location = request.build_absolute_uri(f"/omero_biomero/upload/{resource_id}")
+        location = build_upload_location(request, resource_id)
 
         response = HttpResponse(status=201)
         response["Location"] = location

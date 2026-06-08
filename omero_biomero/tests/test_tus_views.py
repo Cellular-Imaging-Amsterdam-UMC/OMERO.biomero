@@ -524,6 +524,32 @@ class TusUploadCreationTests(TusViewsTestCase):
         meta = self.mod.load_metadata(resource_id)
         self.assertEqual(meta["user_id"], 42)
 
+    def test_create_upload_uses_forwarded_https_in_location(self):
+        """Should return an https Location when the reverse proxy forwards https."""
+        import base64
+
+        filename_b64 = base64.b64encode(b"secure.tif").decode()
+        request = self._make_request(
+            "POST",
+            path="/omero_biomero/upload/",
+            headers={
+                "HTTP_HOST": "omero-acc.amc.nl",
+                "HTTP_X_FORWARDED_PROTO": "https",
+                "HTTP_UPLOAD_LENGTH": "5000",
+                "HTTP_UPLOAD_METADATA": f"filename {filename_b64}",
+                "HTTP_TUS_RESUMABLE": "1.0.0",
+            },
+        )
+        view = self.mod.TusUploadView.as_view()
+        response = view(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(
+            response.get("Location").startswith(
+                "https://omero-acc.amc.nl/omero_biomero/upload/"
+            )
+        )
+
 
 class TusUploadChunkTests(TusViewsTestCase):
     """Tests for chunk upload (PATCH)."""
