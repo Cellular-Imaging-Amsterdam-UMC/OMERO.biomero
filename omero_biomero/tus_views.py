@@ -387,7 +387,7 @@ class TusUploadView(View):
 
     def _finalize_upload(self, resource_id, meta):
         """Move completed upload to user-specific destination directory."""
-        ensure_directories()
+        ensure_chunk_directory()
 
         chunk_path = meta["chunk_path"]
         filename = meta["filename"]
