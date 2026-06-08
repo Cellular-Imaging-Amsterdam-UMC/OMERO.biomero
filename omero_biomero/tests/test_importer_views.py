@@ -6,7 +6,7 @@ import uuid as _uuid
 import types
 import shutil
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from django.test import TestCase, RequestFactory
 from django.http import JsonResponse
 
@@ -605,7 +605,8 @@ class ImporterViewsTests(TestCase):
             _raw(self.mod.group_mappings)(good, conn=self.conn).status_code, 200
         )
         get_req = self.factory.get("/importer/group_mappings")
-        got = _raw(self.mod.group_mappings)(get_req, conn=self.conn)
+        with patch("omero_biomero.utils.GROUP_MAPPINGS_FILE_PATH", cfg):
+            got = _raw(self.mod.group_mappings)(get_req, conn=self.conn)
         self.assertEqual(
             json.loads(got.content)["mappings"], {"g1": "labA", "g2": "labB"}
         )
