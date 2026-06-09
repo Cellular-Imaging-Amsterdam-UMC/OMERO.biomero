@@ -478,6 +478,7 @@ const ImporterApp = () => {
       if (!item) return false;
       const filename = item.filename || item.data || "";
       if (filename.toLowerCase().endsWith(".db")) return true;
+      if (filename.toLowerCase().endsWith(".icarch")) return true;
       if (item.metadata && item.metadata.zarr_type === "plate") return true;
       return false;
     };
@@ -579,6 +580,7 @@ const ImporterApp = () => {
       if (!item) return false;
       const filename = item.data || "";
       if (filename.toLowerCase().endsWith(".db")) return true;
+      if (filename.toLowerCase().endsWith(".icarch")) return true;
       if (item.metadata && item.metadata.zarr_type === "plate") return true;
       return false;
     };
