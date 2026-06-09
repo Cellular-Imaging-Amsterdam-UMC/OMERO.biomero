@@ -4,8 +4,22 @@ import TabContainer from "./components/TabContainer";
 import RunPanel from "./components/RunPanel";
 import GroupSelect from "../shared/components/GroupSelect"; // Add this import
 import SlurmStatusIndicator from "../shared/components/SlurmStatusIndicator";
-import { Tabs, Tab, H4, Tooltip, H6 } from "@blueprintjs/core";
+import {
+  Tabs,
+  Tab,
+  H4,
+  Tooltip,
+  H6,
+  HTMLTable,
+  Tag,
+  Spinner,
+  InputGroup,
+  Button,
+  Callout,
+  Icon,
+} from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
+import { fetchMetabaseData } from "../apiService";
 import SettingsForm from "./components/SettingsForm";
 
 const RunTab = ({ onWorkflowError }) => (
@@ -72,87 +86,252 @@ const AdminPanel = () => {
   );
 };
 
-const StatusPanel = ({
-  iframeUrl,
-  metabaseError,
-  setMetabaseError,
-  isAdmin,
-  metabaseUrl,
-}) => {
-  const iframeRef = useRef(null);
+const StatusPanel = ({ isAdmin, metabaseUrl }) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [data, setData] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetchMetabaseData("workflows");
+      if (response && response.data && response.data.rows) {
+        const mapped = mapRowsToObjects(response.data.cols, response.data.rows);
+        setData(mapped);
+      } else {
+        setData([]);
+      }
+    } catch (err) {
+      console.error("Failed to load workflows status data:", err);
+      setError("Failed to load workflow status data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
+    loadData();
+    const interval = setInterval(loadData, 20000);
+    return () => clearInterval(interval);
+  }, []);
 
-    const onLoad = () => {
-      try {
-        const doc = iframe.contentWindow.document;
+  const mapRowsToObjects = (cols, rows) => {
+    if (!cols || !rows) return [];
+    const colNames = cols.map((c) => c.name);
+    return rows.map((row) => {
+      const obj = {};
+      colNames.forEach((name, idx) => {
+        obj[name] = row[idx] !== undefined ? row[idx] : null;
+      });
+      return obj;
+    });
+  };
 
-        doc.addEventListener("click", (e) => {
-          const a = e.target.closest("a");
-          if (a && a.href) {
-            try {
-              const url = new URL(a.href);
-              if (url.hostname === window.location.hostname) {
-                window.top.location.href = a.href;
-                e.preventDefault();
-              }
-            } catch (_) {
-              // ignore invalid URLs
-            }
-          }
-        });
-      } catch (err) {
-        console.warn("Could not attach click handler to iframe:", err);
-      }
-    };
+  const getStatusTagIntent = (status) => {
+    if (!status) return "none";
+    const s = status.toLowerCase();
+    if (s.includes("done") || s.includes("completed") || s.includes("success")) return "success";
+    if (s.includes("failed") || s.includes("error")) return "danger";
+    if (s.includes("running")) return "primary";
+    if (s.includes("pending") || s.includes("job_pending")) return "warning";
+    return "primary";
+  };
 
-    iframe.addEventListener("load", onLoad);
+  const getRowClass = (status) => {
+    if (!status) return "";
+    const s = status.toLowerCase();
+    if (s.includes("failed") || s.includes("error")) return "bg-red-50/70 dark:bg-red-900/10";
+    if (s.includes("done") || s.includes("completed")) return "bg-green-50/50 dark:bg-green-900/5";
+    return "";
+  };
 
-    return () => {
-      iframe.removeEventListener("load", onLoad);
-    };
-  }, [iframeUrl]);
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "-";
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleString();
+    } catch (_) {
+      return dateStr;
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const filteredData = data.filter((item) => {
+    const search = searchTerm.toLowerCase();
+    const name = String(item.name || "").toLowerCase();
+    const mainTask = String(item.main_task_name || "").toLowerCase();
+    const status = String(item.status || "").toLowerCase();
+    const wfId = String(item.workflow_id || "").toLowerCase();
+    return name.includes(search) || mainTask.includes(search) || status.includes(search) || wfId.includes(search);
+  });
+
+  const totalPages = Math.ceil(filteredData.length / pageSize);
+  const paginatedData = filteredData.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   return (
     <div className="max-h-[calc(100vh-225px)] overflow-y-auto">
-      <H4>Status</H4>
-      <div className="bp5-form-group">
-        <div className="bp5-form-content">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <H4>Status</H4>
           <div className="bp5-form-helper-text">
-            View your active BIOMERO workflow progress, or browse some
-            historical data, here on this dashboard.
-          </div>
-          <div className="bp5-form-helper-text">
-            Tip: When a workflow is <b>DONE</b>, you can find your result images
-            (if any) by pasting the <b>Workflow ID</b> in OMERO's search bar at
-            the top of your screen.
+            View your active BIOMERO workflow progress or historical execution records.
           </div>
         </div>
-      </div>
-      <div className="p-4">
-        {!metabaseError ? (
-          <iframe
-            title="Metabase dashboard"
-            src={iframeUrl}
-            className="w-full h-[800px]"
-            ref={iframeRef}
-            onError={() => setMetabaseError(true)}
+        <div className="flex space-x-2">
+          <InputGroup
+            placeholder="Filter by name, workflow ID, status..."
+            leftIcon="search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ width: "300px" }}
           />
-        ) : (
-          <div className="error">
-            Error loading Metabase dashboard. Please try refreshing the page.
-          </div>
-        )}
-        {isAdmin && (
-          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded">
-            <a href={metabaseUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
-              Click here to access the Metabase interface
-            </a>
-          </div>
-        )}
+          <Button icon="refresh" onClick={loadData} loading={loading}>
+            Refresh
+          </Button>
+        </div>
       </div>
+
+      {loading && data.length === 0 ? (
+        <div className="flex justify-center p-12">
+          <Spinner size={50} />
+        </div>
+      ) : error ? (
+        <Callout intent="danger" title="Error loading data">
+          {error}
+        </Callout>
+      ) : filteredData.length === 0 ? (
+        <Callout intent="warning">
+          No workflow tracking records found.
+        </Callout>
+      ) : (
+        <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+          <HTMLTable striped interactive className="w-full text-sm align-middle">
+            <thead>
+              <tr>
+                <th>Workflow ID</th>
+                <th>Name</th>
+                <th>Main Task Name</th>
+                <th>Status</th>
+                <th>Progress</th>
+                <th>Start Time</th>
+                <th>Task</th>
+                <th>Group</th>
+                <th>User</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedData.map((item, idx) => (
+                <tr key={idx} className={getRowClass(item.status)}>
+                  <td>
+                    {item.workflow_id ? (
+                      <div className="flex items-center space-x-1">
+                        <code className="text-xs bg-gray-100 px-1 py-0.5 rounded font-mono">
+                          {item.workflow_id.substring(0, 8)}...
+                        </code>
+                        <Tooltip content="Copy Workflow ID" compact>
+                          <Button
+                            icon="duplicate"
+                            minimal
+                            small
+                            onClick={() => copyToClipboard(item.workflow_id)}
+                          />
+                        </Tooltip>
+                      </div>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                  <td className="font-semibold">{item.name || "-"}</td>
+                  <td>{item.main_task_name || "-"}</td>
+                  <td>
+                    <Tag intent={getStatusTagIntent(item.status)} large={false} minimal>
+                      {item.status || "Unknown"}
+                    </Tag>
+                  </td>
+                  <td>{item.progress !== null && item.progress !== undefined ? `${item.progress}%` : "-"}</td>
+                  <td className="whitespace-nowrap">{formatDate(item.start_time)}</td>
+                  <td>{item.task || "-"}</td>
+                  <td>{item.group || "-"}</td>
+                  <td>{item.user || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </HTMLTable>
+          {filteredData.length > pageSize && (
+            <div className="flex justify-between items-center p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40">
+              <span className="text-xs text-gray-500">
+                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length} entries
+              </span>
+              <div className="flex space-x-1 items-center">
+                <Button
+                  icon="double-chevron-left"
+                  minimal
+                  small
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(1)}
+                />
+                <Button
+                  icon="chevron-left"
+                  small
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs font-semibold px-3 text-gray-700 dark:text-gray-300">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  rightIcon="chevron-right"
+                  small
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                >
+                  Next
+                </Button>
+                <Button
+                  icon="double-chevron-right"
+                  minimal
+                  small
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(totalPages)}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {isAdmin && metabaseUrl && (
+        <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded flex items-center justify-between">
+          <span className="text-xs text-blue-800 dark:text-blue-300">
+            Administrators can access the raw Metabase interface for query builders and reports.
+          </span>
+          <a
+            href={metabaseUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs font-semibold"
+          >
+            Open Metabase Interface <Icon icon="share" size={12} className="ml-1 inline" />
+          </a>
+        </div>
+      )}
     </div>
   );
 };
@@ -277,9 +456,6 @@ const BiomeroApp = () => {
             panel={
               loadedTabs.Status ? (
                 <StatusPanel
-                  iframeUrl={iframeUrl}
-                  metabaseError={metabaseError}
-                  setMetabaseError={setMetabaseError}
                   isAdmin={isAdmin}
                   metabaseUrl={metabaseUrl}
                 />

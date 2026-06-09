@@ -75,4 +75,10 @@ urlpatterns = [
         biomero_views.biomero,
         name="biomero",
     ),
+    # Metabase data endpoint
+    path(
+        "api/metabase/data/",
+        biomero_views.metabase_data,
+        name="metabase_data",
+    ),
 ]

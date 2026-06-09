@@ -914,3 +914,15 @@ export const checkModelVersions = async (models, forceRefresh = false) => {
   
   return versionChecks;
 };
+
+// Fetch Metabase query results as JSON
+export const fetchMetabaseData = async (dashboardType, page = 1, search = "", limit = 50) => {
+  const params = {
+    dashboard_type: dashboardType,
+    page,
+    search,
+    limit,
+    _: new Date().getTime(),
+  };
+  return apiRequest(`/omero_biomero/api/metabase/data/`, "GET", null, { params });
+};
