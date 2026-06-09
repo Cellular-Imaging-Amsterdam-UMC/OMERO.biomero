@@ -130,8 +130,8 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
   const totalPages = Math.ceil(totalRows / pageSize);
 
   return (
-    <div className="max-h-[calc(100vh-225px)] overflow-y-auto">
-      <div className="flex justify-between items-center mb-4">
+    <div className="flex flex-col h-[calc(100vh-225px)]">
+      <div className="flex justify-between items-center mb-4 flex-shrink-0">
         <div>
           <H4>Monitor</H4>
           <div className="bp5-form-helper-text">
@@ -153,89 +153,95 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
       </div>
 
       {loading && data.length === 0 ? (
-        <div className="flex justify-center p-12">
+        <div className="flex justify-center p-12 flex-grow">
           <Spinner size={50} />
         </div>
       ) : error ? (
-        <Callout intent="danger" title="Error loading data">
-          {error}
-        </Callout>
+        <div className="flex-grow overflow-auto min-h-0">
+          <Callout intent="danger" title="Error loading data">
+            {error}
+          </Callout>
+        </div>
       ) : totalRows === 0 ? (
-        <Callout intent="warning">
-          No import records found.
-        </Callout>
+        <div className="flex-grow overflow-auto min-h-0">
+          <Callout intent="warning">
+            No import records found.
+          </Callout>
+        </div>
       ) : (
-        <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
-          <HTMLTable striped interactive className="w-full text-sm align-middle">
-            <thead>
-              <tr>
-                <th>File Names</th>
-                <th>Stage</th>
-                <th>Dataset/Screen</th>
-                <th>UUID</th>
-                <th>Timestamp</th>
-                <th>Elapsed Time</th>
-                <th>Group</th>
-                <th>User</th>
-                <th>Description</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((item, idx) => (
-                <tr key={idx} className={getRowClass(item.stage)}>
-                  <td className="max-w-xs break-all font-medium">
-                    {formatFileList(item.file_names)}
-                  </td>
-                  <td>
-                    <Tag intent={getStageTagIntent(item.stage)} large={false} minimal>
-                      {item.stage || "Unknown"}
-                    </Tag>
-                  </td>
-                  <td>
-                    {item["Dataset/Screen"] ? (
-                      <a
-                        href={`/webclient/?show=${(item.destination_type || "Dataset").toLowerCase()}-${item["Dataset/Screen"]}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-bold underline flex items-center"
-                      >
-                        <Icon icon="link" size={12} className="mr-1" />
-                        {item.destination_type || "Dataset"} {item["Dataset/Screen"]}
-                      </a>
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-                  <td>
-                    {item.uuid ? (
-                      <div className="flex items-center space-x-1">
-                        <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
-                          {item.uuid.substring(0, 8)}...
-                        </code>
-                        <Tooltip content="Copy UUID" compact>
-                          <Button
-                            icon="duplicate"
-                            minimal
-                            small
-                            onClick={() => copyToClipboard(item.uuid)}
-                          />
-                        </Tooltip>
-                      </div>
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap">{formatDate(item.timestamp)}</td>
-                  <td className="whitespace-nowrap">{item.elapsed_time || "-"}</td>
-                  <td>{item.group_name || "-"}</td>
-                  <td>{item.user_name || "-"}</td>
-                  <td className="text-gray-500 italic max-w-xs truncate">{item.description || "-"}</td>
+        <div className="flex-grow flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg min-h-0">
+          <div className="flex-grow overflow-auto">
+            <HTMLTable interactive className="w-full text-sm align-middle">
+              <thead>
+                <tr>
+                  <th>File Names</th>
+                  <th>Stage</th>
+                  <th>Dataset/Screen</th>
+                  <th>UUID</th>
+                  <th>Timestamp</th>
+                  <th>Elapsed Time</th>
+                  <th>Group</th>
+                  <th>User</th>
+                  <th>Description</th>
                 </tr>
-              ))}
-            </tbody>
-          </HTMLTable>
+              </thead>
+              <tbody>
+                {data.map((item, idx) => (
+                  <tr key={idx}>
+                    <td className="max-w-xs break-all font-medium">
+                      {formatFileList(item.file_names)}
+                    </td>
+                    <td>
+                      <Tag intent={getStageTagIntent(item.stage)} large={false} minimal>
+                        {item.stage || "Unknown"}
+                      </Tag>
+                    </td>
+                    <td>
+                      {item["Dataset/Screen"] ? (
+                        <a
+                          href={`/webclient/?show=${(item.destination_type || "Dataset").toLowerCase()}-${item["Dataset/Screen"]}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-bold underline flex items-center"
+                        >
+                          <Icon icon="link" size={12} className="mr-1" />
+                          {item.destination_type || "Dataset"} {item["Dataset/Screen"]}
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td>
+                      {item.uuid ? (
+                        <div className="flex items-center space-x-1">
+                          <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
+                            {item.uuid.substring(0, 8)}...
+                          </code>
+                          <Tooltip content="Copy UUID" compact>
+                            <Button
+                              icon="duplicate"
+                              minimal
+                              small
+                              onClick={() => copyToClipboard(item.uuid)}
+                            />
+                          </Tooltip>
+                        </div>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap">{formatDate(item.timestamp)}</td>
+                    <td className="whitespace-nowrap">{item.elapsed_time || "-"}</td>
+                    <td>{item.group_name || "-"}</td>
+                    <td>{item.user_name || "-"}</td>
+                    <td className="text-gray-500 italic max-w-xs truncate">{item.description || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </HTMLTable>
+          </div>
           {totalRows > pageSize && (
-            <div className="flex justify-between items-center p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40">
+            <div className="flex-shrink-0 flex justify-between items-center p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40">
               <span className="text-xs text-gray-500">
                 Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalRows)} of {totalRows} entries
               </span>
@@ -280,7 +286,7 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
       )}
       
       {isAdmin && metabaseUrl && (
-        <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded flex items-center justify-between">
+        <div className="flex-shrink-0 mt-4 p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded flex items-center justify-between">
           <span className="text-xs text-blue-800 dark:text-blue-300">
             Administrators can access the raw Metabase interface for query builders and reports.
           </span>

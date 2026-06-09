@@ -61,10 +61,6 @@ class BiomeroViewTests(TestCase):
 
     def test_biomero_context_basic(self):
         env = {
-            "METABASE_SITE_URL": "https://mb.example.org",
-            "METABASE_SECRET_KEY": "secret",
-            "METABASE_WORKFLOWS_DB_PAGE_DASHBOARD_ID": "11",
-            "METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID": "22",
             "IMPORTER_ENABLED": "true",
             "ANALYZER_ENABLED": "false",
         }
@@ -74,32 +70,20 @@ class BiomeroViewTests(TestCase):
         ):
             ctx = _raw_biomero()(None, conn=self._fake_conn())
 
-        self.assertEqual(ctx["metabase_site_url"], env["METABASE_SITE_URL"])
+        self.assertEqual(ctx["metabase_site_url"], "")
+        self.assertEqual(ctx["metabase_token_monitor_workflows"], "")
+        self.assertEqual(ctx["metabase_token_imports"], "")
         self.assertTrue(ctx["importer_enabled"])  # true parsed
         self.assertFalse(ctx["analyzer_enabled"])  # false parsed
         self.assertEqual(ctx["main_js"], "hashed-main.js")
         self.assertEqual(ctx["main_css"], "hashed-main.css")
         self.assertIn(".lif", ctx["uploader_allowed_file_extensions"])
         self.assertNotIn(".xlef", ctx["uploader_allowed_file_extensions"])
-        self.assertIsInstance(ctx["metabase_token_monitor_workflows"], str)
-        self.assertIsInstance(ctx["metabase_token_imports"], str)
-        decoded = jwt.decode(
-            ctx["metabase_token_monitor_workflows"],
-            env["METABASE_SECRET_KEY"],
-            algorithms=["HS256"],
-            options={"verify_exp": False},
-        )
-        self.assertIn("resource", decoded)
 
     def test_biomero_missing_env_defaults(self):
-        # Ensure missing optional env falls back gracefully (tokens will error if key missing)
         with patch.dict(
             os.environ,
-            {
-                "METABASE_SECRET_KEY": "k",
-                "METABASE_WORKFLOWS_DB_PAGE_DASHBOARD_ID": "1",
-                "METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID": "2",
-            },
+            {},
             clear=True,
         ), patch(
             "omero_biomero.biomero_views.get_react_build_file",
@@ -113,18 +97,117 @@ class BiomeroViewTests(TestCase):
     def test_biomero_build_file_fallback(self):
         with patch.dict(
             os.environ,
-            {
-                "METABASE_SECRET_KEY": "k",
-                "METABASE_WORKFLOWS_DB_PAGE_DASHBOARD_ID": "3",
-                "METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID": "4",
-            },
+            {},
             clear=True,
         ):
-            # Use real util but manifest likely absent => returns logical name sans path modifications
             ctx = _raw_biomero()(None, conn=self._fake_conn())
-        # If manifest present returns hashed path; otherwise logical name
         self.assertTrue(
             ctx["main_js"].startswith("omero_biomero/assets/main.")
             and ctx["main_js"].endswith(".js")
             or ctx["main_js"] == "main.js"
         )
+
+    @patch("omero_biomero.biomero_views.psycopg2.connect")
+    def test_metabase_data_imports(self, mock_connect):
+        from omero_biomero.biomero_views import metabase_data
+        from django.test import RequestFactory
+        import datetime
+
+        # Mock database connection and cursor
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_connect.return_value.__enter__.return_value = mock_conn
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+
+        # Fake rows returned from imports SQL query
+        fake_rows = [
+            (
+                '["file1.lif"]',
+                "Import Completed",
+                "101",
+                "some-uuid-1",
+                datetime.datetime(2026, 6, 9, 10, 0, 0),
+                "10 seconds",
+                "group1",
+                "alice",
+                None,
+                "Dataset"
+            )
+        ]
+        mock_cursor.fetchall.return_value = fake_rows
+
+        rf = RequestFactory()
+        req = rf.get('/biomero/metabase_data/', {'dashboard_type': 'imports'})
+        
+        with patch.dict(os.environ, {"INGEST_TRACKING_DB_URL": "postgresql://user:pass@host/db"}):
+            resp = metabase_data(req, conn=self._fake_conn(username="alice"))
+
+        self.assertEqual(resp.status_code, 200)
+        import json
+        data = json.loads(resp.content.decode("utf-8"))["data"]
+        self.assertEqual(data["total_rows"], 1)
+        self.assertEqual(data["rows"][0][3], "some-uuid-1")
+        self.assertEqual(data["rows"][0][4], "2026-06-09T10:00:00")
+        self.assertEqual(data["cols"][0]["name"], "file_names")
+
+    @patch("omero_biomero.biomero_views.psycopg2.connect")
+    def test_metabase_data_workflows(self, mock_connect):
+        from omero_biomero.biomero_views import metabase_data
+        from django.test import RequestFactory
+        import datetime
+
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_connect.return_value.__enter__.return_value = mock_conn
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+
+        # Fake rows returned from workflows SQL query
+        # Columns: workflow_id, name, main_task_name, status, progress, start_time, task, group, user
+        fake_rows = [
+            (
+                "wf-uuid-1",
+                "Workflow 1",
+                "Task A",
+                "Running",
+                50.0,
+                datetime.datetime(2026, 6, 9, 10, 5, 0),
+                "subtask 1",
+                "group1",
+                5
+            )
+        ]
+        mock_cursor.fetchall.return_value = fake_rows
+
+        rf = RequestFactory()
+        req = rf.get('/biomero/metabase_data/', {'dashboard_type': 'workflows'})
+        
+        with patch.dict(os.environ, {"INGEST_TRACKING_DB_URL": "postgresql://user:pass@host/db"}):
+            resp = metabase_data(req, conn=self._fake_conn(user_id=5))
+
+        self.assertEqual(resp.status_code, 200)
+        import json
+        data = json.loads(resp.content.decode("utf-8"))["data"]
+        self.assertEqual(data["total_rows"], 1)
+        self.assertEqual(data["rows"][0][0], "wf-uuid-1")
+        self.assertEqual(data["rows"][0][5], "2026-06-09T10:05:00")
+        self.assertEqual(data["cols"][0]["name"], "workflow_id")
+
+    def test_metabase_data_invalid_type(self):
+        from omero_biomero.biomero_views import metabase_data
+        from django.test import RequestFactory
+
+        rf = RequestFactory()
+        req = rf.get('/biomero/metabase_data/', {'dashboard_type': 'invalid'})
+        resp = metabase_data(req, conn=self._fake_conn())
+        self.assertEqual(resp.status_code, 400)
+
+    def test_metabase_data_missing_db_url(self):
+        from omero_biomero.biomero_views import metabase_data
+        from django.test import RequestFactory
+
+        rf = RequestFactory()
+        req = rf.get('/biomero/metabase_data/', {'dashboard_type': 'imports'})
+        
+        with patch.dict(os.environ, {}, clear=True):
+            resp = metabase_data(req, conn=self._fake_conn())
+        self.assertEqual(resp.status_code, 500)
