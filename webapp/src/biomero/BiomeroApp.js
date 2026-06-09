@@ -227,21 +227,21 @@ const StatusPanel = ({ isAdmin, metabaseUrl }) => {
           <div className="flex-grow overflow-auto">
             <HTMLTable interactive className="w-full text-sm align-middle">
               <thead>
-                <tr>
-                  <th>Workflow ID</th>
-                  <th>Name</th>
-                  <th>Main Task Name</th>
-                  <th>Status</th>
-                  <th>Progress</th>
-                  <th>Start Time</th>
-                  <th>Task</th>
-                  <th>Group</th>
-                  <th>User</th>
+                <tr className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 shadow-[inset_0_-1px_0_rgba(0,0,0,0.1)]">
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Workflow ID</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Name</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Main Task Name</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Status</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Progress</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Start Time</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Task</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Group</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">User</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedData.map((item, idx) => (
-                  <tr key={idx}>
+                  <tr key={idx} className="border-b border-gray-100 dark:border-gray-800/60 last:border-0">
                     <td>
                       {item.workflow_id ? (
                         <div className="flex items-center space-x-1">

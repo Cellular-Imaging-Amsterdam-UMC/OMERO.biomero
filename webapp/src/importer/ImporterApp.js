@@ -173,21 +173,21 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
           <div className="flex-grow overflow-auto">
             <HTMLTable interactive className="w-full text-sm align-middle">
               <thead>
-                <tr>
-                  <th>File Names</th>
-                  <th>Stage</th>
-                  <th>Dataset/Screen</th>
-                  <th>UUID</th>
-                  <th>Timestamp</th>
-                  <th>Elapsed Time</th>
-                  <th>Group</th>
-                  <th>User</th>
-                  <th>Description</th>
+                <tr className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 shadow-[inset_0_-1px_0_rgba(0,0,0,0.1)]">
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">File Names</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Stage</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Dataset/Screen</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">UUID</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Timestamp</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Elapsed Time</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Group</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">User</th>
+                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Description</th>
                 </tr>
               </thead>
               <tbody>
                 {data.map((item, idx) => (
-                  <tr key={idx}>
+                  <tr key={idx} className="border-b border-gray-100 dark:border-gray-800/60 last:border-0">
                     <td className="max-w-xs break-all font-medium">
                       {formatFileList(item.file_names)}
                     </td>
