@@ -32,6 +32,7 @@ UPLOADER_NESTED_FILE_EXTENSIONS = [
 FILE_OR_EXTENSION_PATTERNS_EXCLUSIVE = [
     "experiment.db",
     ".xlef",
+    ".icarch",
 ]
 # Map file extensions to preprocessing keys. Keys must exist in
 # PREPROCESSING_CONFIG. This replaces the earlier generic list and makes
@@ -41,6 +42,7 @@ PREPROCESSING_EXTENSION_MAP = {
     ".xlef": "dataset_leica_uuid",
     ".lof": "dataset_leica_uuid",
     ".db": "screen_db",  # OMERO screen (.db) container conversion
+    ".icarch": "incucyte_archive",
 }
 FOLDER_EXTENSIONS_NON_BROWSABLE = [
     ".zarr",
@@ -87,6 +89,9 @@ PREPROCESSING_CONFIG = {
     "dataset_leica_uuid": {
         "container": "cellularimagingcf/convertleica-docker:v1.2.0",
         "extra_params": {"image_uuid": "{UUID}"},
+    },
+    "incucyte_archive": {
+        "container": "cellularimagingcf/biomero-converter:latest",
     },
     # Add new keys here referencing PREPROCESSING_EXTENSION_MAP as needed.
 }
