@@ -108,6 +108,32 @@ def initialize_biomero_importer():
         )
 
 
+def get_zarr_type(path):
+    """
+    Determine the type of a Zarr group at the given path.
+    Returns:
+        "plate" if it contains a plate attribute
+        "image" if it contains a multiscales attribute
+        "group" if it is a directory and has a .zattrs file but neither attribute
+        None otherwise
+    """
+    if not os.path.isdir(path):
+        return None
+    zattrs_path = os.path.join(path, ".zattrs")
+    if not os.path.isfile(zattrs_path):
+        return None
+    try:
+        with open(zattrs_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if "plate" in data:
+                return "plate"
+            elif "multiscales" in data:
+                return "image"
+            return "group"
+    except Exception:
+        return "group"
+
+
 @login_required()
 @render_response()
 @require_http_methods(["GET"])
@@ -142,57 +168,51 @@ def get_folder_contents(request, conn=None, **kwargs):
     clicked_item_metadata = None
     logger.info(f"Item path: {target_path}, Item UUID: {item_uuid}")
 
-    if os.path.isfile(target_path):
-        ext = os.path.splitext(target_path)[1]
-        if ext in EXTENSION_TO_FILE_BROWSER:
-            if is_folder:
-                metadata = EXTENSION_TO_FILE_BROWSER[ext](
-                    target_path, folder_uuid=item_uuid
-                )
-            elif item_uuid:
-                metadata = EXTENSION_TO_FILE_BROWSER[ext](
-                    target_path, image_uuid=item_uuid
-                )
-            else:
-                metadata = EXTENSION_TO_FILE_BROWSER[ext](target_path)
+    ext = os.path.splitext(target_path)[1].lower()
+    if ext in EXTENSION_TO_FILE_BROWSER:
+        if is_folder:
+            metadata = EXTENSION_TO_FILE_BROWSER[ext](
+                target_path, folder_uuid=item_uuid
+            )
+        elif item_uuid:
+            metadata = EXTENSION_TO_FILE_BROWSER[ext](
+                target_path, image_uuid=item_uuid
+            )
+        else:
+            metadata = EXTENSION_TO_FILE_BROWSER[ext](target_path)
 
-            clicked_item_metadata = json.loads(metadata)
+        clicked_item_metadata = json.loads(metadata)
 
-            for item in clicked_item_metadata["children"]:
-                item_type = item.get("type", None)
-                contents.append(
-                    {
-                        "name": item["name"],
-                        "is_folder": item_type == "Folder",
-                        "id": item_path + "#" + item["uuid"],
-                        "metadata": item,
-                        "source": "filesystem",
-                    }
-                )
+        for item in clicked_item_metadata["children"]:
+            item_type = item.get("type", None)
+            contents.append(
+                {
+                    "name": item["name"],
+                    "is_folder": item_type == "Folder",
+                    "id": item_path + "#" + item["uuid"],
+                    "metadata": item,
+                    "source": "filesystem",
+                }
+            )
 
-        elif ext in SUPPORTED_FILE_EXTENSIONS:
+    elif os.path.isfile(target_path):
+        if ext in SUPPORTED_FILE_EXTENSIONS or ext == ".zarr":
+            metadata = None
+            if ext == ".zarr":
+                z_type = get_zarr_type(target_path)
+                if z_type:
+                    metadata = {"zarr_type": z_type}
             contents.append(
                 {
                     "name": os.path.basename(target_path),
                     "is_folder": False,
                     "id": item_path,
-                    "metadata": None,
+                    "metadata": metadata,
                     "source": "filesystem",
                 }
             )
         else:
             return HttpResponseBadRequest("Invalid folder ID or path does not exist.")
-
-    elif target_path.endswith(".zarr"):  # Handle .zarr folders as files
-        contents.append(
-            {
-                "name": os.path.basename(target_path),
-                "is_folder": False,
-                "id": item_path,
-                "metadata": None,
-                "source": "filesystem",
-            }
-        )
     else:  # Folder case
         items = os.listdir(target_path)
         # Simplified generic special handling (see settings.py docs):
@@ -253,19 +273,22 @@ def get_folder_contents(request, conn=None, **kwargs):
             _, special_filename = matched_files[0]
             item_path_fs = os.path.join(target_path, special_filename)
             ext = os.path.splitext(special_filename)[1].lower()
+            
+            is_folder = (os.path.isdir(item_path_fs) or ext in EXTENSION_TO_FILE_BROWSER)
+            metadata = None
+            if ext == ".zarr":
+                is_folder = True
+            else:
+                is_folder = is_folder and ext not in FOLDER_EXTENSIONS_NON_BROWSABLE
+                if ext in EXTENSION_TO_FILE_BROWSER:
+                    metadata = EXTENSION_TO_FILE_BROWSER[ext](item_path_fs)
+                    
             contents.append(
                 {
                     "name": special_filename,
-                    "is_folder": (
-                        os.path.isdir(item_path_fs) or ext in EXTENSION_TO_FILE_BROWSER
-                    )
-                    and ext not in FOLDER_EXTENSIONS_NON_BROWSABLE,
+                    "is_folder": is_folder,
                     "id": os.path.relpath(item_path_fs, BASE_DIR),
-                    "metadata": (
-                        EXTENSION_TO_FILE_BROWSER[ext](item_path_fs)
-                        if ext in EXTENSION_TO_FILE_BROWSER
-                        else None
-                    ),
+                    "metadata": metadata,
                     "source": "filesystem",
                 }
             )
@@ -273,13 +296,17 @@ def get_folder_contents(request, conn=None, **kwargs):
             # Normal directory listing (no specials)
             for item in items:
                 item_path_fs = os.path.join(target_path, item)
-                ext = os.path.splitext(item)[1]
-                is_folder = (
-                    os.path.isdir(item_path_fs) or ext in EXTENSION_TO_FILE_BROWSER
-                ) and ext not in FOLDER_EXTENSIONS_NON_BROWSABLE
+                ext = os.path.splitext(item)[1].lower()
+                
+                is_folder = (os.path.isdir(item_path_fs) or ext in EXTENSION_TO_FILE_BROWSER)
                 metadata = None
-                if ext in EXTENSION_TO_FILE_BROWSER:
-                    metadata = EXTENSION_TO_FILE_BROWSER[ext](item_path_fs)
+                if ext == ".zarr":
+                    is_folder = True
+                else:
+                    is_folder = is_folder and ext not in FOLDER_EXTENSIONS_NON_BROWSABLE
+                    if ext in EXTENSION_TO_FILE_BROWSER:
+                        metadata = EXTENSION_TO_FILE_BROWSER[ext](item_path_fs)
+                        
                 contents.append(
                     {
                         "name": item,
@@ -451,7 +478,13 @@ def process_files(selected_items, selected_destinations, group, username):
             local_path = item
             subfile_uuid = None
 
-        abs_path = os.path.abspath(os.path.join(BASE_DIR, local_path))
+        if subfile_uuid and local_path.lower().endswith(".zarr"):
+            if subfile_uuid in ("plate", "image"):
+                abs_path = os.path.abspath(os.path.join(BASE_DIR, local_path))
+            else:
+                abs_path = os.path.abspath(os.path.join(BASE_DIR, local_path, subfile_uuid))
+        else:
+            abs_path = os.path.abspath(os.path.join(BASE_DIR, local_path))
 
         logger.info(
             "Importing: %s to %s (UUID: %s)",

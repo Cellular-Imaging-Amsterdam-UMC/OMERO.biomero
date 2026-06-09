@@ -595,6 +595,7 @@ export const AppProvider = ({ children }) => {
           data: content.name,
           childCount: 0,
           source: content.source,
+          metadata: content.metadata,
         };
         return acc;
       }, {});

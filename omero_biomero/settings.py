@@ -2,10 +2,12 @@ import os
 import json
 import tempfile
 from .leica_file_browser.ci_leica_converters_helpers import read_leica_file
+from .zarr_file_browser import read_zarr_file
 
 EXTENSION_TO_FILE_BROWSER = {
     ".lif": read_leica_file,
     ".xlef": read_leica_file,
+    ".zarr": read_zarr_file,
 }
 
 UPLOADER_NESTED_FILE_EXTENSIONS = [

@@ -31,15 +31,18 @@ def _ensure_stub_modules():  # Create stubs if external deps missing.
 
     # biomero.SlurmClient stub
     if "biomero" not in sys.modules:
-        biomero_mod = types.ModuleType("biomero")
+        try:
+            import biomero
+        except ImportError:
+            biomero_mod = types.ModuleType("biomero")
 
-        class SlurmClient:  # pragma: no cover - simple stub
-            _DEFAULT_CONFIG_PATH_1 = "~/.config/biomero1.ini"
-            _DEFAULT_CONFIG_PATH_2 = "~/.config/biomero2.ini"
-            _DEFAULT_CONFIG_PATH_3 = "~/.config/biomero3.ini"
+            class SlurmClient:  # pragma: no cover - simple stub
+                _DEFAULT_CONFIG_PATH_1 = "~/.config/biomero1.ini"
+                _DEFAULT_CONFIG_PATH_2 = "~/.config/biomero2.ini"
+                _DEFAULT_CONFIG_PATH_3 = "~/.config/biomero3.ini"
 
-        setattr(biomero_mod, "SlurmClient", SlurmClient)
-        sys.modules["biomero"] = biomero_mod
+            setattr(biomero_mod, "SlurmClient", SlurmClient)
+            sys.modules["biomero"] = biomero_mod
 
 
 def _raw_admin_config():

@@ -5,7 +5,7 @@
 CONTAINER_NAME="nl-biomero-omeroweb-1"
 
 # Define source and destination directories inside the container
-SRC_DIR="/opt/omero/web/OMERO.biomero/static/omero_biomero/assets"
+SRC_DIR="/opt/omero/web/OMERO.biomero/omero_biomero/static/omero_biomero/assets"
 DEST_DIR="/opt/omero/web/OMERO.web/var/static/omero_biomero/assets"
 
 # Execute the Docker command to copy files

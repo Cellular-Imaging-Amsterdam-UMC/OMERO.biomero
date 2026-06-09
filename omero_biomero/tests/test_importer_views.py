@@ -272,8 +272,9 @@ class ImporterViewsTests(TestCase):
             open(os.path.join(self.tmp, name), "w").close()
         ctx = self._call_get_folder()
         names = [c["name"] for c in ctx["contents"]]
-        self.assertEqual(names, ["subdir", "a.txt", "b.txt", "sample.zarr"])
+        self.assertEqual(names, ["sample.zarr", "subdir", "a.txt", "b.txt"])
         self.assertTrue(ctx["contents"][0]["is_folder"])
+        self.assertTrue(ctx["contents"][1]["is_folder"])
 
     def test_get_folder_contents_special_exact(self):
         open(os.path.join(self.tmp, "experiment.db"), "w").close()
@@ -579,10 +580,10 @@ class ImporterViewsTests(TestCase):
     # group_mappings
     def test_group_mappings_get_empty(self):
         cfg = os.path.join(self.tmp, "group-mappings.json")
-        setattr(self.mod, "GROUP_MAPPINGS_FILE_PATH", cfg)  # type: ignore[attr-defined]
-        req = self.factory.get("/importer/group_mappings")
-        resp = _raw(self.mod.group_mappings)(req, conn=self.conn)
-        self.assertEqual(json.loads(resp.content)["mappings"], {})
+        with patch("omero_biomero.utils.GROUP_MAPPINGS_FILE_PATH", cfg):
+            req = self.factory.get("/importer/group_mappings")
+            resp = _raw(self.mod.group_mappings)(req, conn=self.conn)
+            self.assertEqual(json.loads(resp.content)["mappings"], {})
 
     def test_group_mappings_post_and_get(self):
         cfg = os.path.join(self.tmp, "group-mappings.json")
@@ -622,6 +623,70 @@ class ImporterViewsTests(TestCase):
         )
         resp = _raw(self.mod.group_mappings)(bad, conn=self.conn)
         self.assertEqual(resp.status_code, 400)
+
+    def test_zarr_type_and_browsability_plate(self):
+        # Create a mock Zarr plate directory
+        plate_dir = os.path.join(self.tmp, "my_plate.zarr")
+        os.makedirs(plate_dir)
+        with open(os.path.join(plate_dir, ".zattrs"), "w", encoding="utf-8") as f:
+            json.dump({"plate": {"name": "Test Plate", "wells": [{"path": "A/1"}]}}, f)
+
+        # 1. Test get_zarr_type helper function
+        self.assertEqual(self.mod.get_zarr_type(plate_dir), "plate")
+
+        # 2. Test get_folder_contents for plate zarr
+        # When querying the parent directory, it should list my_plate.zarr as a browseable folder
+        ctx = self._call_get_folder()
+        contents = {c["name"]: c for c in ctx["contents"]}
+        self.assertIn("my_plate.zarr", contents)
+        self.assertTrue(contents["my_plate.zarr"]["is_folder"])
+        self.assertIsNone(contents["my_plate.zarr"]["metadata"])
+
+    def test_zarr_type_and_browsability_image(self):
+        # Create a mock Zarr image directory
+        img_dir = os.path.join(self.tmp, "my_image.zarr")
+        os.makedirs(img_dir)
+        with open(os.path.join(img_dir, ".zattrs"), "w", encoding="utf-8") as f:
+            json.dump({"multiscales": [{"version": "0.4"}]}, f)
+
+        # 1. Test get_zarr_type helper
+        self.assertEqual(self.mod.get_zarr_type(img_dir), "image")
+
+        # 2. Test get_folder_contents for image zarr
+        # When querying the parent directory, it should list my_image.zarr as a browseable folder too
+        ctx = self._call_get_folder()
+        contents = {c["name"]: c for c in ctx["contents"]}
+        self.assertIn("my_image.zarr", contents)
+        self.assertTrue(contents["my_image.zarr"]["is_folder"])
+        self.assertIsNone(contents["my_image.zarr"]["metadata"])
+
+    def test_zarr_subpath_process_files(self):
+        created = []
+        setattr(self.mod, "create_upload_order", lambda order: created.append(order))
+        
+        # Test that process_files resolves "plate" or "image" UUIDs to the root Zarr directory path,
+        # but resolves a custom label UUID (e.g. labels/label1.zarr) to the subpath.
+        self.mod.process_files(
+            [
+                {"localPath": "experiment.zarr", "uuid": "plate"},
+                {"localPath": "experiment.zarr", "uuid": "image"},
+                {"localPath": "experiment.zarr", "uuid": "labels/label1.zarr"},
+            ],
+            [("datasets", 123)],
+            "grp1",
+            "alice",
+        )
+        
+        self.assertEqual(len(created), 1)
+        expected_root_path = os.path.abspath(os.path.join(self.tmp, "experiment.zarr"))
+        expected_label_path = os.path.abspath(os.path.join(self.tmp, "experiment.zarr", "labels/label1.zarr"))
+        self.assertEqual(
+            created[0]["Files"],
+            [expected_root_path, expected_root_path, expected_label_path]
+        )
+
+
+
 
 
 class ImportUploadedFileTests(TestCase):

@@ -279,6 +279,38 @@ const ImporterApp = () => {
   };
 
   const handleUpload = async () => {
+    const nodeId = state.omeroFileTreeSelection[0];
+    const isScreenDest = nodeId && nodeId.includes("screen-");
+    const isDatasetDest = nodeId && nodeId.includes("dataset-");
+
+    const isScreenFile = (item) => {
+      if (!item) return false;
+      const filename = item.filename || item.data || "";
+      if (filename.toLowerCase().endsWith(".db")) return true;
+      if (item.metadata && item.metadata.zarr_type === "plate") return true;
+      return false;
+    };
+
+    if (isDatasetDest) {
+      const hasScreenFiles = uploadList.some(item => isScreenFile(item));
+      if (hasScreenFiles) {
+        toaster.show({
+          message: "Cannot import Screen data (.db files or Zarr screens) into a Dataset. Please remove screen files from the list or select a Screen destination.",
+          intent: "danger",
+        });
+        return;
+      }
+    } else if (isScreenDest) {
+      const hasNonScreenFiles = uploadList.some(item => !isScreenFile(item));
+      if (hasNonScreenFiles) {
+        toaster.show({
+          message: "Cannot import standard files into a Screen. Only .db and Zarr screen files are supported for Screen import. Please remove standard files from the list.",
+          intent: "danger",
+        });
+        return;
+      }
+    }
+
     setUploading(true);
 
     // Enhanced path construction to handle UUID-based items
@@ -290,8 +322,8 @@ const ImporterApp = () => {
       if (item.value.includes("#")) {
         const [filePath, uuid] = item.value.split("#");
 
-        // For UUID items, we want the file path up to the .lif/.xlef/.lof file
-        const fileExtensions = [".lif", ".xlef", ".lof"];
+        // For UUID items, we want the file path up to the container file/directory
+        const fileExtensions = [".lif", ".xlef", ".lof", ".zarr"];
         const hasKnownExtension = fileExtensions.some((ext) =>
           filePath.toLowerCase().includes(ext)
         );
@@ -351,26 +383,32 @@ const ImporterApp = () => {
       return;
     }
 
-    // Helper to identify screen files (currently .db files)
-    const isScreenFile = (filename) => filename.toLowerCase().endsWith(".db");
+    // Helper to identify screen files (.db files or Zarr screens/plates)
+    const isScreenFile = (item) => {
+      if (!item) return false;
+      const filename = item.data || "";
+      if (filename.toLowerCase().endsWith(".db")) return true;
+      if (item.metadata && item.metadata.zarr_type === "plate") return true;
+      return false;
+    };
     
     // Validate selection against destination type
     const selectedItems = state.localFileTreeSelection.map(id => state.localFileTreeData[id]);
     
     if (isDatasetDest) {
-      const hasScreenFiles = selectedItems.some(item => isScreenFile(item.data));
+      const hasScreenFiles = selectedItems.some(item => isScreenFile(item));
       if (hasScreenFiles) {
         toaster.show({
-          message: "Cannot import Screen data (.db files) into a Dataset. Please select a Screen destination.",
+          message: "Cannot import Screen data (.db files or Zarr screens) into a Dataset. Please select a Screen destination.",
           intent: "danger",
         });
         return;
       }
     } else if (isScreenDest) {
-      const hasNonScreenFiles = selectedItems.some(item => !isScreenFile(item.data));
+      const hasNonScreenFiles = selectedItems.some(item => !isScreenFile(item));
       if (hasNonScreenFiles) {
          toaster.show({
-          message: "Cannot import standard files into a Screen. Only .db files are supported for Screen import.",
+          message: "Cannot import standard files into a Screen. Only .db and Zarr screen files are supported for Screen import.",
           intent: "danger",
         });
         return;
