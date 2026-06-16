@@ -194,13 +194,13 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
     if (!suggested) return null;
     if (currentValue === false) {
       return (
-        <Callout intent="warning" compact minimal className="mt-2">
+        <Callout intent="warning" compact minimal className="mt-2 text-sm font-semibold">
           This is suggested for this workflow — re-enable to include these results (if any).
         </Callout>
       );
     }
     return (
-      <Callout intent="success" compact minimal className="mt-2">
+      <Callout intent="success" compact minimal className="mt-2 text-sm font-semibold">
         Suggested for this workflow.
       </Callout>
     );
@@ -546,7 +546,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
                 }}
               />
               {_currentValue === false && (
-               <Callout intent={hasOutputSelection ? "primary" : "danger"} compact minimal className="mt-2">
+               <Callout intent={hasOutputSelection ? "primary" : "danger"} compact minimal className="mt-2 text-sm font-semibold">
                 Type a new {containerType} name and press Enter, or pick an existing one from the menu.
               </Callout>
               )}
