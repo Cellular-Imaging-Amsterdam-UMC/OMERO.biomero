@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Alignment, Card, CardList, FormGroup, InputGroup, Switch, SwitchCard, Callout, Tooltip, Icon, Divider, Tag, Section, SectionCard } from "@blueprintjs/core";
+import { Alignment, Card, FormGroup, InputGroup, Switch, SwitchCard, Callout, Tooltip, Icon, Divider, Tag } from "@blueprintjs/core";
 import { useAppContext } from "../../AppContext";
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover.js";
 
@@ -88,6 +88,11 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
     state.formData.importAsZip,
   ]);
 
+  const useDescriptorFallbackSuggestions = useMemo(() => {
+    const outputs = state.selectedWorkflow?.metadata?.outputs;
+    return Array.isArray(outputs) && outputs.length === 0;
+  }, [state.selectedWorkflow?.metadata?.outputs]);
+
   const outputHints = useMemo(() => {
     const outputs = state.selectedWorkflow?.metadata?.outputs || [];
     const isType = (output, expected) => String(output?.type || "").toLowerCase() === expected;
@@ -129,6 +134,9 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
     const summarizeFull = (items) =>
       items.map((o) => o.name || o.id).filter(Boolean).join(", ");
 
+    const measurementSuggested = measurementOutputs.length > 0 || useDescriptorFallbackSuggestions;
+    const fileAnnotationSuggested = fileAnnotationOutputs.length > 0 || useDescriptorFallbackSuggestions;
+
     return {
       imageCount: imageOutputs.length,
       measurementCount: measurementOutputs.length,
@@ -137,16 +145,16 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
       imageLabel: summarize(imageOutputs),
       imageLabelFull: summarizeFull(imageOutputs),
       measurementLabel: summarize(measurementOutputs),
-      measurementLabelFull: summarizeFull(measurementOutputs),
+      measurementLabelFull: summarizeFull(measurementOutputs) || "CSV measurements and tabular outputs",
       zipLabel: summarize(zipOutputs),
       fileAnnotationLabel: summarize(fileAnnotationOutputs),
-      fileAnnotationLabelFull: summarizeFull(fileAnnotationOutputs),
+      fileAnnotationLabelFull: summarizeFull(fileAnnotationOutputs) || "non-image output files",
       importAsZip: zipOutputs.length > 0,
-      uploadCsv: measurementOutputs.length > 0,
-      attachFileOutputs: fileAnnotationOutputs.length > 0,
+      uploadCsv: measurementSuggested,
+      attachFileOutputs: fileAnnotationSuggested,
       hasImageOutput: imageOutputs.length > 0,
     };
-  }, [state.selectedWorkflow?.metadata]);
+  }, [state.selectedWorkflow?.metadata, useDescriptorFallbackSuggestions]);
 
   // suggested: workflow hint recommends this option on
   // label: short badge text (may be truncated with "+N more")
@@ -166,7 +174,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
           minimal
           round
           intent={overridden ? "warning" : "primary"}
-          className="text-xs cursor-help"
+          className="text-xs font-semibold cursor-help"
         >
           {overridden ? "Suggested (off)" : "Suggested"}
         </Tag>
@@ -182,12 +190,12 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
     return "none";
   };
 
-  const renderDefaultHelperCallout = (suggested, suggestedMsg, currentValue = undefined) => {
+  const renderDefaultHelperCallout = (suggested, currentValue = undefined) => {
     if (!suggested) return null;
     if (currentValue === false) {
       return (
         <Callout intent="warning" compact minimal className="mt-2">
-          This is suggested for this workflow — re-enable to include these results.
+          This is suggested for this workflow — re-enable to include these results (if any).
         </Callout>
       );
     }
@@ -198,11 +206,12 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
     );
   };
 
-  const renderCardTitle = (icon, title, cue = null) => (
+  const renderCardTitle = (icon, title, subtitle = null, cue = null) => (
     <div className="flex items-center gap-2 flex-wrap mb-0.5">
       <Icon icon={icon} size={14} className="text-gray-500" />
       <span className="text-sm font-semibold">{title}</span>
       {cue}
+      {subtitle && <span className="text-xs font-semibold text-gray-500">{subtitle}</span>}
     </div>
   );
 
@@ -504,6 +513,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
             {renderCardTitle(
               "media",
               `Add (mask) image results to a ${containerType}`,
+              `import viewable images into an OMERO ${containerType}`,
               renderDefaultCue(
                 _suggested,
                 outputHints.imageLabel || containerType,
@@ -511,9 +521,6 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
                 outputHints.imageLabelFull || `${containerType} destination`
               )
             )}
-            <p className="text-xs text-gray-500 mb-2">
-              Organizes output images and masks in an OMERO {containerType} for viewing and further analysis.
-            </p>
             <DatasetSelectWithPopover
                 label={null}
                 helperText={null}
@@ -545,7 +552,6 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
               )}
             {renderDefaultHelperCallout(
               _suggested,
-              `Suggested for: ${outputHints.imageLabelFull || `${containerType} destination`}.`,
               _currentValue
             )}
           </Card>
@@ -563,13 +569,9 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
             return _enabled ? (
               // Expanded: plain Card + explicit Switch so form inputs are fully interactive
               <Card compact={true} selected className="mt-2">
-                <div className="flex items-start justify-between gap-3 mb-1">
-                  <div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <Icon icon="edit" size={14} className="text-gray-500" />
-                      <p className="text-sm font-semibold">Rename result images</p>
-                    </div>
-                    <p className="text-xs text-gray-500">Apply a custom naming pattern to imported result images.</p>
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <div className="min-w-0 flex-1">
+                    {renderCardTitle("edit", "Rename result images", "optional naming pattern for imported images")}
                   </div>
                   <Switch
                     checked={true}
@@ -643,19 +645,13 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
                 className="mt-2"
                 compact={true}
               >
-                {renderCardTitle("edit", "Rename result images")}
-                <p className="text-xs font-normal text-gray-500">Apply a custom naming pattern to imported result images.</p>
+                {renderCardTitle("edit", "Rename result images", "optional naming pattern for imported images")}
               </SwitchCard>
             );
           })()}
         </div>
       )}
 
-      <Divider className="my-3" />
-
-      <Section title="Attach non-image results" subtitle="Select these to import non-image outputs, if any.">
-        <SectionCard padded={true}>
-            <CardList bordered={true}>
       {/* ② CSV → OMERO Tables */}
       {(() => {
         const _checked = state.formData.uploadCsv ?? outputHints.uploadCsv ?? defaultValues.uploadCsv;
@@ -669,11 +665,11 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
           >
             {renderCardTitle(
               "th-derived",
-              "CSV → OMERO Tables",
+              "Measurement Tables",
+              "csv results as OMERO.tables",
               renderDefaultCue(outputHints.uploadCsv, outputHints.measurementLabel, state.formData.uploadCsv, outputHints.measurementLabelFull)
             )}
-            <p className="text-xs font-normal text-gray-500">Upload CSV measurement results as interactive OMERO tables for further analysis.</p>
-            {renderDefaultHelperCallout(outputHints.measurementCount > 0, `Suggested for: ${outputHints.measurementLabel}.`, state.formData.uploadCsv)}
+            {renderDefaultHelperCallout(outputHints.uploadCsv, state.formData.uploadCsv)}
           </SwitchCard>
         );
       })()}
@@ -691,23 +687,13 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
             {renderCardTitle(
               "paperclip",
               "Individual file annotations",
+              "attach non-image non-csv output files",
               renderDefaultCue(outputHints.attachFileOutputs, outputHints.fileAnnotationLabel, state.formData.attachFileOutputs, outputHints.fileAnnotationLabelFull)
             )}
-            <p className="text-xs font-normal text-gray-500">Attach non-image, non-CSV output files (arrays, configs, model weights, log files) as individual OMERO file annotations. CSV files are handled by the OMERO tables option above.</p>
-            {renderDefaultHelperCallout(outputHints.fileAnnotationCount > 0, `Suggested for: ${outputHints.fileAnnotationLabel}.`, state.formData.attachFileOutputs)}
+            {renderDefaultHelperCallout(outputHints.attachFileOutputs, state.formData.attachFileOutputs)}
           </SwitchCard>
         );
       })()}
-
-          </CardList>
-        </SectionCard>
-      </Section>
-
-      <Divider className="my-3" />
-
-      <Section title="Archive options" subtitle="Select these only for archiving purposes — any images will not be viewable from OMERO">
-        <SectionCard padded={true}>
-          <CardList bordered={true}>
 
       {/* ④ Attach to input images (dataset mode only) */}
       {!plateMode && (() => {
@@ -722,10 +708,10 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
           >
             {renderCardTitle(
               "flow-branch",
-              "Attach to input images",
-              renderDefaultCue(outputHints.imageCount > 0, outputHints.imageLabel, state.formData.attachToOriginalImages, outputHints.imageLabelFull)
+              "Attach (mask) image results to input images",
+              "keep provenance on the original inputs",
+               null
             )}
-            <p className="text-xs font-normal text-gray-500">Attach output images (e.g. masks) to the original input images to track their provenance.</p>
             {hasImageOutputDuplication && (
               <Callout intent="warning" compact minimal className="mt-2">
                 {hasDestination
@@ -744,8 +730,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         onChange={(e) => handleInputChange("importAsZip", e.target.checked)}
         className="mt-2"
       >
-        {renderCardTitle("archive", "Bulk ZIP archive")}
-        <p className="text-xs font-normal text-gray-500">Attaches a single zip of all results to the parent dataset/project.</p>
+        {renderCardTitle("archive", "Bulk ZIP archive", "single downloadable archive of all results")}
         {hasOtherOutputsAlongWithZip && (
           <Callout intent="warning" compact minimal className="mt-2">
             Other output options are also active — the zip will contain all those files too, duplicating storage.
@@ -753,11 +738,6 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
           </Callout>
         )}
       </SwitchCard>
-
-
-      </CardList>
-    </SectionCard>
-</Section>
 
       <Divider className="my-3" />
 
@@ -769,8 +749,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         onChange={(e) => handleInputChange("receiveEmail", e.target.checked)}
         className="mt-2"
       >
-        {renderCardTitle("envelope", "Email on completion")}
-        <p className="text-xs font-normal text-gray-500">Receive an email from SLURM when one or more jobs finish (completed or failed).</p>
+        {renderCardTitle("envelope", "Email on completion", "SLURM completion or failure notice")}
       </SwitchCard>
     </form>
   );
