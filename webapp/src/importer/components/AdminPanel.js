@@ -30,6 +30,20 @@ const AdminPanel = () => {
     }
   }, [state.groupFolderMappings, state.config?.UPLOADER?.chunk_size]);
 
+  // Debounce saving of chunk size to avoid spamming API calls on every keystroke
+  React.useEffect(() => {
+    const parsedConfigVal = state.config?.UPLOADER?.chunk_size !== undefined
+      ? parseInt(state.config.UPLOADER.chunk_size)
+      : 100;
+      
+    if (chunkSizeInput && !isNaN(chunkSizeInput) && chunkSizeInput !== parsedConfigVal && chunkSizeInput > 0) {
+      const handler = setTimeout(async () => {
+        await saveUploaderConfig({ chunk_size: chunkSizeInput });
+      }, 500);
+      return () => clearTimeout(handler);
+    }
+  }, [chunkSizeInput, state.config?.UPLOADER?.chunk_size]);
+
   React.useEffect(() => {
     loadBiomeroConfig();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -160,16 +174,9 @@ const AdminPanel = () => {
               onValueChange={(valueAsNumber) => {
                 setChunkSizeInput(valueAsNumber);
               }}
-              inputProps={{
-                onBlur: async () => {
-                  if (chunkSizeInput && chunkSizeInput > 0) {
-                    await saveUploaderConfig({ chunk_size: chunkSizeInput });
-                  }
-                }
-              }}
               min={1}
               minorStepSize={null}
-              stepSize={10}
+              stepSize={1}
               className="mt-1"
             />
           </label>
