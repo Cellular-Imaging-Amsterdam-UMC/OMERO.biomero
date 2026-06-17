@@ -9,6 +9,7 @@ import {
   Tag,
   Icon,
   Switch,
+  NumericInput,
 } from "@blueprintjs/core";
 import { Select } from "@blueprintjs/select";
 
@@ -16,10 +17,18 @@ const AdminPanel = () => {
   const { state, saveGroupMappings, loadBiomeroConfig, saveConfigData } = useAppContext();
   const [folderMappings, setFolderMappings] = useState(state.groupFolderMappings || {});
   
+  const chunkSize = state.config?.UPLOADER?.chunk_size !== undefined 
+    ? parseInt(state.config.UPLOADER.chunk_size) 
+    : 100;
+  const [chunkSizeInput, setChunkSizeInput] = useState(chunkSize);
+  
   // Update local state when global state changes
   React.useEffect(() => {
     setFolderMappings(state.groupFolderMappings || {});
-  }, [state.groupFolderMappings]);
+    if (state.config?.UPLOADER?.chunk_size !== undefined) {
+      setChunkSizeInput(parseInt(state.config.UPLOADER.chunk_size) || 100);
+    }
+  }, [state.groupFolderMappings, state.config?.UPLOADER?.chunk_size]);
 
   React.useEffect(() => {
     loadBiomeroConfig();
@@ -142,11 +151,38 @@ const AdminPanel = () => {
           large={true}
           className="mt-4"
         />
-        <div className="text-gray-500 text-sm mt-2">
+        
+        <div className="mt-4 max-w-[300px]">
+          <label className="bp5-label font-semibold text-sm">
+            Uploader Chunk Size (MB)
+            <NumericInput
+              value={chunkSizeInput}
+              onValueChange={(valueAsNumber) => {
+                setChunkSizeInput(valueAsNumber);
+              }}
+              inputProps={{
+                onBlur: async () => {
+                  if (chunkSizeInput && chunkSizeInput > 0) {
+                    await saveUploaderConfig({ chunk_size: chunkSizeInput });
+                  }
+                }
+              }}
+              min={1}
+              minorStepSize={null}
+              stepSize={10}
+              className="mt-1"
+            />
+          </label>
+        </div>
+
+        <div className="text-gray-500 text-sm mt-3">
           When enabled, the "Upload images" tab will be visible to all users.
         </div>
         <div className="text-gray-500 text-sm mt-2">
           When enabled, uploaded files are assembled under the active group's mapped folder in uploads/username instead of the shared uploader destination.
+        </div>
+        <div className="text-gray-500 text-sm mt-2">
+          Uploader chunk size specifies the chunk size in MB for resumable uploads. Lower values help if reverse proxies (like Nginx) limit POST request sizes.
         </div>
       </Card>
 
