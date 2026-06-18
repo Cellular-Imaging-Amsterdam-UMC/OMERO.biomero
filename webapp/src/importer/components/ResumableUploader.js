@@ -31,7 +31,7 @@ const ResumableUploader = ({ datasetId, datasetType, group, groupId }) => {
   const { ui, user } = getDjangoConstants();
   const allowedFileTypes = ui.uploader_allowed_file_extensions;
   
-  const { state } = useAppContext();
+  const { state, toaster } = useAppContext();
   const chunkSizeMb = state.config?.UPLOADER?.chunk_size !== undefined
     ? parseInt(state.config.UPLOADER.chunk_size)
     : 100;
@@ -107,28 +107,31 @@ const ResumableUploader = ({ datasetId, datasetType, group, groupId }) => {
       );
 
       try {
-        await importUploadedFile(
+        const responseData = await importUploadedFile(
           uploadedFilename,
           datasetId,
           datasetType,
           group,
           groupId,
         );
-        uppyRef.current.info(
-          `Import queued for ${uploadedFilename}`,
-          "success",
-          3000,
-        );
+        const msg = responseData?.message || `Successfully queued ${uploadedFilename} for import`;
+        toaster?.show({
+          intent: "success",
+          icon: "tick-circle",
+          message: msg,
+          timeout: 0,
+        });
         if (response?.uploadURL) {
           uploadedFilenameMapRef.current.delete(response.uploadURL);
         }
       } catch (error) {
         console.error("Import trigger failed", error);
-        uppyRef.current.info(
-          `Import failed for ${uploadedFilename}: ${error.message}`,
-          "error",
-          5000,
-        );
+        toaster?.show({
+          intent: "danger",
+          icon: "error",
+          message: `Import failed for ${uploadedFilename}: ${error.message}`,
+          timeout: 0,
+        });
         if (response?.uploadURL) {
           uploadedFilenameMapRef.current.delete(response.uploadURL);
         }

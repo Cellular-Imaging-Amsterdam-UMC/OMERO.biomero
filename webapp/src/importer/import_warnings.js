@@ -35,7 +35,7 @@ export const getImportWarning = (filename, config) => {
 
   if (requiresConversion) {
     return {
-      summary: "File Conversion Required",
+      summary: "Data duplication warning",
       details: "This file will be converted, which will lead to data duplication. The original file will remain untouched."
     };
   }

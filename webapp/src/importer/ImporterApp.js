@@ -324,8 +324,8 @@ const ImporterApp = () => {
 
     // Enhanced path construction to handle UUID-based items
     const selectedLocal = uploadList.map((item) => {
-      const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData);
-      const pathString = itemPath.slice(1).join("/"); // skip Root node
+      const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData, getCurrentGroupFolder());
+      const pathString = itemPath ? itemPath.slice(1).join("/") : item.value;
 
       // Check if this is a UUID-based item (has # in the value)
       if (item.value.includes("#")) {
@@ -425,7 +425,7 @@ const ImporterApp = () => {
     }
     
     const omeroPath = findPathToTreeLeaf(nodeId, state.omeroFileTreeData);
-    const pathString = omeroPath.join("/");
+    const pathString = omeroPath ? omeroPath.join("/") : "";
 
     const newUploadList = state.localFileTreeSelection
       .filter(
@@ -483,8 +483,9 @@ const ImporterApp = () => {
     setAreUploadItemsSelected(areItemsSelected);
   };
 
-  const findPathToTreeLeaf = (nodeId, tree) => {
+  const findPathToTreeLeaf = (nodeId, tree, rootNodeId = "root") => {
     const dfs = (currentNode, path) => {
+      if (!tree || !tree[currentNode]) return null;
       if (currentNode === nodeId) return path.concat(tree[currentNode]?.data);
       const children = tree[currentNode]?.children || [];
       for (const child of children) {
@@ -493,7 +494,7 @@ const ImporterApp = () => {
       }
       return null;
     };
-    return dfs("root", []);
+    return dfs(rootNodeId, []);
   };
 
   const selectedOmeroPath =
@@ -501,14 +502,14 @@ const ImporterApp = () => {
       ? findPathToTreeLeaf(
           state.omeroFileTreeSelection[0],
           state.omeroFileTreeData
-        ).join("/")
+        )?.join("/") || ""
       : "";
 
   const renderCards = () => {
     // TODO
     return uploadList.map((item) => {
-      const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData);
-      const itemPathString = itemPath.join("/");
+      const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData, getCurrentGroupFolder());
+      const itemPathString = itemPath ? itemPath.join("/") : item.filename || item.value;
       const warningInfo = getImportWarning(item.filename, state.config);
       return (
         <Card
