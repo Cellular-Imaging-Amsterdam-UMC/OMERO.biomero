@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Card,
+  Callout,
   FormGroup,
   InputGroup,
   Button,
@@ -8,6 +9,7 @@ import {
   H3,
   H5,
   H6,
+  Tag,
   ButtonGroup,
   Tooltip,
   Spinner,
@@ -18,6 +20,18 @@ import ConfigSection from "./ConfigSection";
 import ModelCard from "./ModelCard.js";
 import ConverterCard from "./ConverterCard.js";
 import { checkModelVersions, clearGitHubCache, slugify, fetchWorkflowMetadata } from "../../apiService";
+
+/** Small inline badge shown next to settings that require a SLURM Init run after changing. */
+const RequiresInitTag = () => (
+  <Tooltip
+    content="Changing this setting requires running the SLURM Init script to take effect. The new scripts must be deployed to Slurm before the setting is active."
+    placement="right"
+  >
+    <Tag intent="warning" minimal style={{ marginLeft: 8, verticalAlign: "middle", cursor: "help" }}>
+      requires Slurm Init
+    </Tag>
+  </Tooltip>
+);
 
 const SettingsForm = () => {
   const { 
@@ -779,6 +793,36 @@ const SettingsForm = () => {
           "cpu-short",
           "SLURM partition to use for conversion jobs when no default partition is configured on your HPC. Leave empty to use system default."
         )}
+        <H6>SACCT History Window</H6>
+        <div className="bp5-form-group">
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              How far back BIOMERO looks when querying job history via{" "}
+              <code>sacct</code>. By default, BIOMERO looks back to 2023-01-01.
+            </div>
+            <div className="bp5-form-helper-text">
+              Option 1: set an absolute start date (ISO format YYYY-MM-DD).
+              Option 2: set a rolling window in days — this overrides the
+              absolute date if both are set. Both can also be overridden by the{" "}
+              <code>BIOMERO_SACCT_START_TIME</code> /{" "}
+              <code>BIOMERO_SACCT_START_DAYS_AGO</code> environment variables.
+            </div>
+          </div>
+        </div>
+        {renderEditableField(
+          "SACCT Start Time",
+          "SLURM.sacct_start_time",
+          settingsForm.SLURM?.sacct_start_time,
+          "2024-01-01",
+          "Absolute start date for sacct job history (ISO format YYYY-MM-DD). Leave blank for the built-in default (2023-01-01)."
+        )}
+        {renderEditableField(
+          "SACCT Days Ago",
+          "SLURM.sacct_days_ago",
+          settingsForm.SLURM?.sacct_days_ago,
+          "7",
+          "Rolling window in days for sacct job history (relative to today). Overrides SACCT Start Time if both are set. Leave blank to use the absolute date or built-in default."
+        )}
         <H6>Repositories</H6>
         <div className="bp5-form-group">
           <div className="bp5-form-content">
@@ -815,8 +859,189 @@ const SettingsForm = () => {
           "SLURM.slurm_script_repo",
           settingsForm.SLURM.slurm_script_repo,
           "Enter repository URL",
-          "The Git repository to pull the Slurm scripts from. Recommended to leave this empty (default) to work with generated job scripts.",
+          "The Git repository to pull the Slurm scripts from. Recommended to leave this empty (default) to work with generated job scripts. ⚠️ Requires Slurm Init after changing.",
           "danger"
+        )}
+        <H6>Processing Settings <RequiresInitTag /></H6>
+        <div className="bp5-form-group">
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              Advanced opt-in settings. All are <strong>off by default</strong>{" "}
+              to preserve backward compatibility. Enable only what your cluster
+              requires.
+            </div>
+          </div>
+        </div>
+        <b>Env-File Submission</b> <RequiresInitTag />
+        <div className="bp5-form-group">
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              When enabled, BIOMERO writes job environment variables to a
+              per-job file on the cluster and passes it to the job script as{" "}
+              <code>$1</code>, instead of relying on SSH environment variable
+              propagation. Enable when your cluster does not forward SSH session
+              env vars into <code>sbatch</code> jobs.
+            </div>
+            <div className="bp5-form-helper-text">
+              Can also be set via the{" "}
+              <code>BIOMERO_ENV_FILE_SUBMISSION</code> environment variable.
+            </div>
+          </div>
+        </div>
+        <Switch
+          checked={settingsForm.SLURM?.env_file_submission === "true"}
+          label="Env-File Submission (off by default)"
+          onChange={(e) =>
+            handleInputChange(
+              "SLURM.env_file_submission",
+              e.target.checked ? "true" : "false"
+            )
+          }
+        />
+        <b>Inject GPU Flag</b> <RequiresInitTag />
+        <div className="bp5-form-group">
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              When enabled, BIOMERO rewrites{" "}
+              <code>singularity run --nv</code> in generated job scripts to a
+              conditional <code>GPU_FLAG</code> variable driven by the{" "}
+              <code>use_gpu</code> workflow parameter. This lets one script run
+              on both CPU and GPU partitions. Enable only if your generated
+              scripts contain{" "}
+              <code>singularity run --nv</code> and you want GPU usage
+              controlled at submission time.
+            </div>
+            <div className="bp5-form-helper-text">
+              Can also be set via the{" "}
+              <code>BIOMERO_INJECT_GPU_FLAG</code> environment variable.
+            </div>
+          </div>
+        </div>
+        <Switch
+          checked={settingsForm.SLURM?.inject_gpu_flag === "true"}
+          label="Inject GPU Flag (off by default)"
+          onChange={(e) =>
+            handleInputChange(
+              "SLURM.inject_gpu_flag",
+              e.target.checked ? "true" : "false"
+            )
+          }
+        />
+        <H6>GPU Fallback Settings</H6>
+        <div className="bp5-form-group">
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              Fallback Slurm GPU resources applied when a workflow submits{" "}
+              <code>use_gpu=true</code> and no per-workflow GPU settings are
+              already defined. Per-workflow job parameters always take
+              precedence.
+            </div>
+            <div className="bp5-form-helper-text">
+              Can also be set via{" "}
+              <code>BIOMERO_GPU_PARTITION</code> /{" "}
+              <code>BIOMERO_GPU_GRES</code> /{" "}
+              <code>BIOMERO_GPU_RESOURCE_FLAG</code> environment variables.
+            </div>
+          </div>
+        </div>
+        {renderEditableField(
+          "GPU Partition",
+          "SLURM.gpu_partition",
+          settingsForm.SLURM?.gpu_partition,
+          "gpu",
+          "Fallback Slurm partition for GPU jobs (e.g. gpu, gpu_a100). Leave blank if not needed."
+        )}
+        {renderEditableField(
+          "GPU GRES",
+          "SLURM.gpu_gres",
+          settingsForm.SLURM?.gpu_gres,
+          "gpu:1",
+          "Fallback --gres or --gpus value for GPU jobs (e.g. gpu:1, gpu:a100:1). Leave blank if not needed."
+        )}
+        {renderEditableField(
+          "GPU Resource Flag",
+          "SLURM.gpu_resource_flag",
+          settingsForm.SLURM?.gpu_resource_flag,
+          "gres",
+          "Whether to use --gres or --gpus for the GPU fallback above. Default: gres."
+        )}
+        <H6>Image Pull Settings <RequiresInitTag /></H6>
+        <div className="bp5-form-group">
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              These settings control how BIOMERO pulls container images onto the
+              cluster. They only take effect when SLURM Init runs{" "}
+              <code>setup_container_images()</code>.
+            </div>
+            <div className="bp5-form-helper-text">
+              By default, BIOMERO pulls container images via a background{" "}
+              <code>nohup</code> command on the login node. Enable sbatch-based
+              pulling to submit pulls as Slurm jobs instead — useful on
+              clusters that restrict long-running processes on login nodes.
+            </div>
+            <div className="bp5-form-helper-text">
+              Can also be set via{" "}
+              <code>BIOMERO_IMAGE_PULL_VIA_SBATCH</code> /{" "}
+              <code>BIOMERO_PULL_CPUS</code> /{" "}
+              <code>BIOMERO_PULL_MEM</code> environment variables.
+            </div>
+          </div>
+        </div>
+        <Switch
+          checked={settingsForm.SLURM?.slurm_image_pull_via_sbatch === "true"}
+          label="Pull Images via sbatch (off by default)"
+          onChange={(e) =>
+            handleInputChange(
+              "SLURM.slurm_image_pull_via_sbatch",
+              e.target.checked ? "true" : "false"
+            )
+          }
+        />
+        {renderEditableField(
+          "Pull CPUs",
+          "SLURM.image_pull_cpus",
+          settingsForm.SLURM?.image_pull_cpus,
+          "8",
+          "Number of CPUs for sbatch image pull jobs. Default: 8. Only used when Pull Images via sbatch is enabled."
+        )}
+        {renderEditableField(
+          "Pull Memory",
+          "SLURM.image_pull_mem",
+          settingsForm.SLURM?.image_pull_mem,
+          "32G",
+          "Memory for sbatch image pull jobs (e.g. 4G, 32G). Default: 32G. Size this to fit your cluster node — typical containers are 1–10 GB."
+        )}
+        <H6>Apptainer / Singularity Settings <RequiresInitTag /></H6>
+        <div className="bp5-form-group">
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              Optional paths for Apptainer/Singularity temporary and cache
+              directories during image pulls. Configure these when the default{" "}
+              <code>/tmp</code> on your login or worker node is too small for
+              large containers. A common recommendation is to point these to
+              scratch storage. SLURM Init will create these directories on the
+              cluster if they do not yet exist.
+            </div>
+            <div className="bp5-form-helper-text">
+              Can also be set via{" "}
+              <code>BIOMERO_APPTAINER_TMPDIR</code> /{" "}
+              <code>BIOMERO_APPTAINER_CACHEDIR</code> environment variables.
+            </div>
+          </div>
+        </div>
+        {renderEditableField(
+          "Apptainer Tmp Dir",
+          "SLURM.apptainer_tmpdir",
+          settingsForm.SLURM?.apptainer_tmpdir,
+          "/scratchdata/$USER/.apptainer-tmp",
+          "Override APPTAINER_TMPDIR during image pulls. Leave blank to use system default."
+        )}
+        {renderEditableField(
+          "Apptainer Cache Dir",
+          "SLURM.apptainer_cachedir",
+          settingsForm.SLURM?.apptainer_cachedir,
+          "/scratchdata/$USER/.apptainer-cache",
+          "Override APPTAINER_CACHEDIR during image pulls. Leave blank to use system default."
         )}
       </CollapsibleSection>
       <CollapsibleSection title="UI Settings" errorCount={getMaxBatchJobsError() ? 1 : 0}>
@@ -1049,6 +1274,50 @@ const SettingsForm = () => {
             )
           }
         />
+        <H6>Analytics Rebuild Window</H6>
+        <div className="bp5-form-group">
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              When the SLURM Init script resets analytics view tables, BIOMERO
+              replays the event history to rebuild the views. On large
+              installations with many past workflow runs this can take several
+              minutes. These settings cap how far back the replay goes.
+            </div>
+          </div>
+        </div>
+        <Callout intent="warning" title="Partial history trade-off">
+          View tables built from a partial history will not show jobs older
+          than the cutoff. Use these settings only to speed up a slow SLURM
+          Init — not as a routine configuration.
+        </Callout>
+        <div className="bp5-form-group" style={{ marginTop: "8px" }}>
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              Option 1: set an absolute cutoff date (ISO format YYYY-MM-DD) —
+              only events from this date onward are replayed. Option 2: set a
+              rolling window in days — this overrides the absolute date if both
+              are set. Both can also be overridden via the{" "}
+              <code>BIOMERO_ANALYTICS_REBUILD_START_TIME</code> /{" "}
+              <code>BIOMERO_ANALYTICS_REBUILD_DAYS_AGO</code> environment
+              variables (or via the SLURM Init script parameters). Leave both
+              blank to replay the full event history (default).
+            </div>
+          </div>
+        </div>
+        {renderEditableField(
+          "Rebuild From Date",
+          "ANALYTICS.analytics_rebuild_start_time",
+          settingsForm.ANALYTICS?.analytics_rebuild_start_time,
+          "2026-01-01",
+          "Absolute cutoff date for analytics rebuild replay (ISO format YYYY-MM-DD). Leave blank for full rebuild."
+        )}
+        {renderEditableField(
+          "Rebuild From Days Ago",
+          "ANALYTICS.analytics_rebuild_days_ago",
+          settingsForm.ANALYTICS?.analytics_rebuild_days_ago,
+          "30",
+          "Rolling window in days for analytics rebuild replay (relative to today). Overrides Rebuild From Date if both are set. Leave blank for full rebuild."
+        )}
       </CollapsibleSection>
       <CollapsibleSection title="Converters Settings">
         <ConfigSection
@@ -1117,6 +1386,7 @@ const SettingsForm = () => {
             "Settings for models/singularity images that we want to run on Slurm.",
             "Model names have to be unique, and require a GitHub repository as well.",
             "Versions for the GitHub repository are highly encouraged! Latest/master can change and cause issues with reproducability! BIOMERO picks up the container version based on the version of the repository. If you provide no version, BIOMERO will pick up the generic latest container.",
+            "⚠️ Adding, removing, or renaming models requires running the SLURM Init script so job scripts are generated and container images are pulled.",
           ]}
           errors={modelErrors}
           validateField={null} // Per-field live validation not needed; duplicate check runs via useEffect

@@ -43,7 +43,13 @@ const MonitorPanel = ({
             try {
               const url = new URL(a.href);
               // Only redirect top window for links within our domain
-              if (url.hostname === window.location.hostname) {
+              if (["localhost", "127.0.0.1"].includes(url.hostname)) {
+                // Metabase behind a reverse proxy can generate absolute localhost
+                // URLs; rewrite them to the current public origin.
+                window.top.location.href =
+                  window.location.origin + url.pathname + url.search + url.hash;
+                e.preventDefault();
+              } else if (url.hostname === window.location.hostname) {
                 window.top.location.href = a.href;
                 e.preventDefault();
               }
