@@ -85,6 +85,7 @@ const SettingsForm = () => {
   const [isInitialized, setIsInitialized] = useState(false); // Track if form has been initialized
 
   const [converters, setConverters] = useState([]);
+  const [globalSbatchParams, setGlobalSbatchParams] = useState([]);
   const [errors, setErrors] = useState({});
   const [modelErrors, setModelErrors] = useState({});
   
@@ -153,17 +154,15 @@ const SettingsForm = () => {
   useEffect(() => {
     if (JSON.stringify(settingsForm) !== JSON.stringify(initialFormData)) {
       setHasChanges(true);
+    } else if (
+      JSON.stringify(converters) !== JSON.stringify(initialFormData?.CONVERTERS) ||
+      JSON.stringify(globalSbatchParams) !== JSON.stringify(initialFormData?.globalSbatchParams)
+    ) {
+      setHasChanges(true);
     } else {
-      if (
-        JSON.stringify(converters) !==
-        JSON.stringify(initialFormData?.CONVERTERS)
-      ) {
-        setHasChanges(true);
-      } else {
-        setHasChanges(false);
-      }
+      setHasChanges(false);
     }
-  }, [settingsForm, initialFormData, converters]);
+  }, [settingsForm, initialFormData, converters, globalSbatchParams]);
 
   const initializeFormState = () => {
     if (state.config) {
@@ -188,6 +187,7 @@ const SettingsForm = () => {
             job: state.config.MODELS[`${prefix}_job`], // e.g., "jobs/cellpose.sh"
             isPlateWorkflow: isPlateWorkflow, // Boolean flag from UI list
             isZarrWorkflow: isZarrWorkflow, // Boolean flag from UI list
+            useGpu: state.config.MODELS[`${prefix}_use_gpu`] === "true",
             extraParams: extractExtraParams(prefix), // Handle the extraParams here
           };
         });
@@ -195,11 +195,15 @@ const SettingsForm = () => {
       const mappedConverters = Object.entries(
         state.config.CONVERTERS || {}
       ).map(([key, value]) => ({ key, value }));
+      const mappedSbatchParams = Object.entries(state.config.SLURM || {})
+        .filter(([k]) => k.startsWith("sbatch_"))
+        .map(([k, v]) => ({ key: k.slice(7), value: v }));
       // store a version to 'reset' to
       setInitialFormData({
         ...state.config,
         MODELS: mappedModels,
         CONVERTERS: mappedConverters,
+        globalSbatchParams: mappedSbatchParams,
       });
       // the living version to be changed by the UI
       setSettingsForm({
@@ -209,6 +213,7 @@ const SettingsForm = () => {
       });
 
       setConverters(mappedConverters);
+      setGlobalSbatchParams(mappedSbatchParams);
     }
   };
 
@@ -631,7 +636,9 @@ const SettingsForm = () => {
       acc[model.name] = model.name;
       acc[`${model.name}_repo`] = model.repo;
       acc[`${model.name}_job`] = model.job;
-      
+      if (model.useGpu) {
+        acc[`${model.name}_use_gpu`] = "true";
+      }
       if (model.extraParams) {
         Object.entries(model.extraParams).forEach(([key, value]) => {
           acc[key] = value;
@@ -655,8 +662,16 @@ const SettingsForm = () => {
       return acc;
     }, {});
 
+    const slurmWithoutSbatch = Object.fromEntries(
+      Object.entries(settingsForm.SLURM || {}).filter(([k]) => !k.startsWith("sbatch_"))
+    );
+    const sbatchEntries = {};
+    globalSbatchParams.forEach(({ key, value }) => {
+      if (key) sbatchEntries[`sbatch_${key}`] = value;
+    });
     return {
       ...settingsForm,
+      SLURM: { ...slurmWithoutSbatch, ...sbatchEntries },
       CONVERTERS: converters,
       MODELS: models,
       UI: {
@@ -971,20 +986,20 @@ const SettingsForm = () => {
           settingsForm.SLURM?.gpu_gres,
           "",
           <>
-            Fallback --gres/--gpus value. Leave blank if not needed.
-            <ExampleNote>gpu:1</ExampleNote>
+            Fallback <code>--gres</code> value for GPU jobs. Use for clusters that allocate GPUs via <code>--gres</code>. Mutually exclusive with GPU GPUS.
+            <ExampleNote>gpu:a100:1</ExampleNote>
             <EnvVarNote vars={["BIOMERO_GPU_GRES"]} />
           </>
         )}
         {renderEditableField(
-          "GPU Resource Flag",
-          "SLURM.gpu_resource_flag",
-          settingsForm.SLURM?.gpu_resource_flag,
+          "GPU GPUS",
+          "SLURM.gpu_gpus",
+          settingsForm.SLURM?.gpu_gpus,
           "",
           <>
-            Whether to use --gres or --gpus for GPU resources. Default: gres.
-            <ExampleNote>gres</ExampleNote>
-            <EnvVarNote vars={["BIOMERO_GPU_RESOURCE_FLAG"]} />
+            Fallback <code>--gpus</code> value for GPU jobs. Use for clusters that allocate GPUs via <code>--gpus</code>. Mutually exclusive with GPU GRES.
+            <ExampleNote>1</ExampleNote>
+            <EnvVarNote vars={["BIOMERO_GPU_GPUS"]} />
           </>
         )}
         <H6>Image Pull Settings <RequiresInitTag /></H6>
@@ -1055,6 +1070,59 @@ const SettingsForm = () => {
             <EnvVarNote vars={["BIOMERO_SLURM_ZIP_CMD"]} />
           </>
         )}
+        <H6>Global Sbatch Parameters</H6>
+        <div className="bp5-form-group">
+          <div className="bp5-form-content">
+            <div className="bp5-form-helper-text">
+              Additional <code>sbatch</code> flags applied to every workflow submission.
+              Per-workflow job parameters always take precedence.
+              Stored as <code>sbatch_flag=value</code> in the config.
+            </div>
+            <div className="bp5-form-helper-text">
+              Useful for short-lived cluster-wide settings like a reservation or priority adjustment.
+              <ExampleNote>reservation=biomero</ExampleNote>
+            </div>
+          </div>
+        </div>
+        {globalSbatchParams.map((param, index) => (
+          <div key={index} className="flex items-center space-x-2 mb-2">
+            <InputGroup
+              value={param.key}
+              placeholder="flag (e.g. reservation)"
+              onChange={(e) => {
+                const updated = [...globalSbatchParams];
+                updated[index] = { ...updated[index], key: e.target.value };
+                setGlobalSbatchParams(updated);
+              }}
+              className="flex-1"
+            />
+            <span className="text-gray-500 font-mono px-1">=</span>
+            <InputGroup
+              value={param.value}
+              placeholder="value (e.g. biomero)"
+              onChange={(e) => {
+                const updated = [...globalSbatchParams];
+                updated[index] = { ...updated[index], value: e.target.value };
+                setGlobalSbatchParams(updated);
+              }}
+              className="flex-1"
+            />
+            <Button
+              icon="delete"
+              minimal
+              intent="danger"
+              onClick={() => setGlobalSbatchParams(globalSbatchParams.filter((_, i) => i !== index))}
+            />
+          </div>
+        ))}
+        <Button
+          icon="add"
+          minimal
+          intent="primary"
+          onClick={() => setGlobalSbatchParams([...globalSbatchParams, { key: "", value: "" }])}
+        >
+          Add Parameter
+        </Button>
       </CollapsibleSection>
       <CollapsibleSection title="UI Settings" errorCount={getMaxBatchJobsError() ? 1 : 0}>
         <div className="bp5-form-group">
