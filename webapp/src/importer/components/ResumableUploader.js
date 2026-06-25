@@ -7,6 +7,7 @@ import "@uppy/dashboard/dist/style.min.css";
 import { importUploadedFile } from "../../apiService";
 import { getDjangoConstants } from "../../constants";
 import { Callout, Intent } from "@blueprintjs/core";
+import { useAppContext } from "../../AppContext";
 
 const getUploadedFilename = (file, response, uploadedFilenameMap) => {
   const uploadUrl = response?.uploadURL;
@@ -29,6 +30,12 @@ const ResumableUploader = ({ datasetId, datasetType, group, groupId }) => {
   const [isReady, setIsReady] = useState(false);
   const { ui, user } = getDjangoConstants();
   const allowedFileTypes = ui.uploader_allowed_file_extensions;
+  
+  const { state, toaster } = useAppContext();
+  const chunkSizeMb = state.config?.UPLOADER?.chunk_size !== undefined
+    ? parseInt(state.config.UPLOADER.chunk_size)
+    : 100;
+  const chunkSize = chunkSizeMb * 1024 * 1024;
 
   useEffect(() => {
     // Create Uppy instance
@@ -43,7 +50,7 @@ const ResumableUploader = ({ datasetId, datasetType, group, groupId }) => {
       },
     }).use(Tus, {
       endpoint: "/omero_biomero/upload/",
-      chunkSize: 100 * 1024 * 1024, // 150MB chunks for faster uploads
+      chunkSize,
       retryDelays: [0, 1000, 3000, 5000],
       limit: 5, // Allow up to 5 concurrent file uploads
       onAfterResponse: (req, res) => {
@@ -61,7 +68,7 @@ const ResumableUploader = ({ datasetId, datasetType, group, groupId }) => {
     return () => {
       uppyInstance.close();
     };
-  }, [allowedFileTypes]);
+  }, [allowedFileTypes, chunkSize]);
 
   useEffect(() => {
     if (!uppyRef.current) return;
@@ -100,28 +107,31 @@ const ResumableUploader = ({ datasetId, datasetType, group, groupId }) => {
       );
 
       try {
-        await importUploadedFile(
+        const responseData = await importUploadedFile(
           uploadedFilename,
           datasetId,
           datasetType,
           group,
           groupId,
         );
-        uppyRef.current.info(
-          `Import queued for ${uploadedFilename}`,
-          "success",
-          3000,
-        );
+        const msg = responseData?.message || `Successfully queued ${uploadedFilename} for import`;
+        toaster?.show({
+          intent: "success",
+          icon: "tick-circle",
+          message: msg,
+          timeout: 0,
+        });
         if (response?.uploadURL) {
           uploadedFilenameMapRef.current.delete(response.uploadURL);
         }
       } catch (error) {
         console.error("Import trigger failed", error);
-        uppyRef.current.info(
-          `Import failed for ${uploadedFilename}: ${error.message}`,
-          "error",
-          5000,
-        );
+        toaster?.show({
+          intent: "danger",
+          icon: "error",
+          message: `Import failed for ${uploadedFilename}: ${error.message}`,
+          timeout: 0,
+        });
         if (response?.uploadURL) {
           uploadedFilenameMapRef.current.delete(response.uploadURL);
         }

@@ -19,6 +19,8 @@ import {
 import "@blueprintjs/core/lib/css/blueprint.css";
 import NewContainerOverlay from "./components/NewContainerOverlay";
 import MetadataForms from "./components/MetadataForms";
+import { getImportWarning } from "./import_warnings";
+
 
 const MonitorPanel = ({
   iframeUrl,
@@ -145,11 +147,18 @@ const ImporterApp = () => {
     state.config?.UPLOADER?.enabled === true ||
     state.config?.UPLOADER?.enabled === "True";
 
+  const uploadToGroupFolderEnabled =
+    state.config?.UPLOADER?.upload_to_group_folder === true ||
+    state.config?.UPLOADER?.upload_to_group_folder === "True";
+
   const getCurrentGroupFolder = () => {
     const activeGroupId = state.user.active_group_id;
     const mapping = state.groupFolderMappings[activeGroupId];
     return mapping?.folder || "root";  // Default to "root" if no mapping exists
   };
+
+  const showNoUploadFolderWarning =
+    uploadToGroupFolderEnabled && getCurrentGroupFolder() === "root";
 
   const [isNewContainerOverlayOpen, setIsNewContainerOverlayOpen] =
     useState(false);
@@ -321,8 +330,8 @@ const ImporterApp = () => {
 
     // Enhanced path construction to handle UUID-based items
     const selectedLocal = uploadList.map((item) => {
-      const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData);
-      const pathString = itemPath.slice(1).join("/"); // skip Root node
+      const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData, getCurrentGroupFolder());
+      const pathString = itemPath ? itemPath.slice(1).join("/") : item.value;
 
       // Check if this is a UUID-based item (has # in the value)
       if (item.value.includes("#")) {
@@ -422,7 +431,7 @@ const ImporterApp = () => {
     }
     
     const omeroPath = findPathToTreeLeaf(nodeId, state.omeroFileTreeData);
-    const pathString = omeroPath.join("/");
+    const pathString = omeroPath ? omeroPath.join("/") : "";
 
     const newUploadList = state.localFileTreeSelection
       .filter(
@@ -480,8 +489,9 @@ const ImporterApp = () => {
     setAreUploadItemsSelected(areItemsSelected);
   };
 
-  const findPathToTreeLeaf = (nodeId, tree) => {
+  const findPathToTreeLeaf = (nodeId, tree, rootNodeId = "root") => {
     const dfs = (currentNode, path) => {
+      if (!tree || !tree[currentNode]) return null;
       if (currentNode === nodeId) return path.concat(tree[currentNode]?.data);
       const children = tree[currentNode]?.children || [];
       for (const child of children) {
@@ -490,7 +500,7 @@ const ImporterApp = () => {
       }
       return null;
     };
-    return dfs("root", []);
+    return dfs(rootNodeId, []);
   };
 
   const selectedOmeroPath =
@@ -498,14 +508,15 @@ const ImporterApp = () => {
       ? findPathToTreeLeaf(
           state.omeroFileTreeSelection[0],
           state.omeroFileTreeData
-        ).join("/")
+        )?.join("/") || ""
       : "";
 
   const renderCards = () => {
     // TODO
     return uploadList.map((item) => {
-      const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData);
-      const itemPathString = itemPath.join("/");
+      const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData, getCurrentGroupFolder());
+      const itemPathString = itemPath ? itemPath.join("/") : item.filename || item.value;
+      const warningInfo = getImportWarning(item.filename, state.config);
       return (
         <Card
           key={item.value}
@@ -537,6 +548,15 @@ const ImporterApp = () => {
           <div className="text-xs text-gray-500 text-align-left w-full select-none">
             {"Source path: " + itemPathString}
           </div>
+          {warningInfo && (
+            <div className="mt-2 flex items-start text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200">
+              <Icon icon="warning-sign" size={14} className="mr-2 mt-0.5 flex-shrink-0 text-amber-600" />
+              <div>
+                <p className="font-semibold m-0">{warningInfo.summary}</p>
+                <p className="m-0 mt-0.5 text-gray-600">{warningInfo.details}</p>
+              </div>
+            </div>
+          )}
         </Card>
       );
     });
@@ -854,21 +874,29 @@ const ImporterApp = () => {
                 </Button>
               </Tooltip>
             </div>
-            {state.localFileTreeData && (
-              <div className="mt-4 max-h-[calc(100vh-450px)] overflow-auto">
-                <FileBrowser
-                  onSelectCallback={(nodeData, coords, e, deselect = false) =>
-                    handleFileTreeSelection(
-                      nodeData,
-                      coords,
-                      e,
-                      "local",
-                      deselect
-                    )
-                  }
-                  rootFolder={getCurrentGroupFolder()}
-                />
+            {showNoUploadFolderWarning ? (
+              <div className="mt-4">
+                <Callout intent="warning" icon="warning-sign">
+                  Your accound has no assigned upload folders. Please contact your OMERO administrator.
+                </Callout>
               </div>
+            ) : (
+              state.localFileTreeData && (
+                <div className="mt-4 max-h-[calc(100vh-450px)] overflow-auto">
+                  <FileBrowser
+                    onSelectCallback={(nodeData, coords, e, deselect = false) =>
+                      handleFileTreeSelection(
+                        nodeData,
+                        coords,
+                        e,
+                        "local",
+                        deselect
+                      )
+                    }
+                    rootFolder={getCurrentGroupFolder()}
+                  />
+                </div>
+              )
             )}
           </div>
           <div className="w-1/4 overflow-auto pt-2">
