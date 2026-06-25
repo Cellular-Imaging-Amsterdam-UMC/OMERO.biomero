@@ -297,7 +297,20 @@ SUPPORTED_FILE_EXTENSIONS = [
 ]
 
 UPLOADER_ALLOWED_FILE_EXTENSIONS = [
-    ext for ext in SUPPORTED_FILE_EXTENSIONS if ext != ".xlef"
+    ext for ext in SUPPORTED_FILE_EXTENSIONS 
+    if ext not in (
+        ".xlef", 
+        ".xml", 
+        ".txt", 
+        ".cfg", 
+        ".db", 
+        ".icarch", 
+        ".zarr", 
+        ".nd", 
+        ".html", 
+        ".csv", 
+        ".gz"
+    )
 ]
 
 # Uploader settings
