@@ -47,6 +47,16 @@ def admin_config(request, conn=None, **kwargs):
                 section: dict(configs.items(section)) for section in configs.sections()
             }
 
+            # Workflow definitions may live under a legacy [MODELS] section or
+            # the preferred [WORKFLOWS] section. Always surface them to the UI as
+            # WORKFLOWS so the admin interface uses consistent terminology,
+            # merging both if they happen to coexist ([WORKFLOWS] wins on clash).
+            if "MODELS" in config_dict or "WORKFLOWS" in config_dict:
+                merged_workflows = {}
+                merged_workflows.update(config_dict.pop("MODELS", {}))
+                merged_workflows.update(config_dict.pop("WORKFLOWS", {}))
+                config_dict["WORKFLOWS"] = merged_workflows
+
             # Load the JSON configuration file (biomero-config.json)
             json_config = {}
             if os.path.exists(CONFIG_FILE_PATH):
@@ -154,6 +164,17 @@ def admin_config(request, conn=None, **kwargs):
                     )
 
             # --- Save INI Config ---
+            # The workflow definitions section may be named [WORKFLOWS]
+            # (preferred) or [MODELS] (legacy). The web UI always sends it as
+            # "WORKFLOWS", but we preserve whichever name the existing ini file
+            # already uses so we never create a duplicate/conflicting section.
+            if "WORKFLOWS" in config:
+                workflow_section_name = "WORKFLOWS"
+            elif "MODELS" in config:
+                workflow_section_name = "MODELS"
+            else:
+                workflow_section_name = "WORKFLOWS"
+
             # Update the config with new values
             for section, settingsd in ini_config_updates.items():
                 if not isinstance(settingsd, dict):
@@ -161,11 +182,16 @@ def admin_config(request, conn=None, **kwargs):
                         f"Section '{section}' must contain key-value pairs."
                     )
 
+                # Normalize the workflow section name to whatever the existing
+                # ini uses (MODELS or WORKFLOWS); they share identical handling.
+                if section in ("MODELS", "WORKFLOWS"):
+                    section = workflow_section_name
+
                 # If the section doesn't exist, add it
                 if section not in config:
                     config.add_section(section)
 
-                if section == "MODELS":
+                if section in ("MODELS", "WORKFLOWS"):
                     # Group keys by prefix (cellpose, stardist, etc.)
                     model_keys = defaultdict(list)
                     for key, value in settingsd.items():

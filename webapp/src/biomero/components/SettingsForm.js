@@ -91,9 +91,9 @@ const SettingsForm = () => {
   
   // Descriptor flags derived from already-fetched state.workflows (populated by Run tab on load)
   const descriptorMetadata = useMemo(() => {
-    if (!settingsForm?.MODELS || !state.workflows) return {};
+    if (!settingsForm?.WORKFLOWS || !state.workflows) return {};
     const result = {};
-    settingsForm.MODELS.forEach((model, index) => {
+    settingsForm.WORKFLOWS.forEach((model, index) => {
       const wf = state.workflows.find((w) => w.name === model.name);
       if (wf?.metadata) {
         result[index] = {
@@ -103,7 +103,7 @@ const SettingsForm = () => {
       }
     });
     return result;
-  }, [settingsForm?.MODELS, state.workflows]);
+  }, [settingsForm?.WORKFLOWS, state.workflows]);
 
   // Version checking state
   const [versionStatus, setVersionStatus] = useState({});
@@ -166,7 +166,7 @@ const SettingsForm = () => {
 
   const initializeFormState = () => {
     if (state.config) {
-      const mappedModels = Object.entries(state.config.MODELS || {})
+      const mappedModels = Object.entries(state.config.WORKFLOWS || {})
         .filter(([key]) => key.endsWith("_repo")) // Filter for relevant keys
         .map(([key, value]) => {
           const prefix = key.replace("_repo", ""); // Extract the prefix
@@ -182,12 +182,12 @@ const SettingsForm = () => {
           const isZarrWorkflow = zarrWorkflows.includes(prefix);
           
           return {
-            name: state.config.MODELS[prefix], // e.g., "cellpose"
+            name: state.config.WORKFLOWS[prefix], // e.g., "cellpose"
             repo: value, // e.g., the repo URL
-            job: state.config.MODELS[`${prefix}_job`], // e.g., "jobs/cellpose.sh"
+            job: state.config.WORKFLOWS[`${prefix}_job`], // e.g., "jobs/cellpose.sh"
             isPlateWorkflow: isPlateWorkflow, // Boolean flag from UI list
             isZarrWorkflow: isZarrWorkflow, // Boolean flag from UI list
-            useGpu: state.config.MODELS[`${prefix}_use_gpu`] === "true",
+            useGpu: state.config.WORKFLOWS[`${prefix}_use_gpu`] === "true",
             extraParams: extractExtraParams(prefix), // Handle the extraParams here
           };
         });
@@ -201,14 +201,14 @@ const SettingsForm = () => {
       // store a version to 'reset' to
       setInitialFormData({
         ...state.config,
-        MODELS: mappedModels,
+        WORKFLOWS: mappedModels,
         CONVERTERS: mappedConverters,
         globalSbatchParams: mappedSbatchParams,
       });
       // the living version to be changed by the UI
       setSettingsForm({
         ...state.config,
-        MODELS: mappedModels,
+        WORKFLOWS: mappedModels,
         CONVERTERS: mappedConverters,
       });
 
@@ -219,7 +219,7 @@ const SettingsForm = () => {
 
   const extractExtraParams = (prefix) => {
     const extraParams = {};
-    Object.entries(state.config.MODELS).forEach(([key, value]) => {
+    Object.entries(state.config.WORKFLOWS || {}).forEach(([key, value]) => {
       if (key.startsWith(`${prefix}_job_`)) {
         const paramKey = key;
         extraParams[paramKey] = value;
@@ -240,26 +240,26 @@ const SettingsForm = () => {
     }
   }, [state.config, isInitialized]); // Only run when config loads and form isn't initialized
 
-  // Validate model fields whenever MODELS changes
+  // Validate model fields whenever WORKFLOWS changes
   useEffect(() => {
-    if (settingsForm?.MODELS) {
-      validateModelFields(settingsForm.MODELS, settingsForm?.SLURM?.slurm_script_repo);
+    if (settingsForm?.WORKFLOWS) {
+      validateModelFields(settingsForm.WORKFLOWS, settingsForm?.SLURM?.slurm_script_repo);
     }
-  }, [settingsForm?.MODELS, settingsForm?.SLURM?.slurm_script_repo]);
+  }, [settingsForm?.WORKFLOWS, settingsForm?.SLURM?.slurm_script_repo]);
 
   // Trigger version check when admin panel opens for the first time
   useEffect(() => {
-    if (settingsForm?.MODELS?.length > 0 && !versionCheckCompleted) {
+    if (settingsForm?.WORKFLOWS?.length > 0 && !versionCheckCompleted) {
       performVersionCheck();
     }
-  }, [settingsForm?.MODELS, versionCheckCompleted]);
+  }, [settingsForm?.WORKFLOWS, versionCheckCompleted]);
 
   const performVersionCheck = async (forceRefresh = false) => {
-    if (!settingsForm?.MODELS?.length || versionCheckLoading) return;
+    if (!settingsForm?.WORKFLOWS?.length || versionCheckLoading) return;
     
     setVersionCheckLoading(true);
     try {
-      const results = await checkModelVersions(settingsForm.MODELS, forceRefresh);
+      const results = await checkModelVersions(settingsForm.WORKFLOWS, forceRefresh);
       const statusMap = {};
       results.forEach(result => {
         statusMap[result.index] = result;
@@ -281,10 +281,10 @@ const SettingsForm = () => {
 
   // Check version for a specific model
   const recheckModelVersion = async (modelIndex, updatedModel = null, forceRefresh = false) => {
-    if (!settingsForm?.MODELS?.[modelIndex] && !updatedModel) return;
+    if (!settingsForm?.WORKFLOWS?.[modelIndex] && !updatedModel) return;
     
     try {
-      const model = updatedModel || settingsForm.MODELS[modelIndex];
+      const model = updatedModel || settingsForm.WORKFLOWS[modelIndex];
       const results = await checkModelVersions([model], forceRefresh);
       if (results.length > 0) {
         const result = { ...results[0], index: modelIndex }; // Fix index to match our array
@@ -298,9 +298,9 @@ const SettingsForm = () => {
     }
   };
 
-  // Calculate version summary for Models Settings
+  // Calculate version summary for Workflows Settings
   const getVersionSummary = () => {
-    if (!settingsForm?.MODELS?.length || !Object.keys(versionStatus).length) {
+    if (!settingsForm?.WORKFLOWS?.length || !Object.keys(versionStatus).length) {
       return { 
         upToDate: 0, 
         total: 0, 
@@ -310,7 +310,7 @@ const SettingsForm = () => {
       };
     }
     
-    const total = settingsForm.MODELS.length;
+    const total = settingsForm.WORKFLOWS.length;
     let upToDate = 0;
     let outdated = 0;
     let rateLimited = 0;
@@ -353,9 +353,9 @@ const SettingsForm = () => {
 
   // Handle when user finishes editing repo URL
   const handleRepoUrlBlur = async (modelIndex) => {
-    if (!settingsForm?.MODELS?.[modelIndex]?.repo) return;
+    if (!settingsForm?.WORKFLOWS?.[modelIndex]?.repo) return;
     
-    const model = settingsForm.MODELS[modelIndex];
+    const model = settingsForm.WORKFLOWS[modelIndex];
 
     // Fetch the descriptor once — gets us the tool name AND zarr/plate flags
     // in a single Django→GitHub round-trip (server-side caching applies).
@@ -363,7 +363,7 @@ const SettingsForm = () => {
 
     if (metadata) {
       setSettingsForm((prev) => {
-        const updatedModels = structuredClone(prev.MODELS);
+        const updatedModels = structuredClone(prev.WORKFLOWS);
         const m = updatedModels[modelIndex];
 
         // Auto-populate name from descriptor if the name field is still empty
@@ -394,7 +394,7 @@ const SettingsForm = () => {
           m.isZarrWorkflow = true;
         }
 
-        return { ...prev, MODELS: updatedModels };
+        return { ...prev, WORKFLOWS: updatedModels };
       });
     }
 
@@ -407,7 +407,7 @@ const SettingsForm = () => {
 
   const handleModelChange = (index, field, value, options = {}) => {
     setSettingsForm((prev) => {
-      const updatedModels = structuredClone(prev.MODELS);
+      const updatedModels = structuredClone(prev.WORKFLOWS);
       updatedModels[index][field] = value;
 
       if (field === "name" && !prev.SLURM.slurm_script_repo) {
@@ -420,7 +420,7 @@ const SettingsForm = () => {
         updatedModels[index]["isZarrWorkflow"] = true;
       }
 
-      return { ...prev, MODELS: updatedModels };
+      return { ...prev, WORKFLOWS: updatedModels };
     });
 
     // Clear version status when repo URL changes - we'll check on blur
@@ -527,14 +527,14 @@ const SettingsForm = () => {
   const addModel = () => {
     setSettingsForm((prev) => ({
       ...prev,
-      MODELS: [...prev.MODELS, { name: "", repo: "", job: "" }],
+      WORKFLOWS: [...prev.WORKFLOWS, { name: "", repo: "", job: "" }],
     }));
   };
 
   const handleDeleteModel = (index) => {
     setSettingsForm((prev) => {
-      const updatedModels = prev.MODELS.filter((_, i) => i !== index);
-      return { ...prev, MODELS: updatedModels };
+      const updatedModels = prev.WORKFLOWS.filter((_, i) => i !== index);
+      return { ...prev, WORKFLOWS: updatedModels };
     });
     // Rebuild versionStatus: remove the deleted entry and shift higher indices down
     setVersionStatus((prev) => {
@@ -553,14 +553,14 @@ const SettingsForm = () => {
     if (!initialFormData) return;
 
     setSettingsForm((prev) => {
-      const updatedModels = [...prev.MODELS];
-      if (initialFormData.MODELS[index]) {
-        updatedModels[index] = initialFormData.MODELS[index]; // Restore model from initial data
+      const updatedModels = [...prev.WORKFLOWS];
+      if (initialFormData.WORKFLOWS[index]) {
+        updatedModels[index] = initialFormData.WORKFLOWS[index]; // Restore model from initial data
       } else {
         updatedModels[index] = { name: "", repo: "", job: "" }; // Reset to default if it's a new model
       }
 
-      return { ...prev, MODELS: updatedModels };
+      return { ...prev, WORKFLOWS: updatedModels };
     });
   };
 
@@ -632,7 +632,7 @@ const SettingsForm = () => {
   };
 
   const transformSettingsFormToPayload = (settingsForm) => {
-    const models = settingsForm.MODELS.reduce((acc, model) => {
+    const models = settingsForm.WORKFLOWS.reduce((acc, model) => {
       acc[model.name] = model.name;
       acc[`${model.name}_repo`] = model.repo;
       acc[`${model.name}_job`] = model.job;
@@ -648,12 +648,12 @@ const SettingsForm = () => {
     }, {});
 
     // Collect plate workflows into a JSON list
-    const plateWorkflows = settingsForm.MODELS
+    const plateWorkflows = settingsForm.WORKFLOWS
       .filter(model => model.isPlateWorkflow)
       .map(model => model.name);
       
     // Collect ZARR workflows into a JSON list
-    const zarrWorkflows = settingsForm.MODELS
+    const zarrWorkflows = settingsForm.WORKFLOWS
       .filter(model => model.isZarrWorkflow)
       .map(model => model.name);
 
@@ -673,7 +673,7 @@ const SettingsForm = () => {
       ...settingsForm,
       SLURM: { ...slurmWithoutSbatch, ...sbatchEntries },
       CONVERTERS: converters,
-      MODELS: models,
+      WORKFLOWS: models,
       UI: {
         ...settingsForm.UI,
         plate_workflows: JSON.stringify(plateWorkflows),
@@ -1381,20 +1381,20 @@ const SettingsForm = () => {
         />
       </CollapsibleSection>
       <CollapsibleSection 
-        title="Models Settings" 
+        title="Workflows Settings" 
         versionSummary={getVersionSummary()}
         versionCheckLoading={versionCheckLoading}
         onRefresh={manualRefreshVersions}
         errorCount={Object.keys(modelErrors).length}
       >
         <ConfigSection
-          items={settingsForm.MODELS}
+          items={settingsForm.WORKFLOWS}
           onItemChange={(index, field, value, options = {}) =>
             handleModelChange(index, field, value, options)
           }
           onAddItem={addModel}
           onAddParam={(index, key, value) => {
-            const updatedModels = structuredClone(settingsForm.MODELS);
+            const updatedModels = structuredClone(settingsForm.WORKFLOWS);
 
             if (!key) {
               console.error("Key is required to add or delete parameters.");
@@ -1418,17 +1418,17 @@ const SettingsForm = () => {
               updatedModels[index].extraParams[formattedKey] = value;
             }
 
-            setSettingsForm((prev) => ({ ...prev, MODELS: updatedModels }));
+            setSettingsForm((prev) => ({ ...prev, WORKFLOWS: updatedModels }));
           }}
           onDeleteItem={handleDeleteModel}
           onResetItem={resetModel}
           CardComponent={ModelCard}
-          title="Model"
+          title="Workflow"
           description={[
-            "Settings for models/singularity images that we want to run on Slurm.",
-            "Model names have to be unique, and require a GitHub repository as well.",
+            "Settings for workflows/singularity images that we want to run on Slurm.",
+            "Workflow names have to be unique, and require a GitHub repository as well.",
             "Versions for the GitHub repository are highly encouraged! Latest/master can change and cause issues with reproducability! BIOMERO picks up the container version based on the version of the repository. If you provide no version, BIOMERO will pick up the generic latest container.",
-            "⚠️ Adding, removing, or renaming models requires running the SLURM Init script so job scripts are generated and container images are pulled.",
+            "⚠️ Adding, removing, or renaming workflows requires running the SLURM Init script so job scripts are generated and container images are pulled.",
           ]}
           errors={modelErrors}
           validateField={null} // Per-field live validation not needed; duplicate check runs via useEffect
