@@ -836,7 +836,21 @@ const SettingsForm = () => {
           "SLURM.slurm_conversion_partition",
           settingsForm.SLURM.slurm_conversion_partition,
           "",
-          "Partition for conversion jobs. Example: cpu-short. Leave empty to use system default."
+          <>
+            Partition for data conversion jobs (added as a real <code>--partition</code> flag on the conversion sbatch). Takes precedence over the generic Default Partition below. Leave empty to fall back to the Default Partition, or the system default if neither is set.
+            <ExampleNote>cpu-short</ExampleNote>
+          </>
+        )}
+        {renderEditableField(
+          "Default Partition",
+          "SLURM.slurm_default_partition",
+          settingsForm.SLURM?.slurm_default_partition,
+          "",
+          <>
+            Generic fallback <code>--partition</code> applied to both workflow and conversion jobs that do not already set a partition. Per-workflow params, GPU partition, and the Conversion Partition always take precedence. Useful on clusters without a usable system default partition.
+            <ExampleNote>cpu-short</ExampleNote>
+            <EnvVarNote vars={["BIOMERO_DEFAULT_PARTITION"]} />
+          </>
         )}
         {renderEditableField(
           "Apptainer Tmp Dir",
@@ -1074,7 +1088,7 @@ const SettingsForm = () => {
         <div className="bp5-form-group">
           <div className="bp5-form-content">
             <div className="bp5-form-helper-text">
-              Additional <code>sbatch</code> flags applied to every workflow submission.
+              Additional <code>sbatch</code> flags applied to every workflow <em>and</em> conversion submission.
               Per-workflow job parameters always take precedence.
               Stored as <code>sbatch_flag=value</code> in the config.
             </div>
