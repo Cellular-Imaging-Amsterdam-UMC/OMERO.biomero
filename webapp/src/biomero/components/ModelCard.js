@@ -41,15 +41,16 @@ const ModelCard = ({
   const [showWarning, setShowWarning] = useState(false);
   const [containerImage, setContainerImage] = useState(null);
 
-  // Fetch container image for already-versioned URLs on mount/when repo changes.
-  // Gated to versioned GitHub URLs only — avoids the 404 waterfall for unversioned/non-GitHub values.
+  // Fetch container image on mount only (for cards loaded from saved config).
+  // NOT on every repo change — that fires per keystroke and hammers GitHub.
+  // Updates happen via fetchContainerImageOnBlur when the user finishes editing.
   useEffect(() => {
     if (item.repo && item.repo.includes('github.com/') && item.repo.includes('/tree/v')) {
       fetchContainerImage(item.repo).then(img => setContainerImage(img || null));
     } else {
       setContainerImage(null);
     }
-  }, [item.repo]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch container image from descriptor.json — only on blur, only for versioned GitHub URLs
   // (avoids 404 storms while typing and avoids fetching unresolvable refs)
