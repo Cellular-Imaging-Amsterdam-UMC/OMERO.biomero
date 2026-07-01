@@ -55,31 +55,14 @@ const ExampleNote = ({ children }) => (
   <span className="block mt-0.5"><strong className="text-gray-600">Example:</strong> <code>{children}</code></span>
 );
 
-/**
- * Small inline info icon shown next to settings that take effect only after
- * running the SLURM Init script. This is purely informational — it describes
- * the setting's nature and does NOT imply any required action right now.
- * (You can always run Init after any config change to be safe.)
- */
+/** Small inline badge shown next to settings that require a SLURM Init run after changing. */
 const RequiresInitTag = () => (
   <Tooltip
-    content="This setting is applied to Slurm when you run the SLURM Init script. You can run Init after any config change to be safe — it is always idempotent."
+    content="Changing this setting requires running the SLURM Init script to take effect. The new scripts must be deployed to Slurm before the setting is active."
     placement="right"
   >
-    <Tag minimal icon="time" className="ml-2 align-middle cursor-help">
-      init
-    </Tag>
-  </Tooltip>
-);
-
-/** Counterpart to RequiresInitTag — settings that apply immediately on save, no Init needed. */
-const RuntimeTag = () => (
-  <Tooltip
-    content="No Slurm Init needed — save and it applies to new workflow submissions immediately."
-    placement="right"
-  >
-    <Tag minimal intent="success" icon="flash" className="ml-2 align-middle cursor-help">
-      runtime
+    <Tag intent="warning" minimal className="ml-2 align-middle cursor-help">
+      requires Slurm Init
     </Tag>
   </Tooltip>
 );
@@ -766,7 +749,7 @@ const SettingsForm = () => {
         </div>
       </div>
 
-      <CollapsibleSection title={<>SSH Settings <RequiresInitTag /></>}>
+      <CollapsibleSection title="SSH Settings">
         <div className="bp5-form-group">
           <div className="bp5-form-content">
             <div className="bp5-form-helper-text">
@@ -803,7 +786,7 @@ const SettingsForm = () => {
             </div>
           </div>
         </div>
-        <CollapsibleSection title={<>Paths <RequiresInitTag /></>} nested>
+        <CollapsibleSection title="Paths" nested>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -848,8 +831,29 @@ const SettingsForm = () => {
             "",
             "Exported as APPTAINER_BINDPATH for workflow jobs. Configure if your HPC administrator requires it. Example: /data/my-scratch/data. Leave blank if not needed."
           )}
+          {renderEditableField(
+            "Slurm Conversion Partition",
+            "SLURM.slurm_conversion_partition",
+            settingsForm.SLURM.slurm_conversion_partition,
+            "",
+            <>
+              Partition for data conversion jobs (added as a real <code>--partition</code> flag on the conversion sbatch). Takes precedence over the generic Default Partition below. Leave empty to fall back to the Default Partition, or the system default if neither is set.
+              <ExampleNote>cpu-short</ExampleNote>
+            </>
+          )}
+          {renderEditableField(
+            "Default Partition",
+            "SLURM.slurm_default_partition",
+            settingsForm.SLURM?.slurm_default_partition,
+            "",
+            <>
+              Generic fallback <code>--partition</code> applied to both workflow and conversion jobs that do not already set a partition. Per-workflow params, GPU partition, and the Conversion Partition always take precedence. Useful on clusters without a usable system default partition.
+              <ExampleNote>cpu-short</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_DEFAULT_PARTITION"]} />
+            </>
+          )}
         </CollapsibleSection>
-        <CollapsibleSection title={<>SACCT History Window <RuntimeTag /></>} nested>
+        <CollapsibleSection title="SACCT History Window" nested>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -881,7 +885,7 @@ const SettingsForm = () => {
             </>
           )}
         </CollapsibleSection>
-        <CollapsibleSection title={<>Repositories <RequiresInitTag /></>} nested>
+        <CollapsibleSection title="Repositories" nested>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -906,7 +910,7 @@ const SettingsForm = () => {
             "danger"
           )}
         </CollapsibleSection>
-        <CollapsibleSection title="Processing Settings" nested>
+        <CollapsibleSection title={<>Processing Settings <RequiresInitTag /></>} nested>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -914,7 +918,6 @@ const SettingsForm = () => {
               </div>
             </div>
           </div>
-          <H6>Job Script Generation <RequiresInitTag /></H6>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -952,25 +955,15 @@ const SettingsForm = () => {
               )
             }
           />
-          <H6>Partition & GPU Fallback <RuntimeTag /></H6>
+          <H6>GPU Fallback Settings</H6>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
-                Runtime defaults applied at sbatch submission. Per-workflow job parameters always take precedence. Leave blank if not needed.
+                Applied as sbatch defaults when <code>use_gpu=true</code> and no per-workflow GPU params are set.
+                Per-workflow job parameters always take precedence. Leave blank if not needed.
               </div>
             </div>
           </div>
-          {renderEditableField(
-            "Default Partition",
-            "SLURM.slurm_default_partition",
-            settingsForm.SLURM?.slurm_default_partition,
-            "",
-            <>
-              Generic fallback <code>--partition</code> for all jobs without an explicit partition. Per-workflow params and GPU partition always take precedence. Useful on clusters without a usable system default partition.
-              <ExampleNote>cpu-short</ExampleNote>
-              <EnvVarNote vars={["BIOMERO_DEFAULT_PARTITION"]} />
-            </>
-          )}
           {renderEditableField(
             "GPU Partition",
             "SLURM.gpu_partition",
@@ -1047,7 +1040,7 @@ const SettingsForm = () => {
             </>
           )}
           {renderEditableField(
-            <span>Apptainer Tmp Dir <RequiresInitTag /></span>,
+            "Apptainer Tmp Dir",
             "SLURM.apptainer_tmpdir",
             settingsForm.SLURM?.apptainer_tmpdir,
             "",
@@ -1068,7 +1061,7 @@ const SettingsForm = () => {
               <EnvVarNote vars={["BIOMERO_APPTAINER_CACHEDIR"]} />
             </>
           )}
-          <H6>ZIP Command <RuntimeTag /></H6>
+          <H6>ZIP Command</H6>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -1088,46 +1081,17 @@ const SettingsForm = () => {
               <EnvVarNote vars={["BIOMERO_SLURM_ZIP_CMD"]} />
             </>
           )}
-          <H6>Global Sbatch Parameters <RuntimeTag /></H6>
+          <H6>Global Sbatch Parameters</H6>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
-                Add a default job value to all workflows.{" "}
-                See Slurm{" "}
-                <a
-                  href="https://slurm.schedmd.com/sbatch.html#SECTION_OPTIONS"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  SBATCH parameters
-                </a>{" "}
-                for all options. Always use the extended form here (e.g.{" "}
-                <code>cpus-per-task</code>, not <code>c</code>).
+                Additional <code>sbatch</code> flags applied to every workflow <em>and</em> conversion submission.
                 Per-workflow job parameters always take precedence.
                 Stored as <code>sbatch_flag=value</code> in the config.
               </div>
               <div className="bp5-form-helper-text">
-                <ul>
-                  E.g.
-                  <li>
-                    Run with specific GPU: <code>gres=gpu:1g.10gb:1</code>
-                  </li>
-                  <li>
-                    Run on a specific partition: <code>partition=luna-gpu-short</code>
-                  </li>
-                  <li>
-                    Use more CPU memory: <code>mem=15GB</code>
-                  </li>
-                  <li>
-                    Higher timeout (d-hh:mm:ss): <code>time=08:00:00</code>
-                  </li>
-                  <li>
-                    Use a reservation: <code>reservation=biomero</code>
-                  </li>
-                  <li>
-                    Charge to a specific account: <code>account=myproject</code>
-                  </li>
-                </ul>
+                Useful for short-lived cluster-wide settings like a reservation or priority adjustment.
+                <ExampleNote>reservation=biomero</ExampleNote>
               </div>
             </div>
           </div>
@@ -1172,7 +1136,7 @@ const SettingsForm = () => {
           </Button>
         </CollapsibleSection>
       </CollapsibleSection>
-      <CollapsibleSection title={<>UI Settings <RuntimeTag /></>} errorCount={getMaxBatchJobsError() ? 1 : 0}>
+      <CollapsibleSection title="UI Settings" errorCount={getMaxBatchJobsError() ? 1 : 0}>
         <div className="bp5-form-group">
           <div className="bp5-form-content">
             <div className="bp5-form-helper-text">
@@ -1246,7 +1210,7 @@ const SettingsForm = () => {
           )}
         </FormGroup>
       </CollapsibleSection>
-      <CollapsibleSection title={<>Analytics Settings <RequiresInitTag /></>}>
+      <CollapsibleSection title="Analytics Settings">
         <div className="bp5-form-group">
           <div className="bp5-form-content">
             <div className="bp5-form-helper-text">
@@ -1409,17 +1373,7 @@ const SettingsForm = () => {
           </>
         )}
       </CollapsibleSection>
-      <CollapsibleSection title={<>Converters Settings <RequiresInitTag /></>}>
-        {renderEditableField(
-          <span>Conversion Partition <RuntimeTag /></span>,
-          "SLURM.slurm_conversion_partition",
-          settingsForm.SLURM.slurm_conversion_partition,
-          "",
-          <>
-            Partition applied to data conversion sbatch jobs. Leave empty to use the Default Partition fallback, or the system default if neither is set.
-            <ExampleNote>cpu-short</ExampleNote>
-          </>
-        )}
+      <CollapsibleSection title="Converters Settings">
         <ConfigSection
           items={converters}
           onItemChange={handleConverterChange}
