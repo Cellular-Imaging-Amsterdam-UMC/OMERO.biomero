@@ -434,6 +434,25 @@ const ModelCard = ({
               : 'Descriptor does not declare ZARR requirement'}
           </div>
         )}
+
+        <div className="flex items-center justify-between mt-3">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">
+              GPU Workflow
+            </span>
+            <span className="text-xs text-gray-500">
+              Mark this workflow as GPU-enabled by default. BIOMERO will apply the global{" "}
+              <code>gpu_partition</code> / <code>gpu_gres</code> / <code>gpu_gpus</code> from
+              Slurm Settings — or override them per-workflow using the sbatch parameters below
+              (e.g. <code>partition=gpu_a100</code>, <code>gres=gpu:a100:1</code>).
+            </span>
+          </div>
+          <Switch
+            checked={item.useGpu || false}
+            disabled={!editable}
+            onChange={(e) => onChange(index, "useGpu", e.target.checked)}
+          />
+        </div>
       </FormGroup>
 
       <FormGroup
