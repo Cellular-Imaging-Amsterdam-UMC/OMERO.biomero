@@ -71,7 +71,7 @@ const CollapsibleSection = ({ title, children, versionSummary, versionCheckLoadi
             <Button
               minimal
               small
-              icon="refresh"
+              icon="repeat"
               onClick={() => onRefresh()}
               disabled={versionCheckLoading}
             />

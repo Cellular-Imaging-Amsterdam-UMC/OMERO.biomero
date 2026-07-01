@@ -10,22 +10,13 @@ import {
   ButtonGroup,
   Switch,
   Spinner,
-  Tag,
 } from "@blueprintjs/core";
 import { FaDocker } from "react-icons/fa6";
 import { fetchContainerImage } from "../../apiService";
+import { RuntimeIcon, SlurmInitIcon } from "./SettingsForm";
 
 /** No Slurm Init needed — save and it applies to new submissions immediately. */
-const RuntimeTag = () => (
-  <Tooltip
-    content="No Slurm Init needed — save and it applies to new workflow submissions immediately."
-    placement="right"
-  >
-    <Tag intent="primary" minimal className="ml-2 align-middle cursor-help">
-      runtime
-    </Tag>
-  </Tooltip>
-);
+// RuntimeIcon and SlurmInitIcon are imported from SettingsForm
 
 const ModelCard = ({
   item,
@@ -147,11 +138,12 @@ const ModelCard = ({
 
       <FormGroup
         label={
-          <span>
-            Model Name{" "}
+          <span className="inline-flex items-center gap-1">
+            Model Name
             <Tooltip content="Provide a unique, lowercase name for this model. It will be used as foldername on Slurm and in the INI file as [name]_job_<parameter>.">
               <Icon icon="help" size={12} />
             </Tooltip>
+            <SlurmInitIcon />
           </span>
         }
         subLabel="Also the path to store the container on the slurm_images_path."
@@ -175,11 +167,12 @@ const ModelCard = ({
 
       <FormGroup
         label={
-          <span>
-            GitHub Repository{" "}
+          <span className="inline-flex items-center gap-1">
+            GitHub Repository
             <Tooltip content="Specify the versioned GitHub repository URL for this model. Versions (e.g., /tree/v1.0.0) ensure reproducibility.">
               <Icon icon="help" size={12} />
             </Tooltip>
+            <SlurmInitIcon />
           </span>
         }
         subLabel="The repository with the descriptor.json file."
@@ -321,11 +314,12 @@ const ModelCard = ({
 
       <FormGroup
         label={
-          <span>
-            Slurm Job Script{" "}
+          <span className="inline-flex items-center gap-1">
+            Slurm Job Script
             <Tooltip content="Specify the relative path to the Slurm job script. Defaults to 'jobs/<model-name>.sh' if left blank.">
               <Icon icon="help" size={12} />
             </Tooltip>
+            <SlurmInitIcon />
           </span>
         }
         subLabel="The jobscript path in the 'slurm_script_repo'. Use jobs/<modelname>.sh, unless you added your own Slurm Script Repository."
@@ -357,7 +351,7 @@ const ModelCard = ({
 
       {/* Workflow Input Configuration */}
       <FormGroup
-        label={<span>Workflow Input Requirements <RuntimeTag /></span>}
+        label={<span className="inline-flex items-center gap-1">Workflow Input Requirements <RuntimeIcon /></span>}
         subLabel="Configure input format requirements for this workflow."
       >
         <div className="flex items-center justify-between">
@@ -420,12 +414,12 @@ const ModelCard = ({
 
       <FormGroup
         label={
-          <span>
-            Additional Slurm Parameters{" "}
+          <span className="inline-flex items-center gap-1">
+            Additional Slurm Parameters
             <Tooltip content="Add parameters in key=value format (e.g., mem=32GB). These will be converted to <name>_job_<key>=<value> in the INI file.">
               <Icon icon="help" size={12} />
             </Tooltip>
-            <RuntimeTag />
+            <RuntimeIcon />
           </span>
         }
         subLabel={

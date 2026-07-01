@@ -55,16 +55,28 @@ const ExampleNote = ({ children }) => (
   <span className="block mt-0.5"><strong className="text-gray-600">Example:</strong> <code>{children}</code></span>
 );
 
-/** Small inline badge shown next to settings that require a SLURM Init run after changing. */
-const RequiresInitTag = () => (
-  <Tooltip
-    content="Changing this setting requires running the SLURM Init script to take effect. The new scripts must be deployed to Slurm before the setting is active."
-    placement="right"
-  >
-    <Tag intent="warning" minimal className="ml-2 align-middle cursor-help">
-      requires Slurm Init
-    </Tag>
-  </Tooltip>
+/** Setting type icon: takes effect immediately after saving, no Slurm Init needed. */
+export const RuntimeIcon = () => (
+  <span className="inline-flex align-middle">
+    <Tooltip
+      content="Runtime setting — takes effect immediately after saving. No Slurm Init needed."
+      placement="right"
+    >
+      <Icon icon="automatic-updates" size={12} className="cursor-help text-gray-400" />
+    </Tooltip>
+  </span>
+);
+
+/** Setting type icon: requires running the Slurm Init script to deploy. */
+export const SlurmInitIcon = () => (
+  <span className="inline-flex align-middle">
+    <Tooltip
+      content="Slurm Init setting — a Slurm Init run is needed to deploy this change to the cluster."
+      placement="right"
+    >
+      <Icon icon="refresh" size={12} className="cursor-help text-gray-400" />
+    </Tooltip>
+  </span>
 );
 
 const SettingsForm = () => {
@@ -152,7 +164,12 @@ const SettingsForm = () => {
   };
 
   useEffect(() => {
-    if (JSON.stringify(settingsForm) !== JSON.stringify(initialFormData)) {
+    if (!initialFormData) return;
+    // globalSbatchParams is stored in initialFormData for the separate comparison below,
+    // but is NOT present in settingsForm — strip it before the main diff to avoid a
+    // permanent false-positive that lights up Save/Undo on every page load.
+    const { globalSbatchParams: _gsb, ...initialForComparison } = initialFormData;
+    if (JSON.stringify(settingsForm) !== JSON.stringify(initialForComparison)) {
       setHasChanges(true);
     } else if (
       JSON.stringify(converters) !== JSON.stringify(initialFormData?.CONVERTERS) ||
@@ -618,6 +635,7 @@ const SettingsForm = () => {
       const currentFormState = {
         ...settingsForm,
         CONVERTERS: converters,
+        globalSbatchParams: globalSbatchParams,
       };
       setInitialFormData(currentFormState);
       
@@ -725,14 +743,17 @@ const SettingsForm = () => {
           </div>
 
           <div className="bp5-form-helper-text">
-            Note that some settings will apply immediately (like a model's{" "}
-            <i>Additional Slurm Parameters</i>), but others might require setup.
+            Each setting is marked with an icon indicating when it takes effect:
+          </div>
+          <div className="bp5-form-helper-text flex items-center gap-1">
+            <RuntimeIcon /> <i>runtime</i> — applies immediately after saving.
+          </div>
+          <div className="bp5-form-helper-text flex items-center gap-1">
+            <SlurmInitIcon /> <i>Slurm Init</i> — requires running the <b>Slurm Init</b> script to deploy to the cluster.
           </div>
 
           <div className="bp5-form-helper-text">
-            I would recommend running the <b>Slurm Init</b> script after
-            changing these settings. You can also use <b>Slurm Check Setup</b>{" "}
-            to see if its needed.
+            Use <b>Slurm Check Setup</b> to verify which workflows are actually installed on your Slurm cluster.
           </div>
 
           <div className="bp5-form-helper-text">
@@ -749,7 +770,7 @@ const SettingsForm = () => {
         </div>
       </div>
 
-      <CollapsibleSection title="SSH Settings">
+      <CollapsibleSection title={<span className="inline-flex items-center gap-1">SSH Settings <SlurmInitIcon /></span>}>
         <div className="bp5-form-group">
           <div className="bp5-form-content">
             <div className="bp5-form-helper-text">
@@ -786,7 +807,7 @@ const SettingsForm = () => {
             </div>
           </div>
         </div>
-        <CollapsibleSection title="Paths" nested>
+        <CollapsibleSection title={<span className="inline-flex items-center gap-1">Paths <SlurmInitIcon /></span>} nested>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -832,7 +853,7 @@ const SettingsForm = () => {
             "Exported as APPTAINER_BINDPATH for workflow jobs. Configure if your HPC administrator requires it. Example: /data/my-scratch/data. Leave blank if not needed."
           )}
           {renderEditableField(
-            "Slurm Conversion Partition",
+            <span className="inline-flex items-center gap-1">Slurm Conversion Partition <RuntimeIcon /></span>,
             "SLURM.slurm_conversion_partition",
             settingsForm.SLURM.slurm_conversion_partition,
             "",
@@ -842,7 +863,7 @@ const SettingsForm = () => {
             </>
           )}
           {renderEditableField(
-            "Default Partition",
+            <span className="inline-flex items-center gap-1">Default Partition <RuntimeIcon /></span>,
             "SLURM.slurm_default_partition",
             settingsForm.SLURM?.slurm_default_partition,
             "",
@@ -853,7 +874,7 @@ const SettingsForm = () => {
             </>
           )}
         </CollapsibleSection>
-        <CollapsibleSection title="SACCT History Window" nested>
+        <CollapsibleSection title={<span className="inline-flex items-center gap-1">SACCT History Window <RuntimeIcon /></span>} nested>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -885,7 +906,7 @@ const SettingsForm = () => {
             </>
           )}
         </CollapsibleSection>
-        <CollapsibleSection title="Repositories" nested>
+        <CollapsibleSection title={<span className="inline-flex items-center gap-1">Repositories <SlurmInitIcon /></span>} nested>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -902,7 +923,7 @@ const SettingsForm = () => {
             </div>
           </div>
           {renderEditableField(
-            <span>Slurm Script Repository <RequiresInitTag /></span>,
+            <span className="inline-flex items-center gap-1">Slurm Script Repository <SlurmInitIcon /></span>,
             "SLURM.slurm_script_repo",
             settingsForm.SLURM.slurm_script_repo,
             "",
@@ -910,7 +931,7 @@ const SettingsForm = () => {
             "danger"
           )}
         </CollapsibleSection>
-        <CollapsibleSection title={<>Processing Settings <RequiresInitTag /></>} nested>
+        <CollapsibleSection title="Processing Settings" nested>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -918,6 +939,7 @@ const SettingsForm = () => {
               </div>
             </div>
           </div>
+          <H6><span className="inline-flex items-center gap-1">Job Script Generation <SlurmInitIcon /></span></H6>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -955,12 +977,11 @@ const SettingsForm = () => {
               )
             }
           />
-          <H6>GPU Fallback Settings</H6>
+          <H6><span className="inline-flex items-center gap-1">Partition &amp; GPU Fallback <RuntimeIcon /></span></H6>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
-                Applied as sbatch defaults when <code>use_gpu=true</code> and no per-workflow GPU params are set.
-                Per-workflow job parameters always take precedence. Leave blank if not needed.
+                Runtime defaults applied at sbatch submission. Per-workflow job parameters always take precedence. Leave blank if not needed.
               </div>
             </div>
           </div>
@@ -997,7 +1018,7 @@ const SettingsForm = () => {
               <EnvVarNote vars={["BIOMERO_GPU_GPUS"]} />
             </>
           )}
-          <H6>Image Pull Settings <RequiresInitTag /></H6>
+          <H6><span className="inline-flex items-center gap-1">Image Pull Settings <SlurmInitIcon /></span></H6>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -1040,7 +1061,7 @@ const SettingsForm = () => {
             </>
           )}
           {renderEditableField(
-            "Apptainer Tmp Dir",
+            <span className="inline-flex items-center gap-1">Apptainer Tmp Dir <SlurmInitIcon /></span>,
             "SLURM.apptainer_tmpdir",
             settingsForm.SLURM?.apptainer_tmpdir,
             "",
@@ -1051,7 +1072,7 @@ const SettingsForm = () => {
             </>
           )}
           {renderEditableField(
-            <span>Apptainer Cache Dir <RequiresInitTag /></span>,
+            <span className="inline-flex items-center gap-1">Apptainer Cache Dir <SlurmInitIcon /></span>,
             "SLURM.apptainer_cachedir",
             settingsForm.SLURM?.apptainer_cachedir,
             "",
@@ -1061,7 +1082,7 @@ const SettingsForm = () => {
               <EnvVarNote vars={["BIOMERO_APPTAINER_CACHEDIR"]} />
             </>
           )}
-          <H6>ZIP Command</H6>
+          <H6><span className="inline-flex items-center gap-1">ZIP Command <RuntimeIcon /></span></H6>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -1081,7 +1102,7 @@ const SettingsForm = () => {
               <EnvVarNote vars={["BIOMERO_SLURM_ZIP_CMD"]} />
             </>
           )}
-          <H6>Global Sbatch Parameters</H6>
+          <H6><span className="inline-flex items-center gap-1">Global Sbatch Parameters <RuntimeIcon /></span></H6>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
@@ -1136,7 +1157,7 @@ const SettingsForm = () => {
           </Button>
         </CollapsibleSection>
       </CollapsibleSection>
-      <CollapsibleSection title="UI Settings" errorCount={getMaxBatchJobsError() ? 1 : 0}>
+      <CollapsibleSection title={<span className="inline-flex items-center gap-1">UI Settings <RuntimeIcon /></span>} errorCount={getMaxBatchJobsError() ? 1 : 0}>
         <div className="bp5-form-group">
           <div className="bp5-form-content">
             <div className="bp5-form-helper-text">
@@ -1210,7 +1231,7 @@ const SettingsForm = () => {
           )}
         </FormGroup>
       </CollapsibleSection>
-      <CollapsibleSection title="Analytics Settings">
+      <CollapsibleSection title={<span className="inline-flex items-center gap-1">Analytics Settings <SlurmInitIcon /></span>}>
         <div className="bp5-form-group">
           <div className="bp5-form-content">
             <div className="bp5-form-helper-text">
@@ -1373,7 +1394,7 @@ const SettingsForm = () => {
           </>
         )}
       </CollapsibleSection>
-      <CollapsibleSection title="Converters Settings">
+      <CollapsibleSection title={<span className="inline-flex items-center gap-1">Converters Settings <SlurmInitIcon /></span>}>
         <ConfigSection
           items={converters}
           onItemChange={handleConverterChange}
@@ -1393,7 +1414,7 @@ const SettingsForm = () => {
         />
       </CollapsibleSection>
       <CollapsibleSection 
-        title="Workflows Settings" 
+        title={<span className="inline-flex items-center gap-1">Workflows Settings <SlurmInitIcon /></span>} 
         versionSummary={getVersionSummary()}
         versionCheckLoading={versionCheckLoading}
         onRefresh={manualRefreshVersions}
