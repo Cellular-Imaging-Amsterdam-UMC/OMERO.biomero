@@ -109,7 +109,9 @@ def admin_config(request, conn=None, **kwargs):
                 if key.endswith("_job"):
                     c = "# The jobscript in the 'slurm_script_repo'"
                 elif key.endswith("_repo"):
-                    c = "# The (e.g. github) repository with the descriptor.json file"
+                    c = "# The (e.g. github) repository with the descriptor.json / config.yaml file"
+                elif key.endswith("_use_gpu"):
+                    c = "# Mark this workflow as GPU-enabled by default (uses global gpu_partition / gpu_gres / gpu_gpus)"
                 else:
                     c = "# Adding or overriding job value for this workflow"
                 return c
@@ -195,9 +197,12 @@ def admin_config(request, conn=None, **kwargs):
                     # Group keys by prefix (cellpose, stardist, etc.)
                     model_keys = defaultdict(list)
                     for key, value in settingsd.items():
-                        # Split the key on the known suffixes
+                        # Split the key on the known suffixes to derive the
+                        # model prefix.  Order matters: check longer/more-
+                        # specific suffixes before shorter ones so that
+                        # e.g. "wf_job_mem" → prefix "wf" (not "wf_job").
                         model_prefix = key
-                        for suffix in ["repo", "job"]:
+                        for suffix in ["use_gpu", "job_", "repo", "job"]:
                             if f"_{suffix}" in key:
                                 model_prefix = key.split(f"_{suffix}")[0]
                                 break

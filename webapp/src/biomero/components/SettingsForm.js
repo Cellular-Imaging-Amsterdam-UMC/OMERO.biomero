@@ -1018,6 +1018,16 @@ const SettingsForm = () => {
               <EnvVarNote vars={["BIOMERO_GPU_GPUS"]} />
             </>
           )}
+          {settingsForm.SLURM?.gpu_gres && settingsForm.SLURM?.gpu_gpus && (
+            <div className="bp5-form-group">
+              <div className="bp5-form-content">
+                <div className="bp5-form-helper-text text-red-600 flex items-center gap-1">
+                  <Icon icon="error" size={12} />
+                  <strong>Conflict:</strong> <code>gpu_gres</code> and <code>gpu_gpus</code> are mutually exclusive — clear one of them.
+                </div>
+              </div>
+            </div>
+          )}
           <H6><span className="inline-flex items-center gap-1">Image Pull Settings <SlurmInitIcon /></span></H6>
           <div className="bp5-form-group">
             <div className="bp5-form-content">
@@ -1470,6 +1480,11 @@ const SettingsForm = () => {
           config={state.config} // Pass config for workflow type detection
           onRepoBlur={handleRepoUrlBlur} // Pass repo blur handler
           descriptorMetadata={descriptorMetadata} // Descriptor flags from already-fetched workflow metadata
+          gpuSettings={{
+            gpu_partition: settingsForm.SLURM?.gpu_partition || "",
+            gpu_gres: settingsForm.SLURM?.gpu_gres || "",
+            gpu_gpus: settingsForm.SLURM?.gpu_gpus || "",
+          }}
         />
       </CollapsibleSection>
       <H5>Note on saving BIOMERO settings</H5>

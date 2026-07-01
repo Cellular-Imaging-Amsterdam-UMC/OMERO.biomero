@@ -18,6 +18,7 @@ const ConfigSection = ({
   config, // Config for workflow type detection
   onRepoBlur, // Repo blur handler
   descriptorMetadata, // Descriptor flags keyed by index
+  gpuSettings, // { gpu_partition, gpu_gres, gpu_gpus } for GPU misconfiguration warnings
 }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [editableIndex, setEditableIndex] = useState(null);
@@ -71,6 +72,31 @@ const ConfigSection = ({
             (dmeta.requiresPlate !== null && (item.isPlateWorkflow || false) !== dmeta.requiresPlate) ||
             (dmeta.requiresZarr !== null && (item.isZarrWorkflow || false) !== dmeta.requiresZarr)
           );
+          // GPU misconfiguration: useGpu is on but global GPU resources aren't configured
+          // and no per-workflow sbatch overrides cover the gap.
+          const hasGpuMisconfiguration = (() => {
+            if (!item.useGpu) return false;
+            const partition = gpuSettings?.gpu_partition;
+            const gres = gpuSettings?.gpu_gres;
+            const gpus = gpuSettings?.gpu_gpus;
+            const extraKeys = Object.keys(item.extraParams || {}).map(k => k.toLowerCase());
+            const hasPerWfPartition = extraKeys.some(k => k.endsWith('_job_partition'));
+            const hasPerWfGres = extraKeys.some(k => k.endsWith('_job_gres') || k.endsWith('_job_gpus'));
+            return (!partition && !hasPerWfPartition) || (!(gres || gpus) && !hasPerWfGres);
+          })();
+          const gpuMisconfigTooltip = (() => {
+            if (!item.useGpu || !hasGpuMisconfiguration) return null;
+            const partition = gpuSettings?.gpu_partition;
+            const gres = gpuSettings?.gpu_gres;
+            const gpus = gpuSettings?.gpu_gpus;
+            const extraKeys = Object.keys(item.extraParams || {}).map(k => k.toLowerCase());
+            const hasPerWfPartition = extraKeys.some(k => k.endsWith('_job_partition'));
+            const hasPerWfGres = extraKeys.some(k => k.endsWith('_job_gres') || k.endsWith('_job_gpus'));
+            const parts = [];
+            if (!partition && !hasPerWfPartition) parts.push('gpu_partition not set');
+            if (!(gres || gpus) && !hasPerWfGres) parts.push('no gpu_gres / gpu_gpus set');
+            return 'GPU workflow: ' + parts.join(', ');
+          })();
           const descriptorMismatchTooltip = dmeta && (() => {
             const parts = [];
             if (dmeta.requiresPlate !== null && (item.isPlateWorkflow || false) !== dmeta.requiresPlate)
@@ -87,7 +113,7 @@ const ConfigSection = ({
             <div className="flex items-center justify-between">
               <H4 className={`font-semibold flex items-center cursor-pointer ${
                 errors && errors[index] ? 'text-red-600' :
-                isVersionOutdated || hasDescriptorMismatch ? 'text-orange-600' : ''
+                isVersionOutdated || hasDescriptorMismatch || hasGpuMisconfiguration ? 'text-orange-600' : ''
               }`}
                 onClick={() => toggleItem(index)}
               >
@@ -136,6 +162,12 @@ const ConfigSection = ({
                     <Icon icon="warning-sign" size={12} intent="warning" className="ml-2" />
                   </Tooltip>
                 )}
+                {/* GPU misconfiguration indicator */}
+                {hasGpuMisconfiguration && (
+                  <Tooltip content={gpuMisconfigTooltip}>
+                    <Icon icon="warning-sign" size={12} intent="warning" className="ml-2" />
+                  </Tooltip>
+                )}
               </H4>
               <div className="flex items-center">
                 {/* Workflow type indicators - right aligned */}
@@ -180,6 +212,7 @@ const ConfigSection = ({
                 versionCheckLoading={versionCheckLoading} // Pass loading state
                 descriptorMeta={descriptorMetadata ? descriptorMetadata[index] ?? null : null}
                 config={config}
+                gpuSettings={gpuSettings}
               />
             </Collapse>
           </div>

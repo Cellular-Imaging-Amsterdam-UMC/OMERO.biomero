@@ -34,6 +34,7 @@ const ModelCard = ({
   versionCheckLoading,
   descriptorMeta,
   config,
+  gpuSettings,  // { gpu_partition, gpu_gres, gpu_gpus } from SLURM settings
 }) => {
   const hasScriptRepo = !!config?.SLURM?.slurm_script_repo;
   const [inputValue, setInputValue] = useState("");
@@ -453,6 +454,32 @@ const ModelCard = ({
             onChange={(e) => onChange(index, "useGpu", e.target.checked)}
           />
         </div>
+        {(item.useGpu) && (() => {
+          const partition = gpuSettings?.gpu_partition;
+          const gres = gpuSettings?.gpu_gres;
+          const gpus = gpuSettings?.gpu_gpus;
+          const hasResources = (gres || gpus);
+          const missingPartition = !partition;
+          const missingResources = !hasResources;
+          // Only warn when no per-workflow override covers the gap.
+          // Check if extraParams already sets partition/gres/gpus for this workflow.
+          const extraKeys = Object.keys(item.extraParams || {}).map(k => k.toLowerCase());
+          const wfName = (item.name || '').toLowerCase();
+          const hasPerWfPartition = extraKeys.some(k => k.endsWith('_job_partition') || k === `${wfName}_job_partition`);
+          const hasPerWfGres = extraKeys.some(k => k.endsWith('_job_gres') || k.endsWith('_job_gpus'));
+          if ((missingPartition && !hasPerWfPartition) || (missingResources && !hasPerWfGres)) {
+            const parts = [];
+            if (missingPartition && !hasPerWfPartition) parts.push('gpu_partition is not set');
+            if (missingResources && !hasPerWfGres) parts.push('neither gpu_gres nor gpu_gpus is set');
+            return (
+              <div className="text-orange-500 text-xs mt-1 flex items-center gap-1">
+                <Icon icon="warning-sign" size={10} />
+                GPU workflow enabled but {parts.join(' and ')} — configure in Slurm Settings or add per-workflow sbatch overrides below.
+              </div>
+            );
+          }
+          return null;
+        })()}
       </FormGroup>
 
       <FormGroup
