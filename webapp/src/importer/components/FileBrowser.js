@@ -3,7 +3,17 @@ import { useAppContext } from "../../AppContext";
 import FileTree from "../../shared/components/FileTree";
 import { fetchFolderData } from "../../apiService";
 
-const FileBrowser = ({ onSelectCallback, rootFolder = null }) => {
+const FileBrowser = ({
+  onSelectCallback,
+  rootFolder = null,
+  // When true, file nodes are hidden — only folders are shown/selectable.
+  foldersOnly = false,
+  // When true, nodes whose display name contains a '.' are hidden.
+  // Catches hidden dirs (.analyzed, .processed) and container files (.zarr, .lif).
+  excludeDotNames = false,
+  // Override the highlighted selection; defaults to state.localFileTreeSelection.
+  selectedItems: selectedItemsProp = undefined,
+}) => {
   const { state, updateState, loadFolderData, toaster } = useAppContext();
 
   // Add useEffect to fetch data for non-root folders when component mounts
@@ -13,36 +23,48 @@ const FileBrowser = ({ onSelectCallback, rootFolder = null }) => {
     }
   }, [rootFolder, state.localFileTreeData, loadFolderData]);
 
-  // Filter the tree data based on rootFolder
+  // Build the base tree (rootFolder subtree or full tree) then apply visibility filters.
   const getFilteredTreeData = () => {
+    let baseData;
+
     if (!rootFolder || rootFolder === "root") {
-      return state.localFileTreeData;
-    }
-
-    // Wait for the folder data to be loaded
-    if (!state.localFileTreeData[rootFolder]) {
+      baseData = state.localFileTreeData;
+    } else if (!state.localFileTreeData[rootFolder]) {
       return { [rootFolder]: { isFolder: true, children: [], data: "Loading...", index: rootFolder } };
-    }
-
-    // Create a new tree starting from the mapped folder
-    const filteredData = {};
-    const queue = [rootFolder];
-    
-    while (queue.length > 0) {
-      const currentPath = queue.pop();
-      const node = state.localFileTreeData[currentPath];
-      
-      if (node) {
-        filteredData[currentPath] = node;
-        
-        // Add children to queue
-        if (node.children) {
-          queue.push(...node.children);
+    } else {
+      // Create a new tree starting from the mapped folder
+      const subtree = {};
+      const queue = [rootFolder];
+      while (queue.length > 0) {
+        const currentPath = queue.pop();
+        const node = state.localFileTreeData[currentPath];
+        if (node) {
+          subtree[currentPath] = node;
+          if (node.children) queue.push(...node.children);
         }
       }
+      baseData = subtree;
     }
 
-    return filteredData;
+    if (!foldersOnly && !excludeDotNames) return baseData;
+
+    // Strip unwanted children from each node's children array.
+    // We intentionally keep children whose node data hasn't loaded yet (child not in baseData)
+    // so the tree can still expand and fetch them lazily.
+    const result = {};
+    Object.entries(baseData).forEach(([key, node]) => {
+      result[key] = {
+        ...node,
+        children: (node.children || []).filter((childKey) => {
+          const child = baseData[childKey];
+          if (!child) return true; // not yet fetched — keep so expand can load it
+          if (foldersOnly && !child.isFolder) return false;
+          if (excludeDotNames && child.data && child.data.includes(".")) return false;
+          return true;
+        }),
+      };
+    });
+    return result;
   };
 
   const treeData = getFilteredTreeData();
@@ -97,7 +119,7 @@ const FileBrowser = ({ onSelectCallback, rootFolder = null }) => {
       initialDataKey={rootFolder || "root"}
       dataStructure={treeData}
       onSelectCallback={onSelectCallback}
-      selectedItems={state.localFileTreeSelection}
+      selectedItems={selectedItemsProp !== undefined ? selectedItemsProp : state.localFileTreeSelection}
     />
   );
 };

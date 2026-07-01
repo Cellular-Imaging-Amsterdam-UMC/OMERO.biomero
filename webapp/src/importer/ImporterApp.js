@@ -728,12 +728,18 @@ const ImporterApp = () => {
 
         <div className="w-3/4 pt-2">
           <h1 className="text-base font-bold p-0 m-0 mb-4">2. Upload Files</h1>
-          <ResumableUploader
-            datasetId={datasetId}
-            datasetType={datasetType}
-            group={groupName}
-            groupId={state.user.active_group_id}
-          />
+          {showNoUploadFolderWarning ? (
+            <Callout intent="warning" icon="warning-sign">
+              The currently selected group has no assigned upload folder. Switch to a different group, or contact your OMERO administrator to get a folder assigned for this group.
+            </Callout>
+          ) : (
+            <ResumableUploader
+              datasetId={datasetId}
+              datasetType={datasetType}
+              group={groupName}
+              groupId={state.user.active_group_id}
+            />
+          )}
         </div>
         </div>
       </div>
@@ -871,7 +877,7 @@ const ImporterApp = () => {
             {showNoUploadFolderWarning ? (
               <div className="mt-4">
                 <Callout intent="warning" icon="warning-sign">
-                  Your accound has no assigned upload folders. Please contact your OMERO administrator.
+                  The currently selected group has no assigned upload folder. Switch to a different group, or contact your OMERO administrator to get a folder assigned for this group.
                 </Callout>
               </div>
             ) : (
