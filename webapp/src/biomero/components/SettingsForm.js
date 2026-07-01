@@ -140,8 +140,10 @@ const SettingsForm = () => {
     return getMaxBatchJobsError() !== null || Object.keys(errors).length > 0 || Object.keys(modelErrors).length > 0;
   };
 
-  const validateModelFields = (models, scriptRepo) => {
+  const validateModelFields = (models, scriptRepo, slurm) => {
     const newErrors = {};
+    const globalGres = slurm?.gpu_gres || '';
+    const globalGpus = slurm?.gpu_gpus || '';
     models.forEach((model, index) => {
       // Duplicate name check
       if (model.name) {
@@ -155,8 +157,23 @@ const SettingsForm = () => {
       if (model.job) {
         const hasDupeJob = models.some((m, i) => i !== index && m.job && m.job === model.job);
         if (hasDupeJob) {
-          if (!newErrors[index]) newErrors[index] = {};
+          if (!newErrors[index]) newErrors[index] = {};           
           newErrors[index].job = `Duplicate job script "${model.job}" — each workflow must have a unique script path`;
+        }
+      }
+      // GPU sbatch conflict: per-workflow --gres + global gpu_gpus (or vice versa)
+      // The slurm client adds them independently, so both would end up in the sbatch
+      // command and SLURM would reject the submission.
+      if (model.useGpu) {
+        const extraKeys = Object.keys(model.extraParams || {}).map(k => k.toLowerCase());
+        const hasPerWfGres = extraKeys.some(k => k.endsWith('_job_gres'));
+        const hasPerWfGpus = extraKeys.some(k => k.endsWith('_job_gpus'));
+        if (hasPerWfGres && globalGpus) {
+          if (!newErrors[index]) newErrors[index] = {};
+          newErrors[index].gpuConflict = `sbatch conflict: per-workflow gres= + global gpu_gpus — --gres and --gpus are mutually exclusive; SLURM will reject this job`;
+        } else if (hasPerWfGpus && globalGres) {
+          if (!newErrors[index]) newErrors[index] = {};
+          newErrors[index].gpuConflict = `sbatch conflict: per-workflow gpus= + global gpu_gres — --gres and --gpus are mutually exclusive; SLURM will reject this job`;
         }
       }
     });
@@ -257,12 +274,12 @@ const SettingsForm = () => {
     }
   }, [state.config, isInitialized]); // Only run when config loads and form isn't initialized
 
-  // Validate model fields whenever WORKFLOWS changes
+  // Validate model fields whenever WORKFLOWS or GPU settings change
   useEffect(() => {
     if (settingsForm?.WORKFLOWS) {
-      validateModelFields(settingsForm.WORKFLOWS, settingsForm?.SLURM?.slurm_script_repo);
+      validateModelFields(settingsForm.WORKFLOWS, settingsForm?.SLURM?.slurm_script_repo, settingsForm?.SLURM);
     }
-  }, [settingsForm?.WORKFLOWS, settingsForm?.SLURM?.slurm_script_repo]);
+  }, [settingsForm?.WORKFLOWS, settingsForm?.SLURM?.slurm_script_repo, settingsForm?.SLURM?.gpu_gres, settingsForm?.SLURM?.gpu_gpus]);
 
   // Trigger version check when admin panel opens for the first time
   useEffect(() => {

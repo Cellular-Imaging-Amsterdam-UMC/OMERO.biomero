@@ -254,7 +254,7 @@ def admin_config(request, conn=None, **kwargs):
                     # Check for removing top-level keys and related keys
                     for key in list(config[section].keys()):
                         model_prefix = key
-                        for suffix in ["repo", "job"]:
+                        for suffix in ["use_gpu", "job_", "repo", "job"]:
                             if f"_{suffix}" in key:
                                 model_prefix = key.split(f"_{suffix}")[0]
                                 break

@@ -381,7 +381,8 @@ const ModelCard = ({
       >
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
-            <span className="text-sm font-medium">
+            <span className="text-sm font-medium flex items-center gap-1">
+              <Icon icon="grid-view" size={12} intent="primary" />
               Plate Workflow (ZARR Only)
             </span>
             <span className="text-xs text-gray-500">
@@ -408,7 +409,8 @@ const ModelCard = ({
         
         <div className="flex items-center justify-between mt-3">
           <div className="flex flex-col">
-            <span className="text-sm font-medium">
+            <span className="text-sm font-medium flex items-center gap-1">
+              <Icon icon="cube" size={12} className="text-gray-500" />
               ZARR Format Required
             </span>
             <span className="text-xs text-gray-500">
@@ -438,7 +440,8 @@ const ModelCard = ({
 
         <div className="flex items-center justify-between mt-3">
           <div className="flex flex-col">
-            <span className="text-sm font-medium">
+            <span className="text-sm font-medium flex items-center gap-1">
+              <Icon icon="lightning" size={12} className="text-yellow-500" />
               GPU Workflow
             </span>
             <span className="text-xs text-gray-500">
@@ -454,23 +457,48 @@ const ModelCard = ({
             onChange={(e) => onChange(index, "useGpu", e.target.checked)}
           />
         </div>
-        {(item.useGpu) && (() => {
+        {/* GPU sbatch params set but toggle is off — show what's already configured */}
+        {!item.useGpu && (() => {
+          const extraEntries = Object.entries(item.extraParams || {});
+          const perWfPartitionEntry = extraEntries.find(([k]) => k.toLowerCase().endsWith('_job_partition'));
+          const perWfGresEntry = extraEntries.find(([k]) => k.toLowerCase().endsWith('_job_gres'));
+          const perWfGpusEntry = extraEntries.find(([k]) => k.toLowerCase().endsWith('_job_gpus'));
+          if (!perWfGresEntry && !perWfGpusEntry && !perWfPartitionEntry) return null;
+          return (
+            <div className="text-gray-400 text-xs mt-2 bg-gray-50 rounded px-2 py-1.5 select-none pointer-events-none space-y-0.5">
+              <div className="font-medium text-gray-500 mb-0.5 flex items-center gap-1">
+                <Icon icon="info-sign" size={10} />
+                GPU sbatch params set (toggle off — global GPU defaults not applied):
+              </div>
+              {perWfPartitionEntry && (
+                <div><code>--partition={perWfPartitionEntry[1]}</code><span className="ml-1 text-gray-300">(per-workflow)</span></div>
+              )}
+              {perWfGresEntry && (
+                <div><code>--gres={perWfGresEntry[1]}</code><span className="ml-1 text-gray-300">(per-workflow)</span></div>
+              )}
+              {perWfGpusEntry && (
+                <div><code>--gpus={perWfGpusEntry[1]}</code><span className="ml-1 text-gray-300">(per-workflow)</span></div>
+              )}
+            </div>
+          );
+        })()}
+        {/* Warning or effective values when GPU toggle is on */}
+        {item.useGpu && (() => {
           const partition = gpuSettings?.gpu_partition;
           const gres = gpuSettings?.gpu_gres;
           const gpus = gpuSettings?.gpu_gpus;
-          const hasResources = (gres || gpus);
-          const missingPartition = !partition;
-          const missingResources = !hasResources;
-          // Only warn when no per-workflow override covers the gap.
-          // Check if extraParams already sets partition/gres/gpus for this workflow.
-          const extraKeys = Object.keys(item.extraParams || {}).map(k => k.toLowerCase());
-          const wfName = (item.name || '').toLowerCase();
-          const hasPerWfPartition = extraKeys.some(k => k.endsWith('_job_partition') || k === `${wfName}_job_partition`);
-          const hasPerWfGres = extraKeys.some(k => k.endsWith('_job_gres') || k.endsWith('_job_gpus'));
-          if ((missingPartition && !hasPerWfPartition) || (missingResources && !hasPerWfGres)) {
+          const extraEntries = Object.entries(item.extraParams || {});
+          const perWfPartitionEntry = extraEntries.find(([k]) => k.toLowerCase().endsWith('_job_partition'));
+          const perWfGresEntry = extraEntries.find(([k]) => k.toLowerCase().endsWith('_job_gres'));
+          const perWfGpusEntry = extraEntries.find(([k]) => k.toLowerCase().endsWith('_job_gpus'));
+          const hasPerWfPartition = !!perWfPartitionEntry;
+          const hasPerWfGres = !!(perWfGresEntry || perWfGpusEntry);
+          const missingPartition = !partition && !hasPerWfPartition;
+          const missingResources = !(gres || gpus) && !hasPerWfGres;
+          if (missingPartition || missingResources) {
             const parts = [];
-            if (missingPartition && !hasPerWfPartition) parts.push('gpu_partition is not set');
-            if (missingResources && !hasPerWfGres) parts.push('neither gpu_gres nor gpu_gpus is set');
+            if (missingPartition) parts.push('gpu_partition is not set');
+            if (missingResources) parts.push('neither gpu_gres nor gpu_gpus is set');
             return (
               <div className="text-orange-500 text-xs mt-1 flex items-center gap-1">
                 <Icon icon="warning-sign" size={10} />
@@ -478,7 +506,39 @@ const ModelCard = ({
               </div>
             );
           }
-          return null;
+          // Cross-type gres/gpus conflict: per-wf gres + global gpus (or vice versa)
+          // The slurm client checks them independently, so BOTH would end up in the
+          // sbatch command → SLURM rejects the submission.
+          const crossConflict = (perWfGresEntry && gpus) || (perWfGpusEntry && gres);
+          if (crossConflict) {
+            const conflictDesc = perWfGresEntry && gpus
+              ? `per-workflow --gres=${perWfGresEntry[1]} + global gpu_gpus=${gpus}`
+              : `per-workflow --gpus=${perWfGpusEntry[1]} + global gpu_gres=${gres}`;
+            return (
+              <div className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                <Icon icon="error" size={10} />
+                <span><strong>sbatch conflict:</strong> {conflictDesc} — <code>--gres</code> and <code>--gpus</code> are mutually exclusive; SLURM will reject this job.</span>
+              </div>
+            );
+          }
+          // All configured — show effective values
+          const effectivePartition = perWfPartitionEntry?.[1] || partition;
+          const effectiveGres = perWfGresEntry?.[1] || gres;
+          const effectiveGpus = perWfGpusEntry?.[1] || gpus;
+          return (
+            <div className="text-gray-400 text-xs mt-2 bg-gray-50 rounded px-2 py-1.5 select-none pointer-events-none space-y-0.5">
+              <div className="font-medium text-gray-500 mb-0.5">Effective GPU resources:</div>
+              {effectivePartition && (
+                <div><code>--partition={effectivePartition}</code><span className="ml-1 text-gray-300">{perWfPartitionEntry ? '(per-workflow)' : '(global)'}</span></div>
+              )}
+              {effectiveGres && (
+                <div><code>--gres={effectiveGres}</code><span className="ml-1 text-gray-300">{perWfGresEntry ? '(per-workflow)' : '(global)'}</span></div>
+              )}
+              {effectiveGpus && (
+                <div><code>--gpus={effectiveGpus}</code><span className="ml-1 text-gray-300">{perWfGpusEntry ? '(per-workflow)' : '(global)'}</span></div>
+              )}
+            </div>
+          );
         })()}
       </FormGroup>
 

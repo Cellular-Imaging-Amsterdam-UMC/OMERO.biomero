@@ -170,23 +170,30 @@ const ConfigSection = ({
                 )}
               </H4>
               <div className="flex items-center">
-                {/* Workflow type indicators - right aligned */}
+                {/* Workflow type indicators - right aligned, multiple can show at once */}
                 {(() => {
                   const workflowTypeIcons = getWorkflowTypeIcons(item.name);
-                  if (workflowTypeIcons?.isPlateWorkflow) {
-                    return (
-                      <Tooltip content="Plate Workflow (operates on OME-ZARR plates)">
-                        <Icon icon="grid-view" size={14} intent="primary" className="mr-2" />
-                      </Tooltip>
-                    );
-                  } else if (workflowTypeIcons?.isZarrWorkflow) {
-                    return (
-                      <Tooltip content="ZARR Workflow (requires importer for results)">
-                        <Icon icon="cube" size={14} intent="none" className="mr-2" />
-                      </Tooltip>
-                    );
-                  }
-                  return null;
+                  const extraItemKeys = Object.keys(item.extraParams || {}).map(k => k.toLowerCase());
+                  const isGpuWorkflow = item.useGpu || extraItemKeys.some(k => k.endsWith('_job_gres') || k.endsWith('_job_gpus'));
+                  return (
+                    <>
+                      {workflowTypeIcons?.isPlateWorkflow && (
+                        <Tooltip content="Plate Workflow (operates on OME-ZARR plates)">
+                          <Icon icon="grid-view" size={14} intent="primary" className="mr-1" />
+                        </Tooltip>
+                      )}
+                      {!workflowTypeIcons?.isPlateWorkflow && workflowTypeIcons?.isZarrWorkflow && (
+                        <Tooltip content="ZARR Workflow (requires importer for results)">
+                          <Icon icon="cube" size={14} intent="none" className="mr-1" />
+                        </Tooltip>
+                      )}
+                      {isGpuWorkflow && (
+                        <Tooltip content={item.useGpu ? 'GPU Workflow (use_gpu enabled)' : 'GPU resources set in sbatch params'}>
+                          <Icon icon="lightning" size={14} className="mr-1 text-yellow-500" />
+                        </Tooltip>
+                      )}
+                    </>
+                  );
                 })()}
                 <Icon
                   icon={expandedIndex === index ? "caret-down" : "caret-right"}
