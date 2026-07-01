@@ -1,16 +1,17 @@
 import React, { useState } from "react";
-import { Collapse, Button, H5, Icon, Tag, Tooltip } from "@blueprintjs/core";
+import { Collapse, Button, H5, H6, Icon, Tag, Tooltip } from "@blueprintjs/core";
 
-const CollapsibleSection = ({ title, children, versionSummary, versionCheckLoading, onRefresh, errorCount }) => {
+const CollapsibleSection = ({ title, children, versionSummary, versionCheckLoading, onRefresh, errorCount, nested }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const TitleTag = nested ? H6 : H5;
 
   return (
-    <div>
+    <div className={nested ? "ml-2 pl-3 border-l-2 border-gray-200 my-1" : ""}>
       <div className="flex items-center justify-between">
-        <H5 className="flex items-center cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
-          <Icon 
-            icon={isOpen ? "chevron-down" : "chevron-right"} 
-            className="mr-2" 
+        <TitleTag className="flex items-center cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
+          <Icon
+            icon={isOpen ? "chevron-down" : "chevron-right"}
+            className="mr-2"
           />
           <span>{title}</span>
           {/* Validation error count tag — same style as version warning tags */}
@@ -62,8 +63,8 @@ const CollapsibleSection = ({ title, children, versionSummary, versionCheckLoadi
               ) : null}
             </span>
           )}
-        </H5>
-        
+        </TitleTag>
+
         {/* Refresh button - separate from clickable title */}
         {onRefresh && (
           <Tooltip content="Refresh version check (clears cache)">

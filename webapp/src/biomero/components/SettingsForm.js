@@ -786,357 +786,355 @@ const SettingsForm = () => {
             </div>
           </div>
         </div>
-        <H6>Paths</H6>
-        <div className="bp5-form-group">
-          <div className="bp5-form-content">
-            <div className="bp5-form-helper-text">
-              You should prefer to use full paths, but you could use relative
-              paths compared to the Slurm user's home dir if you omit the
-              starting '/'.
+        <CollapsibleSection title="Paths" nested>
+          <div className="bp5-form-group">
+            <div className="bp5-form-content">
+              <div className="bp5-form-helper-text">
+                You should prefer to use full paths, but you could use relative
+                paths compared to the Slurm user's home dir if you omit the
+                starting '/'.
+              </div>
             </div>
           </div>
-        </div>
-        {renderEditableField(
-          "Slurm Data Path",
-          "SLURM.slurm_data_path",
-          settingsForm.SLURM.slurm_data_path,
-          "/data/my-scratch/data",
-          "The path on SLURM entrypoint for storing datafiles."
-        )}
-        {renderEditableField(
-          "Slurm Images Path",
-          "SLURM.slurm_images_path",
-          settingsForm.SLURM.slurm_images_path,
-          "/data/my-scratch/singularity_images/workflows",
-          "The path on SLURM entrypoint for storing container image files."
-        )}
-        {renderEditableField(
-          "Slurm Converters Path",
-          "SLURM.slurm_converters_path",
-          settingsForm.SLURM.slurm_converters_path,
-          "/data/my-scratch/singularity_images/converters",
-          "The path on SLURM entrypoint for storing converter image files."
-        )}
-        {renderEditableField(
-          "Slurm Script Path",
-          "SLURM.slurm_script_path",
-          settingsForm.SLURM.slurm_script_path,
-          "/data/my-scratch/slurm-scripts",
-          "The path on SLURM entrypoint for storing the Slurm job scripts."
-        )}
-        {renderEditableField(
-          "Slurm Data Bind Path",
-          "SLURM.slurm_data_bind_path",
-          settingsForm.SLURM.slurm_data_bind_path,
-          "",
-          "Exported as APPTAINER_BINDPATH for workflow jobs. Configure if your HPC administrator requires it. Example: /data/my-scratch/data. Leave blank if not needed."
-        )}
-        {renderEditableField(
-          "Slurm Conversion Partition",
-          "SLURM.slurm_conversion_partition",
-          settingsForm.SLURM.slurm_conversion_partition,
-          "",
-          <>
-            Partition for data conversion jobs (added as a real <code>--partition</code> flag on the conversion sbatch). Takes precedence over the generic Default Partition below. Leave empty to fall back to the Default Partition, or the system default if neither is set.
-            <ExampleNote>cpu-short</ExampleNote>
-          </>
-        )}
-        {renderEditableField(
-          "Default Partition",
-          "SLURM.slurm_default_partition",
-          settingsForm.SLURM?.slurm_default_partition,
-          "",
-          <>
-            Generic fallback <code>--partition</code> applied to both workflow and conversion jobs that do not already set a partition. Per-workflow params, GPU partition, and the Conversion Partition always take precedence. Useful on clusters without a usable system default partition.
-            <ExampleNote>cpu-short</ExampleNote>
-            <EnvVarNote vars={["BIOMERO_DEFAULT_PARTITION"]} />
-          </>
-        )}
-        {renderEditableField(
-          "Apptainer Tmp Dir",
-          "SLURM.apptainer_tmpdir",
-          settingsForm.SLURM?.apptainer_tmpdir,
-          "",
-          <>
-            Override APPTAINER_TMPDIR during image pulls. Leave blank for system default. SLURM Init creates this dir if set.
-            <ExampleNote>/scratchdata/$USER/.apptainer-tmp</ExampleNote>
-            <EnvVarNote vars={["BIOMERO_APPTAINER_TMPDIR"]} />
-          </>
-        )}
-        {renderEditableField(
-          <span>Apptainer Cache Dir <RequiresInitTag /></span>,
-          "SLURM.apptainer_cachedir",
-          settingsForm.SLURM?.apptainer_cachedir,
-          "",
-          <>
-            Override APPTAINER_CACHEDIR during image pulls. Leave blank for system default. SLURM Init creates this dir if set.
-            <ExampleNote>/scratchdata/$USER/.apptainer-cache</ExampleNote>
-            <EnvVarNote vars={["BIOMERO_APPTAINER_CACHEDIR"]} />
-          </>
-        )}
-        <H6>SACCT History Window</H6>
-        <div className="bp5-form-group">
-          <div className="bp5-form-content">
-            <div className="bp5-form-helper-text">
-              How far back BIOMERO looks when querying job history via <code>sacct</code>. Default: 2023-01-01.
-              Option 1: absolute date (YYYY-MM-DD). Option 2: rolling window in days (overrides option 1).
+          {renderEditableField(
+            "Slurm Data Path",
+            "SLURM.slurm_data_path",
+            settingsForm.SLURM.slurm_data_path,
+            "/data/my-scratch/data",
+            "The path on SLURM entrypoint for storing datafiles."
+          )}
+          {renderEditableField(
+            "Slurm Images Path",
+            "SLURM.slurm_images_path",
+            settingsForm.SLURM.slurm_images_path,
+            "/data/my-scratch/singularity_images/workflows",
+            "The path on SLURM entrypoint for storing container image files."
+          )}
+          {renderEditableField(
+            "Slurm Converters Path",
+            "SLURM.slurm_converters_path",
+            settingsForm.SLURM.slurm_converters_path,
+            "/data/my-scratch/singularity_images/converters",
+            "The path on SLURM entrypoint for storing converter image files."
+          )}
+          {renderEditableField(
+            "Slurm Script Path",
+            "SLURM.slurm_script_path",
+            settingsForm.SLURM.slurm_script_path,
+            "/data/my-scratch/slurm-scripts",
+            "The path on SLURM entrypoint for storing the Slurm job scripts."
+          )}
+          {renderEditableField(
+            "Slurm Data Bind Path",
+            "SLURM.slurm_data_bind_path",
+            settingsForm.SLURM.slurm_data_bind_path,
+            "",
+            "Exported as APPTAINER_BINDPATH for workflow jobs. Configure if your HPC administrator requires it. Example: /data/my-scratch/data. Leave blank if not needed."
+          )}
+          {renderEditableField(
+            "Slurm Conversion Partition",
+            "SLURM.slurm_conversion_partition",
+            settingsForm.SLURM.slurm_conversion_partition,
+            "",
+            <>
+              Partition for data conversion jobs (added as a real <code>--partition</code> flag on the conversion sbatch). Takes precedence over the generic Default Partition below. Leave empty to fall back to the Default Partition, or the system default if neither is set.
+              <ExampleNote>cpu-short</ExampleNote>
+            </>
+          )}
+          {renderEditableField(
+            "Default Partition",
+            "SLURM.slurm_default_partition",
+            settingsForm.SLURM?.slurm_default_partition,
+            "",
+            <>
+              Generic fallback <code>--partition</code> applied to both workflow and conversion jobs that do not already set a partition. Per-workflow params, GPU partition, and the Conversion Partition always take precedence. Useful on clusters without a usable system default partition.
+              <ExampleNote>cpu-short</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_DEFAULT_PARTITION"]} />
+            </>
+          )}
+        </CollapsibleSection>
+        <CollapsibleSection title="SACCT History Window" nested>
+          <div className="bp5-form-group">
+            <div className="bp5-form-content">
+              <div className="bp5-form-helper-text">
+                How far back BIOMERO looks when querying job history via <code>sacct</code>. Default: 2023-01-01.
+                Option 1: absolute date (YYYY-MM-DD). Option 2: rolling window in days (overrides option 1).
+              </div>
             </div>
           </div>
-        </div>
-        {renderEditableField(
-          "SACCT Start Time",
-          "SLURM.sacct_start_time",
-          settingsForm.SLURM?.sacct_start_time,
-          "",
-          <>
-            Absolute start date (YYYY-MM-DD). Leave blank for built-in default.
-            <ExampleNote>2024-01-01</ExampleNote>
-            <EnvVarNote vars={["BIOMERO_SACCT_START_TIME"]} />
-          </>
-        )}
-        {renderEditableField(
-          "SACCT Days Ago",
-          "SLURM.sacct_days_ago",
-          settingsForm.SLURM?.sacct_days_ago,
-          "",
-          <>
-            Rolling window in days (relative to today). Overrides SACCT Start Time if both are set. Leave blank for absolute date or built-in default.
-            <ExampleNote>7</ExampleNote>
-            <EnvVarNote vars={["BIOMERO_SACCT_START_DAYS_AGO"]} />
-          </>
-        )}
-        <H6>Repositories</H6>
-        <div className="bp5-form-group">
-          <div className="bp5-form-content">
-            <div className="bp5-form-helper-text">
-              Leave empty (default) — BIOMERO will generate job scripts from the{" "}
-              <a
-                href="https://github.com/NL-BioImaging/biomero/blob/main/resources/job_template.sh"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                job_template
-              </a>{" "}
-              and each workflow's descriptor.json. Only set this if you need custom scripts for every workflow.
+          {renderEditableField(
+            "SACCT Start Time",
+            "SLURM.sacct_start_time",
+            settingsForm.SLURM?.sacct_start_time,
+            "",
+            <>
+              Absolute start date (YYYY-MM-DD). Leave blank for built-in default.
+              <ExampleNote>2024-01-01</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_SACCT_START_TIME"]} />
+            </>
+          )}
+          {renderEditableField(
+            "SACCT Days Ago",
+            "SLURM.sacct_days_ago",
+            settingsForm.SLURM?.sacct_days_ago,
+            "",
+            <>
+              Rolling window in days (relative to today). Overrides SACCT Start Time if both are set. Leave blank for absolute date or built-in default.
+              <ExampleNote>7</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_SACCT_START_DAYS_AGO"]} />
+            </>
+          )}
+        </CollapsibleSection>
+        <CollapsibleSection title="Repositories" nested>
+          <div className="bp5-form-group">
+            <div className="bp5-form-content">
+              <div className="bp5-form-helper-text">
+                Leave empty (default) — BIOMERO will generate job scripts from the{" "}
+                <a
+                  href="https://github.com/NL-BioImaging/biomero/blob/main/resources/job_template.sh"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  job_template
+                </a>{" "}
+                and each workflow's descriptor.json. Only set this if you need custom scripts for every workflow.
+              </div>
             </div>
           </div>
-        </div>
-        {renderEditableField(
-          <span>Slurm Script Repository <RequiresInitTag /></span>,
-          "SLURM.slurm_script_repo",
-          settingsForm.SLURM.slurm_script_repo,
-          "",
-          "Git repository URL for custom Slurm job scripts. Leave empty to use auto-generated scripts (recommended).",
-          "danger"
-        )}
-        <H6>Processing Settings <RequiresInitTag /></H6>
-        <div className="bp5-form-group">
-          <div className="bp5-form-content">
-            <div className="bp5-form-helper-text">
-              Advanced opt-in settings, all <strong>off by default</strong>. Enable only what your cluster requires.
+          {renderEditableField(
+            <span>Slurm Script Repository <RequiresInitTag /></span>,
+            "SLURM.slurm_script_repo",
+            settingsForm.SLURM.slurm_script_repo,
+            "",
+            "Git repository URL for custom Slurm job scripts. Leave empty to use auto-generated scripts (recommended).",
+            "danger"
+          )}
+        </CollapsibleSection>
+        <CollapsibleSection title={<>Processing Settings <RequiresInitTag /></>} nested>
+          <div className="bp5-form-group">
+            <div className="bp5-form-content">
+              <div className="bp5-form-helper-text">
+                Advanced opt-in settings, all <strong>off by default</strong>. Enable only what your cluster requires.
+              </div>
             </div>
           </div>
-        </div>
-        <div className="bp5-form-group">
-          <div className="bp5-form-content">
-            <div className="bp5-form-helper-text">
-              Writes job env vars to a per-job file instead of SSH inline propagation.
-              Enable when <code>sbatch</code> jobs do not inherit SSH session env vars.
-              <EnvVarNote vars={["BIOMERO_ENV_FILE_SUBMISSION"]} />
+          <div className="bp5-form-group">
+            <div className="bp5-form-content">
+              <div className="bp5-form-helper-text">
+                Writes job env vars to a per-job file instead of SSH inline propagation.
+                Enable when <code>sbatch</code> jobs do not inherit SSH session env vars.
+                <EnvVarNote vars={["BIOMERO_ENV_FILE_SUBMISSION"]} />
+              </div>
             </div>
           </div>
-        </div>
-        <Switch
-          checked={settingsForm.SLURM?.env_file_submission === "true"}
-          label="Env-File Submission"
-          onChange={(e) =>
-            handleInputChange(
-              "SLURM.env_file_submission",
-              e.target.checked ? "true" : "false"
-            )
-          }
-        />
-        <div className="bp5-form-group">
-          <div className="bp5-form-content">
-            <div className="bp5-form-helper-text">
-              Rewrites <code>singularity run --nv</code> to a <code>USE_GPU</code>-gated flag so one script runs on both CPU and GPU partitions.
-              <EnvVarNote vars={["BIOMERO_INJECT_GPU_FLAG"]} />
+          <Switch
+            checked={settingsForm.SLURM?.env_file_submission === "true"}
+            label="Env-File Submission"
+            onChange={(e) =>
+              handleInputChange(
+                "SLURM.env_file_submission",
+                e.target.checked ? "true" : "false"
+              )
+            }
+          />
+          <div className="bp5-form-group">
+            <div className="bp5-form-content">
+              <div className="bp5-form-helper-text">
+                Rewrites <code>singularity run --nv</code> to a <code>USE_GPU</code>-gated flag so one script runs on both CPU and GPU partitions.
+                <EnvVarNote vars={["BIOMERO_INJECT_GPU_FLAG"]} />
+              </div>
             </div>
           </div>
-        </div>
-        <Switch
-          checked={settingsForm.SLURM?.inject_gpu_flag === "true"}
-          label="Inject GPU Flag"
-          onChange={(e) =>
-            handleInputChange(
-              "SLURM.inject_gpu_flag",
-              e.target.checked ? "true" : "false"
-            )
-          }
-        />
-        <H6>GPU Fallback Settings</H6>
-        <div className="bp5-form-group">
-          <div className="bp5-form-content">
-            <div className="bp5-form-helper-text">
-              Applied as sbatch defaults when <code>use_gpu=true</code> and no per-workflow GPU params are set.
-              Per-workflow job parameters always take precedence. Leave blank if not needed.
+          <Switch
+            checked={settingsForm.SLURM?.inject_gpu_flag === "true"}
+            label="Inject GPU Flag"
+            onChange={(e) =>
+              handleInputChange(
+                "SLURM.inject_gpu_flag",
+                e.target.checked ? "true" : "false"
+              )
+            }
+          />
+          <H6>GPU Fallback Settings</H6>
+          <div className="bp5-form-group">
+            <div className="bp5-form-content">
+              <div className="bp5-form-helper-text">
+                Applied as sbatch defaults when <code>use_gpu=true</code> and no per-workflow GPU params are set.
+                Per-workflow job parameters always take precedence. Leave blank if not needed.
+              </div>
             </div>
           </div>
-        </div>
-        {renderEditableField(
-          "GPU Partition",
-          "SLURM.gpu_partition",
-          settingsForm.SLURM?.gpu_partition,
-          "",
-          <>
-            Fallback Slurm partition for GPU jobs. Leave blank if not needed.
-            <ExampleNote>gpu</ExampleNote>
-            <EnvVarNote vars={["BIOMERO_GPU_PARTITION"]} />
-          </>
-        )}
-        {renderEditableField(
-          "GPU GRES",
-          "SLURM.gpu_gres",
-          settingsForm.SLURM?.gpu_gres,
-          "",
-          <>
-            Fallback <code>--gres</code> value for GPU jobs. Use for clusters that allocate GPUs via <code>--gres</code>. Mutually exclusive with GPU GPUS.
-            <ExampleNote>gpu:a100:1</ExampleNote>
-            <EnvVarNote vars={["BIOMERO_GPU_GRES"]} />
-          </>
-        )}
-        {renderEditableField(
-          "GPU GPUS",
-          "SLURM.gpu_gpus",
-          settingsForm.SLURM?.gpu_gpus,
-          "",
-          <>
-            Fallback <code>--gpus</code> value for GPU jobs. Use for clusters that allocate GPUs via <code>--gpus</code>. Mutually exclusive with GPU GRES.
-            <ExampleNote>1</ExampleNote>
-            <EnvVarNote vars={["BIOMERO_GPU_GPUS"]} />
-          </>
-        )}
-        <H6>Image Pull Settings <RequiresInitTag /></H6>
-        <div className="bp5-form-group">
-          <div className="bp5-form-content">
-            <div className="bp5-form-helper-text">
-              Controls how BIOMERO pulls container images. Default: background <code>nohup</code> on login node.
-              Enable sbatch-based pulling on clusters that restrict long-running login-node processes.
+          {renderEditableField(
+            "GPU Partition",
+            "SLURM.gpu_partition",
+            settingsForm.SLURM?.gpu_partition,
+            "",
+            <>
+              Fallback Slurm partition for GPU jobs. Leave blank if not needed.
+              <ExampleNote>gpu</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_GPU_PARTITION"]} />
+            </>
+          )}
+          {renderEditableField(
+            "GPU GRES",
+            "SLURM.gpu_gres",
+            settingsForm.SLURM?.gpu_gres,
+            "",
+            <>
+              Fallback <code>--gres</code> value for GPU jobs. Use for clusters that allocate GPUs via <code>--gres</code>. Mutually exclusive with GPU GPUS.
+              <ExampleNote>gpu:a100:1</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_GPU_GRES"]} />
+            </>
+          )}
+          {renderEditableField(
+            "GPU GPUS",
+            "SLURM.gpu_gpus",
+            settingsForm.SLURM?.gpu_gpus,
+            "",
+            <>
+              Fallback <code>--gpus</code> value for GPU jobs. Use for clusters that allocate GPUs via <code>--gpus</code>. Mutually exclusive with GPU GRES.
+              <ExampleNote>1</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_GPU_GPUS"]} />
+            </>
+          )}
+          <H6>Image Pull Settings <RequiresInitTag /></H6>
+          <div className="bp5-form-group">
+            <div className="bp5-form-content">
+              <div className="bp5-form-helper-text">
+                Controls how BIOMERO pulls container images. Default: background <code>nohup</code> on login node.
+                Enable sbatch-based pulling on clusters that restrict long-running login-node processes.
+                <EnvVarNote vars={["BIOMERO_IMAGE_PULL_VIA_SBATCH"]} />
+              </div>
             </div>
           </div>
-        </div>
-        <div className="bp5-form-group">
-          <div className="bp5-form-content">
-            <div className="bp5-form-helper-text">
-              <EnvVarNote vars={["BIOMERO_IMAGE_PULL_VIA_SBATCH"]} />
+          <Switch
+            checked={settingsForm.SLURM?.slurm_image_pull_via_sbatch === "true"}
+            label="Pull Images via sbatch"
+            onChange={(e) =>
+              handleInputChange(
+                "SLURM.slurm_image_pull_via_sbatch",
+                e.target.checked ? "true" : "false"
+              )
+            }
+          />
+          {renderEditableField(
+            "Pull CPUs",
+            "SLURM.image_pull_cpus",
+            settingsForm.SLURM?.image_pull_cpus,
+            "",
+            <>
+              CPUs for sbatch image pull jobs. Only used when Pull via sbatch is on. Default: 8.
+              <ExampleNote>8</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_PULL_CPUS"]} />
+            </>
+          )}
+          {renderEditableField(
+            "Pull Memory",
+            "SLURM.image_pull_mem",
+            settingsForm.SLURM?.image_pull_mem,
+            "",
+            <>
+              Memory for sbatch image pull jobs. Size to fit your cluster node. Default: 32G.
+              <ExampleNote>4G</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_PULL_MEM"]} />
+            </>
+          )}
+          {renderEditableField(
+            "Apptainer Tmp Dir",
+            "SLURM.apptainer_tmpdir",
+            settingsForm.SLURM?.apptainer_tmpdir,
+            "",
+            <>
+              Override APPTAINER_TMPDIR during image pulls. Leave blank for system default. SLURM Init creates this dir if set.
+              <ExampleNote>/scratchdata/$USER/.apptainer-tmp</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_APPTAINER_TMPDIR"]} />
+            </>
+          )}
+          {renderEditableField(
+            <span>Apptainer Cache Dir <RequiresInitTag /></span>,
+            "SLURM.apptainer_cachedir",
+            settingsForm.SLURM?.apptainer_cachedir,
+            "",
+            <>
+              Override APPTAINER_CACHEDIR during image pulls. Leave blank for system default. SLURM Init creates this dir if set.
+              <ExampleNote>/scratchdata/$USER/.apptainer-cache</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_APPTAINER_CACHEDIR"]} />
+            </>
+          )}
+          <H6>ZIP Command</H6>
+          <div className="bp5-form-group">
+            <div className="bp5-form-content">
+              <div className="bp5-form-helper-text">
+                ZIP command for archiving result files on the cluster. Leave blank to auto-detect
+                (<code>7z</code> or <code>7za</code> in PATH).
+              </div>
             </div>
           </div>
-        </div>
-        <Switch
-          checked={settingsForm.SLURM?.slurm_image_pull_via_sbatch === "true"}
-          label="Pull Images via sbatch"
-          onChange={(e) =>
-            handleInputChange(
-              "SLURM.slurm_image_pull_via_sbatch",
-              e.target.checked ? "true" : "false"
-            )
-          }
-        />
-        {renderEditableField(
-          "Pull CPUs",
-          "SLURM.image_pull_cpus",
-          settingsForm.SLURM?.image_pull_cpus,
-          "",
-          <>
-            CPUs for sbatch image pull jobs. Only used when Pull via sbatch is on. Default: 8.
-            <ExampleNote>8</ExampleNote>
-            <EnvVarNote vars={["BIOMERO_PULL_CPUS"]} />
-          </>
-        )}
-        {renderEditableField(
-          "Pull Memory",
-          "SLURM.image_pull_mem",
-          settingsForm.SLURM?.image_pull_mem,
-          "",
-          <>
-            Memory for sbatch image pull jobs. Size to fit your cluster node. Default: 32G.
-            <ExampleNote>4G</ExampleNote>
-            <EnvVarNote vars={["BIOMERO_PULL_MEM"]} />
-          </>
-        )}
-        <H6>ZIP Command</H6>
-        <div className="bp5-form-group">
-          <div className="bp5-form-content">
-            <div className="bp5-form-helper-text">
-              ZIP command for archiving result files on the cluster. Leave blank to auto-detect
-              (<code>7z</code> or <code>7za</code> in PATH).
+          {renderEditableField(
+            "Slurm Zip Command",
+            "SLURM.slurm_zip_cmd",
+            settingsForm.SLURM?.slurm_zip_cmd,
+            "",
+            <>
+              Explicit zip command. Leave blank to auto-detect (<code>7z</code> or <code>7za</code> in PATH).
+              <ExampleNote>7za</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_SLURM_ZIP_CMD"]} />
+            </>
+          )}
+          <H6>Global Sbatch Parameters</H6>
+          <div className="bp5-form-group">
+            <div className="bp5-form-content">
+              <div className="bp5-form-helper-text">
+                Additional <code>sbatch</code> flags applied to every workflow <em>and</em> conversion submission.
+                Per-workflow job parameters always take precedence.
+                Stored as <code>sbatch_flag=value</code> in the config.
+              </div>
+              <div className="bp5-form-helper-text">
+                Useful for short-lived cluster-wide settings like a reservation or priority adjustment.
+                <ExampleNote>reservation=biomero</ExampleNote>
+              </div>
             </div>
           </div>
-        </div>
-        {renderEditableField(
-          "Slurm Zip Command",
-          "SLURM.slurm_zip_cmd",
-          settingsForm.SLURM?.slurm_zip_cmd,
-          "",
-          <>
-            Explicit zip command. Leave blank to auto-detect (<code>7z</code> or <code>7za</code> in PATH).
-            <ExampleNote>7za</ExampleNote>
-            <EnvVarNote vars={["BIOMERO_SLURM_ZIP_CMD"]} />
-          </>
-        )}
-        <H6>Global Sbatch Parameters</H6>
-        <div className="bp5-form-group">
-          <div className="bp5-form-content">
-            <div className="bp5-form-helper-text">
-              Additional <code>sbatch</code> flags applied to every workflow <em>and</em> conversion submission.
-              Per-workflow job parameters always take precedence.
-              Stored as <code>sbatch_flag=value</code> in the config.
+          {globalSbatchParams.map((param, index) => (
+            <div key={index} className="flex items-center space-x-2 mb-2">
+              <InputGroup
+                value={param.key}
+                placeholder="flag (e.g. reservation)"
+                onChange={(e) => {
+                  const updated = [...globalSbatchParams];
+                  updated[index] = { ...updated[index], key: e.target.value };
+                  setGlobalSbatchParams(updated);
+                }}
+                className="flex-1"
+              />
+              <span className="text-gray-500 font-mono px-1">=</span>
+              <InputGroup
+                value={param.value}
+                placeholder="value (e.g. biomero)"
+                onChange={(e) => {
+                  const updated = [...globalSbatchParams];
+                  updated[index] = { ...updated[index], value: e.target.value };
+                  setGlobalSbatchParams(updated);
+                }}
+                className="flex-1"
+              />
+              <Button
+                icon="delete"
+                minimal
+                intent="danger"
+                onClick={() => setGlobalSbatchParams(globalSbatchParams.filter((_, i) => i !== index))}
+              />
             </div>
-            <div className="bp5-form-helper-text">
-              Useful for short-lived cluster-wide settings like a reservation or priority adjustment.
-              <ExampleNote>reservation=biomero</ExampleNote>
-            </div>
-          </div>
-        </div>
-        {globalSbatchParams.map((param, index) => (
-          <div key={index} className="flex items-center space-x-2 mb-2">
-            <InputGroup
-              value={param.key}
-              placeholder="flag (e.g. reservation)"
-              onChange={(e) => {
-                const updated = [...globalSbatchParams];
-                updated[index] = { ...updated[index], key: e.target.value };
-                setGlobalSbatchParams(updated);
-              }}
-              className="flex-1"
-            />
-            <span className="text-gray-500 font-mono px-1">=</span>
-            <InputGroup
-              value={param.value}
-              placeholder="value (e.g. biomero)"
-              onChange={(e) => {
-                const updated = [...globalSbatchParams];
-                updated[index] = { ...updated[index], value: e.target.value };
-                setGlobalSbatchParams(updated);
-              }}
-              className="flex-1"
-            />
-            <Button
-              icon="delete"
-              minimal
-              intent="danger"
-              onClick={() => setGlobalSbatchParams(globalSbatchParams.filter((_, i) => i !== index))}
-            />
-          </div>
-        ))}
-        <Button
-          icon="add"
-          minimal
-          intent="primary"
-          onClick={() => setGlobalSbatchParams([...globalSbatchParams, { key: "", value: "" }])}
-        >
-          Add Parameter
-        </Button>
+          ))}
+          <Button
+            icon="add"
+            minimal
+            intent="primary"
+            onClick={() => setGlobalSbatchParams([...globalSbatchParams, { key: "", value: "" }])}
+          >
+            Add Parameter
+          </Button>
+        </CollapsibleSection>
       </CollapsibleSection>
       <CollapsibleSection title="UI Settings" errorCount={getMaxBatchJobsError() ? 1 : 0}>
         <div className="bp5-form-group">
