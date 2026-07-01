@@ -499,7 +499,10 @@ export const extractGitHubInfo = (repoUrl) => {
   }
   
   // Match GitHub URLs like https://github.com/owner/repo/tree/v1.0.0
-  const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)(?:\/tree\/(.+))?/);
+  // Use [^\/]+ for the version segment so that an optional file path after the
+  // branch (e.g. /tree/v0.0.3/descriptor.json) is NOT captured as part of the
+  // version — only the branch/tag itself is extracted as currentVersion.
+  const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)(?:\/tree\/([^\/]+))?/);
   if (!match || !match[1] || !match[2]) {
     return null;
   }

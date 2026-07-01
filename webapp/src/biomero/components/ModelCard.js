@@ -64,9 +64,21 @@ const ModelCard = ({
   const updateToLatestVersion = () => {
     if (!versionStatus?.latestVersion || !item.repo) return;
 
-    // Extract the base URL without the version, stripping any trailing slashes
-    const baseUrl = item.repo.replace(/\/tree\/.*$/, '').replace(/\/+$/, '');
-    const newUrl = `${baseUrl}/tree/${versionStatus.latestVersion}`;
+    // Extract the base URL (before /tree/...) and any file-path suffix after
+    // the branch tag, so that direct descriptor URLs like
+    //   .../tree/v0.0.3/descriptor.json  →  .../tree/v1.0.0/descriptor.json
+    // are preserved correctly while plain tree URLs work as before.
+    const treeMatch = item.repo.match(/^(.*?)\/tree\/[^\/]+(\/.*)?$/);
+    let newUrl;
+    if (treeMatch) {
+      const baseUrl = treeMatch[1].replace(/\/+$/, '');
+      const fileSuffix = treeMatch[2] || '';          // e.g. '/descriptor.json' or ''
+      newUrl = `${baseUrl}/tree/${versionStatus.latestVersion}${fileSuffix}`;
+    } else {
+      // Fallback: plain repo URL, just append the new tree ref
+      const baseUrl = item.repo.replace(/\/+$/, '');
+      newUrl = `${baseUrl}/tree/${versionStatus.latestVersion}`;
+    }
     
     // Update the versionStatus first to preserve justUpdated flag
     if (versionStatus) {
@@ -175,7 +187,19 @@ const ModelCard = ({
             <SlurmInitIcon />
           </span>
         }
-        subLabel="The repository with the descriptor.json file."
+        subLabel={
+          <span>
+            GitHub URL pointing to the workflow repository — either a versioned tree URL or a direct descriptor file inside that tree.{" "}
+            <span className="font-mono text-xs">
+              https://github.com/org/repo/tree/v1.0.0
+            </span>
+            {" "}(auto-discovers descriptor.json / config.yaml) or{" "}
+            <span className="font-mono text-xs">
+              …/tree/v1.0.0/descriptor.json
+            </span>
+            {" "}(uses that exact file). Pinning a version is strongly recommended.
+          </span>
+        }
         helperText={!item.repo && !item.name ? (
           <span className="text-blue-600 font-medium">
             ↑ Start here! Paste the GitHub URL — the name will be filled automatically.
@@ -185,7 +209,7 @@ const ModelCard = ({
       >
         <InputGroup
           value={item.repo}
-          placeholder="e.g., https://github.com/org/repo/tree/v1.0.0"
+          placeholder="e.g., https://github.com/org/repo/tree/v1.0.0  or  …/tree/v1.0.0/descriptor.json"
           readOnly={!editable}
           onChange={(e) => onChange(index, "repo", e.target.value)}
           onBlur={() => {
