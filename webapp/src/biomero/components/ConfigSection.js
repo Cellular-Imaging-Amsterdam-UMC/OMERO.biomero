@@ -19,6 +19,7 @@ const ConfigSection = ({
   onRepoBlur, // Repo blur handler
   descriptorMetadata, // Descriptor flags keyed by index
   gpuSettings, // { gpu_partition, gpu_gres, gpu_gpus } for GPU misconfiguration warnings
+  globalJobParams, // { sbatchParams, defaultPartition } for showing active global params
 }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [editableIndex, setEditableIndex] = useState(null);
@@ -220,6 +221,7 @@ const ConfigSection = ({
                 descriptorMeta={descriptorMetadata ? descriptorMetadata[index] ?? null : null}
                 config={config}
                 gpuSettings={gpuSettings}
+                globalJobParams={globalJobParams}
               />
             </Collapse>
           </div>

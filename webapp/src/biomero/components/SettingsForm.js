@@ -909,24 +909,25 @@ const SettingsForm = () => {
             "Exported as APPTAINER_BINDPATH for workflow jobs. Configure if your HPC administrator requires it. Example: /data/my-scratch/data. Leave blank if not needed."
           )}
           {renderEditableField(
-            <span className="inline-flex items-center gap-1">Slurm Conversion Partition <RuntimeIcon /></span>,
-            "SLURM.slurm_conversion_partition",
-            settingsForm.SLURM.slurm_conversion_partition,
+            <span className="inline-flex items-center gap-1">Apptainer Tmp Dir <SlurmInitIcon /></span>,
+            "SLURM.apptainer_tmpdir",
+            settingsForm.SLURM?.apptainer_tmpdir,
             "",
             <>
-              Partition for data conversion jobs (added as a real <code>--partition</code> flag on the conversion sbatch). Takes precedence over the generic Default Partition below. Leave empty to fall back to the Default Partition, or the system default if neither is set.
-              <ExampleNote>cpu-short</ExampleNote>
+              Path for Apptainer/Singularity temporary files (sets APPTAINER_TMPDIR). Useful when <code>/tmp</code> is too small on your login or worker nodes — applies to image pulls and job execution. Leave blank for system default. SLURM Init creates this dir if set.
+              <ExampleNote>/scratchdata/$USER/.apptainer-tmp</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_APPTAINER_TMPDIR"]} />
             </>
           )}
           {renderEditableField(
-            <span className="inline-flex items-center gap-1">Default Partition <RuntimeIcon /></span>,
-            "SLURM.slurm_default_partition",
-            settingsForm.SLURM?.slurm_default_partition,
+            <span className="inline-flex items-center gap-1">Apptainer Cache Dir <SlurmInitIcon /></span>,
+            "SLURM.apptainer_cachedir",
+            settingsForm.SLURM?.apptainer_cachedir,
             "",
             <>
-              Generic fallback <code>--partition</code> applied to both workflow and conversion jobs that do not already set a partition. Per-workflow params, GPU partition, and the Conversion Partition always take precedence. Useful on clusters without a usable system default partition.
-              <ExampleNote>cpu-short</ExampleNote>
-              <EnvVarNote vars={["BIOMERO_DEFAULT_PARTITION"]} />
+              Path for the Apptainer/Singularity image cache (sets APPTAINER_CACHEDIR). Useful when the default cache location is too small — applies to image pulls and job execution. Leave blank for system default. SLURM Init creates this dir if set.
+              <ExampleNote>/scratchdata/$USER/.apptainer-cache</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_APPTAINER_CACHEDIR"]} />
             </>
           )}
         </CollapsibleSection>
@@ -1042,6 +1043,27 @@ const SettingsForm = () => {
             </div>
           </div>
           {renderEditableField(
+            <span className="inline-flex items-center gap-1">Default Partition <RuntimeIcon /></span>,
+            "SLURM.slurm_default_partition",
+            settingsForm.SLURM?.slurm_default_partition,
+            "",
+            <>
+              Generic fallback <code>--partition</code> applied to both workflow and conversion jobs that do not already set a partition. Per-workflow params, the Conversion Partition, and GPU Partition always take precedence. Useful on clusters without a usable system default partition.
+              <ExampleNote>cpu-short</ExampleNote>
+              <EnvVarNote vars={["BIOMERO_DEFAULT_PARTITION"]} />
+            </>
+          )}
+          {renderEditableField(
+            <span className="inline-flex items-center gap-1">Slurm Conversion Partition <RuntimeIcon /></span>,
+            "SLURM.slurm_conversion_partition",
+            settingsForm.SLURM.slurm_conversion_partition,
+            "",
+            <>
+              Partition for data conversion jobs (added as a real <code>--partition</code> flag on the conversion sbatch). Takes precedence over the Default Partition above. Leave empty to fall back to the Default Partition, or the system default if neither is set.
+              <ExampleNote>cpu-short</ExampleNote>
+            </>
+          )}
+          {renderEditableField(
             "GPU Partition",
             "SLURM.gpu_partition",
             settingsForm.SLURM?.gpu_partition,
@@ -1124,28 +1146,6 @@ const SettingsForm = () => {
               Memory for sbatch image pull jobs. Size to fit your cluster node. Default: 32G.
               <ExampleNote>4G</ExampleNote>
               <EnvVarNote vars={["BIOMERO_PULL_MEM"]} />
-            </>
-          )}
-          {renderEditableField(
-            <span className="inline-flex items-center gap-1">Apptainer Tmp Dir <SlurmInitIcon /></span>,
-            "SLURM.apptainer_tmpdir",
-            settingsForm.SLURM?.apptainer_tmpdir,
-            "",
-            <>
-              Override APPTAINER_TMPDIR during image pulls. Leave blank for system default. SLURM Init creates this dir if set.
-              <ExampleNote>/scratchdata/$USER/.apptainer-tmp</ExampleNote>
-              <EnvVarNote vars={["BIOMERO_APPTAINER_TMPDIR"]} />
-            </>
-          )}
-          {renderEditableField(
-            <span className="inline-flex items-center gap-1">Apptainer Cache Dir <SlurmInitIcon /></span>,
-            "SLURM.apptainer_cachedir",
-            settingsForm.SLURM?.apptainer_cachedir,
-            "",
-            <>
-              Override APPTAINER_CACHEDIR during image pulls. Leave blank for system default. SLURM Init creates this dir if set.
-              <ExampleNote>/scratchdata/$USER/.apptainer-cache</ExampleNote>
-              <EnvVarNote vars={["BIOMERO_APPTAINER_CACHEDIR"]} />
             </>
           )}
           <H6><span className="inline-flex items-center gap-1">ZIP Command <RuntimeIcon /></span></H6>
@@ -1540,6 +1540,10 @@ const SettingsForm = () => {
             gpu_partition: settingsForm.SLURM?.gpu_partition || "",
             gpu_gres: settingsForm.SLURM?.gpu_gres || "",
             gpu_gpus: settingsForm.SLURM?.gpu_gpus || "",
+          }}
+          globalJobParams={{
+            sbatchParams: globalSbatchParams,
+            defaultPartition: settingsForm.SLURM?.slurm_default_partition || "",
           }}
         />
       </CollapsibleSection>

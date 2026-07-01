@@ -35,6 +35,7 @@ const ModelCard = ({
   descriptorMeta,
   config,
   gpuSettings,  // { gpu_partition, gpu_gres, gpu_gpus } from SLURM settings
+  globalJobParams, // { sbatchParams, defaultPartition } from SLURM settings
 }) => {
   const hasScriptRepo = !!config?.SLURM?.slurm_script_repo;
   const [inputValue, setInputValue] = useState("");
@@ -460,31 +461,7 @@ const ModelCard = ({
             onChange={(e) => onChange(index, "useGpu", e.target.checked)}
           />
         </div>
-        {/* GPU sbatch params set but toggle is off — show what's already configured */}
-        {!item.useGpu && (() => {
-          const extraEntries = Object.entries(item.extraParams || {});
-          const perWfPartitionEntry = extraEntries.find(([k]) => k.toLowerCase().endsWith('_job_partition'));
-          const perWfGresEntry = extraEntries.find(([k]) => k.toLowerCase().endsWith('_job_gres'));
-          const perWfGpusEntry = extraEntries.find(([k]) => k.toLowerCase().endsWith('_job_gpus'));
-          if (!perWfGresEntry && !perWfGpusEntry && !perWfPartitionEntry) return null;
-          return (
-            <div className="text-gray-400 text-xs mt-2 bg-gray-50 rounded px-2 py-1.5 select-none pointer-events-none space-y-0.5">
-              <div className="font-medium text-gray-500 mb-0.5 flex items-center gap-1">
-                <Icon icon="info-sign" size={10} />
-                GPU sbatch params set (toggle off — global GPU defaults not applied):
-              </div>
-              {perWfPartitionEntry && (
-                <div><code>--partition={perWfPartitionEntry[1]}</code><span className="ml-1 text-gray-300">(per-workflow)</span></div>
-              )}
-              {perWfGresEntry && (
-                <div><code>--gres={perWfGresEntry[1]}</code><span className="ml-1 text-gray-300">(per-workflow)</span></div>
-              )}
-              {perWfGpusEntry && (
-                <div><code>--gpus={perWfGpusEntry[1]}</code><span className="ml-1 text-gray-300">(per-workflow)</span></div>
-              )}
-            </div>
-          );
-        })()}
+        {/* GPU sbatch params set but toggle is off — shown in unified global section below */}
         {/* Warning or effective values when GPU toggle is on */}
         {item.useGpu && (() => {
           const partition = gpuSettings?.gpu_partition;
@@ -524,24 +501,8 @@ const ModelCard = ({
               </div>
             );
           }
-          // All configured — show effective values
-          const effectivePartition = perWfPartitionEntry?.[1] || partition;
-          const effectiveGres = perWfGresEntry?.[1] || gres;
-          const effectiveGpus = perWfGpusEntry?.[1] || gpus;
-          return (
-            <div className="text-gray-400 text-xs mt-2 bg-gray-50 rounded px-2 py-1.5 select-none pointer-events-none space-y-0.5">
-              <div className="font-medium text-gray-500 mb-0.5">Effective GPU resources:</div>
-              {effectivePartition && (
-                <div><code>--partition={effectivePartition}</code><span className="ml-1 text-gray-300">{perWfPartitionEntry ? '(per-workflow)' : '(global)'}</span></div>
-              )}
-              {effectiveGres && (
-                <div><code>--gres={effectiveGres}</code><span className="ml-1 text-gray-300">{perWfGresEntry ? '(per-workflow)' : '(global)'}</span></div>
-              )}
-              {effectiveGpus && (
-                <div><code>--gpus={effectiveGpus}</code><span className="ml-1 text-gray-300">{perWfGpusEntry ? '(per-workflow)' : '(global)'}</span></div>
-              )}
-            </div>
-          );
+          // No separate effective-values block here — shown in unified section below.
+          return null;
         })()}
       </FormGroup>
 
@@ -668,6 +629,55 @@ const ModelCard = ({
           ))}
         </ul>
       )}
+      {/* Active global settings — show greyed-out globals that aren't overridden by per-workflow params */}
+      {(() => {
+        // Collect the param names already set per-workflow (the part after _job_)
+        const perWfParamNames = new Set(
+          Object.keys(item.extraParams || {}).map(k => {
+            const m = k.match(/_job_(.+)$/);
+            return m ? m[1].toLowerCase() : null;
+          }).filter(Boolean)
+        );
+
+        const activeGlobals = [];
+
+        // GPU settings (only when useGpu is on and no per-workflow override)
+        if (item.useGpu) {
+          const gpuPartition = gpuSettings?.gpu_partition;
+          const gpuGres = gpuSettings?.gpu_gres;
+          const gpuGpus = gpuSettings?.gpu_gpus;
+          if (gpuPartition && !perWfParamNames.has('partition'))
+            activeGlobals.push({ flag: '--partition', value: gpuPartition, source: 'GPU setting' });
+          if (gpuGres && !perWfParamNames.has('gres'))
+            activeGlobals.push({ flag: '--gres', value: gpuGres, source: 'GPU setting' });
+          if (gpuGpus && !perWfParamNames.has('gpus'))
+            activeGlobals.push({ flag: '--gpus', value: gpuGpus, source: 'GPU setting' });
+        }
+
+        // Default partition (only if no per-workflow or GPU partition already covers it)
+        const hasPartitionAlready = perWfParamNames.has('partition') || (item.useGpu && gpuSettings?.gpu_partition);
+        if (globalJobParams?.defaultPartition && !hasPartitionAlready)
+          activeGlobals.push({ flag: '--partition', value: globalJobParams.defaultPartition, source: 'global default' });
+
+        // Global sbatch params (if not overridden per-workflow)
+        for (const { key, value } of (globalJobParams?.sbatchParams || [])) {
+          if (key && value && !perWfParamNames.has(key.toLowerCase()))
+            activeGlobals.push({ flag: `--${key}`, value, source: 'global' });
+        }
+
+        if (activeGlobals.length === 0) return null;
+        return (
+          <div className="mt-2 border-t border-gray-100 pt-2 space-y-0.5">
+            <div className="text-xs text-gray-400 font-medium mb-1">Also active for this workflow:</div>
+            {activeGlobals.map(({ flag, value, source }, i) => (
+              <div key={i} className="flex items-center gap-1.5 text-xs text-gray-400">
+                <code className="text-gray-400">{flag}={value}</code>
+                <span className="text-gray-300">({source})</span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </Card>
   );
 };
