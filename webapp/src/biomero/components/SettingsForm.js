@@ -55,25 +55,30 @@ const ExampleNote = ({ children }) => (
   <span className="block mt-0.5"><strong className="text-gray-600">Example:</strong> <code>{children}</code></span>
 );
 
-/** Small inline badge shown next to settings that require a SLURM Init run after changing. */
+/**
+ * Small inline info icon shown next to settings that take effect only after
+ * running the SLURM Init script. This is purely informational — it describes
+ * the setting's nature and does NOT imply any required action right now.
+ * (You can always run Init after any config change to be safe.)
+ */
 const RequiresInitTag = () => (
   <Tooltip
-    content="Changing this setting requires running the SLURM Init script to take effect. The new scripts must be deployed to Slurm before the setting is active."
+    content="This setting is applied to Slurm when you run the SLURM Init script. You can run Init after any config change to be safe — it is always idempotent."
     placement="right"
   >
-    <Tag intent="warning" minimal className="ml-2 align-middle cursor-help">
-      requires Slurm Init
+    <Tag minimal icon="time" className="ml-2 align-middle cursor-help">
+      init
     </Tag>
   </Tooltip>
 );
 
-/** Small inline badge for settings that apply immediately on save — no Slurm Init needed. */
+/** Counterpart to RequiresInitTag — settings that apply immediately on save, no Init needed. */
 const RuntimeTag = () => (
   <Tooltip
     content="No Slurm Init needed — save and it applies to new workflow submissions immediately."
     placement="right"
   >
-    <Tag intent="primary" minimal className="ml-2 align-middle cursor-help">
+    <Tag minimal intent="success" icon="flash" className="ml-2 align-middle cursor-help">
       runtime
     </Tag>
   </Tooltip>
