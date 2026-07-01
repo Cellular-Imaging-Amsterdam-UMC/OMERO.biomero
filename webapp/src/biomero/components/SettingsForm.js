@@ -391,9 +391,31 @@ const SettingsForm = () => {
     
     const model = settingsForm.WORKFLOWS[modelIndex];
 
+    // Clear any previous repo error for this model
+    setModelErrors((prev) => {
+      if (!prev[modelIndex]?.repo) return prev;
+      const next = { ...prev };
+      if (next[modelIndex]) {
+        const { repo: _, ...rest } = next[modelIndex];
+        if (Object.keys(rest).length === 0) delete next[modelIndex];
+        else next[modelIndex] = rest;
+      }
+      return next;
+    });
+
     // Fetch the descriptor once — gets us the tool name AND zarr/plate flags
     // in a single Django→GitHub round-trip (server-side caching applies).
-    const metadata = await fetchWorkflowMetadata(null, model.repo);
+    let metadata;
+    try {
+      metadata = await fetchWorkflowMetadata(null, model.repo);
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'Could not fetch descriptor';
+      setModelErrors((prev) => ({
+        ...prev,
+        [modelIndex]: { ...(prev[modelIndex] || {}), repo: `Descriptor not found: ${msg}` },
+      }));
+      return;
+    }
 
     if (metadata) {
       setSettingsForm((prev) => {

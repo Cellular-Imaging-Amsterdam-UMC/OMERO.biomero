@@ -201,12 +201,14 @@ const ModelCard = ({
             {" "}(uses that exact file). Pinning a version is strongly recommended.
           </span>
         }
-        helperText={!item.repo && !item.name ? (
+        helperText={errors?.repo ? (
+          <span className="text-red-500"><Icon icon="error" size={10} className="mr-1" />{errors.repo}</span>
+        ) : !item.repo && !item.name ? (
           <span className="text-blue-600 font-medium">
             ↑ Start here! Paste the GitHub URL — the name will be filled automatically.
           </span>
         ) : null}
-        intent={!item.repo && !item.name ? "primary" : undefined}
+        intent={errors?.repo ? "danger" : !item.repo && !item.name ? "primary" : undefined}
       >
         <InputGroup
           value={item.repo}
