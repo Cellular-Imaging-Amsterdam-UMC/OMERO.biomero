@@ -275,6 +275,13 @@ def admin_config(request, conn=None, **kwargs):
                     # Update or add the keys in the section
                     for key, value in settingsd.items():
                         config.set(section, key, value)
+                    # Remove sbatch_* keys that were deleted via the UI.
+                    # The frontend omits removed entries from the payload, so any
+                    # sbatch_* key still in the ini but absent from settingsd is stale.
+                    if section == "SLURM":
+                        for key in list(config[section].keys()):
+                            if key.startswith("sbatch_") and key not in settingsd:
+                                del config[section][key]
 
             # Prepare the update timestamp comment
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
