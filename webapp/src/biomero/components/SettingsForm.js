@@ -177,7 +177,24 @@ const SettingsForm = () => {
         }
       }
     });
-    setModelErrors(newErrors);
+    setModelErrors((prev) => {
+      // Merge: keep repo errors set by handleRepoUrlBlur, only replace
+      // name/job/gpuConflict which we just recomputed.
+      const merged = {};
+      // Collect all indices present in either old or new errors
+      const allIndices = new Set([
+        ...Object.keys(prev).map(Number),
+        ...Object.keys(newErrors).map(Number),
+      ]);
+      allIndices.forEach((i) => {
+        const repoErr = prev[i]?.repo;
+        const computed = newErrors[i] || {};
+        const entry = { ...computed };
+        if (repoErr) entry.repo = repoErr;
+        if (Object.keys(entry).length > 0) merged[i] = entry;
+      });
+      return merged;
+    });
   };
 
   useEffect(() => {
