@@ -12,6 +12,7 @@ import {
   NumericInput,
 } from "@blueprintjs/core";
 import { Select } from "@blueprintjs/select";
+import LocalFolderSelectWithPopover from "./LocalFolderSelectWithPopover";
 
 const AdminPanel = () => {
   const { state, saveGroupMappings, loadBiomeroConfig, saveConfigData } = useAppContext();
@@ -79,15 +80,6 @@ const AdminPanel = () => {
     });
   };
 
-  // Create items array for folder select
-  const folderItems = state.localFileTreeData ? 
-    Object.keys(state.localFileTreeData)
-      .filter(key => state.localFileTreeData[key].isFolder)
-      .map(folder => ({
-        id: folder,
-        name: folder
-      })) : [];
-
   const renderOption = (item, { handleClick, handleFocus, modifiers }) => {
     if (!modifiers.matchesPredicate) {
       return null;
@@ -108,10 +100,6 @@ const AdminPanel = () => {
 
   const handleGroupSelect = (item) => {
     setSelectedGroup(item.id);
-  };
-
-  const handleFolderSelect = (item) => {
-    setSelectedFolder(item.id);
   };
 
   const handleAddMapping = async () => {
@@ -223,27 +211,10 @@ const AdminPanel = () => {
             </div>
 
             <div className="flex-1">
-              <Select
-                items={folderItems}
-                itemRenderer={renderOption}
-                onItemSelect={handleFolderSelect}
-                activeItem={folderItems.find(f => f.id === selectedFolder)}
-                filterable={false}
-                noResults={
-                  <MenuItem
-                    disabled={true}
-                    text="No folders available"
-                    roleStructure="listoption"
-                  />
-                }
-              >
-                <Button
-                  text={folderItems.find(f => f.id === selectedFolder)?.name || "Select a folder..."}
-                  rightIcon="double-caret-vertical"
-                  icon="folder-close"
-                  fill={true}
-                />
-              </Select>
+              <LocalFolderSelectWithPopover
+                value={selectedFolder}
+                onChange={(folderId) => setSelectedFolder(folderId)}
+              />
             </div>
           </div>
 
