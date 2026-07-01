@@ -10,9 +10,22 @@ import {
   ButtonGroup,
   Switch,
   Spinner,
+  Tag,
 } from "@blueprintjs/core";
 import { FaDocker } from "react-icons/fa6";
 import { fetchContainerImage } from "../../apiService";
+
+/** No Slurm Init needed — save and it applies to new submissions immediately. */
+const RuntimeTag = () => (
+  <Tooltip
+    content="No Slurm Init needed — save and it applies to new workflow submissions immediately."
+    placement="right"
+  >
+    <Tag intent="primary" minimal className="ml-2 align-middle cursor-help">
+      runtime
+    </Tag>
+  </Tooltip>
+);
 
 const ModelCard = ({
   item,
@@ -344,7 +357,7 @@ const ModelCard = ({
 
       {/* Workflow Input Configuration */}
       <FormGroup
-        label="Workflow Input Requirements"
+        label={<span>Workflow Input Requirements <RuntimeTag /></span>}
         subLabel="Configure input format requirements for this workflow."
       >
         <div className="flex items-center justify-between">
@@ -412,6 +425,7 @@ const ModelCard = ({
             <Tooltip content="Add parameters in key=value format (e.g., mem=32GB). These will be converted to <name>_job_<key>=<value> in the INI file.">
               <Icon icon="help" size={12} />
             </Tooltip>
+            <RuntimeTag />
           </span>
         }
         subLabel={
