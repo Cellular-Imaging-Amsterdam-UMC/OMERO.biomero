@@ -101,9 +101,9 @@ const ConfigSection = ({
           const descriptorMismatchTooltip = dmeta && (() => {
             const parts = [];
             if (dmeta.requiresPlate !== null && (item.isPlateWorkflow || false) !== dmeta.requiresPlate)
-              parts.push(dmeta.requiresPlate ? 'Descriptor requires plate — consider enabling' : 'Descriptor does not declare plate requirement');
+              parts.push(dmeta.requiresPlate ? 'Descriptor indicates plate input — enable Plate Workflow?' : 'Plate Workflow enabled but not in descriptor — intentional?');
             if (dmeta.requiresZarr !== null && (item.isZarrWorkflow || false) !== dmeta.requiresZarr)
-              parts.push(dmeta.requiresZarr ? 'Descriptor requires ZARR — consider enabling' : 'Descriptor does not declare ZARR requirement');
+              parts.push(dmeta.requiresZarr ? 'Descriptor indicates Zarr input — enable Zarr Workflow?' : 'Zarr Workflow enabled but not in descriptor — intentional?');
             return parts.join(' · ');
           })();
           const isVersionOutdated = versionStatus && versionStatus[index] &&
@@ -114,7 +114,7 @@ const ConfigSection = ({
             <div className="flex items-center justify-between">
               <H4 className={`font-semibold flex items-center cursor-pointer ${
                 errors && errors[index] ? 'text-red-600' :
-                isVersionOutdated || hasDescriptorMismatch || hasGpuMisconfiguration ? 'text-orange-600' : ''
+                isVersionOutdated || hasGpuMisconfiguration ? 'text-orange-600' : ''
               }`}
                 onClick={() => toggleItem(index)}
               >
@@ -151,16 +151,22 @@ const ConfigSection = ({
                       );
                     } else if (isOutdated) {
                       return (
-                        <Icon icon="outdated" size={12} intent="warning" className="ml-2" />
+                        <Tooltip content={
+                          status.status === 'unknown'
+                            ? `No version pinned — latest is ${status.latestVersion}`
+                            : `Update available: ${status.currentVersion} → ${status.latestVersion}`
+                        }>
+                          <Icon icon="outdated" size={12} intent="warning" className="ml-2" />
+                        </Tooltip>
                       );
                     }
                   }
                   return null;
                 })()}
-                {/* Descriptor mismatch indicator */}
+                {/* Descriptor mismatch hint (soft — not a blocking warning) */}
                 {hasDescriptorMismatch && (
                   <Tooltip content={descriptorMismatchTooltip}>
-                    <Icon icon="warning-sign" size={12} intent="warning" className="ml-2" />
+                    <Icon icon="help" size={12} className="ml-2 text-gray-400" />
                   </Tooltip>
                 )}
                 {/* GPU misconfiguration indicator */}

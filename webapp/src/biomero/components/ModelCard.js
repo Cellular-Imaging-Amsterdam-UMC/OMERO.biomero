@@ -403,11 +403,11 @@ const ModelCard = ({
           />
         </div>
         {descriptorMeta !== null && descriptorMeta !== undefined && descriptorMeta.requiresPlate !== null && (item.isPlateWorkflow || false) !== descriptorMeta.requiresPlate && (
-          <div className="text-orange-500 text-xs mt-1 flex items-center gap-1">
-            <Icon icon="warning-sign" size={10} />
+          <div className="text-gray-400 text-xs mt-1 flex items-center gap-1">
+            <Icon icon="help" size={10} />
             {descriptorMeta.requiresPlate
-              ? 'Descriptor declares plate input required — consider enabling'
-              : 'Descriptor does not declare plate requirement'}
+              ? 'Descriptor indicates plate input — enable Plate Workflow?'
+              : 'Plate Workflow enabled but not in descriptor — intentional?'}
           </div>
         )}
         
@@ -434,11 +434,11 @@ const ModelCard = ({
           />
         </div>
         {descriptorMeta !== null && descriptorMeta !== undefined && descriptorMeta.requiresZarr !== null && (item.isZarrWorkflow || false) !== descriptorMeta.requiresZarr && (
-          <div className="text-orange-500 text-xs mt-1 flex items-center gap-1">
-            <Icon icon="warning-sign" size={10} />
+          <div className="text-gray-400 text-xs mt-1 flex items-center gap-1">
+            <Icon icon="help" size={10} />
             {descriptorMeta.requiresZarr
-              ? 'Descriptor declares ZARR required — consider enabling'
-              : 'Descriptor does not declare ZARR requirement'}
+              ? 'Descriptor indicates Zarr input — enable Zarr Workflow?'
+              : 'Zarr Workflow enabled but not in descriptor — intentional?'}
           </div>
         )}
 
