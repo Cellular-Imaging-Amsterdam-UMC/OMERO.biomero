@@ -164,6 +164,117 @@ class AdminConfigTests(TestCase):
         written = cfg_path.read_text()
         self.assertNotIn("old=", written)
 
+    def test_get_models_section_exposed_as_workflows(self):
+        """Legacy [MODELS] in the ini is surfaced to the UI as WORKFLOWS."""
+        cfg_path = Path(
+            self._create_tempfile("[MODELS]\ncellpose=/path/cellpose.sif\n")
+        )
+
+        class StubSlurm:
+            _DEFAULT_CONFIG_PATH_1 = str(cfg_path)
+            _DEFAULT_CONFIG_PATH_2 = str(cfg_path)
+            _DEFAULT_CONFIG_PATH_3 = str(cfg_path)
+
+        with patch("omero_biomero.admin_views.SlurmClient", StubSlurm):
+            view = _raw_admin_config()
+            request = SimpleNamespace(method="GET")
+            resp = view(request, conn=_fake_conn())
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        # UI consistently sees the section as WORKFLOWS, never MODELS.
+        self.assertIn("WORKFLOWS", data["config"])
+        self.assertNotIn("MODELS", data["config"])
+        self.assertEqual(
+            data["config"]["WORKFLOWS"]["cellpose"], "/path/cellpose.sif"
+        )
+
+    def test_post_workflows_payload_writes_to_existing_models_section(self):
+        """A WORKFLOWS payload preserves a legacy [MODELS] section name."""
+        SlurmClient = sys.modules["biomero"].SlurmClient
+        cfg_path = Path(self._create_tempfile("[MODELS]\n"))
+
+        class StubSlurm:
+            _DEFAULT_CONFIG_PATH_1 = "unused"
+            _DEFAULT_CONFIG_PATH_2 = "unused"
+            _DEFAULT_CONFIG_PATH_3 = str(cfg_path)
+
+        with patch("omero_biomero.admin_views.SlurmClient", StubSlurm):
+            payload = {
+                "config": {
+                    "WORKFLOWS": {
+                        "cellpose": "/path/cellpose.sif",
+                        "cellpose_repo": "https://example.org/cellpose",
+                        "cellpose_job": "cellpose_job.sh",
+                    }
+                }
+            }
+            request = SimpleNamespace(method="POST", body=json.dumps(payload).encode())
+            view = _raw_admin_config()
+            resp = view(request, conn=_fake_conn())
+        self.assertEqual(resp.status_code, 200)
+        written = cfg_path.read_text()
+        self.assertIn("[MODELS]", written)
+        self.assertNotIn("[WORKFLOWS]", written)
+        self.assertIn("cellpose_repo", written)
+
+    def test_post_workflows_payload_writes_to_workflows_section(self):
+        """A WORKFLOWS payload writes to an existing [WORKFLOWS] section."""
+        SlurmClient = sys.modules["biomero"].SlurmClient
+        cfg_path = Path(self._create_tempfile("[WORKFLOWS]\n"))
+
+        class StubSlurm:
+            _DEFAULT_CONFIG_PATH_1 = "unused"
+            _DEFAULT_CONFIG_PATH_2 = "unused"
+            _DEFAULT_CONFIG_PATH_3 = str(cfg_path)
+
+        with patch("omero_biomero.admin_views.SlurmClient", StubSlurm):
+            payload = {
+                "config": {
+                    "WORKFLOWS": {
+                        "cellpose": "/path/cellpose.sif",
+                        "cellpose_repo": "https://example.org/cellpose",
+                        "cellpose_job": "cellpose_job.sh",
+                    }
+                }
+            }
+            request = SimpleNamespace(method="POST", body=json.dumps(payload).encode())
+            view = _raw_admin_config()
+            resp = view(request, conn=_fake_conn())
+        self.assertEqual(resp.status_code, 200)
+        written = cfg_path.read_text()
+        self.assertIn("[WORKFLOWS]", written)
+        self.assertNotIn("[MODELS]", written)
+        self.assertIn("cellpose_repo", written)
+
+    def test_post_workflows_payload_creates_workflows_section_when_absent(self):
+        """With no existing workflow section, a WORKFLOWS payload creates [WORKFLOWS]."""
+        SlurmClient = sys.modules["biomero"].SlurmClient
+        cfg_path = Path(self._create_tempfile("[GENERAL]\nfoo=bar\n"))
+
+        class StubSlurm:
+            _DEFAULT_CONFIG_PATH_1 = "unused"
+            _DEFAULT_CONFIG_PATH_2 = "unused"
+            _DEFAULT_CONFIG_PATH_3 = str(cfg_path)
+
+        with patch("omero_biomero.admin_views.SlurmClient", StubSlurm):
+            payload = {
+                "config": {
+                    "WORKFLOWS": {
+                        "cellpose": "/path/cellpose.sif",
+                        "cellpose_repo": "https://example.org/cellpose",
+                        "cellpose_job": "cellpose_job.sh",
+                    }
+                }
+            }
+            request = SimpleNamespace(method="POST", body=json.dumps(payload).encode())
+            view = _raw_admin_config()
+            resp = view(request, conn=_fake_conn())
+        self.assertEqual(resp.status_code, 200)
+        written = cfg_path.read_text()
+        self.assertIn("[WORKFLOWS]", written)
+        self.assertNotIn("[MODELS]", written)
+        self.assertIn("cellpose_repo", written)
+
     def test_post_converters_section(self):
         SlurmClient = sys.modules["biomero"].SlurmClient
         cfg_path = Path(self._create_tempfile("[CONVERTERS]\nold=1\n"))

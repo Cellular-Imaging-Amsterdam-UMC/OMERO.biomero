@@ -47,6 +47,16 @@ def admin_config(request, conn=None, **kwargs):
                 section: dict(configs.items(section)) for section in configs.sections()
             }
 
+            # Workflow definitions may live under a legacy [MODELS] section or
+            # the preferred [WORKFLOWS] section. Always surface them to the UI as
+            # WORKFLOWS so the admin interface uses consistent terminology,
+            # merging both if they happen to coexist ([WORKFLOWS] wins on clash).
+            if "MODELS" in config_dict or "WORKFLOWS" in config_dict:
+                merged_workflows = {}
+                merged_workflows.update(config_dict.pop("MODELS", {}))
+                merged_workflows.update(config_dict.pop("WORKFLOWS", {}))
+                config_dict["WORKFLOWS"] = merged_workflows
+
             # Load the JSON configuration file (biomero-config.json)
             json_config = {}
             if os.path.exists(CONFIG_FILE_PATH):
@@ -99,7 +109,9 @@ def admin_config(request, conn=None, **kwargs):
                 if key.endswith("_job"):
                     c = "# The jobscript in the 'slurm_script_repo'"
                 elif key.endswith("_repo"):
-                    c = "# The (e.g. github) repository with the descriptor.json file"
+                    c = "# The (e.g. github) repository with the descriptor.json / config.yaml file"
+                elif key.endswith("_use_gpu"):
+                    c = "# Mark this workflow as GPU-enabled by default (uses global gpu_partition / gpu_gres / gpu_gpus)"
                 else:
                     c = "# Adding or overriding job value for this workflow"
                 return c
@@ -154,6 +166,17 @@ def admin_config(request, conn=None, **kwargs):
                     )
 
             # --- Save INI Config ---
+            # The workflow definitions section may be named [WORKFLOWS]
+            # (preferred) or [MODELS] (legacy). The web UI always sends it as
+            # "WORKFLOWS", but we preserve whichever name the existing ini file
+            # already uses so we never create a duplicate/conflicting section.
+            if "WORKFLOWS" in config:
+                workflow_section_name = "WORKFLOWS"
+            elif "MODELS" in config:
+                workflow_section_name = "MODELS"
+            else:
+                workflow_section_name = "WORKFLOWS"
+
             # Update the config with new values
             for section, settingsd in ini_config_updates.items():
                 if not isinstance(settingsd, dict):
@@ -161,17 +184,25 @@ def admin_config(request, conn=None, **kwargs):
                         f"Section '{section}' must contain key-value pairs."
                     )
 
+                # Normalize the workflow section name to whatever the existing
+                # ini uses (MODELS or WORKFLOWS); they share identical handling.
+                if section in ("MODELS", "WORKFLOWS"):
+                    section = workflow_section_name
+
                 # If the section doesn't exist, add it
                 if section not in config:
                     config.add_section(section)
 
-                if section == "MODELS":
+                if section in ("MODELS", "WORKFLOWS"):
                     # Group keys by prefix (cellpose, stardist, etc.)
                     model_keys = defaultdict(list)
                     for key, value in settingsd.items():
-                        # Split the key on the known suffixes
+                        # Split the key on the known suffixes to derive the
+                        # model prefix.  Order matters: check longer/more-
+                        # specific suffixes before shorter ones so that
+                        # e.g. "wf_job_mem" → prefix "wf" (not "wf_job").
                         model_prefix = key
-                        for suffix in ["repo", "job"]:
+                        for suffix in ["use_gpu", "job_", "repo", "job"]:
                             if f"_{suffix}" in key:
                                 model_prefix = key.split(f"_{suffix}")[0]
                                 break
@@ -223,7 +254,7 @@ def admin_config(request, conn=None, **kwargs):
                     # Check for removing top-level keys and related keys
                     for key in list(config[section].keys()):
                         model_prefix = key
-                        for suffix in ["repo", "job"]:
+                        for suffix in ["use_gpu", "job_", "repo", "job"]:
                             if f"_{suffix}" in key:
                                 model_prefix = key.split(f"_{suffix}")[0]
                                 break
@@ -249,6 +280,13 @@ def admin_config(request, conn=None, **kwargs):
                     # Update or add the keys in the section
                     for key, value in settingsd.items():
                         config.set(section, key, value)
+                    # Remove sbatch_* keys that were deleted via the UI.
+                    # The frontend omits removed entries from the payload, so any
+                    # sbatch_* key still in the ini but absent from settingsd is stale.
+                    if section == "SLURM":
+                        for key in list(config[section].keys()):
+                            if key.startswith("sbatch_") and key not in settingsd:
+                                del config[section][key]
 
             # Prepare the update timestamp comment
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")

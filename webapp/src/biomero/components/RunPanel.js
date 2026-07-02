@@ -160,6 +160,7 @@ const RunPanel = ({ onWorkflowError }) => {
 
   const getWorkflowOutputDefaults = (workflow) => {
     const outputs = workflow?.metadata?.outputs || [];
+    const useDescriptorFallbackSuggestions = Array.isArray(outputs) && outputs.length === 0;
     const hasCsvTableOutput = outputs.some((output) => {
       const type = String(output?.type || "").toLowerCase();
       if (!["measurement", "file"].includes(type)) return false;
@@ -186,8 +187,8 @@ const RunPanel = ({ onWorkflowError }) => {
     return {
       attachToOriginalImages: false,
       importAsZip: false,  // Zip is opt-in only; no output type auto-enables it
-      uploadCsv: hasCsvTableOutput,
-      attachFileOutputs: hasFileAnnotationOutput,
+      uploadCsv: hasCsvTableOutput || useDescriptorFallbackSuggestions,
+      attachFileOutputs: hasFileAnnotationOutput || useDescriptorFallbackSuggestions,
     };
   };
 
