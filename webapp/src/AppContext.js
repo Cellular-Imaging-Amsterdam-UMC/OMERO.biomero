@@ -604,7 +604,12 @@ export const AppProvider = ({ children }) => {
         index: parentId,
         isFolder: true,
         children: contents.map((content) => content.id),
-        data: parentId === "root" ? "Home" : "Folder",
+        // Use the actual folder path (parentId) as the display label for
+        // group-mapped root folders instead of a generic placeholder — the
+        // node id already equals the path relative to BASE_DIR, so it is a
+        // meaningful label, and other code (e.g. path display) must not rely
+        // on this being a fake/generic value.
+        data: parentId === "root" ? "Home" : parentId,
         childCount: contents.length,
       };
 

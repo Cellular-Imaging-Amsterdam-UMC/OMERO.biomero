@@ -328,11 +328,24 @@ const ImporterApp = () => {
 
     setUploading(true);
 
-    // Enhanced path construction to handle UUID-based items
+    // Enhanced path construction to handle UUID-based items.
+    //
+    // NOTE: item.value (the tree node id) is already the correct path
+    // relative to BASE_DIR/IMPORT_MOUNT_PATH — the backend's
+    // get_folder_contents() always computes ids via
+    // os.path.relpath(item_path_fs, BASE_DIR) (or "<parent_path>#<uuid>"
+    // for nested container items), so it already includes any group-mapped
+    // subfolder prefix (e.g. "biomero-group1/Barbie1.tif").
+    //
+    // We must NOT reconstruct the path from the tree's display "data"
+    // labels via findPathToTreeLeaf: the root node of a group-mapped
+    // folder is seeded with a generic placeholder label (see
+    // AppContext.loadFolderData), not the real folder name, so that
+    // reconstruction silently drops the group subfolder and sends a
+    // truncated path (e.g. "/data/Barbie1.tif" instead of
+    // "/data/biomero-group1/Barbie1.tif"), causing "not recognized as
+    // file or directory" errors in the importer.
     const selectedLocal = uploadList.map((item) => {
-      const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData, getCurrentGroupFolder());
-      const pathString = itemPath ? itemPath.slice(1).join("/") : item.value;
-
       // Check if this is a UUID-based item (has # in the value)
       if (item.value.includes("#")) {
         const [filePath, uuid] = item.value.split("#");
@@ -353,9 +366,11 @@ const ImporterApp = () => {
         }
       }
 
-      // Backward compatible: return simple path string for regular files
+      // Regular files/folders: item.value (the tree node id) is already the
+      // correct localPath, relative to BASE_DIR/IMPORT_MOUNT_PATH, including
+      // any group-mapped subfolder prefix.
       return {
-        localPath: pathString,
+        localPath: item.value,
         uuid: null
       };
     });
@@ -514,8 +529,13 @@ const ImporterApp = () => {
   const renderCards = () => {
     // TODO
     return uploadList.map((item) => {
-      const itemPath = findPathToTreeLeaf(item.value, state.localFileTreeData, getCurrentGroupFolder());
-      const itemPathString = itemPath ? itemPath.join("/") : item.filename || item.value;
+      // Display the actual localPath (item.value), consistent with what is
+      // sent to the importer in handleUpload — do not reconstruct via
+      // findPathToTreeLeaf, which uses display labels that are not reliable
+      // path segments for group-mapped root folders.
+      const itemPathString = item.value.includes("#")
+        ? item.value.split("#")[0]
+        : item.value || item.filename;
       const warningInfo = getImportWarning(item.filename, state.config);
       return (
         <Card
