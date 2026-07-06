@@ -42,15 +42,58 @@ def build_upload_location(request, resource_id):
     return f"{scheme}://{request.get_host()}/omero_biomero/upload/{resource_id}"
 
 
+# Directories are created by whichever process handles the web request
+# (running as the omeroweb container's user), but must also be readable/
+# traversable by other containers that later act on the same files (e.g.
+# biomero-importer, which may run as a different uid/gid — see
+# OMERO_CONTAINER_USER). Path.mkdir()'s `mode` argument is combined with
+# the process umask, so a restrictive umask (e.g. 0077) can silently
+# produce directories that other containers get "Permission denied" on.
+# We therefore always chmod explicitly after creation, which bypasses
+# umask entirely.
+DIR_MODE = 0o775
+
+
+def _mkdir_traversable(path):
+    """Create `path` (and any missing parents) and ensure it is readable/
+    traversable (0o775) regardless of the process umask.
+
+    Only chmods directories that did not already exist, so we never touch
+    permissions on pre-existing (e.g. host-mounted) folders such as a
+    group's mapped network share.
+    """
+    p = Path(path)
+    # Walk up to find the first already-existing ancestor; everything
+    # below that will be newly created by mkdir(parents=True) and needs
+    # its permissions fixed up.
+    to_create = []
+    current = p
+    while not current.exists():
+        to_create.append(current)
+        if current.parent == current:
+            break
+        current = current.parent
+
+    p.mkdir(parents=True, exist_ok=True)
+
+    for created_dir in to_create:
+        try:
+            os.chmod(created_dir, DIR_MODE)
+        except OSError as e:
+            logger.warning(
+                f"Could not chmod newly created directory {created_dir}: {e}"
+            )
+
+
 def ensure_chunk_directory():
     """Ensure the temporary chunk storage directory exists."""
-    Path(UPLOADER_CHUNKS_DIR).mkdir(parents=True, exist_ok=True)
+    _mkdir_traversable(UPLOADER_CHUNKS_DIR)
 
 
 def ensure_directories():
     """Ensure TUS directories exist."""
     ensure_chunk_directory()
-    Path(UPLOADER_DESTINATION_DIR).mkdir(parents=True, exist_ok=True)
+    _mkdir_traversable(UPLOADER_DESTINATION_DIR)
 
 
 def get_metadata_path(resource_id):
@@ -405,7 +448,7 @@ class TusUploadView(View):
             group_mappings_file_path=GROUP_MAPPINGS_FILE_PATH,
             uploader_destination_dir=UPLOADER_DESTINATION_DIR,
         )
-        Path(user_dest_dir).mkdir(parents=True, exist_ok=True)
+        _mkdir_traversable(user_dest_dir)
 
         # Ensure unique filename in destination (handle duplicates from same user)
         dest_path = os.path.join(user_dest_dir, filename)
@@ -428,6 +471,16 @@ class TusUploadView(View):
 
             shutil.copy2(chunk_path, dest_path)
             os.remove(chunk_path)
+
+        # The chunk file was created via open(..., "wb") during upload, whose
+        # permissions depend on the process umask (e.g. a restrictive umask
+        # of 0077 leaves it at 0600, unreadable by other containers such as
+        # biomero-importer that may run as a different uid/gid). Explicitly
+        # chmod the final file so it is readable regardless of umask.
+        try:
+            os.chmod(dest_path, 0o664)
+        except OSError as e:
+            logger.warning(f"Could not chmod uploaded file {dest_path}: {e}")
 
         # Store the final destination path in metadata before cleaning up
         final_filename = os.path.basename(dest_path)
