@@ -21,7 +21,7 @@ from .settings import (
     UPLOADER_CHUNKS_DIR,
     UPLOADER_DESTINATION_DIR,
 )
-from .utils import get_upload_storage_dir
+from .utils import get_upload_storage_dir, get_group_folder_path, is_upload_to_group_folder_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -54,46 +54,54 @@ def build_upload_location(request, resource_id):
 DIR_MODE = 0o775
 
 
-def _mkdir_traversable(path):
-    """Create `path` (and any missing parents) and ensure it is readable/
-    traversable (0o775) regardless of the process umask.
+def _mkdir_traversable(path, boundary=None):
+    """Create `path` (and any missing parents) and ensure every directory
+    strictly below `boundary` (exclusive), up to and including `path`, is
+    readable/traversable (0o775) regardless of the process umask.
 
-    Only chmods directories that did not already exist, so we never touch
-    permissions on pre-existing (e.g. host-mounted) folders such as a
-    group's mapped network share.
+    Unlike a "only chmod newly created dirs" approach, this always
+    (re-)applies permissions, self-healing directories that were created
+    before this permission handling existed (e.g. an old `user_0` or
+    `uploads/<username>` directory left with stale/incorrect permissions
+    from before this fix). `boundary` itself and anything above it (e.g. a
+    group's mounted network folder, or BASE_DIR) is never touched, since
+    those may be pre-existing, externally-managed directories we do not
+    own. If `boundary` is None, everything up to and including `path` is
+    treated as ours (safe for our own fully-managed staging directories
+    such as UPLOADER_CHUNKS_DIR / UPLOADER_DESTINATION_DIR).
     """
-    p = Path(path)
-    # Walk up to find the first already-existing ancestor; everything
-    # below that will be newly created by mkdir(parents=True) and needs
-    # its permissions fixed up.
-    to_create = []
-    current = p
-    while not current.exists():
-        to_create.append(current)
-        if current.parent == current:
-            break
-        current = current.parent
+    p = Path(path).resolve()
+    boundary_p = Path(boundary).resolve() if boundary else None
 
     p.mkdir(parents=True, exist_ok=True)
 
-    for created_dir in to_create:
+    to_chmod = []
+    current = p
+    while current != boundary_p:
+        to_chmod.append(current)
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+
+    for d in reversed(to_chmod):
         try:
-            os.chmod(created_dir, DIR_MODE)
+            os.chmod(d, DIR_MODE)
         except OSError as e:
-            logger.warning(
-                f"Could not chmod newly created directory {created_dir}: {e}"
-            )
+            logger.warning(f"Could not chmod directory {d}: {e}")
 
 
 def ensure_chunk_directory():
     """Ensure the temporary chunk storage directory exists."""
-    _mkdir_traversable(UPLOADER_CHUNKS_DIR)
+    _mkdir_traversable(UPLOADER_CHUNKS_DIR, boundary=os.path.dirname(UPLOADER_CHUNKS_DIR))
 
 
 def ensure_directories():
     """Ensure TUS directories exist."""
     ensure_chunk_directory()
-    _mkdir_traversable(UPLOADER_DESTINATION_DIR)
+    _mkdir_traversable(
+        UPLOADER_DESTINATION_DIR, boundary=os.path.dirname(UPLOADER_DESTINATION_DIR)
+    )
 
 
 def get_metadata_path(resource_id):
@@ -455,7 +463,24 @@ class TusUploadView(View):
             group_mappings_file_path=GROUP_MAPPINGS_FILE_PATH,
             uploader_destination_dir=UPLOADER_DESTINATION_DIR,
         )
-        _mkdir_traversable(user_dest_dir)
+
+        # Determine a safe boundary for self-healing permissions: never
+        # chmod a group's pre-existing, externally-managed mapped folder
+        # itself, but always (re-)fix everything our own upload convention
+        # creates below it ("uploads/<username>"). For the default
+        # (non-group) destination, everything from UPLOADER_DESTINATION_DIR
+        # downward is exclusively ours.
+        boundary = os.path.dirname(UPLOADER_DESTINATION_DIR)
+        if is_upload_to_group_folder_enabled(CONFIG_FILE_PATH) and username and group_id is not None:
+            group_folder_path = get_group_folder_path(
+                group_id,
+                base_dir=BASE_DIR,
+                group_mappings_file_path=GROUP_MAPPINGS_FILE_PATH,
+            )
+            if group_folder_path and user_dest_dir.startswith(group_folder_path):
+                boundary = group_folder_path
+
+        _mkdir_traversable(user_dest_dir, boundary=boundary)
 
         # Ensure unique filename in destination (handle duplicates from same user)
         dest_path = os.path.join(user_dest_dir, filename)
