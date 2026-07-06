@@ -363,7 +363,14 @@ class TusUploadView(View):
 
         # Check if upload is complete
         if new_offset >= meta["length"]:
-            final_filename = self._finalize_upload(resource_id, meta)
+            try:
+                final_filename = self._finalize_upload(resource_id, meta)
+            except PermissionError as e:
+                logger.error(f"Permission denied finalizing upload {resource_id}: {e}")
+                return HttpResponse(f"Permission denied: {e}", status=403)
+            except OSError as e:
+                logger.error(f"Error finalizing upload {resource_id}: {e}")
+                return HttpResponse(f"Error finalizing upload: {e}", status=500)
 
         response = HttpResponse(status=204)
         response["Upload-Offset"] = str(new_offset)
@@ -469,7 +476,22 @@ class TusUploadView(View):
             # If rename fails (e.g., cross-filesystem), copy and delete
             import shutil
 
-            shutil.copy2(chunk_path, dest_path)
+            try:
+                shutil.copy2(chunk_path, dest_path)
+            except PermissionError as e:
+                # Surface a clear, specific error instead of letting this
+                # propagate as an unhandled 500 with a raw traceback. This is
+                # almost always a directory the omeroweb process does not
+                # have write access to (e.g. a pre-existing directory from
+                # before permissions were fixed up, or a genuine host-level
+                # permission/ownership mismatch between containers).
+                raise PermissionError(
+                    f"Permission denied writing uploaded file to "
+                    f"'{dest_path}': {e}. Check that the destination "
+                    f"directory is writable by the omeroweb process "
+                    f"(uid/gid), e.g. it may need to be deleted and "
+                    f"recreated, or its ownership/permissions fixed."
+                ) from e
             os.remove(chunk_path)
 
         # The chunk file was created via open(..., "wb") during upload, whose

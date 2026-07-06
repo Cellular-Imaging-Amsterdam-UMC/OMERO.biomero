@@ -140,9 +140,27 @@ const ResumableUploader = ({ datasetId, datasetType, group, groupId }) => {
 
     uppyRef.current.on("upload-success", onUploadSuccess);
 
+    // Surface upload-time failures (e.g. permission-denied finalizing the
+    // upload server-side) directly instead of leaving the user to only see
+    // Uppy's dashboard error state, or a confusing later "file not found"
+    // when the import trigger inevitably can't find a file that was never
+    // actually written to disk.
+    const onUploadError = (file, error) => {
+      console.error("Upload failed", file?.name, error);
+      const serverMessage = error?.request?.responseText || error?.message || "Unknown error";
+      toaster?.show({
+        intent: "danger",
+        icon: "error",
+        message: `Upload failed for ${file?.name || "file"}: ${serverMessage}`,
+        timeout: 0,
+      });
+    };
+    uppyRef.current.on("upload-error", onUploadError);
+
     return () => {
       if (uppyRef.current) {
         uppyRef.current.off("upload-success", onUploadSuccess);
+        uppyRef.current.off("upload-error", onUploadError);
         // Remove Dashboard plugin on cleanup
         const dashboardPlugin = uppyRef.current.getPlugin("Dashboard");
         if (dashboardPlugin) {
