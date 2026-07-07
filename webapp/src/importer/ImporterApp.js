@@ -157,8 +157,19 @@ const ImporterApp = () => {
     return mapping?.folder || "root";  // Default to "root" if no mapping exists
   };
 
+  // Whether the active group has an explicit mapping entry (regardless of what
+  // folder it maps to — even "root" is a valid, intentional mapping).
+  const activeGroupHasMapping =
+    !!state.groupFolderMappings?.[state.user?.active_group_id];
+
+  // Import panel: always block if there is no group folder mapping, regardless
+  // of whether the web uploader feature is enabled.
+  const showNoImportFolderWarning = !activeGroupHasMapping;
+
+  // Upload panel: only block if the "upload to group folder" setting is on and
+  // the current group has no folder mapped.
   const showNoUploadFolderWarning =
-    uploadToGroupFolderEnabled && getCurrentGroupFolder() === "root";
+    uploadToGroupFolderEnabled && !activeGroupHasMapping;
 
   const [isNewContainerOverlayOpen, setIsNewContainerOverlayOpen] =
     useState(false);
@@ -900,7 +911,7 @@ const ImporterApp = () => {
                 </Button>
               </Tooltip>
             </div>
-            {showNoUploadFolderWarning ? (
+            {showNoImportFolderWarning ? (
               <div className="mt-4">
                 <Callout intent="warning" icon="warning-sign">
                   The currently selected group has no assigned upload folder. Switch to a different group, or contact your OMERO administrator to get a folder assigned for this group.
