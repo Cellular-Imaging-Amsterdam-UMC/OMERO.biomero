@@ -232,6 +232,7 @@ const AdminPanel = () => {
 
         <div className="mt-4">
           <h4 className="text-md font-semibold mb-2">Current Mappings:</h4>
+          <div className="max-h-64 overflow-y-auto">
           {Object.entries(folderMappings).map(([group, data]) => (
             <Card 
               key={group} 
@@ -277,6 +278,7 @@ const AdminPanel = () => {
               </div>
             </Card>
           ))}
+          </div>
         </div>
       </Card>
     </div>
