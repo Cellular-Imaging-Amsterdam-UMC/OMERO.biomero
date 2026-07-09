@@ -99,16 +99,29 @@ class AnalyzerViewsTests(TestCase):
         ):
             view = _raw("run_workflow_script")
             payload = {"workflow_name": "wfA", "params": params_in}
+            # Use a dict subclass that also exposes .modified so the view can
+            # write request.session.modified = True (as Django sessions do).
+            class _Session(dict):
+                modified = False
+
             request = SimpleNamespace(
                 method="POST",
                 body=json.dumps(payload).encode(),
-                session={},
+                session=_Session(),
             )
             resp = view(request, conn=conn)
         self.assertEqual(resp.status_code, 200)
         data = json.loads(resp.content)
         self.assertEqual(data["status"], "success")
         self.assertIn("jobId", data)
+        # Verify the Activities callback was registered in the session
+        self.assertIn("callback", request.session)
+        self.assertTrue(
+            any(
+                v.get("job_type") == "script"
+                for v in request.session["callback"].values()
+            )
+        )
         svc.runScript.assert_called()  # ensure script executed
 
     def test_run_workflow_script_invalid_json(self):
