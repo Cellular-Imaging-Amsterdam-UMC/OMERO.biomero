@@ -284,6 +284,11 @@ def list_workflows(request, conn=None, **kwargs):
         return JsonResponse({"error": str(e)}, status=500)
 
 
+def _is_versioned_url(url_or_name: str) -> bool:
+    """Return True when the identifier points at a pinned GitHub tree ref."""
+    return bool(url_or_name and "/tree/v" in str(url_or_name))
+
+
 @login_required()
 @require_http_methods(["GET"])
 def get_workflow_metadata(request, conn=None, **kwargs):
@@ -292,7 +297,13 @@ def get_workflow_metadata(request, conn=None, **kwargs):
     GET /api/analyzer/workflows/?repo=URL → descriptor fetched directly from GitHub.
 
     Returns the biomero-schema descriptor dict enriched with ``githubUrl``.
-    Results are cached for 1 hour (versioned URLs won't change within a version).
+
+    Caching strategy:
+    - Versioned URLs (/tree/vX.Y.Z) are immutable → 24-hour Django cache TTL.
+    - Unversioned / name-only lookups         → 1-hour Django cache TTL.
+    - A separate ``*:stale`` key is stored indefinitely so that when GitHub
+      returns a rate-limit error (429) the last known good data is served
+      instead of a hard error.
     """
     workflow_name = kwargs.get("name")
     repo_url = request.GET.get("repo", "").strip()
@@ -303,8 +314,11 @@ def get_workflow_metadata(request, conn=None, **kwargs):
             status=400,
         )
 
-    cache_key = f"workflow_metadata:{repo_url or workflow_name}"
+    identifier = repo_url or workflow_name
+    cache_key = f"workflow_metadata:{identifier}"
+    stale_key = f"{cache_key}:stale"
     no_cache = "no-cache" in request.headers.get("Cache-Control", "")
+
     cached = None if no_cache else cache.get(cache_key)
     if cached is not None:
         response = JsonResponse(cached)
@@ -324,11 +338,25 @@ def get_workflow_metadata(request, conn=None, **kwargs):
                 metadata = sc.generic_descriptor_from_github(workflow_name)
                 github_url = sc.slurm_model_repos.get(workflow_name)
                 enriched = {**metadata, "name": workflow_name, "githubUrl": github_url}
-        cache.set(cache_key, enriched, 3600)
+
+        # Versioned URLs are immutable — cache aggressively.
+        ttl = 86400 if _is_versioned_url(identifier) else 3600
+        cache.set(cache_key, enriched, ttl)
+        # Always refresh the stale fallback with no expiry so it survives future 429s.
+        cache.set(stale_key, enriched, None)
         response = JsonResponse(enriched)
         response["X-Cache"] = "MISS"
         return response
     except Exception as e:
+        # On GitHub rate-limit (or any transient error) try to serve stale data.
+        stale = cache.get(stale_key)
+        if stale is not None:
+            logger.warning(
+                f"GitHub error for {identifier!r} — serving stale cache: {e}"
+            )
+            response = JsonResponse(stale)
+            response["X-Cache"] = "STALE"
+            return response
         logger.error(
             f"Error fetching metadata for workflow {workflow_name or repo_url}: {str(e)}"
         )
