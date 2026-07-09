@@ -240,10 +240,28 @@ def run_workflow_script(request, conn=None, **kwargs):
             omero_job_id = proc.getJob()._id
             msg = f"Started script {script_id} at {datetime.datetime.now()} with OMERO Job ID {unwrap(omero_job_id)}"
             logger.info(msg)
+
+            # Register with OMERO.web Activities panel so the script run
+            # shows up in the user's Activities view (bell icon).
+            # Mirrors the pattern used by omeroweb/webclient/views.py::run_script().
+            # The key must be str(proc) — a "ProcessCallback/UUID:..." Ice proxy
+            # string — so the activities() poller recognises it as a script job.
+            if "callback" not in request.session:
+                request.session["callback"] = {}
+            job_id = str(proc)
+            request.session["callback"][job_id] = {
+                "job_type": "script",
+                "job_name": workflow_name,
+                "start_time": str(datetime.datetime.now()),
+                "status": "in progress",
+            }
+            request.session.modified = True
+
             return JsonResponse(
                 {
                     "status": "success",
                     "message": f"Script {script_name} for {workflow_name} started successfully: {msg}",
+                    "jobId": job_id,
                 }
             )
 
