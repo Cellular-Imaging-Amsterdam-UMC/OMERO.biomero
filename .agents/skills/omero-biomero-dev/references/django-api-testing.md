@@ -65,22 +65,23 @@
 Prepare the existing local environment on Windows when needed:
 
 ```powershell
-.\venv\Scripts\python.exe -m pip install -e . -r requirements.txt
+.\venv\Scripts\python.exe -m pip install -e ".[test]"
 .\venv\Scripts\python.exe manage.py test omero_biomero.tests.test_biomero_views
 .\venv\Scripts\python.exe manage.py test
 ```
 
-On Windows, `omero-web` may pull `zeroc-ice` into an unsupported local C++ build.
-If that full install fails specifically at Ice, keep using the same `venv`: install
-the project editable with `--no-deps`, install `requirements.txt` plus the direct
-imports needed by the selected tests, and run pytest so `tests/conftest.py` loads
-the repository's OMERO/importer stubs before Django setup. Do not present this
-stubbed environment as a production dependency check.
+On Windows with the repository's Python 3.12 x86_64 environment, install
+Glencoe's matching prebuilt Ice wheel before the normal test extra. This keeps
+pip from attempting an unsupported local Ice C++ build. For another supported
+platform or Python version, select the matching wheel from Glencoe's release
+table rather than using `--no-deps`. Run pytest when `tests/conftest.py` must
+load the repository's OMERO/importer stubs before Django setup.
 
 ```powershell
-.\venv\Scripts\python.exe -m pip install --no-deps -e .
-.\venv\Scripts\python.exe -m pip install -r requirements.txt Django PyJWT `
-  psycopg2-binary requests numpy PyYAML
+.\venv\Scripts\python.exe -m pip install `
+  "https://github.com/glencoesoftware/zeroc-ice-py-win-x86_64/releases/download/20240325/zeroc_ice-3.6.5-cp312-cp312-win_amd64.whl"
+.\venv\Scripts\python.exe -m pip install "omero-py==5.21.0"
+.\venv\Scripts\python.exe -m pip install -e ".[test]"
 .\venv\Scripts\python.exe -m pytest omero_biomero\tests\test_biomero_views.py -q
 ```
 

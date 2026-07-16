@@ -56,6 +56,16 @@ setup(
         "configupdater>=3.2,<4",
         "biomero-importer>=1.2.1,<2",
     ],
+    extras_require={
+        "test": [
+            "pytest>=6",
+            "pytest-cov",
+            "mock",
+            "flake8",
+            "psycopg2-binary>=2.9",
+            "numpy>=1.26",
+        ],
+    },
     python_requires=">=3.12",
     include_package_data=True,
     zip_safe=False,

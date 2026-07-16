@@ -30,6 +30,25 @@ def _ensure_stubs():
         dec.render_response = render_response
         sys.modules["omeroweb.webclient.decorators"] = dec
 
+    if "omero.rtypes" not in sys.modules:
+        omero_pkg = sys.modules.setdefault("omero", types.ModuleType("omero"))
+        omero_pkg.__path__ = []
+        rtypes = types.ModuleType("omero.rtypes")
+
+        def unwrap(value):
+            return value.getValue() if hasattr(value, "getValue") else value
+
+        rtypes.unwrap = unwrap
+        rtypes.wrap = lambda value: value
+        rtypes.rbool = lambda value: value
+        rtypes.rlong = lambda value: value
+        rtypes.rlist = lambda value: value
+        model = types.ModuleType("omero.model")
+        omero_pkg.rtypes = rtypes
+        omero_pkg.model = model
+        sys.modules["omero.rtypes"] = rtypes
+        sys.modules["omero.model"] = model
+
     if "biomero_importer.utils.ingest_tracker" not in sys.modules:
         pkg = types.ModuleType("biomero_importer")
         utils_pkg = types.ModuleType("biomero_importer.utils")
