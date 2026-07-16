@@ -10,7 +10,6 @@ import {
   H4,
   Tooltip,
   H6,
-  HTMLTable,
   Tag,
   Spinner,
   InputGroup,
@@ -23,7 +22,20 @@ import "@blueprintjs/core/lib/css/blueprint.css";
 import { fetchMetabaseData } from "../apiService";
 import SettingsForm from "./components/SettingsForm";
 import DateFilterControl from "../shared/components/DateFilterControl";
+import ResizableTable from "../shared/components/ResizableTable";
 import { createDateFilter } from "../shared/dateFilters";
+
+const WORKFLOW_STATUS_COLUMNS = [
+  { key: "workflow_id", label: "Workflow ID", width: 120, minWidth: 100 },
+  { key: "name", label: "Name", width: 150, minWidth: 100 },
+  { key: "main_task", label: "Main Task Name", width: 170, minWidth: 120 },
+  { key: "status", label: "Status", width: 110, minWidth: 90 },
+  { key: "progress", label: "Progress", width: 90, minWidth: 75 },
+  { key: "start_time", label: "Start Time", width: 160, minWidth: 140 },
+  { key: "task", label: "Task", width: 130, minWidth: 90 },
+  { key: "group", label: "Group", width: 90, minWidth: 70 },
+  { key: "user", label: "User", width: 90, minWidth: 70 },
+];
 
 const RunTab = ({ onWorkflowError }) => (
   <div className="max-h-[calc(100vh-225px)] overflow-y-auto">
@@ -247,22 +259,11 @@ export const StatusPanel = ({ isAdmin, metabaseUrl }) => {
       ) : (
         <div className="flex-grow flex flex-col min-h-0">
           <div className="flex-grow overflow-auto">
-            <HTMLTable bordered className="w-full align-middle">
-              <thead className="sticky top-0 z-10 bg-white dark:bg-gray-800">
-                <tr>
-                  <th>Workflow ID</th>
-                  <th>Name</th>
-                  <th>Main Task Name</th>
-                  <th>Status</th>
-                  <th>Progress</th>
-                  <th>Start Time</th>
-                  <th>Task</th>
-                  <th>Group</th>
-                  <th>User</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedData.map((item) => (
+            <ResizableTable
+              columns={WORKFLOW_STATUS_COLUMNS}
+              storageKey="workflow-status"
+            >
+              {paginatedData.map((item) => (
                   <tr key={item.workflow_id} className={getRowClass(item.status)}>
                     <td>
                       {item.workflow_id ? (
@@ -296,9 +297,8 @@ export const StatusPanel = ({ isAdmin, metabaseUrl }) => {
                     <td>{item.group || "-"}</td>
                     <td>{item.user || "-"}</td>
                   </tr>
-                ))}
-              </tbody>
-            </HTMLTable>
+              ))}
+            </ResizableTable>
           </div>
           {filteredData.length > pageSize && (
             <div className="flex-shrink-0 flex justify-between items-center pt-3">

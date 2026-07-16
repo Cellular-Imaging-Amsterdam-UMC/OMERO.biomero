@@ -17,7 +17,6 @@ import {
   Classes,
   Icon,
   Tooltip,
-  HTMLTable,
   Tag,
   Spinner,
   InputGroup,
@@ -27,6 +26,7 @@ import NewContainerOverlay from "./components/NewContainerOverlay";
 import MetadataForms from "./components/MetadataForms";
 import { fetchMetabaseData } from "../apiService";
 import DateFilterControl from "../shared/components/DateFilterControl";
+import ResizableTable from "../shared/components/ResizableTable";
 import { createDateFilter } from "../shared/dateFilters";
 
 const getOmeroSearchHref = (searchTerm) =>
@@ -45,6 +45,18 @@ const getFileHref = (fileName, uuid, fileTargets) => {
   }
   return getOmeroSearchHref(uuid);
 };
+
+const IMPORT_MONITOR_COLUMNS = [
+  { key: "file_names", label: "File Names", width: 240, minWidth: 160 },
+  { key: "stage", label: "Stage", width: 130, minWidth: 100 },
+  { key: "destination", label: "Dataset/Screen", width: 120, minWidth: 100 },
+  { key: "uuid", label: "UUID", width: 110, minWidth: 95 },
+  { key: "timestamp", label: "Timestamp", width: 165, minWidth: 140 },
+  { key: "elapsed", label: "Elapsed Time", width: 120, minWidth: 95 },
+  { key: "group", label: "Group", width: 85, minWidth: 70 },
+  { key: "user", label: "User", width: 85, minWidth: 70 },
+  { key: "description", label: "Description", width: 140, minWidth: 100 },
+];
 
 export const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
   const [loading, setLoading] = useState(true);
@@ -235,24 +247,13 @@ export const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
       ) : (
         <div className="flex-grow flex flex-col min-h-0">
           <div className="flex-grow overflow-auto">
-            <HTMLTable bordered className="w-full align-middle">
-              <thead className="sticky top-0 z-10 bg-white dark:bg-gray-800">
-                <tr>
-                  <th>File Names</th>
-                  <th>Stage</th>
-                  <th>Dataset/Screen</th>
-                  <th>UUID</th>
-                  <th>Timestamp</th>
-                  <th>Elapsed Time</th>
-                  <th>Group</th>
-                  <th>User</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((item) => (
+            <ResizableTable
+              columns={IMPORT_MONITOR_COLUMNS}
+              storageKey="import-monitor"
+            >
+              {data.map((item) => (
                   <tr key={item.uuid} className={getRowClass(item.stage)}>
-                    <td className="max-w-xs break-all">
+                    <td className="break-all">
                       {formatFileList(
                         item.file_names,
                         item.uuid,
@@ -301,11 +302,10 @@ export const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
                     <td className="whitespace-nowrap">{item.elapsed_time || "-"}</td>
                     <td>{item.group_name || "-"}</td>
                     <td>{item.user_name || "-"}</td>
-                    <td className={`${Classes.TEXT_MUTED} max-w-xs truncate`}>{item.description || "-"}</td>
+                    <td className={`${Classes.TEXT_MUTED} truncate`}>{item.description || "-"}</td>
                   </tr>
-                ))}
-              </tbody>
-            </HTMLTable>
+              ))}
+            </ResizableTable>
           </div>
           {totalRows > pageSize && (
             <div className="flex-shrink-0 flex justify-between items-center pt-3">
