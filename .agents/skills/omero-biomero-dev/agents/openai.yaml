@@ -1,0 +1,4 @@
+interface:
+  display_name: "OMERO.biomero Development"
+  short_description: "Develop and verify the OMERO.biomero web plugin"
+  default_prompt: "Use $omero-biomero-dev to implement and verify an OMERO.biomero change using repository conventions."
