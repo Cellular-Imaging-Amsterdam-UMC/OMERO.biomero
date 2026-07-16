@@ -151,6 +151,60 @@ class BiomeroViewTests(TestCase):
         self.assertEqual(data["cols"][0]["name"], "file_names")
 
     @patch("omero_biomero.biomero_views.psycopg2.connect")
+    def test_metabase_data_imports_applies_parameterized_date_filter(self, mock_connect):
+        from datetime import datetime, timezone
+        from django.test import RequestFactory
+        from omero_biomero.biomero_views import metabase_data
+
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_connect.return_value.__enter__.return_value = mock_conn
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+
+        req = RequestFactory().get(
+            "/biomero/metabase_data/",
+            {
+                "dashboard_type": "imports",
+                "date_from": "2026-07-16T00:00:00Z",
+                "date_to": "2026-07-17T00:00:00Z",
+                "date_mode": "exclude",
+            },
+        )
+
+        with patch.dict(
+            os.environ,
+            {"INGEST_TRACKING_DB_URL": "postgresql://user:pass@host/db"},
+        ):
+            resp = metabase_data(req, conn=self._fake_conn(username="alice"))
+
+        self.assertEqual(resp.status_code, 200)
+        query, params = mock_cursor.execute.call_args.args
+        self.assertIn("NOT (ft.last_timestamp >= %s", query)
+        self.assertEqual(params[0], "alice")
+        self.assertEqual(params[1], datetime(2026, 7, 16, tzinfo=timezone.utc))
+        self.assertEqual(params[2], datetime(2026, 7, 17, tzinfo=timezone.utc))
+
+    @patch("omero_biomero.biomero_views.psycopg2.connect")
+    def test_metabase_data_imports_rejects_invalid_date_filter(self, mock_connect):
+        from django.test import RequestFactory
+        from omero_biomero.biomero_views import metabase_data
+
+        req = RequestFactory().get(
+            "/biomero/metabase_data/",
+            {
+                "dashboard_type": "imports",
+                "date_from": "not-a-date",
+                "date_to": "2026-07-17T00:00:00Z",
+            },
+        )
+
+        resp = metabase_data(req, conn=self._fake_conn(username="alice"))
+
+        self.assertEqual(resp.status_code, 400)
+        mock_connect.assert_not_called()
+
+    @patch("omero_biomero.biomero_views.psycopg2.connect")
     def test_metabase_data_workflows(self, mock_connect):
         from omero_biomero.biomero_views import metabase_data
         from django.test import RequestFactory
@@ -191,6 +245,41 @@ class BiomeroViewTests(TestCase):
         self.assertEqual(data["rows"][0][0], "wf-uuid-1")
         self.assertEqual(data["rows"][0][5], "2026-06-09T10:05:00")
         self.assertEqual(data["cols"][0]["name"], "workflow_id")
+
+    @patch("omero_biomero.biomero_views.psycopg2.connect")
+    def test_metabase_data_workflows_applies_date_filter(self, mock_connect):
+        from datetime import datetime, timezone
+        from django.test import RequestFactory
+        from omero_biomero.biomero_views import metabase_data
+
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_connect.return_value.__enter__.return_value = mock_conn
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+
+        req = RequestFactory().get(
+            "/biomero/metabase_data/",
+            {
+                "dashboard_type": "workflows",
+                "date_from": "2026-07-16T00:00:00Z",
+                "date_to": "2026-07-17T00:00:00Z",
+                "date_mode": "include",
+            },
+        )
+
+        with patch.dict(
+            os.environ,
+            {"INGEST_TRACKING_DB_URL": "postgresql://user:pass@host/db"},
+        ):
+            resp = metabase_data(req, conn=self._fake_conn(user_id=5))
+
+        self.assertEqual(resp.status_code, 200)
+        query, params = mock_cursor.execute.call_args.args
+        self.assertIn("start_time >= %s", query)
+        self.assertEqual(params[0], 5)
+        self.assertEqual(params[1], datetime(2026, 7, 16, tzinfo=timezone.utc))
+        self.assertEqual(params[2], datetime(2026, 7, 17, tzinfo=timezone.utc))
 
     def test_metabase_data_invalid_type(self):
         from omero_biomero.biomero_views import metabase_data

@@ -15,12 +15,15 @@ import {
   Spinner,
   InputGroup,
   Button,
+  ButtonGroup,
   Callout,
-  Icon,
+  Classes,
 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 import { fetchMetabaseData } from "../apiService";
 import SettingsForm from "./components/SettingsForm";
+import DateFilterControl from "../shared/components/DateFilterControl";
+import { createDateFilter } from "../shared/dateFilters";
 
 const RunTab = ({ onWorkflowError }) => (
   <div className="max-h-[calc(100vh-225px)] overflow-y-auto">
@@ -86,17 +89,26 @@ const AdminPanel = () => {
   );
 };
 
-const StatusPanel = ({ isAdmin, metabaseUrl }) => {
+export const StatusPanel = ({ isAdmin, metabaseUrl }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [dateFilter, setDateFilter] = useState(() => createDateFilter("all"));
+  const pageSize = 50;
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchMetabaseData("workflows");
+      const response = await fetchMetabaseData(
+        "workflows",
+        1,
+        "",
+        pageSize,
+        dateFilter
+      );
       if (response && response.data && response.data.rows) {
         const mapped = mapRowsToObjects(response.data.cols, response.data.rows);
         setData(mapped);
@@ -115,7 +127,7 @@ const StatusPanel = ({ isAdmin, metabaseUrl }) => {
     loadData();
     const interval = setInterval(loadData, 20000);
     return () => clearInterval(interval);
-  }, []);
+  }, [dateFilter]);
 
   const mapRowsToObjects = (cols, rows) => {
     if (!cols || !rows) return [];
@@ -140,11 +152,15 @@ const StatusPanel = ({ isAdmin, metabaseUrl }) => {
   };
 
   const getRowClass = (status) => {
-    if (!status) return "";
+    if (!status) return "hover:bg-gray-50 dark:hover:bg-gray-800/40";
     const s = status.toLowerCase();
-    if (s.includes("failed") || s.includes("error")) return "bg-red-50/70 dark:bg-red-900/10";
-    if (s.includes("done") || s.includes("completed")) return "bg-green-50/50 dark:bg-green-900/5";
-    return "";
+    if (s.includes("failed") || s.includes("error")) {
+      return "bg-red-50/70 hover:bg-red-100/70 dark:bg-red-900/10 dark:hover:bg-red-900/20";
+    }
+    if (s.includes("done") || s.includes("completed") || s.includes("success")) {
+      return "bg-green-50/70 hover:bg-green-100/70 dark:bg-green-900/10 dark:hover:bg-green-900/20";
+    }
+    return "hover:bg-gray-50 dark:hover:bg-gray-800/40";
   };
 
   const formatDate = (dateStr) => {
@@ -161,12 +177,14 @@ const StatusPanel = ({ isAdmin, metabaseUrl }) => {
     navigator.clipboard.writeText(text);
   };
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 50;
-
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
+
+  const handleDateFilterChange = (nextFilter) => {
+    setCurrentPage(1);
+    setDateFilter(nextFilter);
+  };
 
   const filteredData = data.filter((item) => {
     const search = searchTerm.toLowerCase();
@@ -188,11 +206,15 @@ const StatusPanel = ({ isAdmin, metabaseUrl }) => {
       <div className="flex justify-between items-center mb-4 flex-shrink-0">
         <div>
           <H4>Status</H4>
-          <div className="bp5-form-helper-text">
+          <div className={Classes.TEXT_MUTED}>
             View your active BIOMERO workflow progress or historical execution records.
           </div>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
+          <DateFilterControl
+            value={dateFilter}
+            onChange={handleDateFilterChange}
+          />
           <InputGroup
             placeholder="Filter by name, workflow ID, status..."
             leftIcon="search"
@@ -223,29 +245,29 @@ const StatusPanel = ({ isAdmin, metabaseUrl }) => {
           </Callout>
         </div>
       ) : (
-        <div className="flex-grow flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg min-h-0">
+        <div className="flex-grow flex flex-col min-h-0">
           <div className="flex-grow overflow-auto">
-            <HTMLTable interactive className="w-full text-sm align-middle">
-              <thead>
-                <tr className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 shadow-[inset_0_-1px_0_rgba(0,0,0,0.1)]">
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Workflow ID</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Name</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Main Task Name</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Status</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Progress</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Start Time</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Task</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Group</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">User</th>
+            <HTMLTable bordered className="w-full align-middle">
+              <thead className="sticky top-0 z-10 bg-white dark:bg-gray-800">
+                <tr>
+                  <th>Workflow ID</th>
+                  <th>Name</th>
+                  <th>Main Task Name</th>
+                  <th>Status</th>
+                  <th>Progress</th>
+                  <th>Start Time</th>
+                  <th>Task</th>
+                  <th>Group</th>
+                  <th>User</th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedData.map((item, idx) => (
-                  <tr key={idx} className="border-b border-gray-100 dark:border-gray-800/60 last:border-0">
+                {paginatedData.map((item) => (
+                  <tr key={item.workflow_id} className={getRowClass(item.status)}>
                     <td>
                       {item.workflow_id ? (
                         <div className="flex items-center space-x-1">
-                          <code className="text-xs bg-gray-100 px-1 py-0.5 rounded font-mono">
+                          <code className={Classes.MONOSPACE_TEXT}>
                             {item.workflow_id.substring(0, 8)}...
                           </code>
                           <Tooltip content="Copy Workflow ID" compact>
@@ -261,10 +283,10 @@ const StatusPanel = ({ isAdmin, metabaseUrl }) => {
                         "-"
                       )}
                     </td>
-                    <td className="font-semibold">{item.name || "-"}</td>
+                    <td>{item.name || "-"}</td>
                     <td>{item.main_task_name || "-"}</td>
                     <td>
-                      <Tag intent={getStatusTagIntent(item.status)} large={false} minimal>
+                      <Tag intent={getStatusTagIntent(item.status)} minimal>
                         {item.status || "Unknown"}
                       </Tag>
                     </td>
@@ -279,11 +301,11 @@ const StatusPanel = ({ isAdmin, metabaseUrl }) => {
             </HTMLTable>
           </div>
           {filteredData.length > pageSize && (
-            <div className="flex-shrink-0 flex justify-between items-center p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40">
-              <span className="text-xs text-gray-500">
+            <div className="flex-shrink-0 flex justify-between items-center pt-3">
+              <span className={Classes.TEXT_MUTED}>
                 Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length} entries
               </span>
-              <div className="flex space-x-1 items-center">
+              <ButtonGroup>
                 <Button
                   icon="double-chevron-left"
                   minimal
@@ -299,7 +321,7 @@ const StatusPanel = ({ isAdmin, metabaseUrl }) => {
                 >
                   Previous
                 </Button>
-                <span className="text-xs font-semibold px-3 text-gray-700 dark:text-gray-300">
+                <span className="flex items-center px-3">
                   Page {currentPage} of {totalPages}
                 </span>
                 <Button
@@ -317,26 +339,29 @@ const StatusPanel = ({ isAdmin, metabaseUrl }) => {
                   disabled={currentPage === totalPages}
                   onClick={() => setCurrentPage(totalPages)}
                 />
-              </div>
+              </ButtonGroup>
             </div>
           )}
         </div>
       )}
       
       {isAdmin && metabaseUrl && (
-        <div className="flex-shrink-0 mt-4 p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded flex items-center justify-between">
-          <span className="text-xs text-blue-800 dark:text-blue-300">
-            Administrators can access the raw Metabase interface for query builders and reports.
-          </span>
-          <a
-            href={metabaseUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs font-semibold"
-          >
-            Open Metabase Interface <Icon icon="share" size={12} className="ml-1 inline" />
-          </a>
-        </div>
+        <Callout intent="primary" className="flex-shrink-0 mt-4">
+          <div className="flex items-center justify-between gap-4">
+            <span>
+              Administrators can access the raw Metabase interface for query builders and reports.
+            </span>
+            <Button
+              icon="share"
+              minimal
+              small
+              text="Open Metabase Interface"
+              href={metabaseUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            />
+          </div>
+        </Callout>
       )}
     </div>
   );

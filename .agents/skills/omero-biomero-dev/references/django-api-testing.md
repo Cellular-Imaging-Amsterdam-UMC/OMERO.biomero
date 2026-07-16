@@ -70,7 +70,22 @@ Prepare the existing local environment on Windows when needed:
 .\venv\Scripts\python.exe manage.py test
 ```
 
+On Windows, `omero-web` may pull `zeroc-ice` into an unsupported local C++ build.
+If that full install fails specifically at Ice, keep using the same `venv`: install
+the project editable with `--no-deps`, install `requirements.txt` plus the direct
+imports needed by the selected tests, and run pytest so `tests/conftest.py` loads
+the repository's OMERO/importer stubs before Django setup. Do not present this
+stubbed environment as a production dependency check.
+
+```powershell
+.\venv\Scripts\python.exe -m pip install --no-deps -e .
+.\venv\Scripts\python.exe -m pip install -r requirements.txt Django PyJWT `
+  psycopg2-binary requests numpy PyYAML
+.\venv\Scripts\python.exe -m pytest omero_biomero\tests\test_biomero_views.py -q
+```
+
 On POSIX, use the equivalent `./venv/bin/python` commands. Run the narrow module
-or test first, then the full suite. If installation fails, report that failure;
-do not claim a test result from another interpreter. CI also performs a
-production frontend build, so backend-only changes must not break packaging.
+or test first, then the full suite. If installation or an existing import-time
+network fetch fails, report the exact failure and passing test count; do not
+switch interpreters or claim the suite passed. CI also performs a production
+frontend build, so backend-only changes must not break packaging.

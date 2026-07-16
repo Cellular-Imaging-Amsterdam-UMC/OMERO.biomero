@@ -916,7 +916,13 @@ export const checkModelVersions = async (models, forceRefresh = false) => {
 };
 
 // Fetch Metabase query results as JSON
-export const fetchMetabaseData = async (dashboardType, page = 1, search = "", limit = 50) => {
+export const fetchMetabaseData = async (
+  dashboardType,
+  page = 1,
+  search = "",
+  limit = 50,
+  dateFilter = {}
+) => {
   const params = {
     dashboard_type: dashboardType,
     page,
@@ -924,5 +930,12 @@ export const fetchMetabaseData = async (dashboardType, page = 1, search = "", li
     limit,
     _: new Date().getTime(),
   };
+
+  if (dateFilter.dateFrom && dateFilter.dateTo) {
+    params.date_from = dateFilter.dateFrom;
+    params.date_to = dateFilter.dateTo;
+    params.date_mode = dateFilter.dateMode || "include";
+  }
+
   return apiRequest(`/omero_biomero/api/metabase/data/`, "GET", null, { params });
 };

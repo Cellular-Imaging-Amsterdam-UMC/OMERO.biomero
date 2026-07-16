@@ -5,6 +5,7 @@ import time
 import requests
 import urllib.parse
 import psycopg2
+from datetime import datetime
 
 from django.http import JsonResponse
 from omeroweb.webclient.decorators import login_required, render_response
@@ -19,6 +20,38 @@ from .settings import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_date_filter(request):
+    date_from_raw = request.GET.get("date_from")
+    date_to_raw = request.GET.get("date_to")
+    date_mode = request.GET.get("date_mode", "include")
+
+    if not date_from_raw and not date_to_raw:
+        return None, None
+    if not date_from_raw or not date_to_raw:
+        return None, "date_from and date_to must be provided together"
+    if date_mode not in {"include", "exclude"}:
+        return None, "Invalid date_mode"
+    if len(date_from_raw) > 64 or len(date_to_raw) > 64:
+        return None, "Invalid date range"
+
+    try:
+        date_from = datetime.fromisoformat(date_from_raw.replace("Z", "+00:00"))
+        date_to = datetime.fromisoformat(date_to_raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None, "Invalid date range"
+
+    if date_from.utcoffset() is None or date_to.utcoffset() is None:
+        return None, "Date range must include a timezone"
+    if date_from >= date_to:
+        return None, "date_from must be before date_to"
+
+    return {
+        "date_from": date_from,
+        "date_to": date_to,
+        "date_mode": date_mode,
+    }, None
 
 
 # TODO remove this check when the app is ready
@@ -81,6 +114,10 @@ def metabase_data(request, conn=None, **kwargs):
     if dashboard_type not in ["imports", "workflows"]:
         return JsonResponse({"error": "Invalid dashboard_type"}, status=400)
 
+    date_filter, date_filter_error = _parse_date_filter(request)
+    if date_filter_error:
+        return JsonResponse({"error": date_filter_error}, status=400)
+
     try:
         page = int(request.GET.get("page", 1))
         limit = int(request.GET.get("limit", 50))
@@ -105,8 +142,26 @@ def metabase_data(request, conn=None, **kwargs):
         with psycopg2.connect(db_url) as db_conn:
             with db_conn.cursor() as cursor:
                 if dashboard_type == "imports":
+                    date_clause = ""
+                    date_params = []
+                    if date_filter:
+                        if date_filter["date_mode"] == "exclude":
+                            date_clause = (
+                                "AND NOT (ft.last_timestamp >= %s "
+                                "AND ft.last_timestamp < %s)"
+                            )
+                        else:
+                            date_clause = (
+                                "AND ft.last_timestamp >= %s "
+                                "AND ft.last_timestamp < %s"
+                            )
+                        date_params = [
+                            date_filter["date_from"],
+                            date_filter["date_to"],
+                        ]
+
                     # Fetch imports data directly using CTEs to format elapsed times
-                    query = """
+                    query = f"""
                     WITH ElapsedTimes AS (
                         SELECT 
                             uuid,
@@ -162,9 +217,10 @@ def metabase_data(request, conn=None, **kwargs):
                     JOIN imports ON imports.uuid = ft.uuid
                     WHERE ls.rn = 1 and imports.stage = ls.stage
                       AND imports.user_name = %s
+                      {date_clause}
                     ORDER BY ft.last_timestamp DESC;
                     """
-                    cursor.execute(query, (username,))
+                    cursor.execute(query, tuple([username, *date_params]))
                     raw_rows = cursor.fetchall()
 
                     # Filter rows in Python to match search_term logic
@@ -201,14 +257,31 @@ def metabase_data(request, conn=None, **kwargs):
                     ]
 
                 else: # workflows
+                    date_clause = ""
+                    date_params = []
+                    if date_filter:
+                        if date_filter["date_mode"] == "exclude":
+                            date_clause = (
+                                "AND NOT (start_time >= %s AND start_time < %s)"
+                            )
+                        else:
+                            date_clause = (
+                                "AND start_time >= %s AND start_time < %s"
+                            )
+                        date_params = [
+                            date_filter["date_from"],
+                            date_filter["date_to"],
+                        ]
+
                     # Fetch from biomero_workflow_progress_view
-                    query = """
+                    query = f"""
                     SELECT workflow_id, name, main_task_name, status, progress, start_time, task, "group", "user"
                     FROM biomero_workflow_progress_view
                     WHERE "user" = %s
+                      {date_clause}
                     ORDER BY start_time DESC;
                     """
-                    cursor.execute(query, (user_id,))
+                    cursor.execute(query, tuple([user_id, *date_params]))
                     raw_rows = cursor.fetchall()
 
                     # Filter rows in Python to match search_term logic

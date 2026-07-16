@@ -10,9 +10,11 @@ import {
   Tab,
   H4,
   Button,
+  ButtonGroup,
   CardList,
   Card,
   Callout,
+  Classes,
   Icon,
   Tooltip,
   HTMLTable,
@@ -24,21 +26,30 @@ import "@blueprintjs/core/lib/css/blueprint.css";
 import NewContainerOverlay from "./components/NewContainerOverlay";
 import MetadataForms from "./components/MetadataForms";
 import { fetchMetabaseData } from "../apiService";
+import DateFilterControl from "../shared/components/DateFilterControl";
+import { createDateFilter } from "../shared/dateFilters";
 
-const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
+export const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalRows, setTotalRows] = useState(0);
+  const [dateFilter, setDateFilter] = useState(() => createDateFilter("all"));
   const pageSize = 50;
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchMetabaseData("imports", currentPage, searchTerm, pageSize);
+      const response = await fetchMetabaseData(
+        "imports",
+        currentPage,
+        searchTerm,
+        pageSize,
+        dateFilter
+      );
       if (response && response.data && response.data.rows) {
         const mapped = mapRowsToObjects(response.data.cols, response.data.rows);
         setData(mapped);
@@ -59,7 +70,7 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
     loadData();
     const interval = setInterval(loadData, 20000);
     return () => clearInterval(interval);
-  }, [currentPage, searchTerm]);
+  }, [currentPage, searchTerm, dateFilter]);
 
   const mapRowsToObjects = (cols, rows) => {
     if (!cols || !rows) return [];
@@ -83,11 +94,15 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
   };
 
   const getRowClass = (stage) => {
-    if (!stage) return "";
+    if (!stage) return "hover:bg-gray-50 dark:hover:bg-gray-800/40";
     const s = stage.toLowerCase();
-    if (s.includes("failed")) return "bg-red-50/70 dark:bg-red-900/10";
-    if (s.includes("completed")) return "bg-green-50/50 dark:bg-green-900/5";
-    return "";
+    if (s.includes("failed")) {
+      return "bg-red-50/70 hover:bg-red-100/70 dark:bg-red-900/10 dark:hover:bg-red-900/20";
+    }
+    if (s.includes("completed")) {
+      return "bg-green-50/70 hover:bg-green-100/70 dark:bg-green-900/10 dark:hover:bg-green-900/20";
+    }
+    return "hover:bg-gray-50 dark:hover:bg-gray-800/40";
   };
 
   const formatFileList = (fileNamesStr) => {
@@ -96,7 +111,7 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
       if (Array.isArray(files) && files.length > 0) {
         if (files.length === 1) return files[0];
         return (
-          <ul className="list-disc pl-4 m-0 text-xs">
+          <ul className="list-disc pl-4 m-0">
             {files.map((f, i) => (
               <li key={i}>{f}</li>
             ))}
@@ -127,6 +142,11 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
     setCurrentPage(1);
   }, [searchTerm]);
 
+  const handleDateFilterChange = (nextFilter) => {
+    setCurrentPage(1);
+    setDateFilter(nextFilter);
+  };
+
   const totalPages = Math.ceil(totalRows / pageSize);
 
   return (
@@ -134,11 +154,15 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
       <div className="flex justify-between items-center mb-4 flex-shrink-0">
         <div>
           <H4>Monitor</H4>
-          <div className="bp5-form-helper-text">
+          <div className={Classes.TEXT_MUTED}>
             View active import progress or historical data. Click on links in the Dataset/Screen column to navigate directly to them in OMERO.
           </div>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
+          <DateFilterControl
+            value={dateFilter}
+            onChange={handleDateFilterChange}
+          />
           <InputGroup
             placeholder="Filter by filename, stage, user..."
             leftIcon="search"
@@ -169,30 +193,30 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
           </Callout>
         </div>
       ) : (
-        <div className="flex-grow flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg min-h-0">
+        <div className="flex-grow flex flex-col min-h-0">
           <div className="flex-grow overflow-auto">
-            <HTMLTable interactive className="w-full text-sm align-middle">
-              <thead>
-                <tr className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 shadow-[inset_0_-1px_0_rgba(0,0,0,0.1)]">
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">File Names</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Stage</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Dataset/Screen</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">UUID</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Timestamp</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Elapsed Time</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Group</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">User</th>
-                  <th className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">Description</th>
+            <HTMLTable bordered className="w-full align-middle">
+              <thead className="sticky top-0 z-10 bg-white dark:bg-gray-800">
+                <tr>
+                  <th>File Names</th>
+                  <th>Stage</th>
+                  <th>Dataset/Screen</th>
+                  <th>UUID</th>
+                  <th>Timestamp</th>
+                  <th>Elapsed Time</th>
+                  <th>Group</th>
+                  <th>User</th>
+                  <th>Description</th>
                 </tr>
               </thead>
               <tbody>
-                {data.map((item, idx) => (
-                  <tr key={idx} className="border-b border-gray-100 dark:border-gray-800/60 last:border-0">
-                    <td className="max-w-xs break-all font-medium">
+                {data.map((item) => (
+                  <tr key={item.uuid} className={getRowClass(item.stage)}>
+                    <td className="max-w-xs break-all">
                       {formatFileList(item.file_names)}
                     </td>
                     <td>
-                      <Tag intent={getStageTagIntent(item.stage)} large={false} minimal>
+                      <Tag intent={getStageTagIntent(item.stage)} minimal>
                         {item.stage || "Unknown"}
                       </Tag>
                     </td>
@@ -202,7 +226,7 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
                           href={`/webclient/?show=${(item.destination_type || "Dataset").toLowerCase()}-${item["Dataset/Screen"]}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-bold underline flex items-center"
+                          className="flex items-center"
                         >
                           <Icon icon="link" size={12} className="mr-1" />
                           {item.destination_type || "Dataset"} {item["Dataset/Screen"]}
@@ -214,7 +238,7 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
                     <td>
                       {item.uuid ? (
                         <div className="flex items-center space-x-1">
-                          <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
+                          <code className={Classes.MONOSPACE_TEXT}>
                             {item.uuid.substring(0, 8)}...
                           </code>
                           <Tooltip content="Copy UUID" compact>
@@ -234,18 +258,18 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
                     <td className="whitespace-nowrap">{item.elapsed_time || "-"}</td>
                     <td>{item.group_name || "-"}</td>
                     <td>{item.user_name || "-"}</td>
-                    <td className="text-gray-500 italic max-w-xs truncate">{item.description || "-"}</td>
+                    <td className={`${Classes.TEXT_MUTED} max-w-xs truncate`}>{item.description || "-"}</td>
                   </tr>
                 ))}
               </tbody>
             </HTMLTable>
           </div>
           {totalRows > pageSize && (
-            <div className="flex-shrink-0 flex justify-between items-center p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40">
-              <span className="text-xs text-gray-500">
+            <div className="flex-shrink-0 flex justify-between items-center pt-3">
+              <span className={Classes.TEXT_MUTED}>
                 Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalRows)} of {totalRows} entries
               </span>
-              <div className="flex space-x-1 items-center">
+              <ButtonGroup>
                 <Button
                   icon="double-chevron-left"
                   minimal
@@ -261,7 +285,7 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
                 >
                   Previous
                 </Button>
-                <span className="text-xs font-semibold px-3 text-gray-700 dark:text-gray-300">
+                <span className="flex items-center px-3">
                   Page {currentPage} of {totalPages}
                 </span>
                 <Button
@@ -279,26 +303,29 @@ const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
                   disabled={currentPage === totalPages}
                   onClick={() => setCurrentPage(totalPages)}
                 />
-              </div>
+              </ButtonGroup>
             </div>
           )}
         </div>
       )}
       
       {isAdmin && metabaseUrl && (
-        <div className="flex-shrink-0 mt-4 p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded flex items-center justify-between">
-          <span className="text-xs text-blue-800 dark:text-blue-300">
-            Administrators can access the raw Metabase interface for query builders and reports.
-          </span>
-          <a
-            href={metabaseUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs font-semibold"
-          >
-            Open Metabase Interface <Icon icon="share" size={12} className="ml-1 inline" />
-          </a>
-        </div>
+        <Callout intent="primary" className="flex-shrink-0 mt-4">
+          <div className="flex items-center justify-between gap-4">
+            <span>
+              Administrators can access the raw Metabase interface for query builders and reports.
+            </span>
+            <Button
+              icon="share"
+              minimal
+              small
+              text="Open Metabase Interface"
+              href={metabaseUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            />
+          </div>
+        </Callout>
       )}
     </div>
   );
