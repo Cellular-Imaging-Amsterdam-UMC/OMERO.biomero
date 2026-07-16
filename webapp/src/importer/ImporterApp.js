@@ -29,6 +29,23 @@ import { fetchMetabaseData } from "../apiService";
 import DateFilterControl from "../shared/components/DateFilterControl";
 import { createDateFilter } from "../shared/dateFilters";
 
+const getOmeroSearchHref = (searchTerm) =>
+  `/webclient/search/?search_query=${encodeURIComponent(`"${searchTerm}"`)}`;
+
+const DIRECT_OMERO_TARGET = /^(image|plate)-[1-9]\d*$/;
+
+const getFileHref = (fileName, uuid, fileTargets) => {
+  const targets = fileTargets && fileTargets[fileName];
+  if (
+    Array.isArray(targets) &&
+    targets.length === 1 &&
+    DIRECT_OMERO_TARGET.test(targets[0])
+  ) {
+    return `/webclient/?show=${targets[0]}`;
+  }
+  return getOmeroSearchHref(uuid);
+};
+
 export const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -105,15 +122,41 @@ export const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
     return "hover:bg-gray-50 dark:hover:bg-gray-800/40";
   };
 
-  const formatFileList = (fileNamesStr) => {
+  const formatFileName = (fileName, uuid, fileTargets) => {
+    if (!uuid) return fileName;
+
+    const href = getFileHref(fileName, uuid, fileTargets);
+    const isDirectLink = href.startsWith("/webclient/?show=");
+
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={
+          isDirectLink
+            ? `Open ${fileName} in OMERO`
+            : `Search OMERO for files imported with UUID ${uuid}`
+        }
+      >
+        {fileName}
+      </a>
+    );
+  };
+
+  const formatFileList = (fileNamesStr, uuid, fileTargets) => {
     try {
       const files = JSON.parse(fileNamesStr);
       if (Array.isArray(files) && files.length > 0) {
-        if (files.length === 1) return files[0];
+        if (files.length === 1) {
+          return formatFileName(files[0], uuid, fileTargets);
+        }
         return (
           <ul className="list-disc pl-4 m-0">
             {files.map((f, i) => (
-              <li key={i}>{f}</li>
+              <li key={`${f}-${i}`}>
+                {formatFileName(f, uuid, fileTargets)}
+              </li>
             ))}
           </ul>
         );
@@ -134,10 +177,6 @@ export const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
     }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-  };
-
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
@@ -155,7 +194,8 @@ export const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
         <div>
           <H4>Monitor</H4>
           <div className={Classes.TEXT_MUTED}>
-            View active import progress or historical data. Click on links in the Dataset/Screen column to navigate directly to them in OMERO.
+            View active import progress or historical data. Open destinations
+            directly, or use file name and UUID links to search OMERO.
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -213,7 +253,11 @@ export const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
                 {data.map((item) => (
                   <tr key={item.uuid} className={getRowClass(item.stage)}>
                     <td className="max-w-xs break-all">
-                      {formatFileList(item.file_names)}
+                      {formatFileList(
+                        item.file_names,
+                        item.uuid,
+                        item.file_targets
+                      )}
                     </td>
                     <td>
                       <Tag intent={getStageTagIntent(item.stage)} minimal>
@@ -237,19 +281,18 @@ export const MonitorPanel = ({ isAdmin, metabaseUrl }) => {
                     </td>
                     <td>
                       {item.uuid ? (
-                        <div className="flex items-center space-x-1">
+                        <a
+                          href={getOmeroSearchHref(item.uuid)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Search OMERO for UUID ${item.uuid}`}
+                          className="inline-flex items-center"
+                        >
                           <code className={Classes.MONOSPACE_TEXT}>
                             {item.uuid.substring(0, 8)}...
                           </code>
-                          <Tooltip content="Copy UUID" compact>
-                            <Button
-                              icon="duplicate"
-                              minimal
-                              small
-                              onClick={() => copyToClipboard(item.uuid)}
-                            />
-                          </Tooltip>
-                        </div>
+                          <Icon icon="search" size={12} className="ml-1" />
+                        </a>
                       ) : (
                         "-"
                       )}

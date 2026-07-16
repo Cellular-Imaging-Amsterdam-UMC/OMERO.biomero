@@ -186,6 +186,72 @@ class BiomeroViewTests(TestCase):
         self.assertEqual(params[2], datetime(2026, 7, 17, tzinfo=timezone.utc))
 
     @patch("omero_biomero.biomero_views.psycopg2.connect")
+    def test_metabase_data_imports_resolves_visible_file_targets(
+        self, mock_connect
+    ):
+        import datetime
+        import json
+        from django.test import RequestFactory
+        from omero.rtypes import unwrap
+        from omero_biomero.biomero_views import metabase_data
+
+        db_conn = MagicMock()
+        cursor = MagicMock()
+        mock_connect.return_value.__enter__.return_value = db_conn
+        db_conn.cursor.return_value.__enter__.return_value = cursor
+        cursor.fetchall.return_value = [
+            (
+                '["file1.lif"]',
+                "Import Completed",
+                "101",
+                "visible-uuid",
+                datetime.datetime(2026, 6, 9, 10),
+                "10 seconds",
+                "group1",
+                "alice",
+                None,
+                "Dataset",
+            ),
+            (
+                '["file2.lif"]',
+                "Import Completed",
+                "102",
+                "hidden-uuid",
+                datetime.datetime(2026, 6, 8, 10),
+                "10 seconds",
+                "group1",
+                "alice",
+                None,
+                "Dataset",
+            ),
+        ]
+
+        conn = self._fake_conn(username="alice")
+        query_service = conn.getQueryService.return_value
+        query_service.projection.side_effect = [
+            [["visible-uuid", 1251, "file1.lif", "/data/file1.lif"]],
+            [],
+        ]
+        request = RequestFactory().get(
+            "/biomero/metabase_data/",
+            {"dashboard_type": "imports", "page": 1, "limit": 1},
+        )
+
+        with patch.dict(
+            os.environ,
+            {"INGEST_TRACKING_DB_URL": "postgresql://user:pass@host/db"},
+        ):
+            response = metabase_data(request, conn=conn)
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content.decode("utf-8"))["data"]
+        self.assertEqual(data["cols"][-1]["name"], "file_targets")
+        self.assertEqual(data["rows"][0][-1], {"file1.lif": ["image-1251"]})
+        self.assertEqual(query_service.projection.call_count, 2)
+        _, params, _ = query_service.projection.call_args_list[0].args
+        self.assertEqual(unwrap(params.map["uuids"]), ["visible-uuid"])
+
+    @patch("omero_biomero.biomero_views.psycopg2.connect")
     def test_metabase_data_imports_rejects_invalid_date_filter(self, mock_connect):
         from django.test import RequestFactory
         from omero_biomero.biomero_views import metabase_data

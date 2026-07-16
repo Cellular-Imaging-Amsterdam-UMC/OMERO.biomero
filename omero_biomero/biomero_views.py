@@ -1,4 +1,5 @@
 import jwt
+import json
 import logging
 import os
 import time
@@ -8,6 +9,8 @@ import psycopg2
 from datetime import datetime
 
 from django.http import JsonResponse
+from omero.rtypes import rlist, rstring, unwrap
+from omero.sys import ParametersI
 from omeroweb.webclient.decorators import login_required, render_response
 
 from .utils import (
@@ -20,6 +23,86 @@ from .settings import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _normalized_file_name(value):
+    normalized = str(value or "").replace(chr(92), "/").rstrip("/")
+    return normalized.rsplit("/", 1)[-1].casefold()
+
+
+def _resolve_import_file_targets(conn, rows):
+    """Resolve visible filenames to accessible OMERO Images or Plates."""
+    uuids = list(dict.fromkeys(str(row[3]) for row in rows if row[3]))
+    if not uuids:
+        return [{} for _ in rows]
+
+    resolved = {}
+    query_service = conn.getQueryService()
+    for object_type in ("Image", "Plate"):
+        query = f"""
+            SELECT DISTINCT uuid_value.value, obj.id, obj.name,
+                            path_value.value
+            FROM {object_type}AnnotationLink link
+            JOIN link.child annotation
+            JOIN annotation.mapValue uuid_value
+            JOIN annotation.mapValue path_value
+            JOIN link.parent obj
+            WHERE uuid_value.name = :uuid_key
+              AND uuid_value.value IN (:uuids)
+              AND path_value.name = :filepath_key
+        """
+        params = ParametersI()
+        params.addString("uuid_key", "UUID")
+        params.addString("filepath_key", "Filepath")
+        params.map["uuids"] = rlist([rstring(value) for value in uuids])
+
+        try:
+            projection = query_service.projection(
+                query, params, conn.SERVICE_OPTS
+            )
+        except Exception:
+            logger.warning(
+                "Could not resolve import links for OMERO %ss",
+                object_type.lower(),
+                exc_info=True,
+            )
+            continue
+
+        for (
+            uuid_value,
+            object_id,
+            object_name,
+            file_path,
+        ) in unwrap(projection):
+            uuid_value = str(uuid_value)
+            target = f"{object_type.lower()}-{object_id}"
+            names = {
+                _normalized_file_name(object_name),
+                _normalized_file_name(file_path),
+            }
+            for name in names - {""}:
+                names_by_uuid = resolved.setdefault(uuid_value, {})
+                names_by_uuid.setdefault(name, set()).add(target)
+
+    row_targets = []
+    for row in rows:
+        uuid_value = str(row[3] or "")
+        candidates = resolved.get(uuid_value, {})
+        try:
+            file_names = json.loads(row[0] or "[]")
+        except (TypeError, ValueError):
+            file_names = []
+
+        targets = {}
+        if isinstance(file_names, list):
+            for file_name in file_names:
+                normalized_name = _normalized_file_name(file_name)
+                matches = candidates.get(normalized_name, set())
+                if matches:
+                    targets[str(file_name)] = sorted(matches)
+        row_targets.append(targets)
+
+    return row_targets
 
 
 def _parse_date_filter(request):
@@ -124,6 +207,8 @@ def metabase_data(request, conn=None, **kwargs):
     except (ValueError, TypeError):
         page = 1
         limit = 50
+    page = max(1, page)
+    limit = max(1, min(limit, 100))
     search_term = request.GET.get("search", "").strip().lower()
 
     db_url = os.environ.get("INGEST_TRACKING_DB_URL")
@@ -325,6 +410,17 @@ def metabase_data(request, conn=None, **kwargs):
         start_idx = (page - 1) * limit
         end_idx = page * limit
         sliced_rows = rows[start_idx:end_idx]
+
+        if dashboard_type == "imports":
+            file_targets = _resolve_import_file_targets(conn, sliced_rows)
+            sliced_rows = [
+                [*row, targets]
+                for row, targets in zip(sliced_rows, file_targets)
+            ]
+            cols.append({
+                "name": "file_targets",
+                "display_name": "File Targets",
+            })
 
         result_data = {
             "data": {

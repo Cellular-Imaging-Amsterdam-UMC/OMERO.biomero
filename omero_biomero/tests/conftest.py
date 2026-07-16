@@ -43,11 +43,24 @@ def _ensure_stubs():
         rtypes.rbool = lambda value: value
         rtypes.rlong = lambda value: value
         rtypes.rlist = lambda value: value
+        rtypes.rstring = lambda value: value
+        omero_sys = types.ModuleType("omero.sys")
+
+        class ParametersI:
+            def __init__(self):
+                self.map = {}
+
+            def addString(self, name, value):
+                self.map[name] = value
+
+        omero_sys.ParametersI = ParametersI
         model = types.ModuleType("omero.model")
         omero_pkg.rtypes = rtypes
         omero_pkg.model = model
+        omero_pkg.sys = omero_sys
         sys.modules["omero.rtypes"] = rtypes
         sys.modules["omero.model"] = model
+        sys.modules["omero.sys"] = omero_sys
 
     if "biomero_importer.utils.ingest_tracker" not in sys.modules:
         pkg = types.ModuleType("biomero_importer")
