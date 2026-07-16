@@ -1,117 +1,95 @@
-import React, { useId, useState } from "react";
-import {
-  Button,
-  FormGroup,
-  HTMLSelect,
-  InputGroup,
-  Popover,
-  Switch,
-} from "@blueprintjs/core";
+import React, { useEffect, useMemo, useState } from "react";
+import { Button, Classes, Popover, Switch } from "@blueprintjs/core";
+import { DateRangePicker } from "@blueprintjs/datetime";
+import "@blueprintjs/datetime/lib/css/blueprint-datetime.css";
+import "./DateFilterControl.css";
 import {
   createDateFilter,
-  DATE_PRESETS,
-  getDateRange,
+  createDateFilterFromRange,
   getDateFilterLabel,
-  toDateInputValue,
 } from "../dateFilters";
 
+const getPickerRange = ({ dateFrom, dateTo }) => {
+  if (!dateFrom || !dateTo) return [null, null];
+
+  const start = new Date(dateFrom);
+  const end = new Date(dateTo);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return [null, null];
+  }
+
+  end.setDate(end.getDate() - 1);
+  return [start, end];
+};
+
 const DateFilterControl = ({ value, onChange }) => {
-  const today = toDateInputValue(new Date());
-  const [selectedPreset, setSelectedPreset] = useState(value.preset);
-  const [dateMode, setDateMode] = useState(value.dateMode);
-  const [customFrom, setCustomFrom] = useState(value.customFrom || today);
-  const [customTo, setCustomTo] = useState(value.customTo || today);
-  const presetInputId = useId();
-  const fromInputId = useId();
-  const toInputId = useId();
+  const { dateFrom, dateMode, dateTo } = value;
+  const [selectedRange, setSelectedRange] = useState(() =>
+    getPickerRange(value)
+  );
+  const today = useMemo(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, []);
 
-  const selectPreset = (event) => {
-    const nextPreset = event.target.value;
-    setSelectedPreset(nextPreset);
+  useEffect(() => {
+    setSelectedRange(getPickerRange({ dateFrom, dateTo }));
+  }, [dateFrom, dateTo]);
 
-    if (nextPreset === "all") {
-      setDateMode("include");
+  const hasCompleteRange = Boolean(selectedRange[0] && selectedRange[1]);
+
+  const selectRange = (nextRange) => {
+    setSelectedRange(nextRange);
+
+    if (nextRange[0] && nextRange[1]) {
+      onChange(createDateFilterFromRange(nextRange, dateMode));
+    } else if (!nextRange[0] && !nextRange[1]) {
       onChange(createDateFilter("all"));
-    } else if (nextPreset !== "custom") {
-      onChange(createDateFilter(nextPreset, dateMode));
     }
   };
 
   const toggleMode = (event) => {
     const nextMode = event.target.checked ? "exclude" : "include";
-    setDateMode(nextMode);
-
-    if (selectedPreset !== "custom" && selectedPreset !== "all") {
-      onChange(createDateFilter(selectedPreset, nextMode));
+    if (hasCompleteRange) {
+      onChange(createDateFilterFromRange(selectedRange, nextMode));
     }
   };
 
-  const customRange = getDateRange(
-    "custom",
-    new Date(),
-    customFrom,
-    customTo
-  );
-
-  const applyCustomRange = () => {
-    if (customRange) {
-      onChange(
-        createDateFilter("custom", dateMode, customFrom, customTo)
-      );
-    }
+  const clearRange = () => {
+    const emptyRange = [null, null];
+    setSelectedRange(emptyRange);
+    onChange(createDateFilter("all"));
   };
 
   const content = (
-    <div className="p-4 w-80">
-      <FormGroup label="Date range" labelFor={presetInputId}>
-        <HTMLSelect
-          id={presetInputId}
-          fill
-          value={selectedPreset}
-          options={DATE_PRESETS}
-          onChange={selectPreset}
-        />
-      </FormGroup>
-
-      {selectedPreset === "custom" && (
-        <div className="grid grid-cols-2 gap-3">
-          <FormGroup label="From" labelFor={fromInputId}>
-            <InputGroup
-              id={fromInputId}
-              type="date"
-              value={customFrom}
-              max={customTo || undefined}
-              onChange={(event) => setCustomFrom(event.target.value)}
-            />
-          </FormGroup>
-          <FormGroup label="To" labelFor={toInputId}>
-            <InputGroup
-              id={toInputId}
-              type="date"
-              value={customTo}
-              min={customFrom || undefined}
-              onChange={(event) => setCustomTo(event.target.value)}
-            />
-          </FormGroup>
-        </div>
-      )}
-
-      <Switch
-        checked={dateMode === "exclude"}
-        disabled={selectedPreset === "all"}
-        label="Exclude selected range"
-        onChange={toggleMode}
+    <div className={Classes.UI_TEXT}>
+      <DateRangePicker
+        allowSingleDayRange
+        className="date-filter-picker"
+        highlightCurrentDay
+        maxDate={today}
+        shortcuts
+        singleMonthOnly
+        value={selectedRange}
+        onChange={selectRange}
       />
-
-      {selectedPreset === "custom" && (
-        <Button
-          fill
-          intent="primary"
-          text="Apply date range"
-          disabled={!customRange}
-          onClick={applyCustomRange}
+      <div className="flex items-center justify-between gap-4 p-3 pt-0">
+        <Switch
+          className="mb-0"
+          checked={dateMode === "exclude"}
+          disabled={!hasCompleteRange}
+          label="Exclude selected range"
+          onChange={toggleMode}
         />
-      )}
+        <Button
+          disabled={!selectedRange[0] && !selectedRange[1]}
+          icon="filter-remove"
+          minimal
+          text="Clear"
+          onClick={clearRange}
+        />
+      </div>
     </div>
   );
 

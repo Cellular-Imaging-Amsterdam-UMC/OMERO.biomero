@@ -124,6 +124,27 @@ export const createDateFilter = (
   ...getDateRange(preset, now, customFrom, customTo),
 });
 
+export const createDateFilterFromRange = (
+  [dateFrom, dateTo] = [null, null],
+  dateMode = "include"
+) => {
+  if (
+    !(dateFrom instanceof Date) ||
+    !(dateTo instanceof Date) ||
+    Number.isNaN(dateFrom.getTime()) ||
+    Number.isNaN(dateTo.getTime())
+  ) {
+    return createDateFilter("all");
+  }
+
+  return createDateFilter(
+    "custom",
+    dateMode,
+    toDateInputValue(dateFrom),
+    toDateInputValue(dateTo)
+  );
+};
+
 export const getDateFilterLabel = (filter) => {
   if (filter.preset === "custom") {
     const range = `${filter.customFrom} – ${filter.customTo}`;

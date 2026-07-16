@@ -1,0 +1,5 @@
+.date-filter-picker
+  .bp5-datepicker-month-select
+  > .bp5-icon {
+  right: 2px !important;
+}

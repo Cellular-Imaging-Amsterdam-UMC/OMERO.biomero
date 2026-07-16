@@ -5,6 +5,7 @@
   "private": true,
   "dependencies": {
     "@blueprintjs/core": "^5.16.2",
+    "@blueprintjs/datetime": "5.3.33",
     "@blueprintjs/select": "^5.3.4",
     "@mdi/js": "^7.4.47",
     "@mdi/react": "^1.6.1",
