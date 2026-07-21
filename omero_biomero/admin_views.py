@@ -32,30 +32,27 @@ def admin_config(request, conn=None, **kwargs):
             if not is_admin:
                 logger.error(f"Unauthorized request for user {user_id}:{username}")
                 return JsonResponse({"error": "Unauthorized request"}, status=403)
-            # Load the configuration file
-            configs = configparser.ConfigParser(allow_no_value=True)
-            # Loads from default locations and given location, missing files are ok
-            configs.read(
-                [
-                    os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_1),
-                    os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_2),
-                    os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_3),
-                ]
-            )
-            # Convert configparser object to JSON-like dict
-            config_dict = {
-                section: dict(configs.items(section)) for section in configs.sections()
-            }
-
-            # Workflow definitions may live under a legacy [MODELS] section or
-            # the preferred [WORKFLOWS] section. Always surface them to the UI as
-            # WORKFLOWS so the admin interface uses consistent terminology,
-            # merging both if they happen to coexist ([WORKFLOWS] wins on clash).
-            if "MODELS" in config_dict or "WORKFLOWS" in config_dict:
-                merged_workflows = {}
-                merged_workflows.update(config_dict.pop("MODELS", {}))
-                merged_workflows.update(config_dict.pop("WORKFLOWS", {}))
-                config_dict["WORKFLOWS"] = merged_workflows
+            # Load configuration files in priority order: later files win per-key.
+            # [MODELS] and [WORKFLOWS] are treated as the same section (backward-
+            # compatible rename) so a file using either name correctly overrides
+            # or is overridden by files read before/after it, based solely on
+            # file-read order — not section name.
+            config_dict = {}
+            for _path in [
+                os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_1),
+                os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_2),
+                os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_3),
+            ]:
+                if not os.path.exists(_path):
+                    continue
+                _cfg = configparser.ConfigParser(allow_no_value=True)
+                _cfg.read(_path)
+                for _section in _cfg.sections():
+                    # Normalise legacy [MODELS] to [WORKFLOWS]
+                    _key = "WORKFLOWS" if _section.upper() == "MODELS" else _section
+                    if _key not in config_dict:
+                        config_dict[_key] = {}
+                    config_dict[_key].update(dict(_cfg.items(_section)))
 
             # Load the JSON configuration file (biomero-config.json)
             json_config = {}
