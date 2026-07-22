@@ -31,7 +31,9 @@ from .utils import (
     get_uploaded_file_candidates,
     get_all_group_mappings,
 )
-from .leica_file_browser.ci_leica_converters_helpers import extract_nested_leica_items
+from convertleica_file_browser.ci_leica_converters_helpers import (
+    extract_nested_leica_items,
+)
 
 logger = logging.getLogger(__name__)
 

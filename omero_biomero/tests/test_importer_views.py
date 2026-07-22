@@ -72,7 +72,7 @@ def _raw(fn):
 
 class LeicaHelperTests(TestCase):
     def test_extract_nested_leica_items_flattens_image_nodes(self):
-        from omero_biomero.leica_file_browser import ci_leica_converters_helpers as helpers
+        from convertleica_file_browser import ci_leica_converters_helpers as helpers
 
         original = helpers.read_leica_file
 
@@ -107,7 +107,7 @@ class LeicaHelperTests(TestCase):
         )
 
     def test_extract_nested_leica_items_loads_nested_lif_folders_by_uuid(self):
-        from omero_biomero.leica_file_browser import ci_leica_converters_helpers as helpers
+        from convertleica_file_browser import ci_leica_converters_helpers as helpers
 
         original = helpers.read_leica_file
 
@@ -161,7 +161,7 @@ class LeicaHelperTests(TestCase):
         )
 
     def test_extract_nested_leica_items_accepts_real_lif_image_shape(self):
-        from omero_biomero.leica_file_browser import ci_leica_converters_helpers as helpers
+        from convertleica_file_browser import ci_leica_converters_helpers as helpers
 
         original = helpers.read_leica_file
 
