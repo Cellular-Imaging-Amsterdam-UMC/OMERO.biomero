@@ -1,4 +1,5 @@
 import os
+import errno
 import sys
 import json
 import tempfile
@@ -578,43 +579,192 @@ class ImporterViewsTests(TestCase):
         iv.initialize_biomero_importer()
 
     # group_mappings
+    def _set_group_mapping_paths(self, config_path=None, mappings_path=None):
+        config_path = config_path or os.path.join(self.tmp, "biomero-config.json")
+        mappings_path = mappings_path or os.path.join(
+            self.tmp, "group-mappings.json"
+        )
+        setattr(self.mod, "CONFIG_FILE_PATH", config_path)  # type: ignore[attr-defined]
+        setattr(
+            self.mod,
+            "GROUP_MAPPINGS_FILE_PATH",
+            mappings_path,
+        )  # type: ignore[attr-defined]
+        return config_path, mappings_path
+
+    def _post_group_mappings(self, mappings, conn=None):
+        request = self.factory.post(
+            "/importer/group_mappings",
+            data=json.dumps({"mappings": mappings}),
+            content_type="application/json",
+        )
+        return _raw(self.mod.group_mappings)(request, conn=conn or self.conn)
+
+    def _read_json(self, path):
+        with open(path, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+
     def test_group_mappings_get_empty(self):
-        cfg = os.path.join(self.tmp, "group-mappings.json")
-        with patch("omero_biomero.utils.GROUP_MAPPINGS_FILE_PATH", cfg):
+        config_path, mappings_path = self._set_group_mapping_paths()
+        with patch(
+            "omero_biomero.utils.CONFIG_FILE_PATH", config_path
+        ), patch(
+            "omero_biomero.utils.GROUP_MAPPINGS_FILE_PATH", mappings_path
+        ):
             req = self.factory.get("/importer/group_mappings")
             resp = _raw(self.mod.group_mappings)(req, conn=self.conn)
             self.assertEqual(json.loads(resp.content)["mappings"], {})
 
-    def test_group_mappings_post_and_get(self):
-        cfg = os.path.join(self.tmp, "group-mappings.json")
-        setattr(self.mod, "GROUP_MAPPINGS_FILE_PATH", cfg)  # type: ignore[attr-defined]
-        non_admin = self._fake_conn(["grp1"], admin=False)
-        bad = self.factory.post(
-            "/importer/group_mappings",
-            data=json.dumps({"mappings": {"a": "b"}}),
-            content_type="application/json",
+    def test_group_mappings_post_writes_both_files_and_preserves_config(self):
+        config_path, mappings_path = self._set_group_mapping_paths()
+        existing_config = {
+            "UPLOADER": {"enabled": True},
+            "group_mappings": {"old": {"folder": "old-folder"}},
+            "unrelated": ["keep", "me"],
+        }
+        with open(config_path, "w", encoding="utf-8") as fh:
+            json.dump(existing_config, fh)
+
+        mappings = {
+            "g1": {"folder": "labA", "groupName": "Group A"},
+            "g2": {"folder": "labB", "groupName": "Group B"},
+        }
+        response = self._post_group_mappings(mappings)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self._read_json(mappings_path), mappings)
+        saved_config = self._read_json(config_path)
+        self.assertEqual(saved_config["group_mappings"], mappings)
+        self.assertEqual(saved_config["UPLOADER"], existing_config["UPLOADER"])
+        self.assertEqual(saved_config["unrelated"], existing_config["unrelated"])
+
+    def test_group_mappings_post_supports_busy_bind_mounted_files(self):
+        config_path, mappings_path = self._set_group_mapping_paths()
+        with open(config_path, "w", encoding="utf-8") as fh:
+            json.dump({"keep": "value", "group_mappings": {}}, fh)
+        with open(mappings_path, "w", encoding="utf-8") as fh:
+            json.dump({}, fh)
+        submitted = {"g1": {"folder": "labA"}}
+
+        with patch(
+            "omero_biomero.importer_views.os.replace",
+            side_effect=OSError(errno.EBUSY, "Device or resource busy"),
+        ):
+            response = self._post_group_mappings(submitted)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self._read_json(mappings_path), submitted)
+        self.assertEqual(
+            self._read_json(config_path),
+            {"keep": "value", "group_mappings": submitted},
         )
         self.assertEqual(
-            _raw(self.mod.group_mappings)(bad, conn=non_admin).status_code, 403
-        )
-        good = self.factory.post(
-            "/importer/group_mappings",
-            data=json.dumps({"mappings": {"g1": "labA", "g2": "labB"}}),
-            content_type="application/json",
-        )
-        self.assertEqual(
-            _raw(self.mod.group_mappings)(good, conn=self.conn).status_code, 200
-        )
-        get_req = self.factory.get("/importer/group_mappings")
-        with patch("omero_biomero.utils.GROUP_MAPPINGS_FILE_PATH", cfg):
-            got = _raw(self.mod.group_mappings)(get_req, conn=self.conn)
-        self.assertEqual(
-            json.loads(got.content)["mappings"], {"g1": "labA", "g2": "labB"}
+            [name for name in os.listdir(self.tmp) if name.endswith(".tmp")],
+            [],
         )
 
+    def test_group_mappings_post_removes_deleted_mapping_from_both_files(self):
+        config_path, mappings_path = self._set_group_mapping_paths()
+        old_mappings = {
+            "g1": {"folder": "labA"},
+            "g2": {"folder": "labB"},
+        }
+        with open(config_path, "w", encoding="utf-8") as fh:
+            json.dump({"group_mappings": old_mappings, "keep": "value"}, fh)
+        with open(mappings_path, "w", encoding="utf-8") as fh:
+            json.dump(old_mappings, fh)
+
+        submitted = {"g2": {"folder": "labB"}}
+        response = self._post_group_mappings(submitted)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self._read_json(mappings_path), submitted)
+        self.assertEqual(self._read_json(config_path)["group_mappings"], submitted)
+
+    def test_group_mappings_get_merges_legacy_and_separate_with_override(self):
+        config_path, mappings_path = self._set_group_mapping_paths()
+        with open(config_path, "w", encoding="utf-8") as fh:
+            json.dump(
+                {
+                    "group_mappings": {
+                        "legacy": {"folder": "legacy-only"},
+                        "shared": {"folder": "legacy-value"},
+                    }
+                },
+                fh,
+            )
+        with open(mappings_path, "w", encoding="utf-8") as fh:
+            json.dump(
+                {
+                    "shared": {"folder": "separate-value"},
+                    "primary": {"folder": "separate-only"},
+                },
+                fh,
+            )
+
+        with patch(
+            "omero_biomero.utils.CONFIG_FILE_PATH", config_path
+        ), patch(
+            "omero_biomero.utils.GROUP_MAPPINGS_FILE_PATH", mappings_path
+        ):
+            response = _raw(self.mod.group_mappings)(
+                self.factory.get("/importer/group_mappings"), conn=self.conn
+            )
+
+        self.assertEqual(
+            json.loads(response.content)["mappings"],
+            {
+                "legacy": {"folder": "legacy-only"},
+                "shared": {"folder": "separate-value"},
+                "primary": {"folder": "separate-only"},
+            },
+        )
+
+    def test_group_mappings_supports_legacy_only_and_creates_directories(self):
+        config_path = os.path.join(self.tmp, "legacy", "biomero-config.json")
+        mappings_path = os.path.join(self.tmp, "primary", "group-mappings.json")
+        self._set_group_mapping_paths(config_path, mappings_path)
+        os.makedirs(os.path.dirname(config_path))
+        legacy_mappings = {"legacy": {"folder": "legacy-folder"}}
+        with open(config_path, "w", encoding="utf-8") as fh:
+            json.dump({"group_mappings": legacy_mappings}, fh)
+
+        with patch(
+            "omero_biomero.utils.CONFIG_FILE_PATH", config_path
+        ), patch(
+            "omero_biomero.utils.GROUP_MAPPINGS_FILE_PATH", mappings_path
+        ):
+            get_response = _raw(self.mod.group_mappings)(
+                self.factory.get("/importer/group_mappings"), conn=self.conn
+            )
+        self.assertEqual(json.loads(get_response.content)["mappings"], legacy_mappings)
+
+        submitted = {"new": {"folder": "new-folder"}}
+        post_response = self._post_group_mappings(submitted)
+        self.assertEqual(post_response.status_code, 200)
+        self.assertEqual(self._read_json(mappings_path), submitted)
+        self.assertEqual(self._read_json(config_path)["group_mappings"], submitted)
+
+    def test_group_mappings_post_does_not_create_missing_legacy_config(self):
+        config_path = os.path.join(self.tmp, "config", "biomero-config.json")
+        mappings_path = os.path.join(self.tmp, "mappings", "group-mappings.json")
+        self._set_group_mapping_paths(config_path, mappings_path)
+        submitted = {"new": {"folder": "new-folder"}}
+
+        response = self._post_group_mappings(submitted)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self._read_json(mappings_path), submitted)
+        self.assertFalse(os.path.exists(config_path))
+
+    def test_group_mappings_post_rejects_non_admin(self):
+        self._set_group_mapping_paths()
+        non_admin = self._fake_conn(["grp1"], admin=False)
+        response = self._post_group_mappings({"g1": "labA"}, conn=non_admin)
+        self.assertEqual(response.status_code, 403)
+
     def test_group_mappings_post_invalid_json(self):
-        cfg = os.path.join(self.tmp, "group-mappings.json")
-        setattr(self.mod, "GROUP_MAPPINGS_FILE_PATH", cfg)  # type: ignore[attr-defined]
+        self._set_group_mapping_paths()
         bad = self.factory.generic(
             "POST",
             "/importer/group_mappings",
@@ -623,6 +773,52 @@ class ImporterViewsTests(TestCase):
         )
         resp = _raw(self.mod.group_mappings)(bad, conn=self.conn)
         self.assertEqual(resp.status_code, 400)
+
+    def test_group_mappings_post_invalid_config_json_returns_error(self):
+        config_path, mappings_path = self._set_group_mapping_paths()
+        with open(config_path, "w", encoding="utf-8") as fh:
+            fh.write("{invalid json")
+
+        response = self._post_group_mappings({"g1": {"folder": "labA"}})
+
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("error", json.loads(response.content))
+        self.assertFalse(os.path.exists(mappings_path))
+        with open(config_path, "r", encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), "{invalid json")
+
+    def test_group_mappings_post_write_failure_never_returns_success(self):
+        self._set_group_mapping_paths()
+        with patch(
+            "omero_biomero.importer_views.os.replace",
+            side_effect=OSError("disk full"),
+        ):
+            response = self._post_group_mappings({"g1": {"folder": "labA"}})
+
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("error", json.loads(response.content))
+
+    def test_group_mappings_post_config_write_failure_never_returns_success(self):
+        config_path, mappings_path = self._set_group_mapping_paths()
+        with open(config_path, "w", encoding="utf-8") as fh:
+            json.dump({"group_mappings": {}}, fh)
+        real_replace = os.replace
+
+        def fail_config_replace(source, destination):
+            if destination == config_path:
+                raise OSError("config is read-only")
+            return real_replace(source, destination)
+
+        with patch(
+            "omero_biomero.importer_views.os.replace",
+            side_effect=fail_config_replace,
+        ):
+            response = self._post_group_mappings({"g1": {"folder": "labA"}})
+
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("error", json.loads(response.content))
+        self.assertTrue(os.path.exists(mappings_path))
+        self.assertEqual(self._read_json(config_path), {"group_mappings": {}})
 
     def test_zarr_type_and_browsability_plate(self):
         # Create a mock Zarr plate directory

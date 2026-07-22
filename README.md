@@ -22,6 +22,26 @@ Additionally, the plugin provides a user-friendly interface to execute OMERO scr
 - **Frontend**: React
 - **Backend**: Python/Django
 
+## Group folder mapping compatibility
+
+Administrators manage importer group-to-folder mappings in the importer Admin
+Settings page. Saving mappings always writes the complete mapping object to:
+
+- `group-mappings.json`, configured by `OMERO_BIOMERO_GROUP_MAPPINGS_FILE`.
+
+When `biomero-config.json` already exists, saving also replaces its
+`group_mappings` key. A missing legacy config is not created solely for group
+mappings. Its location is configured by `OMERO_BIOMERO_CONFIG_FILE`.
+
+The conditional second write preserves compatibility with BIOMERO scripts that still read
+`biomero-config.json["group_mappings"]` directly. Both locations are replaced
+with the complete submitted object, so deleting a mapping in the UI also removes
+it from both files. Other top-level keys in `biomero-config.json` are preserved.
+
+Reads remain backward compatible with deployments that only have
+`biomero-config.json`: mappings from both files are merged, and values from
+`group-mappings.json` take precedence when the same group exists in both.
+
 ## Development
 
 The following instructions assume Ubuntu OS.

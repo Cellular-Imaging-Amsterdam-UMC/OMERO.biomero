@@ -1,6 +1,8 @@
 import json
+import errno
 import os
 import logging
+import tempfile
 import uuid
 
 from collections import defaultdict
@@ -39,6 +41,54 @@ logger = logging.getLogger(__name__)
 
 
 _INGEST_INITIALIZED = False
+
+
+def _atomic_write_json(path, data):
+    """Write JSON through a same-directory temporary file and atomic replace."""
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    file_descriptor, temporary_path = tempfile.mkstemp(
+        dir=directory,
+        prefix=f".{os.path.basename(path)}.",
+        suffix=".tmp",
+    )
+    try:
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as temporary_file:
+            json.dump(data, temporary_file, indent=2)
+            temporary_file.write("\n")
+            temporary_file.flush()
+            os.fsync(temporary_file.fileno())
+        try:
+            os.replace(temporary_path, path)
+        except OSError as replace_error:
+            if replace_error.errno != errno.EBUSY or not os.path.isfile(path):
+                raise
+
+            # Docker/Podman single-file bind mounts cannot be replaced with
+            # rename(2), even when the mounted file is writable. Reuse the
+            # fully serialized and synced temporary file for an in-place copy.
+            logger.warning(
+                "Atomic replacement unsupported for bind-mounted file %s; "
+                "falling back to in-place update",
+                path,
+            )
+            with open(temporary_path, "rb") as staged_file, open(
+                path, "wb"
+            ) as target_file:
+                target_file.write(staged_file.read())
+                target_file.flush()
+                os.fsync(target_file.fileno())
+            os.unlink(temporary_path)
+    except Exception:
+        try:
+            os.close(file_descriptor)
+        except OSError:
+            pass
+        try:
+            os.unlink(temporary_path)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def expand_nested_selected_items(selected_items):
@@ -416,41 +466,35 @@ def group_mappings(request, conn=None, **kwargs):
         if not isinstance(mappings, dict):
             return JsonResponse({"error": "'mappings' must be an object"}, status=400)
 
-        existing = {}
-        if os.path.exists(GROUP_MAPPINGS_FILE_PATH):
+        config = None
+        if os.path.exists(CONFIG_FILE_PATH):
             try:
-                with open(GROUP_MAPPINGS_FILE_PATH, "r") as f:
-                    existing = json.load(f) or {}
-                if not isinstance(existing, dict):
-                    existing = {}
-            except Exception:
-                existing = {}
-
-        # The whole file is just mappings now
-        existing = mappings
-
-        # Ensure parent directory exists (handle cases where path includes
-        # ~ which we expanded earlier).
-        config_dir = os.path.dirname(GROUP_MAPPINGS_FILE_PATH)
-        if config_dir and not os.path.exists(config_dir):
-            try:
-                os.makedirs(config_dir, exist_ok=True)
-            except Exception as e:
+                with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as config_file:
+                    config = json.load(config_file)
+                if not isinstance(config, dict):
+                    raise ValueError("Configuration root must be a JSON object")
+            except (OSError, ValueError, json.JSONDecodeError):
                 logger.error(
-                    "Failed creating config directory %s: %s",
-                    config_dir,
-                    e,
+                    "Failed reading BIOMERO configuration for group mappings",
+                    exc_info=True,
                 )
                 return JsonResponse(
-                    {"error": "Failed to prepare config directory"},
+                    {"error": "Failed to load BIOMERO configuration"},
                     status=500,
                 )
+
+        # Replace the complete object in the dedicated file and mirror it into
+        # an existing legacy config. Omissions represent deletions from the UI.
+        if config is not None:
+            config["group_mappings"] = mappings
+
         try:
-            with open(GROUP_MAPPINGS_FILE_PATH, "w", encoding="utf-8") as f:
-                json.dump(existing, f, indent=2)
-        except Exception as e:
-            logger.error("Failed writing group mappings: %s", e)
-            return JsonResponse({"error": f"Failed to save mappings, {e}"}, status=500)
+            _atomic_write_json(GROUP_MAPPINGS_FILE_PATH, mappings)
+            if config is not None:
+                _atomic_write_json(CONFIG_FILE_PATH, config)
+        except (OSError, TypeError, ValueError):
+            logger.error("Failed writing group mappings", exc_info=True)
+            return JsonResponse({"error": "Failed to save mappings"}, status=500)
 
         logger.info("Group mappings updated by %s (ID: %s)", username, user_id)
         return JsonResponse({"message": "Mappings saved successfully"})
