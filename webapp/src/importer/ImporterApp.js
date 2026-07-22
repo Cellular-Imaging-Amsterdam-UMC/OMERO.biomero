@@ -1013,7 +1013,7 @@ const ImporterApp = () => {
   };
 
   return (
-    <div className="focus:outline-none focus:ring-0">
+    <div className="h-[calc(100vh-85px)] overflow-y-auto focus:outline-none focus:ring-0">
       <div className="p-4">
         {state?.user?.groups && (
           <div className="flex items-center">

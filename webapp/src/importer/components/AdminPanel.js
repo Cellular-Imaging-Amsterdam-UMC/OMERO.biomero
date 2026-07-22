@@ -135,10 +135,10 @@ const AdminPanel = () => {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-4">
+    <div className="p-4">
       <H4>Admin Settings</H4>
       
-      <Card elevation={Elevation.TWO} className="mt-4 max-w-[800px]">
+      <Card elevation={Elevation.TWO} className="mt-4 w-full">
         <h3 className="text-lg font-semibold mb-4">General Settings</h3>
         <Switch
           checked={uploaderEnabled}
@@ -181,12 +181,12 @@ const AdminPanel = () => {
         </div>
       </Card>
 
-      <Card elevation={Elevation.TWO} className="mt-4 max-w-[800px]">
+      <Card elevation={Elevation.TWO} className="mt-4 w-full">
         <h3 className="text-lg font-semibold mb-4">Group Folder Mappings</h3>
         
         <div className="mb-4">
-          <div className="flex space-x-4">
-            <div className="flex-1">
+          <div className="flex flex-col gap-4 md:flex-row">
+            <div className="min-w-0 flex-1">
               <Select
                 items={state?.user?.groups || []}
                 itemRenderer={renderOption}
@@ -210,7 +210,7 @@ const AdminPanel = () => {
               </Select>
             </div>
 
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <LocalFolderSelectWithPopover
                 value={selectedFolder}
                 onChange={(folderId) => setSelectedFolder(folderId)}
@@ -218,12 +218,13 @@ const AdminPanel = () => {
             </div>
           </div>
 
-          <div className="mt-4 mb-8 flex justify-end">
+          <div className="mt-4 mb-8 flex justify-stretch sm:justify-end">
             <Button
               onClick={handleAddMapping}
               disabled={selectedGroup === undefined || selectedGroup === "" || !selectedFolder}
               rightIcon="plus"
               intent="success"
+              className="w-full sm:w-auto"
             >
               Add mapping
             </Button>
@@ -239,27 +240,27 @@ const AdminPanel = () => {
               className="mb-2 p-3"
               elevation={Elevation.ONE}
             >
-              <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <Tag
                     intent="primary"
                     round={true}
                     icon="people"
-                    className="min-w-fit"
+                    className="max-w-full"
                   >
                     {data.groupName}
                   </Tag>
-                  <Icon icon="arrow-right" />
+                  <Icon icon="arrow-right" className="shrink-0" />
                   <Tag
                     intent="success"
                     round={true}
                     icon="folder-close"
-                    className="min-w-fit"
+                    className="max-w-full"
                   >
                     {data.folder}
                   </Tag>
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex shrink-0 self-end space-x-2 sm:self-auto">
                   <Button
                     icon="edit"
                     minimal={true}
