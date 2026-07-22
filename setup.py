@@ -54,7 +54,7 @@ setup(
         "pyjwt>=2.12.1,<3",
         "biomero>=2.8.0,<3",
         "configupdater>=3.2,<4",
-        "biomero-importer @ git+https://github.com/NL-BioImaging/BIOMERO.importer.git@main",
+        "biomero-importer>=1.3.1,<2",
         "convertleica-file-browser>=1.7.3,<2",
     ],
     python_requires=">=3.12",
