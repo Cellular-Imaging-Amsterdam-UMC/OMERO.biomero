@@ -89,11 +89,11 @@ PREPROCESSING_CONFIG = {
         "extra_params": {"saveoption": "single"},
     },
     "dataset_leica_uuid": {
-        "container": "cellularimagingcf/convertleica-docker:v1.2.0",
+        "container": "cellularimagingcf/convertleica-docker:v1.7.4",
         "extra_params": {"image_uuid": "{UUID}"},
     },
     "incucyte_archive": {
-        "container": "cellularimagingcf/biomero-converter:latest",
+        "container": "cellularimagingcf/biomero-converter:v0.1.29",
     },
     # Add new keys here referencing PREPROCESSING_EXTENSION_MAP as needed.
 }
