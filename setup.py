@@ -55,7 +55,7 @@ setup(
         "biomero @ git+https://github.com/NL-BioImaging/biomero.git@main",
         "configupdater>=3.2,<4",
         "biomero-importer>=1.3.1,<2",
-        "convertleica-file-browser>=1.7.3,<2",
+        "convertleica-file-browser>=1.7.4,<2",
     ],
     python_requires=">=3.12",
     include_package_data=True,
