@@ -32,11 +32,15 @@ const ConfigSection = ({
       JSON.parse(config.UI.plate_workflows || '[]') : [];
     const isPlateWorkflow = plateWorkflows.includes(workflowName);
     
+    const dualModeWorkflows = config.UI.dual_mode_workflows ?
+      JSON.parse(config.UI.dual_mode_workflows || '[]') : [];
+    const isDualModeWorkflow = dualModeWorkflows.includes(workflowName);
+
     const zarrWorkflows = config.UI.zarr_workflows ? 
       JSON.parse(config.UI.zarr_workflows || '[]') : [];
     const isZarrWorkflow = zarrWorkflows.includes(workflowName);
     
-    return { isPlateWorkflow, isZarrWorkflow };
+    return { isPlateWorkflow, isZarrWorkflow, isDualModeWorkflow };
   };
 
   const toggleItem = (index) => {
@@ -185,7 +189,11 @@ const ConfigSection = ({
                   return (
                     <>
                       {workflowTypeIcons?.isPlateWorkflow && (
-                        <Tooltip content="Plate Workflow (operates on OME-ZARR plates)">
+                        <Tooltip content={
+                          workflowTypeIcons.isDualModeWorkflow
+                            ? "Plate and image workflow (one SLURM workflow)"
+                            : "Plate Workflow (operates on OME-ZARR plates)"
+                        }>
                           <Icon icon="grid-view" size={14} intent="primary" className="mr-1" />
                         </Tooltip>
                       )}

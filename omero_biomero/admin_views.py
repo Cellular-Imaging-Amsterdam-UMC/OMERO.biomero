@@ -3,8 +3,6 @@ import datetime
 import json
 import logging
 import os
-import logging
-import os
 
 from biomero import SlurmClient
 from collections import defaultdict
@@ -32,27 +30,30 @@ def admin_config(request, conn=None, **kwargs):
             if not is_admin:
                 logger.error(f"Unauthorized request for user {user_id}:{username}")
                 return JsonResponse({"error": "Unauthorized request"}, status=403)
-            # Load configuration files in priority order: later files win per-key.
-            # [MODELS] and [WORKFLOWS] are treated as the same section (backward-
-            # compatible rename) so a file using either name correctly overrides
-            # or is overridden by files read before/after it, based solely on
-            # file-read order — not section name.
+            # Use BIOMERO's public loader so reads and writes follow the same
+            # layered or authoritative-file policy. Legacy [MODELS] remains a
+            # lower-priority alias for [WORKFLOWS].
+            if hasattr(SlurmClient, "load_config"):
+                loaded_config = SlurmClient.load_config()
+            else:  # Backward compatibility with older BIOMERO releases.
+                loaded_config = configparser.ConfigParser(allow_no_value=True)
+                loaded_config.read([
+                    os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_1),
+                    os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_2),
+                    os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_3),
+                ])
+
             config_dict = {}
-            for _path in [
-                os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_1),
-                os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_2),
-                os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_3),
-            ]:
-                if not os.path.exists(_path):
-                    continue
-                _cfg = configparser.ConfigParser(allow_no_value=True)
-                _cfg.read(_path)
-                for _section in _cfg.sections():
-                    # Normalise legacy [MODELS] to [WORKFLOWS]
-                    _key = "WORKFLOWS" if _section.upper() == "MODELS" else _section
-                    if _key not in config_dict:
-                        config_dict[_key] = {}
-                    config_dict[_key].update(dict(_cfg.items(_section)))
+            for section in loaded_config.sections():
+                if section.upper() not in ("MODELS", "WORKFLOWS"):
+                    config_dict[section] = dict(loaded_config.items(section))
+
+            workflows = {}
+            for section in ("MODELS", "WORKFLOWS"):
+                if loaded_config.has_section(section):
+                    workflows.update(dict(loaded_config.items(section)))
+            if workflows:
+                config_dict["WORKFLOWS"] = workflows
 
             # Load the JSON configuration file (biomero-config.json)
             json_config = {}
@@ -69,7 +70,15 @@ def admin_config(request, conn=None, **kwargs):
             for key, value in json_config.items():
                 config_dict[key] = value
 
-            return JsonResponse({"config": config_dict})
+            authoritative = (
+                SlurmClient.get_authoritative_config_path()
+                if hasattr(SlurmClient, "get_authoritative_config_path")
+                else None
+            )
+            return JsonResponse({
+                "config": config_dict,
+                "config_mode": "authoritative" if authoritative else "layered",
+            })
         except Exception as e:
             logger.error(f"Error retrieving BIOMERO config: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
@@ -89,8 +98,12 @@ def admin_config(request, conn=None, **kwargs):
                 logger.error(f"Unauthorized request for user {user_id}:{username}")
                 return JsonResponse({"error": "Unauthorized request"}, status=403)
 
-            # Define the file path for saving the configuration
-            config_path = os.path.expanduser(SlurmClient._DEFAULT_CONFIG_PATH_3)
+            # Use BIOMERO's authoritative write target when configured.
+            if hasattr(SlurmClient, "get_config_write_path"):
+                config_path = SlurmClient.get_config_write_path()
+            else:
+                config_path = os.path.expanduser(
+                    SlurmClient._DEFAULT_CONFIG_PATH_3)
 
             # Create ConfigUpdater object
             config = ConfigUpdater()
@@ -101,6 +114,18 @@ def admin_config(request, conn=None, **kwargs):
 
             # Extract the 'config' section from the incoming data
             config_data = data.get("config", {})
+            deleted = data.get("deleted", [])
+            if not isinstance(deleted, list):
+                raise ValueError("Invalid deletion list")
+            for deletion in deleted:
+                if (
+                    not isinstance(deletion, dict)
+                    or not isinstance(deletion.get("section"), str)
+                    or not deletion["section"]
+                    or not isinstance(deletion.get("option"), str)
+                    or not deletion["option"]
+                ):
+                    raise ValueError("Invalid deletion entry")
 
             def generate_model_comment(key):
                 if key.endswith("_job"):
@@ -133,8 +158,15 @@ def admin_config(request, conn=None, **kwargs):
                 else:
                     ini_config_updates[section] = settingsd
 
+            json_deletions = [
+                item for item in deleted if item["section"] in JSON_SECTIONS
+            ]
+            ini_deletions = [
+                item for item in deleted if item["section"] not in JSON_SECTIONS
+            ]
+
             # --- Save JSON Config ---
-            if json_config_updates:
+            if json_config_updates or json_deletions:
                 try:
                     current_json_config = {}
                     if os.path.exists(CONFIG_FILE_PATH):
@@ -144,6 +176,12 @@ def admin_config(request, conn=None, **kwargs):
                     # Update with new values
                     for key, value in json_config_updates.items():
                         current_json_config[key] = value
+
+                    for deletion in json_deletions:
+                        section_data = current_json_config.get(
+                            deletion["section"])
+                        if isinstance(section_data, dict):
+                            section_data.pop(deletion["option"], None)
 
                     # Ensure directory exists
                     config_dir = os.path.dirname(CONFIG_FILE_PATH)
@@ -285,6 +323,15 @@ def admin_config(request, conn=None, **kwargs):
                             if key.startswith("sbatch_") and key not in settingsd:
                                 del config[section][key]
 
+            # Apply explicit deletions last so every INI option can be removed,
+            # independent of section-specific form behavior.
+            for deletion in ini_deletions:
+                section = deletion["section"]
+                if section in ("MODELS", "WORKFLOWS"):
+                    section = workflow_section_name
+                if section in config and deletion["option"] in config[section]:
+                    del config[section][deletion["option"]]
+
             # Prepare the update timestamp comment
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             change_comment = f"Config automatically updated by {username} ({user_id}) via the web UI on {timestamp}"
@@ -305,21 +352,15 @@ def admin_config(request, conn=None, **kwargs):
                 logger.info(f"Configuration saved successfully to {config_path}")
             except PermissionError:
                 logger.error(
-                    f"Permission denied writing to {config_path}. Skipping INI save."
+                    f"Permission denied writing to {config_path}."
                 )
-                if not json_config_updates:
-                    # If we only tried to save INI and failed, that's an error.
-                    # If we saved JSON but failed INI, we might want to warn or just succeed partially.
-                    # For now, if we have mix, and INI fails, we report error?
-                    # But the user might be toggling UPLOADER (JSON) and not caring about Slurm (INI).
-                    # So if json_config_updates succeeded, we can treat it as partial success.
-                    pass
+                raise
             except Exception as e:
                 logger.error(f"Error saving INI config: {e}")
                 raise e
 
             return JsonResponse(
-                {"message": "Configuration saved successfully", "path": config_path},
+                {"message": "Configuration saved successfully"},
                 status=200,
             )
 
@@ -328,8 +369,12 @@ def admin_config(request, conn=None, **kwargs):
             return JsonResponse({"error": "Invalid JSON data"}, status=400)
         except ValueError as e:
             logger.error(f"Invalid configuration format: {str(e)}")
+            error_prefix = (
+                "Invalid deletion" if "deletion" in str(e).lower()
+                else "Invalid configuration format"
+            )
             return JsonResponse(
-                {"error": f"Invalid configuration format: {str(e)}"}, status=400
+                {"error": f"{error_prefix}: {str(e)}"}, status=400
             )
         except Exception as e:
             logger.error(f"Unexpected error: {str(e)}")

@@ -1,4 +1,5 @@
 import json
+import configparser
 import sys
 import types
 import shutil
@@ -103,6 +104,30 @@ class AdminConfigTests(TestCase):
         data = json.loads(resp.content)
         self.assertEqual(data["config"]["SEC"]["key"], "value")
 
+    def test_get_uses_shared_loader_and_reports_config_mode(self):
+        parser = configparser.ConfigParser(allow_no_value=True)
+        parser.read_string("[SLURM]\ngpu_gres=file-value\n")
+
+        class StubSlurm:
+            @classmethod
+            def load_config(cls):
+                return parser
+
+            @classmethod
+            def get_authoritative_config_path(cls):
+                return "/managed/slurm-config.ini"
+
+        with patch("omero_biomero.admin_views.SlurmClient", StubSlurm):
+            view = _raw_admin_config()
+            request = SimpleNamespace(method="GET")
+            resp = view(request, conn=_fake_conn())
+
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data["config"]["SLURM"]["gpu_gres"], "file-value")
+        self.assertNotIn("sources", data)
+        self.assertEqual(data["config_mode"], "authoritative")
+
     def test_post_invalid_json(self):
         view = _raw_admin_config()
         request = SimpleNamespace(method="POST", body=b"not-json")
@@ -116,6 +141,90 @@ class AdminConfigTests(TestCase):
         view = _raw_admin_config()
         resp = view(request, conn=_fake_conn(is_admin=False))
         self.assertEqual(resp.status_code, 403)
+
+    def test_post_explicitly_deletes_any_ini_option(self):
+        cfg_path = Path(
+            self._create_tempfile(
+                "[SLURM]\nkeep=value\nremove=value\n"
+                "[ANALYTICS]\nremove_too=true\n"
+            )
+        )
+
+        class StubSlurm:
+            @classmethod
+            def get_config_write_path(cls):
+                return str(cfg_path)
+
+        payload = {
+            "config": {"SLURM": {"keep": "value"}},
+            "deleted": [
+                {"section": "SLURM", "option": "remove"},
+                {"section": "ANALYTICS", "option": "remove_too"},
+            ],
+        }
+        with patch("omero_biomero.admin_views.SlurmClient", StubSlurm):
+            request = SimpleNamespace(
+                method="POST", body=json.dumps(payload).encode()
+            )
+            resp = _raw_admin_config()(request, conn=_fake_conn())
+
+        self.assertEqual(resp.status_code, 200)
+        written = cfg_path.read_text()
+        self.assertIn("keep = value", written)
+        self.assertNotIn("remove = value", written)
+        self.assertNotIn("remove_too", written)
+
+    def test_post_rejects_invalid_explicit_deletion(self):
+        cfg_path = Path(self._create_tempfile("[SLURM]\nkeep=value\n"))
+
+        class StubSlurm:
+            @classmethod
+            def get_config_write_path(cls):
+                return str(cfg_path)
+
+        payload = {
+            "config": {},
+            "deleted": [{"section": "SLURM"}],
+        }
+        with patch("omero_biomero.admin_views.SlurmClient", StubSlurm):
+            request = SimpleNamespace(
+                method="POST", body=json.dumps(payload).encode()
+            )
+            resp = _raw_admin_config()(request, conn=_fake_conn())
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("Invalid deletion", json.loads(resp.content)["error"])
+
+    def test_post_explicitly_deletes_json_option(self):
+        cfg_path = Path(self._create_tempfile("[SLURM]\nkeep=value\n"))
+        json_cfg = self._tmpdir / "biomero-config.json"
+        json_cfg.write_text(json.dumps({
+            "UPLOADER": {"keep": True, "remove": True},
+        }))
+
+        class StubSlurm:
+            @classmethod
+            def get_config_write_path(cls):
+                return str(cfg_path)
+
+        payload = {
+            "config": {"UPLOADER": {"keep": True}},
+            "deleted": [{"section": "UPLOADER", "option": "remove"}],
+        }
+        with patch(
+            "omero_biomero.admin_views.SlurmClient", StubSlurm
+        ), patch(
+            "omero_biomero.admin_views.CONFIG_FILE_PATH", str(json_cfg)
+        ):
+            request = SimpleNamespace(
+                method="POST", body=json.dumps(payload).encode()
+            )
+            resp = _raw_admin_config()(request, conn=_fake_conn())
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(
+            json.loads(json_cfg.read_text())["UPLOADER"], {"keep": True}
+        )
 
     def test_post_models_section_add(self):
         SlurmClient = sys.modules["biomero"].SlurmClient

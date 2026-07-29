@@ -27,6 +27,7 @@ import WorkflowInput from "./WorkflowInput";
 import InputOptions from "./InputOptions";
 import PlateWorkflowDialog from "./plate/PlateWorkflowDialog";
 import WorkflowFileInputStep, { getFileInputParams, isFileInputStepValid } from "./WorkflowFileInputStep";
+import { getWorkflowModes, isWorkflowAvailableInTab } from "../workflowModes";
 
 const DescriptionWithToggle = ({ description }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -92,28 +93,14 @@ const RunPanel = ({ onWorkflowError }) => {
   // Check if importer is enabled - only show plate features if it is
   const isImporterEnabled = window.WEBCLIENT?.UI?.IMPORTER_ENABLED || false;
 
-  // Helper function to check if a workflow has specific flags from config or schema
-  const getWorkflowFlags = (workflowName) => {
-    const config = state.config;
-    let isPlateWorkflow = false;
-    let isZarrWorkflow = false;
-
-    // Admin-configured overrides (zarr_workflows / plate_workflows lists)
-    if (config?.UI) {
-      const plateWorkflows = config.UI.plate_workflows ?
-        JSON.parse(config.UI.plate_workflows || '[]') : [];
-      const zarrWorkflows = config.UI.zarr_workflows ?
-        JSON.parse(config.UI.zarr_workflows || '[]') : [];
-      isPlateWorkflow = plateWorkflows.includes(workflowName);
-      isZarrWorkflow = zarrWorkflows.includes(workflowName);
-    }
-
-    // Schema-level flags auto-detected from the descriptor (bilayers)
+  // Resolve workflow modes from admin overrides and BILAYERS descriptor metadata.
+  const getModesForWorkflow = (workflowName) => {
     const wfData = state.workflows?.find(w => w.name === workflowName);
-    isZarrWorkflow = isZarrWorkflow || (wfData?.metadata?.['requires-zarr'] ?? false);
-    isPlateWorkflow = isPlateWorkflow || (wfData?.metadata?.['requires-plate'] ?? false);
-
-    return { isPlateWorkflow, isZarrWorkflow };
+    return getWorkflowModes(
+      workflowName,
+      state.config?.UI,
+      wfData?.metadata
+    );
   };
   
   // Helper to get SLURM status intent for version tags
@@ -208,27 +195,28 @@ const RunPanel = ({ onWorkflowError }) => {
   // Count workflows for each tab after search filtering
   // Only show plate workflows if importer is enabled
   const imageWorkflowCount = searchFilteredWorkflows.filter((workflow) => {
-    const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflow.name);
-    // Exclude plate workflows always, and also exclude ZARR workflows if importer is disabled
-    return !isPlateWorkflow && (!isZarrWorkflow || isImporterEnabled);
+    return isWorkflowAvailableInTab(
+      getModesForWorkflow(workflow.name),
+      "images",
+      isImporterEnabled
+    );
   }).length;
 
   const plateWorkflowCount = isImporterEnabled ? searchFilteredWorkflows.filter((workflow) => {
-    const { isPlateWorkflow } = getWorkflowFlags(workflow.name);
-    return isPlateWorkflow;
+    return isWorkflowAvailableInTab(
+      getModesForWorkflow(workflow.name),
+      "plates",
+      isImporterEnabled
+    );
   }).length : 0;
 
   // Filter workflows based on active tab from the search results
   const filteredWorkflows = searchFilteredWorkflows.filter((workflow) => {
-    if (activeWorkflowTab === "plates") {
-      // Check if workflow is marked as plate workflow in config AND importer is enabled
-      const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflow.name);
-      return isImporterEnabled && isPlateWorkflow;
-    } else {
-      // Images tab: exclude workflows marked as plate-only, and exclude ZARR workflows if importer is disabled
-      const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflow.name);
-      return !isPlateWorkflow && (!isZarrWorkflow || isImporterEnabled);
-    }
+    return isWorkflowAvailableInTab(
+      getModesForWorkflow(workflow.name),
+      activeWorkflowTab,
+      isImporterEnabled
+    );
   });
 
   useEffect(() => {
@@ -264,9 +252,8 @@ const RunPanel = ({ onWorkflowError }) => {
 
   // Handle workflow click
   const handleWorkflowClick = (workflow) => {
-    // Determine workflow mode based on config flags instead of tab
-    const { isPlateWorkflow, isZarrWorkflow } = getWorkflowFlags(workflow.name);
-    const workflowMode = isPlateWorkflow ? "plates" : "images";
+    // Dual-mode workflows use the dialog associated with the card's active tab.
+    const workflowMode = activeWorkflowTab === "plates" ? "plates" : "images";
     
     // Set selected workflow in the global state context
     updateState({
@@ -324,11 +311,11 @@ const RunPanel = ({ onWorkflowError }) => {
   const shouldSkipInputOptions = () => {
     if (!state.selectedWorkflow) return false;
     
-    const { isPlateWorkflow } = getWorkflowFlags(state.selectedWorkflow.name);
+    const isPlateMode = state.formData?.workflowMode === "plates";
     const selectedCount = state.formData?.IDs?.length || 0;
     
-    // Skip if it's a plate workflow (only 1 plate) or only 1 image selected
-    return isPlateWorkflow || selectedCount === 1;
+    // Skip for the plate dialog or when only one image is selected.
+    return isPlateMode || selectedCount === 1;
   };
   
   // Custom step navigation logic
@@ -630,10 +617,10 @@ const RunPanel = ({ onWorkflowError }) => {
 
       {/* Conditional Dialog for Workflow Details */}
       {state.selectedWorkflow && (() => {
-        const { isPlateWorkflow } = getWorkflowFlags(state.selectedWorkflow.name);
+        const isPlateMode = state.formData?.workflowMode === "plates";
         
-        // Use PlateWorkflowDialog for plate workflows (only if importer is enabled)
-        if (isPlateWorkflow && isImporterEnabled) {
+        // Use PlateWorkflowDialog when the workflow was opened from the plate tab.
+        if (isPlateMode && isImporterEnabled) {
           return (
             <PlateWorkflowDialog
               workflow={state.selectedWorkflow}

@@ -423,11 +423,11 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const saveConfigData = async (config) => {
+  const saveConfigData = async (config, deleted = []) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await postConfig(config);
+      const response = await postConfig(config, deleted);
 
       const message = response?.message || "Config saved successfully.";
 
@@ -450,6 +450,7 @@ export const AppProvider = ({ children }) => {
         timeout: 0,
       });
       setError(err.message);
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -535,7 +536,10 @@ export const AppProvider = ({ children }) => {
     try {
       const response = await fetchConfig();
       const config = response.config;
-      updateState({ config });
+      updateState({
+        config,
+        configMode: response.config_mode || "layered",
+      });
     } catch (err) {
       setError(err.message);
     } finally {

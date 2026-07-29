@@ -270,7 +270,7 @@ export const runWorkflow = async (workflowName, params = {}) => {
   }
 };
 
-export const postConfig = async (config) => {
+export const postConfig = async (config, deleted = []) => {
   const { urls } = getDjangoConstants(); // Base URL for the API from Django constants
 
   try {
@@ -278,7 +278,7 @@ export const postConfig = async (config) => {
     const csrfToken = window.csrftoken;
 
     // Prepare the payload with script_name and optional params
-    const payload = { config };
+    const payload = { config, deleted };
 
     const response = await apiRequest(urls.api_config, "POST", payload, {
       headers: {

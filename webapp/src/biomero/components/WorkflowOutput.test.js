@@ -1,0 +1,153 @@
+import React from "react";
+import { render, waitFor } from "@testing-library/react";
+import WorkflowOutput, {
+  getSuggestedDatasetDestination,
+} from "./WorkflowOutput";
+import { useAppContext } from "../../AppContext";
+
+jest.mock("../../AppContext", () => ({
+  useAppContext: jest.fn(),
+}));
+jest.mock("@blueprintjs/core", () => {
+  const Container = ({ children }) => <div>{children}</div>;
+  return {
+    Alignment: { END: "end" },
+    Card: Container,
+    FormGroup: Container,
+    InputGroup: () => <input />,
+    Switch: Container,
+    SwitchCard: Container,
+    Callout: Container,
+    Tooltip: Container,
+    Icon: () => null,
+    Divider: () => <hr />,
+    Tag: Container,
+  };
+});
+
+jest.mock("./DatasetSelectWithPopover.js", () => () => (
+  <div data-testid="dataset-select" />
+));
+
+const baseFormData = {
+  importAsZip: false,
+  uploadCsv: false,
+  attachToOriginalImages: false,
+  attachFileOutputs: false,
+  selectedDatasets: [],
+  selectedDatasetId: null,
+  enableRename: false,
+};
+
+describe("WorkflowOutput image-pathway destination suggestions", () => {
+  test("suggests a new dataset named after a single input plate", async () => {
+    const updateState = jest.fn();
+    useAppContext.mockReturnValue({
+      state: {
+        formData: baseFormData,
+        inputDatasets: [{
+          index: "plate-42",
+          id: 42,
+          data: "Screening Plate A",
+          category: "plates",
+        }],
+        selectedWorkflow: {
+          name: "cellpose",
+          metadata: {
+            outputs: [{ id: "mask", name: "Mask", type: "image" }],
+          },
+        },
+        omeroFileTreeData: {},
+      },
+      updateState,
+    });
+
+    render(<WorkflowOutput onSelectionChange={jest.fn()} />);
+
+    await waitFor(() => {
+      expect(updateState).toHaveBeenCalledWith({
+        formData: expect.objectContaining({
+          selectedDatasets: [expect.stringMatching(/^Screening_Plate_A_cellpose_\d{8}_\d{6}$/)],
+          selectedDatasetId: null,
+        }),
+      });
+    });
+  });
+
+  test("suggests one compact new dataset for mixed inputs", async () => {
+    const updateState = jest.fn();
+    useAppContext.mockReturnValue({
+      state: {
+        formData: baseFormData,
+        inputDatasets: [
+          {
+            index: "dataset-7",
+            id: 7,
+            data: "Primary Images",
+            category: "datasets",
+          },
+          {
+            index: "plate-42",
+            id: 42,
+            data: "Screening Plate A",
+            category: "plates",
+          },
+        ],
+        selectedWorkflow: {
+          name: "nuclei_segmentation",
+          metadata: {
+            outputs: [{ id: "mask", name: "Mask", type: "image" }],
+          },
+        },
+        omeroFileTreeData: {},
+      },
+      updateState,
+    });
+
+    render(<WorkflowOutput onSelectionChange={jest.fn()} />);
+
+    await waitFor(() => {
+      expect(updateState).toHaveBeenCalledWith({
+        formData: expect.objectContaining({
+          selectedDatasets: [expect.stringMatching(/^Primary_Images_nuclei_segmentation_\d{8}_\d{6}$/)],
+          selectedDatasetId: null,
+        }),
+      });
+    });
+  });
+
+  test("reuses one existing dataset instead of creating another", () => {
+    expect(getSuggestedDatasetDestination(
+      [{
+        index: "dataset-7",
+        id: 7,
+        data: "Primary Images",
+        category: "datasets",
+      }],
+      "nuclei_segmentation"
+    )).toEqual({ name: "Primary Images", id: 7 });
+  });
+
+  test("caps generated destination names without listing every input", () => {
+    const destination = getSuggestedDatasetDestination(
+      [
+        {
+          data: "A very long primary input container name that should be shortened for display",
+          category: "plates",
+        },
+        { data: "Second input", category: "datasets" },
+        { data: "Third input", category: "plates" },
+      ],
+      "an_extremely_long_workflow_name_that_also_needs_shortening",
+      new Date(2026, 6, 29, 14, 35, 22)
+    );
+
+    expect(destination.id).toBeNull();
+    expect(destination.name.length).toBeLessThanOrEqual(64);
+    expect(destination.name).not.toMatch(/\s/);
+    expect(destination.name).not.toContain("+");
+    expect(destination.name).toMatch(/_20260729_143522$/);
+    expect(destination.name).not.toContain("Second input");
+    expect(destination.name).not.toContain("Third input");
+  });
+});

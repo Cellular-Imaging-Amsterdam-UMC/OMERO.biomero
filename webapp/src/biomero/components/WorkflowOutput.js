@@ -3,6 +3,65 @@ import { Alignment, Card, FormGroup, InputGroup, Switch, SwitchCard, Callout, To
 import { useAppContext } from "../../AppContext";
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover.js";
 
+const MAX_SUGGESTED_DATASET_NAME_LENGTH = 64;
+
+const safeNamePart = (value) => String(value || "")
+  .trim()
+  .replace(/\s+/g, "_")
+  .replace(/[^A-Za-z0-9._-]+/g, "_")
+  .replace(/_+/g, "_")
+  .replace(/^[-_.]+|[-_.]+$/g, "");
+
+const truncateNamePart = (value, maxLength) => {
+  if (value.length <= maxLength) return value;
+  return value.slice(0, maxLength).replace(/[-_.]+$/g, "");
+};
+
+const padTimestampPart = (value) => String(value).padStart(2, "0");
+
+const formatRunTimestamp = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "unknown_time";
+  return [
+    date.getFullYear(),
+    padTimestampPart(date.getMonth() + 1),
+    padTimestampPart(date.getDate()),
+  ].join("") + "_" + [
+    padTimestampPart(date.getHours()),
+    padTimestampPart(date.getMinutes()),
+    padTimestampPart(date.getSeconds()),
+  ].join("");
+};
+
+export const getSuggestedDatasetDestination = (inputs, workflowName, now = new Date()) => {
+  const containers = Array.isArray(inputs) ? inputs.filter(Boolean) : [];
+  if (containers.length === 0) return null;
+
+  const firstInput = containers[0];
+  const firstInputName = String(firstInput?.data || "").trim();
+
+  // A single dataset already is the most useful destination; all other input
+  // combinations get a separator-safe, timestamped result dataset name.
+  if (containers.length === 1 && firstInput?.category === "datasets" && firstInputName) {
+    return { name: firstInputName, id: firstInput.id ?? null };
+  }
+
+  const workflowPart = truncateNamePart(
+    safeNamePart(workflowName) || "workflow",
+    24
+  );
+  const timestamp = formatRunTimestamp(now);
+  const suffix = `_${workflowPart}_${timestamp}`;
+  const inputNameLimit = Math.max(8, MAX_SUGGESTED_DATASET_NAME_LENGTH - suffix.length);
+  const inputPart = truncateNamePart(safeNamePart(firstInputName) || "input_data", inputNameLimit);
+
+  return {
+    name: `${inputPart}${suffix}`,
+    id: null,
+  };
+
+};
+
 const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   const { state, updateState } = useAppContext();
   const [renamePattern, setRenamePattern] = useState("{original_file}_result.{ext}");
@@ -247,29 +306,33 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   useEffect(() => {
     if (plateMode) return;
     if (autoFilledDatasets.current) return;
-    const inputs = state.inputDatasets || [];
-    if (inputs.length === 0) return;
-    const hasPlate = inputs.some((d) => d?.category === "plates");
-    const allDatasets = inputs.every((d) => d?.category === "datasets");
+    const destination = getSuggestedDatasetDestination(
+      state.inputDatasets,
+      state.selectedWorkflow?.name
+    );
+    if (!destination) return;
 
-    // Backward compatibility: never clear existing dataset target defaults here.
-    // If inputs are not datasets, keep whatever is already selected.
-    if (hasPlate || !allDatasets) return;
-
-    // Only auto-populate once when all inputs are datasets and nothing chosen yet
+    // Only auto-populate once and never overwrite an explicit destination.
     if (
-      allDatasets &&
       (!state.formData.selectedDatasets ||
         state.formData.selectedDatasets.length === 0)
     ) {
-      const firstInputDataset = inputs[0];
       autoFilledDatasets.current = true;
-      handleFormDataUpdate({
-        selectedDatasets: firstInputDataset?.data ? [firstInputDataset.data] : [],
-        selectedDatasetId: firstInputDataset?.id ?? null,
+      updateState({
+        formData: {
+          ...state.formData,
+          selectedDatasets: [destination.name],
+          selectedDatasetId: destination.id,
+        },
       });
     }
-  }, [state.inputDatasets, plateMode]);
+  }, [
+    state.inputDatasets,
+    state.selectedWorkflow?.name,
+    plateMode,
+    state.formData,
+    updateState,
+  ]);
 
   // Plate-mode: auto-fill the parent screen once per plate ID
   useEffect(() => {

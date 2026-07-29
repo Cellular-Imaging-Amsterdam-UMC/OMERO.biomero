@@ -20,6 +20,7 @@ import ConfigSection from "./ConfigSection";
 import ModelCard from "./ModelCard.js";
 import ConverterCard from "./ConverterCard.js";
 import { checkModelVersions, clearGitHubCache, slugify, fetchWorkflowMetadata } from "../../apiService";
+import { getDeletedConfigOptions } from "../configAdmin";
 
 const DOCS_URL = "https://nl-bioimaging.github.io/biomero/slurm-configuration.html";
 
@@ -227,6 +228,11 @@ const SettingsForm = () => {
             JSON.parse(state.config.UI.plate_workflows || '[]') : [];
           const isPlateWorkflow = plateWorkflows.includes(prefix);
           
+
+          const dualModeWorkflows = state.config.UI?.dual_mode_workflows ?
+            JSON.parse(state.config.UI.dual_mode_workflows || '[]') : [];
+          const isDualModeWorkflow = dualModeWorkflows.includes(prefix);
+
           // Check if this workflow is marked as ZARR workflow in UI config
           const zarrWorkflows = state.config.UI?.zarr_workflows ? 
             JSON.parse(state.config.UI.zarr_workflows || '[]') : [];
@@ -237,6 +243,7 @@ const SettingsForm = () => {
             repo: value, // e.g., the repo URL
             job: state.config.WORKFLOWS[`${prefix}_job`], // e.g., "jobs/cellpose.sh"
             isPlateWorkflow: isPlateWorkflow, // Boolean flag from UI list
+            isDualModeWorkflow: isDualModeWorkflow,
             isZarrWorkflow: isZarrWorkflow, // Boolean flag from UI list
             useGpu: state.config.WORKFLOWS[`${prefix}_use_gpu`] === "true",
             extraParams: extractExtraParams(prefix), // Handle the extraParams here
@@ -492,6 +499,11 @@ const SettingsForm = () => {
         // When enabling plate workflow, also enable ZARR
         updatedModels[index]["isZarrWorkflow"] = true;
       }
+      if (field === "isPlateWorkflow" && value === false &&
+          !descriptorMetadata[index]?.requiresPlate) {
+        updatedModels[index]["isDualModeWorkflow"] = false;
+      }
+
 
       return { ...prev, WORKFLOWS: updatedModels };
     });
@@ -685,7 +697,11 @@ const SettingsForm = () => {
         }));
       }
       
-      await saveConfigData(transformSettingsFormToPayload(configToSave));
+      const configPayload = transformSettingsFormToPayload(configToSave);
+      const deleted = getDeletedConfigOptions(
+        state.config || {}, configPayload
+      );
+      await saveConfigData(configPayload, deleted);
       
       // Update the baseline for "hasChanges" detection - form state is now the "initial" state
       const currentFormState = {
@@ -700,6 +716,8 @@ const SettingsForm = () => {
       
       setShowSaveTooltip(false); // Hide "Don't forget to save"
       setShowResetTooltip(true); // Show "Reload to apply changes"
+    } catch {
+      // AppContext displays the save error; keep the existing form baseline.
     } finally {
       setLoading(false);
     }
@@ -726,6 +744,11 @@ const SettingsForm = () => {
       .filter(model => model.isPlateWorkflow)
       .map(model => model.name);
       
+
+    // Workflows in this list appear in both the image and plate run tabs.
+    const dualModeWorkflows = settingsForm.WORKFLOWS
+      .filter(model => model.isDualModeWorkflow)
+      .map(model => model.name);
     // Collect ZARR workflows into a JSON list
     const zarrWorkflows = settingsForm.WORKFLOWS
       .filter(model => model.isZarrWorkflow)
@@ -751,7 +774,8 @@ const SettingsForm = () => {
       UI: {
         ...settingsForm.UI,
         plate_workflows: JSON.stringify(plateWorkflows),
-        zarr_workflows: JSON.stringify(zarrWorkflows)
+        zarr_workflows: JSON.stringify(zarrWorkflows),
+        dual_mode_workflows: JSON.stringify(dualModeWorkflows)
       }
     };
   };
@@ -764,7 +788,11 @@ const SettingsForm = () => {
     explanation,
     intent = ""
   ) => (
-    <FormGroup label={label} helperText={explanation} intent={intent}>
+    <FormGroup
+      label={label}
+      helperText={explanation}
+      intent={intent}
+    >
       <div className="flex items-center space-x-2">
         <InputGroup
           value={value || ""}
@@ -1342,6 +1370,7 @@ const SettingsForm = () => {
             <code>SQLALCHEMY_URL</code> environment variable instead (safer — it takes priority). See{" "}
             <a href="https://docs.sqlalchemy.org/en/20/core/engines.html#database-urls" target="_blank" rel="noopener noreferrer">SQLAlchemy docs</a>.
             <ExampleNote>postgresql+psycopg2://user:password@localhost:5432/db</ExampleNote>
+            <EnvVarNote vars={["SQLALCHEMY_URL"]} />
           </>,
           "danger"
         )}
@@ -1551,33 +1580,23 @@ const SettingsForm = () => {
       <div className="bp5-form-group">
         <div className="bp5-form-content">
           <div className="bp5-form-helper-text">
-            Note that there are possibly <b>multiple</b> config files that
-            BIOMERO reads from and combines into 1 final configuration.
-          </div>
-          <div className="bp5-form-helper-text">
-            By default (in this order):
-            <ol>
-              <li>
-                {" "}
-                (1) <code>/etc/slurm-config.ini</code>{" "}
-              </li>
-              <li>
-                {" "}
-                (2) and <code>~/slurm-config.ini</code>{" "}
-              </li>
-              <li> (3) and environment variables that you set </li>
-            </ol>
-          </div>
-          <div className="bp5-form-helper-text">
-            We write these values in (2) the local{" "}
-            <code>~/slurm-config.ini</code>, but read also from (1) the
-            system-wide <code>/etc/slurm-config.ini</code>. So it could be that{" "}
-            <b>removing</b> some setting here doesn't work because they are set
-            in <code>/etc/slurm-config.ini</code>: if so, please contact your
-            system administrator to change that file. <b>Adding</b> and/or{" "}
-            <b>overwriting</b> values should always work, because{" "}
-            <code>~/slurm-config.ini</code> is read and applied last (but before
-            environment variables).
+            {state.configMode === "authoritative" ? (
+              <>
+                This admin page manages BIOMERO's authoritative configuration
+                file. Adding, changing, and deleting settings here affects the
+                shared file directly. Environment variables on runtime workers
+                can still override saved values; OMERO.web cannot inspect or
+                display those worker-local overrides.
+              </>
+            ) : (
+              <>
+                This deployment uses BIOMERO's legacy layered configuration.
+                Values from system configuration files can reappear after they
+                are removed here. Set <code>BIOMERO_SLURM_CONFIG_FILE</code> in
+                both OMERO.web and the BIOMERO worker to enable authoritative
+                configuration management.
+              </>
+            )}
           </div>
         </div>
       </div>

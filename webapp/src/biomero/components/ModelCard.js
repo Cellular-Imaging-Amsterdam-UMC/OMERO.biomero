@@ -38,6 +38,7 @@ const ModelCard = ({
   globalJobParams, // { sbatchParams, defaultPartition } from SLURM settings
 }) => {
   const hasScriptRepo = !!config?.SLURM?.slurm_script_repo;
+  const supportsPlates = (item.isPlateWorkflow || false) || descriptorMeta?.requiresPlate === true;
   const [inputValue, setInputValue] = useState("");
   const [showWarning, setShowWarning] = useState(false);
   const [containerImage, setContainerImage] = useState(null);
@@ -411,6 +412,28 @@ const ModelCard = ({
           </div>
         )}
         
+
+        <div className="flex items-center justify-between mt-3">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium flex items-center gap-1">
+              <Icon icon="applications" size={12} intent="primary" />
+              Also Allow Image Input
+            </span>
+            <span className="text-xs text-gray-500">
+              Show this same workflow in both tabs and use the image dialog for image runs
+            </span>
+          </div>
+          <Tooltip
+            content="Enable Plate Workflow first, or declare requires-plate in the BILAYERS descriptor"
+            disabled={supportsPlates}
+          >
+            <Switch
+              checked={item.isDualModeWorkflow || false}
+              disabled={!editable || !supportsPlates}
+              onChange={(e) => onChange(index, "isDualModeWorkflow", e.target.checked)}
+            />
+          </Tooltip>
+        </div>
         <div className="flex items-center justify-between mt-3">
           <div className="flex flex-col">
             <span className="text-sm font-medium flex items-center gap-1">
@@ -418,15 +441,15 @@ const ModelCard = ({
               ZARR Format Required
             </span>
             <span className="text-xs text-gray-500">
-              {item.isPlateWorkflow 
+              {supportsPlates
                 ? "Automatically enabled when plate workflow is selected"
                 : "Enable for workflows that require ZARR input format (skips TIFF conversion)"
               }
             </span>
           </div>
           <Switch
-            checked={item.isZarrWorkflow || false}
-            disabled={!editable || item.isPlateWorkflow} // Disable when plate workflow is enabled
+            checked={(item.isZarrWorkflow || false) || supportsPlates}
+            disabled={!editable || supportsPlates} // Plate support always requires ZARR
             onChange={(e) => {
               const isChecked = e.target.checked;
               onChange(index, "isZarrWorkflow", isChecked);

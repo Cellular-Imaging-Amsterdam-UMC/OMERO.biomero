@@ -9,7 +9,7 @@ CONTAINER_NAME="nl-biomero-omeroweb-1"
 COMMAND0="chmod a+w /opt/omero/web/OMERO.web/var/static"
 COMMAND0B="git config --global --add safe.directory /opt/omero/web/OMERO.biomero"
 
-COMMAND1="/opt/omero/web/venv3/bin/python -m pip install --no-cache-dir -e /opt/omero/web/OMERO.biomero --force-reinstall --no-deps"
+COMMAND1="/opt/omero/web/venv3/bin/python -m pip install --no-cache-dir --upgrade -e /opt/omero/web/OMERO.biomero"
 COMMAND2="/opt/omero/web/venv3/bin/omero-biomero-setup"
 
 COMMAND3="/opt/omero/web/venv3/bin/omero web stop || true; rm -f /opt/omero/web/OMERO.web/var/django.pid"
