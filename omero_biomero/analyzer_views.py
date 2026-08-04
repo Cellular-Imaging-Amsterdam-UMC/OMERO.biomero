@@ -15,6 +15,43 @@ import omero.model
 
 logger = logging.getLogger(__name__)
 
+def get_roi_script_capability(script_service, scripts=None):
+    """Ask OMERO whether the optional Labels2Rois script is installed."""
+    scripts = scripts if scripts is not None else script_service.getScripts()
+    matches = [script for script in scripts
+               if unwrap(script.getName()) == constants.LABELS_TO_ROIS_SCRIPT]
+    if not matches:
+        return {
+            "available": False,
+            "reason": "The Labels2Rois utility script is not installed.",
+        }
+
+    return {
+        "available": True,
+        "reason": None,
+    }
+
+
+def descriptor_all_image_outputs_are_labels(workflow_name):
+    """Return true when every declared image output is a label image."""
+    try:
+        with SlurmClient.from_config(config_only=True) as sc:
+            metadata = sc.generic_descriptor_from_github(workflow_name)
+    except Exception as exc:
+        logger.warning(
+            f"Could not inspect descriptor outputs for {workflow_name}: {exc}")
+        return False
+
+    image_outputs = [
+        output for output in metadata.get("outputs", [])
+        if str(output.get("type", "")).lower() == "image"
+    ]
+    return bool(image_outputs) and all(
+        "label" in [str(value).lower() for value in
+                    (output.get("sub-type") or output.get("subtype") or [])]
+        for output in image_outputs
+    )
+
 
 @login_required()
 @require_http_methods(["POST"])
@@ -30,6 +67,7 @@ def run_workflow_script(request, conn=None, **kwargs):
         if not workflow_name:
             return JsonResponse({"error": "workflow_name is required"}, status=400)
         params = data.get("params", {})
+        launch_warnings = []
         
         # Determine which script to use based on batch processing settings
         batch_enabled = params.get("batchEnabled", False)
@@ -143,6 +181,9 @@ def run_workflow_script(request, conn=None, **kwargs):
         rename_pt = params.get("renamePattern", "")
         version = params.get("version")
         attach_file_outputs = params.get("attachFileOutputs", False)
+        create_rois = bool(params.get("createRois", False))
+        roi_label_pattern = str(params.get("roiLabelPattern", "") or "").strip()
+        roi_shape = str(params.get("roiShape", "Polygon") or "Polygon")
         # EXPERIMENTAL: ZARR format support
         use_zarr = params.get("useZarrFormat", False)
         # Always default to 0.4 so omero-cli-zarr doesn't fall back to 0.5 (Zarr v3)
@@ -151,6 +192,43 @@ def run_workflow_script(request, conn=None, **kwargs):
         batch_enabled = params.get("batchEnabled", False)
         batch_count = params.get("batchCount", 1)
         batch_size = params.get("batchSize", len(input_ids) if input_ids else 1)
+
+        if create_rois:
+            roi_capability = get_roi_script_capability(svc, scripts)
+            if not roi_capability["available"]:
+                create_rois = False
+                launch_warnings.append({
+                    "code": "roi_script_unavailable",
+                    "message": (
+                        "ROI postprocessing was requested but will be skipped: "
+                        f"{roi_capability['reason']}"
+                    ),
+                })
+            else:
+                has_import_destination = bool(
+                    output_ds or output_sc or output_ds_id or output_sc_id)
+                if not has_import_destination:
+                    return JsonResponse({
+                        "error": (
+                            "ROI creation requires importing result images "
+                            "into a Dataset or Screen."
+                        )
+                    }, status=400)
+                if roi_shape not in ("Polygon", "Mask"):
+                    return JsonResponse({
+                        "error": "ROI shape must be Polygon or Mask"
+                    }, status=400)
+                if not roi_label_pattern:
+                    if descriptor_all_image_outputs_are_labels(workflow_name):
+                        roi_label_pattern = "*"
+                    else:
+                        return JsonResponse({
+                            "error": (
+                                "A label image pattern is required because "
+                                "the workflow does not describe every image "
+                                "output as subtype 'label'."
+                            )
+                        }, status=400)
 
         # Convert provided params to OMERO rtypes using wrap
         known_params = [
@@ -179,6 +257,9 @@ def run_workflow_script(request, conn=None, **kwargs):
             "batchCount",     # Frontend calculated (not sent to script)
             "batchSize",      # Converted to Batch_Size for script
             "attachFileOutputs",  # Converted to workflow.OUTPUT_ATTACH_FILE_OUTPUTS
+            "createRois",         # Converted to workflow.OUTPUT_CREATE_ROIS
+            "roiLabelPattern",    # Converted to workflow.ROI_LABEL_PATTERN
+            "roiShape",           # Converted to workflow.ROI_SHAPE
         ]
         # File-attachment params arrive as FILE_{param_id}: int annotation ID.
         # Must be rlong — wrap() would give rstring if the value is a string.
@@ -227,6 +308,9 @@ def run_workflow_script(request, conn=None, **kwargs):
                 ),
                 workflow.OUTPUT_CSV_TABLE: rbool(uploadcsv),
                 workflow.OUTPUT_ATTACH_FILE_OUTPUTS: rbool(attach_file_outputs),
+                workflow.OUTPUT_CREATE_ROIS: rbool(create_rois),
+                workflow.ROI_LABEL_PATTERN: wrap(roi_label_pattern),
+                workflow.ROI_SHAPE: wrap(roi_shape),
             }
         )
         
@@ -262,6 +346,8 @@ def run_workflow_script(request, conn=None, **kwargs):
                     "status": "success",
                     "message": f"Script {script_name} for {workflow_name} started successfully: {msg}",
                     "jobId": job_id,
+                    "warnings": launch_warnings,
+                    "effectiveOptions": {"createRois": create_rois},
                 }
             )
 
@@ -544,12 +630,17 @@ def get_slurm_status(request, conn=None, **kwargs):
     script_name = constants.RUN_WF_SCRIPT  # Contains all workflow version info
     
     logger.info(f"Starting SLURM status check for script: {script_name}")
+    roi_capability = {
+        "available": False,
+        "reason": "ROI capability could not be checked.",
+    }
     
     try:
         scriptService = conn.getScriptService()
         
         # Find the script by name (same approach as run_workflow_script)
         scripts = scriptService.getScripts()
+        roi_capability = get_roi_script_capability(scriptService, scripts)
         script = None
         for s in scripts:
             if unwrap(s.getName()) == script_name:
@@ -565,7 +656,8 @@ def get_slurm_status(request, conn=None, **kwargs):
                 "last_checked": datetime.datetime.now().isoformat(),
                 "icon": "error",
                 "intent": "danger",
-                "workflow_versions": {}
+                "workflow_versions": {},
+                "capabilities": {"roi_postprocessing": roi_capability},
             })
         
         # Get the script ID and fetch params
@@ -617,7 +709,8 @@ def get_slurm_status(request, conn=None, **kwargs):
             "last_checked": datetime.datetime.now().isoformat(),
             "icon": "tick-circle",
             "intent": "success",
-            "workflow_versions": workflow_versions
+            "workflow_versions": workflow_versions,
+            "capabilities": {"roi_postprocessing": roi_capability},
         }
         
         logger.info(f"SLURM status check successful. Status: {status['status']}, Workflows: {total_workflows}")
@@ -654,6 +747,8 @@ def get_slurm_status(request, conn=None, **kwargs):
                 "workflow_versions": {}
             }
     
+    status.setdefault(
+        "capabilities", {"roi_postprocessing": roi_capability})
     return JsonResponse(status)
 
 

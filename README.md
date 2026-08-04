@@ -16,6 +16,7 @@ Additionally, the plugin provides a user-friendly interface to execute OMERO scr
 - **Upload Monitoring**: Monitor the status and history of uploads using a dashboard.
 - **Script Execution**: Execute OMERO scripts through a user-friendly interface and monitor their execution.
 - **Workflow Execution**: Execute BIOMERO workflows on SLURM cluster and monitor their execution.
+- **Optional ROI Output**: Import label-image results and convert them into Polygon or Mask ROIs on the original images. Descriptor label subtypes provide safe defaults; other workflows can select masks with a filename glob.
 
 ## Technologies Used
 

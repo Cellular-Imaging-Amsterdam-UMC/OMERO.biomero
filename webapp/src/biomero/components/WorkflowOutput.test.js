@@ -14,6 +14,7 @@ jest.mock("@blueprintjs/core", () => {
     Alignment: { END: "end" },
     Card: Container,
     FormGroup: Container,
+    HTMLSelect: () => <select />,
     InputGroup: () => <input />,
     Switch: Container,
     SwitchCard: Container,
@@ -37,6 +38,9 @@ const baseFormData = {
   selectedDatasets: [],
   selectedDatasetId: null,
   enableRename: false,
+  createRois: false,
+  roiLabelPattern: "",
+  roiShape: "Polygon",
 };
 
 describe("WorkflowOutput image-pathway destination suggestions", () => {
@@ -149,5 +153,81 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
     expect(destination.name).toMatch(/_20260729_143522$/);
     expect(destination.name).not.toContain("Second input");
     expect(destination.name).not.toContain("Third input");
+  });
+
+  test("accepts automatic ROI selection for descriptor label outputs", async () => {
+    const onSelectionChange = jest.fn();
+    useAppContext.mockReturnValue({
+      state: {
+        formData: {
+          ...baseFormData,
+          selectedDatasets: ["Results"],
+          createRois: true,
+          roiLabelPattern: "*",
+        },
+        inputDatasets: [],
+        selectedWorkflow: {
+          name: "bilayers-cellpose",
+          metadata: {
+            outputs: [{ id: "mask", type: "image", "sub-type": ["label"] }],
+          },
+        },
+        capabilities: { roi_postprocessing: { available: true } },
+        omeroFileTreeData: {},
+      },
+      updateState: jest.fn(),
+    });
+
+    render(<WorkflowOutput onSelectionChange={onSelectionChange} />);
+
+    await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(true));
+  });
+
+  test("requires a user pattern for workflows without label descriptors", async () => {
+    const onSelectionChange = jest.fn();
+    useAppContext.mockReturnValue({
+      state: {
+        formData: {
+          ...baseFormData,
+          selectedDatasets: ["Results"],
+          createRois: true,
+          roiLabelPattern: "",
+        },
+        inputDatasets: [],
+        selectedWorkflow: { name: "biaflows-cellpose", metadata: { outputs: [] } },
+        capabilities: { roi_postprocessing: { available: true } },
+        omeroFileTreeData: {},
+      },
+      updateState: jest.fn(),
+    });
+
+    render(<WorkflowOutput onSelectionChange={onSelectionChange} />);
+
+    await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(false));
+  });
+
+  test("requires imported screen images for plate ROI postprocessing", async () => {
+    const onSelectionChange = jest.fn();
+    useAppContext.mockReturnValue({
+      state: {
+        formData: {
+          selectedScreens: [],
+          selectedScreenId: null,
+          createRois: true,
+          roiLabelPattern: "*",
+        },
+        selectedWorkflow: {
+          name: "plate-labels",
+          metadata: { outputs: [{ type: "image", subtype: ["label"] }] },
+        },
+        capabilities: { roi_postprocessing: { available: true } },
+        omeroFileTreeData: {},
+      },
+      updateState: jest.fn(),
+    });
+
+    render(<WorkflowOutput plateMode onSelectionChange={onSelectionChange} />);
+
+    await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(false));
   });
 });
