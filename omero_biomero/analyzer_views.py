@@ -221,14 +221,9 @@ def run_workflow_script(request, conn=None, **kwargs):
                 if not roi_label_pattern:
                     if descriptor_all_image_outputs_are_labels(workflow_name):
                         roi_label_pattern = "*"
-                    else:
-                        return JsonResponse({
-                            "error": (
-                                "A label image pattern is required because "
-                                "the workflow does not describe every image "
-                                "output as subtype 'label'."
-                            )
-                        }, status=400)
+                    # Otherwise an empty selector requests conservative,
+                    # best-effort selection after result images are imported
+                    # and matched to their source images.
 
         # Convert provided params to OMERO rtypes using wrap
         known_params = [

@@ -183,7 +183,7 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
     await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(true));
   });
 
-  test("requires a user pattern for workflows without label descriptors", async () => {
+  test("uses best-effort ROI selection without label descriptors", async () => {
     const onSelectionChange = jest.fn();
     useAppContext.mockReturnValue({
       state: {
@@ -201,9 +201,10 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
       updateState: jest.fn(),
     });
 
-    render(<WorkflowOutput onSelectionChange={onSelectionChange} />);
+    const { getByText } = render(<WorkflowOutput onSelectionChange={onSelectionChange} />);
 
-    await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(false));
+    await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(true));
+    expect(getByText(/match imported results to each original image/i)).toBeInTheDocument();
   });
 
   test("requires imported screen images for plate ROI postprocessing", async () => {

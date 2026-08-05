@@ -235,11 +235,8 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   const roiHasDestination = plateMode
     ? (state.formData.selectedScreens?.length ?? 0) > 0
     : (state.formData.selectedDatasets?.length ?? 0) > 0;
-  const roiNeedsPattern = !outputHints.allImageOutputsAreLabels;
-  const roiPatternMissing = roiNeedsPattern
-    && !String(state.formData.roiLabelPattern || "").trim();
   const roiValidationError = !!state.formData.createRois && (
-    !roiCapabilityAvailable || !roiHasDestination || roiPatternMissing
+    !roiCapabilityAvailable || !roiHasDestination
   );
 
   // suggested: workflow hint recommends this option on
@@ -587,11 +584,6 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
             <strong>ROI creation:</strong> Select a {containerType} destination so the label images are imported first.
           </Callout>
         )}
-        {state.formData.createRois && roiPatternMissing && (
-          <Callout intent="danger" compact className="mb-2">
-            <strong>ROI creation:</strong> Enter a glob that identifies the label images.
-          </Callout>
-        )}
         {state.formData.createRois && !roiCapabilityAvailable && (
           <Callout intent="danger" compact className="mb-2">
             <strong>ROI creation:</strong> {roiCapability?.reason || "The ROI utility capability has not been confirmed."}
@@ -685,26 +677,16 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
               />
             </div>
 
-            {outputHints.allImageOutputsAreLabels ? (
-              <Callout intent="success" compact minimal className="mt-2 text-sm">
-                All declared image outputs are labels. BIOMERO will select them automatically.
-              </Callout>
-            ) : (
-              <FormGroup
-                label="Label image pattern"
-                labelFor="roi-label-pattern"
-                helperText="Glob matched against result basenames before any import rename. Example: *_cp_masks.tif"
-                className="mt-2 mb-2"
-              >
-                <InputGroup
-                  id="roi-label-pattern"
-                  value={state.formData.roiLabelPattern || ""}
-                  onChange={(e) => handleInputChange("roiLabelPattern", e.target.value)}
-                  placeholder="*_cp_masks.tif"
-                  intent={roiPatternMissing ? "danger" : "none"}
-                />
-              </FormGroup>
-            )}
+            <Callout
+              intent={outputHints.allImageOutputsAreLabels ? "success" : "primary"}
+              compact
+              minimal
+              className="mt-2 text-sm"
+            >
+              {outputHints.allImageOutputsAreLabels
+                ? "All declared image outputs are labels. BIOMERO will use them automatically."
+                : "BIOMERO will match imported results to each original image and select label-like outputs automatically. Ambiguous results are skipped without failing the workflow."}
+            </Callout>
 
             <FormGroup
               label="ROI representation"
@@ -729,8 +711,8 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
               onChange={(e) => handleFormDataUpdate({
                 createRois: e.target.checked,
                 roiShape: state.formData.roiShape || "Polygon",
-                ...(e.target.checked && outputHints.allImageOutputsAreLabels
-                  ? { roiLabelPattern: "*" }
+                ...(e.target.checked
+                  ? { roiLabelPattern: outputHints.allImageOutputsAreLabels ? "*" : "" }
                   : {}),
               })}
               className="mt-2"

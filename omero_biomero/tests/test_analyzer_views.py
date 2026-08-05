@@ -214,6 +214,63 @@ class AnalyzerViewsTests(TestCase):
         self.assertIn("Dataset or Screen", resp.content.decode())
         svc.getParams.assert_not_called()
 
+    def test_run_workflow_roi_accepts_automatic_selector(self):
+        from biomero.constants import workflow
+        from omero.rtypes import unwrap
+
+        class Script:
+            def __init__(self, script_id, name):
+                self.id = script_id
+                self.name = name
+
+            def getName(self):
+                return self.name
+
+        class Proc:
+            class Job:
+                _id = 99
+
+            def getJob(self):
+                return self.Job()
+
+        svc = MagicMock()
+        svc.getScripts.return_value = [
+            Script(42, "SLURM_Run_Workflow.py"),
+            Script(43, "Labels2Rois.py"),
+        ]
+        svc.runScript.return_value = Proc()
+        conn = MagicMock()
+        conn.getScriptService.return_value = svc
+        params = {
+            "IDs": [1],
+            "Data_Type": "Image",
+            "selectedDatasets": ["Results"],
+            "createRois": True,
+            "roiLabelPattern": "",
+        }
+
+        class _Session(dict):
+            modified = False
+
+        request = SimpleNamespace(
+            method="POST",
+            body=json.dumps({"workflow_name": "wfA", "params": params}).encode(),
+            session=_Session(),
+        )
+        with patch(
+            "omero_biomero.analyzer_views.prepare_workflow_parameters",
+            lambda *a, **k: params,
+        ), patch(
+            "omero_biomero.analyzer_views.descriptor_all_image_outputs_are_labels",
+            return_value=False,
+        ):
+            resp = _raw("run_workflow_script")(request, conn=conn)
+
+        self.assertEqual(resp.status_code, 200)
+        sent_inputs = svc.runScript.call_args.args[1]
+        self.assertEqual(
+            unwrap(sent_inputs[workflow.ROI_LABEL_PATTERN]), "")
+
     def test_run_workflow_script_invalid_json(self):
         view = _raw("run_workflow_script")
         request = SimpleNamespace(method="POST", body=b"not-json")
