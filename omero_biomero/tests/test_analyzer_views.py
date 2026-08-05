@@ -190,7 +190,7 @@ class AnalyzerViewsTests(TestCase):
         svc = MagicMock()
         svc.getScripts.return_value = [
             Script(42, "SLURM_Run_Workflow.py"),
-            Script(43, "Labels2Rois"),
+            Script(43, "Labels2Rois.py"),
         ]
         conn = MagicMock()
         conn.getScriptService.return_value = svc
@@ -257,7 +257,7 @@ class AnalyzerViewsTests(TestCase):
         svc = MagicMock()
         svc.getScripts.return_value = [
             Script(42, "SLURM_Run_Workflow.py"),
-            Script(43, "Labels2Rois"),
+            Script(43, "Labels2Rois.py"),
         ]
         svc.getParams.return_value = SimpleNamespace(inputs={})
         conn = MagicMock()
