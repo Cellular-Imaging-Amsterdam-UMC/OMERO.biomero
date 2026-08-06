@@ -12,6 +12,8 @@ import "./tailwind.css";
 import { AppProvider } from "./AppContext";
 import BiomeroApp from "./biomero/BiomeroApp";
 import ImporterApp from "./importer/ImporterApp";
+import DataAnalysisApp from "./data-analysis/DataAnalysisApp";
+import { resolveAppName } from "./appRouting";
 import {
   Navbar,
   NavbarGroup,
@@ -66,10 +68,13 @@ c-64 60 -112 93 -271 188 -375 222 -525 400 -604 719 -18 72 -22 117 -22 257
 const AppRouter = () => {
   const [searchParams] = useSearchParams();
   const WEBCLIENT = window.WEBCLIENT;
-  const { IMPORTER_ENABLED, ANALYZER_ENABLED } = WEBCLIENT.UI;
+  const { IMPORTER_ENABLED, ANALYZER_ENABLED, DATA_ANALYSIS_ENABLED } = WEBCLIENT.UI;
   const navigate = useNavigate();
-  const appName =
-    searchParams.get("tab") || (IMPORTER_ENABLED ? "import" : "biomero");
+  const appName = resolveAppName(searchParams.get("tab"), {
+    importer_enabled: IMPORTER_ENABLED,
+    analyzer_enabled: ANALYZER_ENABLED,
+    data_analysis_enabled: DATA_ANALYSIS_ENABLED,
+  });
 
   return (
     <AppProvider>
@@ -106,10 +111,26 @@ const AppRouter = () => {
                 outlined={appName === "biomero"}
               />
             )}
+            {DATA_ANALYSIS_ENABLED && (
+              <Button
+                className={`bp5-minimal focus:ring-0 focus:ring-offset-0 ${
+                  appName === "data-analysis"
+                    ? "bp5-intent-primary font-bold shadow-md"
+                    : ""
+                }`}
+                icon="applications"
+                text="Data Analysis"
+                onClick={() => navigate("?tab=data-analysis")}
+                outlined={appName === "data-analysis"}
+              />
+            )}
           </NavbarGroup>
         </Navbar>
         <div className="pt-[50px]">
-          {appName === "biomero" ? <BiomeroApp /> : <ImporterApp />}
+          {appName === "import" && <ImporterApp />}
+          {appName === "biomero" && <BiomeroApp />}
+          {appName === "data-analysis" && <DataAnalysisApp />}
+          {!appName && <div className="p-6">No BIOMERO applications are enabled.</div>}
         </div>
       </div>
     </AppProvider>

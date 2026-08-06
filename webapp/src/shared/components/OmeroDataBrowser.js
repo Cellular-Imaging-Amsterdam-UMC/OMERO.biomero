@@ -1,7 +1,12 @@
 import React from "react";
 import { useAppContext } from "../../AppContext";
 import FileTree from "./FileTree";
-import { fetchProjectData, fetchPlatesData } from "../../apiService";
+import {
+  fetchImages,
+  fetchPlateImages,
+  fetchProjectData,
+  fetchPlatesData,
+} from "../../apiService";
 
 const OmeroDataBrowser = ({ onSelectCallback }) => {
   const { state, updateState } = useAppContext();
@@ -23,6 +28,34 @@ const OmeroDataBrowser = ({ onSelectCallback }) => {
         childCount: plate.childCount || 0,
         data: plate.name,
         source: "omero",
+      }));
+    } else if (nodeType === "dataset") {
+      response = await fetchImages(
+        node.id,
+        1,
+        false,
+        false,
+        state.user.active_group_id
+      );
+      children = response.map((image) => ({
+        id: image.id,
+        category: "images",
+        index: `image-${image.id}`,
+        isFolder: false,
+        children: [],
+        childCount: 0,
+        data: image.name,
+        source: "omero",
+      }));
+    } else if (nodeType === "plate") {
+      response = await fetchPlateImages(node.id);
+      children = response.map((image) => ({
+        ...image,
+        category: "images",
+        isFolder: false,
+        children: [],
+        childCount: 0,
+        data: image.name,
       }));
     } else {
       response = await fetchProjectData(node);
