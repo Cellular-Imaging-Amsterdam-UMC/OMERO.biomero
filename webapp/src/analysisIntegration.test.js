@@ -2,7 +2,10 @@ import {
   ANALYSIS_MESSAGE_SCHEMA,
   buildAnalysisUrl,
   isAnalysisMessage,
+  launchContextUrl,
   parseAnalysisLaunch,
+  postAnalysisTheme,
+  sourceFromLaunchContext,
   sourceFromWorkspaceDataset,
   sourceFromTreeItems,
   workspaceDatasetResolutionUrl,
@@ -110,4 +113,44 @@ test("managed Dataset metadata provides guidance when it cannot resume", () => {
 
   expect(result.source).toBeNull();
   expect(result.error).toBe("The original source is unavailable.");
+});
+
+test("managed workspace launch matches the middle pane without requiring a snapshot", () => {
+  const result = sourceFromLaunchContext({
+    panel_kind: "workspace",
+    workspace_summary: {
+      can_resume: true,
+      workspace_name: "SolHunt analysis",
+      source_type: "Screen",
+      source_id: 152,
+      source_name: "SolHunt",
+    },
+  }, { type: "Dataset", id: 303, title: "Managed Dataset" });
+
+  expect(result.source).toMatchObject({
+    type: "Screen",
+    id: 152,
+    workspaceAnnotationId: null,
+    resumeWorkspaceName: "SolHunt analysis",
+  });
+});
+
+test("launch context preserves a same-type multi-selection", () => {
+  const url = new URL(launchContextUrl("/omero_analysis/", {
+    type: "Image",
+    id: 5,
+    selectionIds: [5, 6],
+  }));
+  expect(url.pathname).toBe("/omero_analysis/api/launch-context/Image/5/");
+  expect(url.searchParams.getAll("selection_id")).toEqual(["5", "6"]);
+});
+
+test("BIOMERO sends only whitelisted light and dark theme messages", () => {
+  const iframeWindow = { postMessage: jest.fn() };
+  expect(postAnalysisTheme(iframeWindow, "dark")).toBe(true);
+  expect(iframeWindow.postMessage).toHaveBeenCalledWith(
+    expect.objectContaining({ source: "omero-biomero", type: "theme-changed", payload: { theme: "dark" } }),
+    window.location.origin
+  );
+  expect(postAnalysisTheme(iframeWindow, "sepia")).toBe(false);
 });
