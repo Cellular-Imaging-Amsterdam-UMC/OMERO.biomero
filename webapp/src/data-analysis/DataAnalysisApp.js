@@ -12,8 +12,10 @@ import { useAppContext } from "../AppContext";
 import OmeroDataBrowser from "../shared/components/OmeroDataBrowser";
 import {
   buildAnalysisUrl,
+  fetchWorkspaceDatasetResolution,
   isAnalysisMessage,
   parseAnalysisLaunch,
+  sourceFromWorkspaceDataset,
   sourceFromTreeItems,
 } from "../analysisIntegration";
 
@@ -27,6 +29,12 @@ const DataAnalysisApp = () => {
   const [dirty, setDirty] = useState(false);
   const [ready, setReady] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [workspaceResolution, setWorkspaceResolution] = useState({
+    loading: false,
+    source: null,
+    error: "",
+    managed: false,
+  });
   const iframeRef = useRef(null);
 
   const { ui, urls } = state;
@@ -43,6 +51,67 @@ const DataAnalysisApp = () => {
     .map((id) => state.omeroFileTreeData?.[id])
     .filter(Boolean);
   const selectedResult = sourceFromTreeItems(selectedItems);
+  const selectedDatasetId =
+    selectedResult.source?.type === "Dataset" &&
+    !(selectedResult.source.selectionIds || []).length
+      ? selectedResult.source.id
+      : null;
+
+  useEffect(() => {
+    if (!selectedDatasetId) {
+      setWorkspaceResolution({
+        loading: false,
+        source: null,
+        error: "",
+        managed: false,
+      });
+      return undefined;
+    }
+    const controller = new AbortController();
+    setWorkspaceResolution({
+      loading: true,
+      source: null,
+      error: "",
+      managed: false,
+    });
+    fetchWorkspaceDatasetResolution(urls.data_analysis, selectedDatasetId, {
+      signal: controller.signal,
+    })
+      .then((payload) => {
+        if (payload.managed) {
+          setWorkspaceResolution({
+            loading: false,
+            ...sourceFromWorkspaceDataset(payload),
+          });
+        } else {
+          setWorkspaceResolution({
+            loading: false,
+            source: selectedResult.source,
+            error: "",
+            managed: false,
+          });
+        }
+      })
+      .catch((error) => {
+        if (error.name === "AbortError") return;
+        setWorkspaceResolution({
+          loading: false,
+          source: null,
+          error: error.message,
+          managed: false,
+        });
+      });
+    return () => controller.abort();
+    // The Dataset ID and stable Analysis base URL fully identify this lookup.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDatasetId, urls.data_analysis]);
+
+  const selectableSource = selectedDatasetId
+    ? workspaceResolution.source
+    : selectedResult.source;
+  const selectionError = selectedDatasetId
+    ? workspaceResolution.error
+    : selectedResult.error;
   const searchResults = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return [];
@@ -144,7 +213,8 @@ const DataAnalysisApp = () => {
         <H3>Choose data for Analysis</H3>
         <p className="mb-4 text-gray-600">
           Select a Dataset, Screen, Plate, or Image. Hold Ctrl or Command to
-          select multiple Images or Plates of the same type.
+          select multiple Images or Plates of the same type. Expand the
+          +AnalysisWorkspaces Project and select a managed Dataset to resume it.
         </p>
         <InputGroup
           leftIcon="search"
@@ -173,18 +243,27 @@ const DataAnalysisApp = () => {
             <Spinner />
           )}
         </Card>
-        <Callout intent={selectedResult.source ? "primary" : "warning"}>
-          {selectedResult.source
-            ? `${selectedResult.source.title} — ${selectedResult.source.type}`
-            : selectedResult.error}
+        <Callout intent={selectableSource ? "primary" : "warning"}>
+          {workspaceResolution.loading
+            ? "Checking whether this Dataset is a saved Analysis Workspace…"
+            : selectableSource?.resumeWorkspaceName
+              ? `Resume ${selectableSource.resumeWorkspaceName} — original source ${selectableSource.type} ${selectableSource.id}`
+              : selectableSource
+                ? `${selectableSource.title} — ${selectableSource.type}`
+                : selectionError}
         </Callout>
         <Button
           className="mt-4"
           intent="primary"
           icon="applications"
-          text="Open Data Analysis"
-          disabled={!selectedResult.source}
-          onClick={() => setSource(selectedResult.source)}
+          text={
+            selectableSource?.resumeWorkspaceName
+              ? `Resume ${selectableSource.resumeWorkspaceName}`
+              : "Open Data Analysis"
+          }
+          loading={workspaceResolution.loading}
+          disabled={!selectableSource || workspaceResolution.loading}
+          onClick={() => setSource(selectableSource)}
         />
       </div>
     );

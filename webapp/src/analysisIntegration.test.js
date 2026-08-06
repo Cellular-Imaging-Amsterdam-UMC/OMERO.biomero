@@ -3,7 +3,9 @@ import {
   buildAnalysisUrl,
   isAnalysisMessage,
   parseAnalysisLaunch,
+  sourceFromWorkspaceDataset,
   sourceFromTreeItems,
+  workspaceDatasetResolutionUrl,
 } from "./analysisIntegration";
 
 test("explicit Analysis parameters are parsed through the supported whitelist", () => {
@@ -68,4 +70,44 @@ test("iframe messages require the same origin, source window, and schema", () =>
       iframeWindow
     )
   ).toBe(false);
+});
+
+test("managed Dataset resolution stays on the Analysis base URL", () => {
+  expect(workspaceDatasetResolutionUrl("/omero_analysis/", 303)).toBe(
+    "http://localhost/omero_analysis/api/workspace-dataset/303/"
+  );
+  expect(workspaceDatasetResolutionUrl("https://evil.example/", 0)).toBe("");
+  expect(workspaceDatasetResolutionUrl("https://evil.example/", 303)).toBe("");
+});
+
+test("managed Dataset metadata becomes a saved Workspace launch", () => {
+  const result = sourceFromWorkspaceDataset({
+    managed: true,
+    resumable: true,
+    datasetName: "Screen-152 — SolHunt",
+    workspaceName: "SolHunt analysis",
+    sourceObjectType: "Screen",
+    sourceObjectId: 152,
+    sourceObjectName: "SolHunt",
+    workspaceAnnotationId: 901,
+  });
+
+  expect(result.source).toMatchObject({
+    type: "Screen",
+    id: 152,
+    title: "SolHunt",
+    resumeWorkspaceName: "SolHunt analysis",
+    workspaceAnnotationId: 901,
+  });
+});
+
+test("managed Dataset metadata provides guidance when it cannot resume", () => {
+  const result = sourceFromWorkspaceDataset({
+    managed: true,
+    resumable: false,
+    error: "The original source is unavailable.",
+  });
+
+  expect(result.source).toBeNull();
+  expect(result.error).toBe("The original source is unavailable.");
 });

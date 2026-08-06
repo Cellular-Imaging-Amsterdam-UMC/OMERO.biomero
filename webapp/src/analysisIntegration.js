@@ -136,6 +136,76 @@ export const buildAnalysisUrl = (baseUrl, source, embedded = true) => {
   return url.toString();
 };
 
+export const workspaceDatasetResolutionUrl = (baseUrl, datasetId) => {
+  const id = positiveInteger(datasetId);
+  if (!baseUrl || !id) return "";
+  const base = new URL(baseUrl, window.location.origin);
+  if (base.origin !== window.location.origin) return "";
+  return new URL(`api/workspace-dataset/${id}/`, base).toString();
+};
+
+export const fetchWorkspaceDatasetResolution = async (
+  baseUrl,
+  datasetId,
+  options = {}
+) => {
+  const url = workspaceDatasetResolutionUrl(baseUrl, datasetId);
+  if (!url) throw new Error("The Analysis Workspace Dataset is invalid.");
+  const response = await fetch(url, {
+    credentials: "same-origin",
+    headers: { Accept: "application/json" },
+    signal: options.signal,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      payload?.error?.message ||
+        "The Analysis Workspace metadata could not be resolved."
+    );
+  }
+  return payload;
+};
+
+export const sourceFromWorkspaceDataset = (payload) => {
+  if (!payload?.managed) return { source: null, error: "", managed: false };
+  if (!payload.resumable) {
+    return {
+      source: null,
+      error:
+        payload.error || "This Analysis Workspace cannot currently be resumed.",
+      managed: true,
+    };
+  }
+  const type = normalizedType(payload.sourceObjectType);
+  const id = positiveInteger(payload.sourceObjectId);
+  const workspaceAnnotationId = positiveInteger(
+    payload.workspaceAnnotationId
+  );
+  if (!type || !id || !workspaceAnnotationId) {
+    return {
+      source: null,
+      error: "This Analysis Workspace has invalid synchronized source metadata.",
+      managed: true,
+    };
+  }
+  return {
+    source: {
+      type,
+      id,
+      selectionIds: [],
+      dataAnnotationIds: [],
+      workspaceAnnotationId,
+      libraryItemIds: [],
+      openLibrary: false,
+      title: payload.sourceObjectName || `${type} ${id}`,
+      resumeWorkspaceName:
+        payload.workspaceName || payload.datasetName || "Analysis Workspace",
+    },
+    error: "",
+    managed: true,
+  };
+};
+
 export const isAnalysisMessage = (event, iframeWindow) =>
   event.origin === window.location.origin &&
   event.source === iframeWindow &&
