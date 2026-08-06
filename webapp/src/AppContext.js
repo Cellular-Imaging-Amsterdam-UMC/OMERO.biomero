@@ -185,7 +185,9 @@ export const AppProvider = ({ children }) => {
 
   const updateState = (newState) => {
     setState((prevState) => {
-      return { ...prevState, ...newState };
+      const nextState =
+        typeof newState === "function" ? newState(prevState) : newState;
+      return { ...prevState, ...nextState };
     });
   };
 

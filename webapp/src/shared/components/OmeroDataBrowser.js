@@ -71,23 +71,24 @@ const OmeroDataBrowser = ({ onSelectCallback }) => {
       }));
     }
 
-    const updatedNode = {
-      ...state.omeroFileTreeData[node.index],
-      children: children.map((child) => child.index),
-    };
-
     const newNodes = children.reduce((acc, child) => {
       acc[child.index] = child;
       return acc;
     }, {});
 
-    updateState({
+    // Expansion requests are asynchronous and several nodes can be opened in
+    // quick succession. Merge into the latest tree state so a slower response
+    // cannot replace children that another request has just loaded.
+    updateState((latestState) => ({
       omeroFileTreeData: {
-        ...state.omeroFileTreeData,
+        ...latestState.omeroFileTreeData,
         ...newNodes,
-        [node.index]: updatedNode,
+        [node.index]: {
+          ...latestState.omeroFileTreeData[node.index],
+          children: children.map((child) => child.index),
+        },
       },
-    });
+    }));
     return newNodes;
   };
 
