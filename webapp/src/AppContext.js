@@ -31,6 +31,7 @@ const INFRA_PARAMS = new Set([
   'active_group_id', 'receiveEmail', 'importAsZip', 'uploadCsv', 'attachFileOutputs',
   'attachToOriginalImages', 'selectedDatasets', 'selectedDatasetId', 'selectedScreens', 'selectedScreenId', 'renamePattern', 'enableRename',
   'createRois', 'roiLabelPattern', 'roiShape', 'deleteLabelImagesAfterRois',
+  'clearExistingRois', 'clearRoiFilter',
   'batchEnabled', 'batchCount', 'batchSize', 'version',
   'cytomine_host', 'cytomine_public_key', 'cytomine_private_key',
   'cytomine_id_project', 'cytomine_id_software',
@@ -57,7 +58,10 @@ const WorkflowSubmitToast = ({ workflowName, startedAt, params, metadata, warnin
   if (params.attachToOriginalImages) outputLines.push("Attached to input images");
   if (params.createRois) {
     const cleanup = params.deleteLabelImagesAfterRois ? "; imported labels removed from OMERO" : "";
-    outputLines.push(`ROIs on original images (${params.roiShape || "Polygon"}${cleanup})`);
+    const clearing = params.clearExistingRois
+      ? `; existing ROIs cleared${params.clearRoiFilter ? ` matching "${params.clearRoiFilter}"` : ""}`
+      : "";
+    outputLines.push(`ROIs on original images (${params.roiShape || "Polygon"}${cleanup}${clearing})`);
   }
   if (params.receiveEmail) outputLines.push("E-mail on completion");
 

@@ -249,6 +249,8 @@ class AnalyzerViewsTests(TestCase):
             "selectedDatasets": ["Results"],
             "createRois": True,
             "deleteLabelImagesAfterRois": True,
+            "clearExistingRois": True,
+            "clearRoiFilter": "cellpose",
             "roiLabelPattern": "",
         }
 
@@ -275,6 +277,10 @@ class AnalyzerViewsTests(TestCase):
             unwrap(sent_inputs[workflow.ROI_LABEL_PATTERN]), "")
         self.assertTrue(
             unwrap(sent_inputs[workflow.ROI_DELETE_LABEL_IMAGES]))
+        self.assertTrue(
+            unwrap(sent_inputs[workflow.ROI_CLEAR_EXISTING]))
+        self.assertEqual(
+            unwrap(sent_inputs[workflow.ROI_CLEAR_FILTER]), "cellpose")
 
     def test_run_workflow_script_invalid_json(self):
         view = _raw("run_workflow_script")

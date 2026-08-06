@@ -184,6 +184,8 @@ def run_workflow_script(request, conn=None, **kwargs):
         create_rois = bool(params.get("createRois", False))
         delete_label_images_after_rois = bool(
             params.get("deleteLabelImagesAfterRois", False))
+        clear_existing_rois = bool(params.get("clearExistingRois", False))
+        clear_roi_filter = str(params.get("clearRoiFilter", "") or "").strip()
         roi_label_pattern = str(params.get("roiLabelPattern", "") or "").strip()
         roi_shape = str(params.get("roiShape", "Polygon") or "Polygon")
         # EXPERIMENTAL: ZARR format support
@@ -229,6 +231,9 @@ def run_workflow_script(request, conn=None, **kwargs):
 
         delete_label_images_after_rois = (
             create_rois and delete_label_images_after_rois)
+        clear_existing_rois = create_rois and clear_existing_rois
+        if not clear_existing_rois:
+            clear_roi_filter = ""
 
         # Convert provided params to OMERO rtypes using wrap
         known_params = [
@@ -259,6 +264,8 @@ def run_workflow_script(request, conn=None, **kwargs):
             "attachFileOutputs",  # Converted to workflow.OUTPUT_ATTACH_FILE_OUTPUTS
             "createRois",         # Converted to workflow.OUTPUT_CREATE_ROIS
             "deleteLabelImagesAfterRois",  # Converted to workflow.ROI_DELETE_LABEL_IMAGES
+            "clearExistingRois",      # Converted to workflow.ROI_CLEAR_EXISTING
+            "clearRoiFilter",         # Converted to workflow.ROI_CLEAR_FILTER
             "roiLabelPattern",    # Converted to workflow.ROI_LABEL_PATTERN
             "roiShape",           # Converted to workflow.ROI_SHAPE
         ]
@@ -316,6 +323,9 @@ def run_workflow_script(request, conn=None, **kwargs):
         )
         if delete_label_images_after_rois:
             inputs[workflow.ROI_DELETE_LABEL_IMAGES] = rbool(True)
+        if clear_existing_rois:
+            inputs[workflow.ROI_CLEAR_EXISTING] = rbool(True)
+            inputs[workflow.ROI_CLEAR_FILTER] = wrap(clear_roi_filter)
         
         # Remove None values for non-batched workflows
         inputs = {k: v for k, v in inputs.items() if v is not None}
@@ -354,6 +364,8 @@ def run_workflow_script(request, conn=None, **kwargs):
                         "createRois": create_rois,
                         "deleteLabelImagesAfterRois":
                             delete_label_images_after_rois,
+                        "clearExistingRois": clear_existing_rois,
+                        "clearRoiFilter": clear_roi_filter,
                     },
                 }
             )

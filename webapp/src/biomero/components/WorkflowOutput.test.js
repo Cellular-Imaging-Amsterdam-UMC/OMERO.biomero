@@ -30,8 +30,14 @@ jest.mock("@blueprintjs/core", () => {
         })}
       </select>
     ),
-    InputGroup: () => <input />,
-    Switch: Container,
+    InputGroup: (props) => <input {...props} />,
+    Switch: ({ children, label, ...props }) => (
+      <label>
+        {label}
+        <input type="checkbox" aria-label={label} {...props} />
+        {children}
+      </label>
+    ),
     SwitchCard: Container,
     Callout: Container,
     Tooltip: Container,
@@ -56,6 +62,8 @@ const baseFormData = {
   createRois: false,
   roiLabelPattern: "",
   roiShape: "Polygon",
+  clearExistingRois: false,
+  clearRoiFilter: "",
 };
 
 describe("WorkflowOutput image-pathway destination suggestions", () => {
@@ -251,6 +259,45 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
 
     expect(updateState).toHaveBeenCalledWith({
       formData: expect.objectContaining({ deleteLabelImagesAfterRois: true }),
+    });
+  });
+
+  test("offers opt-in filtered ROI clearing on original images", () => {
+    const updateState = jest.fn();
+    useAppContext.mockReturnValue({
+      state: {
+        formData: {
+          ...baseFormData,
+          selectedDatasets: ["Results"],
+          createRois: true,
+          clearExistingRois: true,
+          clearRoiFilter: "cellpose__run-uuid",
+        },
+        inputDatasets: [],
+        selectedWorkflow: { name: "cellpose", metadata: { outputs: [] } },
+        capabilities: { roi_postprocessing: { available: true } },
+        omeroFileTreeData: {},
+      },
+      updateState,
+    });
+
+    render(<WorkflowOutput onSelectionChange={jest.fn()} />);
+
+    const clearSwitch = screen.getByLabelText("Clear existing ROIs on original images");
+    expect(clearSwitch).toBeChecked();
+    expect(screen.getByText(/workflow name and run UUID for provenance/i)).toBeInTheDocument();
+    expect(screen.getByText(/leaving the filter empty removes every existing ROI/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Only clear ROI names containing (optional)")).toHaveValue(
+      "cellpose__run-uuid"
+    );
+
+    fireEvent.change(
+      screen.getByLabelText("Only clear ROI names containing (optional)"),
+      { target: { value: "stardist" } }
+    );
+
+    expect(updateState).toHaveBeenCalledWith({
+      formData: expect.objectContaining({ clearRoiFilter: "stardist" }),
     });
   });
 

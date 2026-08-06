@@ -94,6 +94,8 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         selectedScreenId: null,
         createRois: false,
         deleteLabelImagesAfterRois: false,
+        clearExistingRois: false,
+        clearRoiFilter: "",
         roiLabelPattern: "",
         roiShape: "Polygon",
       }
@@ -109,6 +111,8 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         enableRename: false,
         createRois: false,
         deleteLabelImagesAfterRois: false,
+        clearExistingRois: false,
+        clearRoiFilter: "",
         roiLabelPattern: "",
         roiShape: "Polygon",
       };
@@ -685,9 +689,14 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
               minimal
               className="mt-2 text-sm"
             >
-              {outputHints.allImageOutputsAreLabels
-                ? "All declared image outputs are labels. BIOMERO will use them automatically."
-                : "BIOMERO will match imported results to each original image and select label-like outputs automatically. Ambiguous results are skipped without failing the workflow."}
+              <div>
+                {outputHints.allImageOutputsAreLabels
+                  ? "All declared image outputs are labels. BIOMERO will use them automatically."
+                  : "BIOMERO will match imported results to each original image and select label-like outputs automatically. Ambiguous results are skipped without failing the workflow."}
+              </div>
+              <div className="mt-1">
+                Created ROI names include the workflow name and run UUID for provenance and filtering.
+              </div>
             </Callout>
 
             <FormGroup
@@ -726,6 +735,34 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
                 ]}
               />
             </FormGroup>
+
+            <FormGroup
+              helperText="New ROIs are always added to the original images. Enable this only when older ROIs on those originals should be removed first."
+              className="mt-2 mb-0"
+            >
+              <Switch
+                label="Clear existing ROIs on original images"
+                checked={!!state.formData.clearExistingRois}
+                onChange={(e) => handleInputChange("clearExistingRois", e.target.checked)}
+                className="mb-0"
+              />
+            </FormGroup>
+
+            {state.formData.clearExistingRois && (
+              <FormGroup
+                label="Only clear ROI names containing (optional)"
+                labelFor="roi-clear-filter"
+                helperText="Case-sensitive. Leaving the filter empty removes every existing ROI from each original image before this run's ROIs are added."
+                className="mt-2 mb-0"
+              >
+                <InputGroup
+                  id="roi-clear-filter"
+                  value={state.formData.clearRoiFilter || ""}
+                  onChange={(e) => handleInputChange("clearRoiFilter", e.target.value)}
+                  placeholder="e.g. cellpose or a workflow UUID"
+                />
+              </FormGroup>
+            )}
           </Card>
         ) : (
           <>

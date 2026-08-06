@@ -186,6 +186,8 @@ const RunPanel = ({ onWorkflowError }) => {
       attachFileOutputs: hasFileAnnotationOutput || useDescriptorFallbackSuggestions,
       createRois: false,
       deleteLabelImagesAfterRois: false,
+      clearExistingRois: false,
+      clearRoiFilter: "",
       roiLabelPattern: allImageOutputsAreLabels ? "*" : "",
       roiShape: "Polygon",
     };
