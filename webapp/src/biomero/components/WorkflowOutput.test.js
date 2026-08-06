@@ -1,5 +1,5 @@
 import React from "react";
-import { render, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import WorkflowOutput, {
   getSuggestedDatasetDestination,
 } from "./WorkflowOutput";
@@ -10,11 +10,26 @@ jest.mock("../../AppContext", () => ({
 }));
 jest.mock("@blueprintjs/core", () => {
   const Container = ({ children }) => <div>{children}</div>;
+  const MockFormGroup = ({ children, helperText, label, labelFor }) => (
+    <div>
+      {label && <label htmlFor={labelFor}>{label}</label>}
+      {children}
+      {helperText && <span>{helperText}</span>}
+    </div>
+  );
   return {
     Alignment: { END: "end" },
     Card: Container,
-    FormGroup: Container,
-    HTMLSelect: () => <select />,
+    FormGroup: MockFormGroup,
+    HTMLSelect: ({ options = [], ...props }) => (
+      <select {...props}>
+        {options.map((option) => {
+          const value = typeof option === "string" ? option : option.value;
+          const label = typeof option === "string" ? option : option.label;
+          return <option key={value} value={value}>{label}</option>;
+        })}
+      </select>
+    ),
     InputGroup: () => <input />,
     Switch: Container,
     SwitchCard: Container,
@@ -201,10 +216,42 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
       updateState: jest.fn(),
     });
 
-    const { getByText } = render(<WorkflowOutput onSelectionChange={onSelectionChange} />);
+    render(<WorkflowOutput onSelectionChange={onSelectionChange} />);
 
     await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(true));
-    expect(getByText(/match imported results to each original image/i)).toBeInTheDocument();
+    expect(screen.getByText(/match imported results to each original image/i)).toBeInTheDocument();
+  });
+
+  test("offers OMERO label-image cleanup inside the active ROI card", () => {
+    const updateState = jest.fn();
+    useAppContext.mockReturnValue({
+      state: {
+        formData: {
+          ...baseFormData,
+          selectedDatasets: ["Results"],
+          createRois: true,
+        },
+        inputDatasets: [],
+        selectedWorkflow: { name: "cellpose", metadata: { outputs: [] } },
+        capabilities: { roi_postprocessing: { available: true } },
+        omeroFileTreeData: {},
+      },
+      updateState,
+    });
+
+    render(
+      <WorkflowOutput onSelectionChange={jest.fn()} />
+    );
+
+    const retentionSelect = screen.getByLabelText("Imported label images");
+    expect(retentionSelect).toHaveValue("keep");
+    expect(screen.getByText(/workflow files in \.analyzed are preserved/i)).toBeInTheDocument();
+
+    fireEvent.change(retentionSelect, { target: { value: "delete" } });
+
+    expect(updateState).toHaveBeenCalledWith({
+      formData: expect.objectContaining({ deleteLabelImagesAfterRois: true }),
+    });
   });
 
   test("requires imported screen images for plate ROI postprocessing", async () => {

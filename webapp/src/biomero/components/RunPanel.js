@@ -185,6 +185,7 @@ const RunPanel = ({ onWorkflowError }) => {
       uploadCsv: hasCsvTableOutput || useDescriptorFallbackSuggestions,
       attachFileOutputs: hasFileAnnotationOutput || useDescriptorFallbackSuggestions,
       createRois: false,
+      deleteLabelImagesAfterRois: false,
       roiLabelPattern: allImageOutputsAreLabels ? "*" : "",
       roiShape: "Polygon",
     };

@@ -30,7 +30,7 @@ const INFRA_PARAMS = new Set([
   'IDs', 'Data_Type', 'workflowMode', 'plateMode', 'useZarrFormat', 'Format',
   'active_group_id', 'receiveEmail', 'importAsZip', 'uploadCsv', 'attachFileOutputs',
   'attachToOriginalImages', 'selectedDatasets', 'selectedDatasetId', 'selectedScreens', 'selectedScreenId', 'renamePattern', 'enableRename',
-  'createRois', 'roiLabelPattern', 'roiShape',
+  'createRois', 'roiLabelPattern', 'roiShape', 'deleteLabelImagesAfterRois',
   'batchEnabled', 'batchCount', 'batchSize', 'version',
   'cytomine_host', 'cytomine_public_key', 'cytomine_private_key',
   'cytomine_id_project', 'cytomine_id_software',
@@ -55,7 +55,10 @@ const WorkflowSubmitToast = ({ workflowName, startedAt, params, metadata, warnin
   if (params.uploadCsv) outputLines.push("OMERO tables (CSV)");
   if (params.attachFileOutputs) outputLines.push("File annotations");
   if (params.attachToOriginalImages) outputLines.push("Attached to input images");
-  if (params.createRois) outputLines.push(`ROIs on original images (${params.roiShape || "Polygon"})`);
+  if (params.createRois) {
+    const cleanup = params.deleteLabelImagesAfterRois ? "; imported labels removed from OMERO" : "";
+    outputLines.push(`ROIs on original images (${params.roiShape || "Polygon"}${cleanup})`);
+  }
   if (params.receiveEmail) outputLines.push("E-mail on completion");
 
   // Build lookup from descriptor so we can classify each param

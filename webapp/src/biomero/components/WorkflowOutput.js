@@ -93,6 +93,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         selectedScreens: [],
         selectedScreenId: null,
         createRois: false,
+        deleteLabelImagesAfterRois: false,
         roiLabelPattern: "",
         roiShape: "Polygon",
       }
@@ -107,6 +108,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         renamePattern: "{original_file}_result.{ext}",
         enableRename: false,
         createRois: false,
+        deleteLabelImagesAfterRois: false,
         roiLabelPattern: "",
         roiShape: "Polygon",
       };
@@ -699,6 +701,29 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
                 value={state.formData.roiShape || "Polygon"}
                 onChange={(e) => handleInputChange("roiShape", e.target.value)}
                 options={["Polygon", "Mask"]}
+              />
+            </FormGroup>
+
+            <FormGroup
+              label="Imported label images"
+              labelFor="roi-label-image-retention"
+              helperText="Workflow files in .analyzed are preserved."
+              className="mt-2 mb-0"
+            >
+              <HTMLSelect
+                id="roi-label-image-retention"
+                value={state.formData.deleteLabelImagesAfterRois ? "delete" : "keep"}
+                onChange={(e) => handleInputChange(
+                  "deleteLabelImagesAfterRois",
+                  e.target.value === "delete"
+                )}
+                options={[
+                  { label: "Keep in OMERO", value: "keep" },
+                  {
+                    label: "Delete from OMERO after ROI creation",
+                    value: "delete",
+                  },
+                ]}
               />
             </FormGroup>
           </Card>

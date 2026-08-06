@@ -174,6 +174,8 @@ class AnalyzerViewsTests(TestCase):
         self.assertFalse(data["effectiveOptions"]["createRois"])
         sent_inputs = svc.runScript.call_args.args[1]
         self.assertFalse(unwrap(sent_inputs[workflow.OUTPUT_CREATE_ROIS]))
+        self.assertNotIn(
+            workflow.ROI_DELETE_LABEL_IMAGES, sent_inputs)
 
     def test_run_workflow_roi_requires_import_destination(self):
         class Script:
@@ -246,6 +248,7 @@ class AnalyzerViewsTests(TestCase):
             "Data_Type": "Image",
             "selectedDatasets": ["Results"],
             "createRois": True,
+            "deleteLabelImagesAfterRois": True,
             "roiLabelPattern": "",
         }
 
@@ -270,6 +273,8 @@ class AnalyzerViewsTests(TestCase):
         sent_inputs = svc.runScript.call_args.args[1]
         self.assertEqual(
             unwrap(sent_inputs[workflow.ROI_LABEL_PATTERN]), "")
+        self.assertTrue(
+            unwrap(sent_inputs[workflow.ROI_DELETE_LABEL_IMAGES]))
 
     def test_run_workflow_script_invalid_json(self):
         view = _raw("run_workflow_script")

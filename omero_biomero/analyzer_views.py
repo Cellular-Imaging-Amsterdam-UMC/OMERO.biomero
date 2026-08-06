@@ -182,6 +182,8 @@ def run_workflow_script(request, conn=None, **kwargs):
         version = params.get("version")
         attach_file_outputs = params.get("attachFileOutputs", False)
         create_rois = bool(params.get("createRois", False))
+        delete_label_images_after_rois = bool(
+            params.get("deleteLabelImagesAfterRois", False))
         roi_label_pattern = str(params.get("roiLabelPattern", "") or "").strip()
         roi_shape = str(params.get("roiShape", "Polygon") or "Polygon")
         # EXPERIMENTAL: ZARR format support
@@ -225,6 +227,9 @@ def run_workflow_script(request, conn=None, **kwargs):
                     # best-effort selection after result images are imported
                     # and matched to their source images.
 
+        delete_label_images_after_rois = (
+            create_rois and delete_label_images_after_rois)
+
         # Convert provided params to OMERO rtypes using wrap
         known_params = [
             transfer.DATA_TYPE,
@@ -253,6 +258,7 @@ def run_workflow_script(request, conn=None, **kwargs):
             "batchSize",      # Converted to Batch_Size for script
             "attachFileOutputs",  # Converted to workflow.OUTPUT_ATTACH_FILE_OUTPUTS
             "createRois",         # Converted to workflow.OUTPUT_CREATE_ROIS
+            "deleteLabelImagesAfterRois",  # Converted to workflow.ROI_DELETE_LABEL_IMAGES
             "roiLabelPattern",    # Converted to workflow.ROI_LABEL_PATTERN
             "roiShape",           # Converted to workflow.ROI_SHAPE
         ]
@@ -308,6 +314,8 @@ def run_workflow_script(request, conn=None, **kwargs):
                 workflow.ROI_SHAPE: wrap(roi_shape),
             }
         )
+        if delete_label_images_after_rois:
+            inputs[workflow.ROI_DELETE_LABEL_IMAGES] = rbool(True)
         
         # Remove None values for non-batched workflows
         inputs = {k: v for k, v in inputs.items() if v is not None}
@@ -342,7 +350,11 @@ def run_workflow_script(request, conn=None, **kwargs):
                     "message": f"Script {script_name} for {workflow_name} started successfully: {msg}",
                     "jobId": job_id,
                     "warnings": launch_warnings,
-                    "effectiveOptions": {"createRois": create_rois},
+                    "effectiveOptions": {
+                        "createRois": create_rois,
+                        "deleteLabelImagesAfterRois":
+                            delete_label_images_after_rois,
+                    },
                 }
             )
 
