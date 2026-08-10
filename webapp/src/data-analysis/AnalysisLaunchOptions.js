@@ -7,6 +7,7 @@ import {
   Divider,
   H5,
   InputGroup,
+  HTMLSelect,
   Spinner,
   Tag,
 } from "@blueprintjs/core";
@@ -24,6 +25,7 @@ const sourceKey = (source) => source
 const AnalysisLaunchOptions = ({ baseUrl, source, selectionError, onOpen }) => {
   const [launch, setLaunch] = useState({ loading: false, data: null, error: "" });
   const [attachmentIds, setAttachmentIds] = useState(new Set());
+  const [bindingModes, setBindingModes] = useState({});
   const [libraryIds, setLibraryIds] = useState(new Set());
   const [libraryQuery, setLibraryQuery] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -45,6 +47,7 @@ const AnalysisLaunchOptions = ({ baseUrl, source, selectionError, onOpen }) => {
 
   useEffect(() => {
     setAttachmentIds(new Set());
+    setBindingModes({});
     setLibraryIds(new Set());
     setLibraryQuery("");
     if (!source) {
@@ -58,18 +61,26 @@ const AnalysisLaunchOptions = ({ baseUrl, source, selectionError, onOpen }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, baseUrl]);
 
+  const attachments = launch.data?.supported_attachments || [];
   const resolution = sourceFromLaunchContext(launch.data, source);
   const resolvedSource = resolution.source
     ? {
         ...resolution.source,
         dataAnnotationIds: [...attachmentIds],
+        dataBindings: Object.fromEntries(
+          [...attachmentIds]
+            .filter((id) => bindingModes[id])
+            .map((id) => [id, bindingModes[id]])
+        ),
+        attachmentPolicies: Object.fromEntries(
+          attachments.map((item) => [item.annotation_id, item])
+        ),
         libraryItemIds: [...libraryIds],
         openLibrary: libraryIds.size > 0,
       }
     : null;
   const contextError = launch.error || resolution.error || selectionError;
   const panelKind = launch.data?.panel_kind;
-  const attachments = launch.data?.supported_attachments || [];
   const library = launch.data?.analysis_library_datasets || [];
   const filteredLibrary = useMemo(() => {
     const query = libraryQuery.trim().toLowerCase();
@@ -91,6 +102,34 @@ const AnalysisLaunchOptions = ({ baseUrl, source, selectionError, onOpen }) => {
     if (next.has(value)) next.delete(value); else next.add(value);
     return next;
   });
+
+  const toggleAttachment = (attachment) => {
+    const id = attachment.annotation_id;
+    setAttachmentIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+        setBindingModes((modes) => {
+          const copy = { ...modes };
+          delete copy[id];
+          return copy;
+        });
+      } else {
+        if (!attachment.query_format) {
+          next.add(id);
+          return next;
+        }
+        const allowed = attachment.allowed_modes || ["local"];
+        const mode = allowed.includes(attachment.default_mode)
+          ? attachment.default_mode : allowed[0];
+        if (mode) {
+          next.add(id);
+          setBindingModes((modes) => ({ ...modes, [id]: mode }));
+        }
+      }
+      return next;
+    });
+  };
 
   const upload = async (file) => {
     if (!file || !source) return;
@@ -151,20 +190,47 @@ const AnalysisLaunchOptions = ({ baseUrl, source, selectionError, onOpen }) => {
             <Divider />
             <div className="analysis-option-list">
               {attachments.map((attachment) => (
-                <Checkbox
-                  key={attachment.annotation_id}
-                  checked={attachmentIds.has(attachment.annotation_id)}
-                  onChange={() => toggle(setAttachmentIds, attachment.annotation_id)}
-                  labelElement={(
+                <div className="analysis-attachment-choice" key={attachment.annotation_id}>
+                  <Checkbox
+                    checked={attachmentIds.has(attachment.annotation_id)}
+                    disabled={Array.isArray(attachment.allowed_modes) && !attachment.allowed_modes.length}
+                    onChange={() => toggleAttachment(attachment)}
+                    labelElement={(
                     <span className="analysis-option-label">
                       <strong>{attachment.name}</strong>
                       <small>
                         {attachment.mimetype} · {attachment.size} bytes
                         {!attachment.direct && ` · from ${attachment.object_type} ${attachment.object_id} — ${attachment.object_name}`}
+                        {attachment.query_format && ` · ${attachment.query_format.toUpperCase()}`}
                       </small>
                     </span>
+                    )}
+                  />
+                  {attachment.query_format && attachmentIds.has(attachment.annotation_id) && (
+                    <HTMLSelect
+                      aria-label={`Query mode for ${attachment.name}`}
+                      value={bindingModes[attachment.annotation_id] || ""}
+                      onChange={(event) => setBindingModes((current) => ({
+                        ...current,
+                        [attachment.annotation_id]: event.target.value,
+                      }))}
+                      options={(attachment.allowed_modes || []).map((mode) => ({
+                        label: mode === "remote" ? "Remote" : "Local",
+                        value: mode,
+                      }))}
+                    />
                   )}
-                />
+                  {attachment.query_format && (
+                    <small>
+                      {attachment.threshold_reason === "remote-required-by-policy"
+                        ? "Server policy requires remote queries."
+                        : attachment.threshold_reason === "size-at-or-above-threshold"
+                          ? "Remote is recommended because this source meets the size threshold."
+                          : "Local is the default; remote remains available."}
+                      {!attachment.worker_ready && " The remote query worker is unavailable."}
+                    </small>
+                  )}
+                </div>
               ))}
               {!attachments.length && <p className="analysis-empty">No supported data attachments yet.</p>}
             </div>

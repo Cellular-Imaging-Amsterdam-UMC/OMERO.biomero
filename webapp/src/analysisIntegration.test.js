@@ -40,6 +40,42 @@ test("invalid and mixed source selections are rejected", () => {
   ).toMatch(/same type/);
 });
 
+test("data query bindings are strictly parsed and preserved", () => {
+  const source = parseAnalysisLaunch(
+    "?type=Image&id=5&data_annotation=11&data_annotation=12" +
+      "&data_binding=11:remote&data_binding=12:local"
+  );
+  expect(source.dataBindings).toEqual({ 11: "remote", 12: "local" });
+  const url = new URL(buildAnalysisUrl("/omero_analysis/", {
+    ...source,
+    attachmentPolicies: {
+      11: { allowed_modes: ["remote"] },
+      12: { allowed_modes: ["local", "remote"] },
+    },
+  }));
+  expect(url.searchParams.getAll("data_binding")).toEqual([
+    "11:remote",
+    "12:local",
+  ]);
+});
+
+test("malformed, duplicate, unselected, and forbidden bindings are rejected", () => {
+  expect(parseAnalysisLaunch("?type=Image&id=5&data_annotation=11&data_binding=bad")).toBeNull();
+  expect(parseAnalysisLaunch(
+    "?type=Image&id=5&data_annotation=11&data_binding=11:local&data_binding=11:remote"
+  )).toBeNull();
+  expect(parseAnalysisLaunch(
+    "?type=Image&id=5&data_annotation=11&data_binding=12:remote"
+  )).toBeNull();
+  expect(buildAnalysisUrl("/omero_analysis/", {
+    type: "Image",
+    id: 5,
+    dataAnnotationIds: [11],
+    dataBindings: { 11: "local" },
+    attachmentPolicies: { 11: { allowed_modes: ["remote"] } },
+  })).toBe("");
+});
+
 test("same-type image selection becomes one Analysis source", () => {
   const result = sourceFromTreeItems([
     { category: "images", id: 5, data: "I5" },

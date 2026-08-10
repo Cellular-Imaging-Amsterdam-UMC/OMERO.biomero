@@ -37,13 +37,26 @@ const sourceFromParams = (params, prefix) => {
   const selectionIds = positiveIntegers(params.getAll(`${prefix}selection_id`));
   if (selectionIds.length && !MULTI_SOURCE_TYPES.has(type)) return null;
 
+  const dataAnnotationIds = positiveIntegers(
+    params.getAll(`${prefix}data_annotation`)
+  );
+  const dataBindings = {};
+  for (const raw of params.getAll(`${prefix}data_binding`)) {
+    const match = /^(\d+):(local|remote)$/.exec(raw);
+    if (!match) return null;
+    const annotationId = positiveInteger(match[1]);
+    if (
+      !annotationId || !dataAnnotationIds.includes(annotationId) ||
+      Object.prototype.hasOwnProperty.call(dataBindings, annotationId)
+    ) return null;
+    dataBindings[annotationId] = match[2];
+  }
   return {
     type,
     id,
     selectionIds,
-    dataAnnotationIds: positiveIntegers(
-      params.getAll(`${prefix}data_annotation`)
-    ),
+    dataAnnotationIds,
+    dataBindings,
     workspaceAnnotationId: positiveInteger(
       params.get(`${prefix}workspace_annotation`)
     ),
@@ -95,6 +108,7 @@ export const sourceFromTreeItems = (items) => {
       id: first.id,
       selectionIds: sources.length > 1 ? sources.map((source) => source.id) : [],
       dataAnnotationIds: [],
+      dataBindings: {},
       workspaceAnnotationId: null,
       libraryItemIds: [],
       openLibrary: false,
@@ -126,6 +140,16 @@ export const buildAnalysisUrl = (baseUrl, source, embedded = true) => {
     (source.dataAnnotationIds || []).forEach((id) =>
       url.searchParams.append("data_annotation", String(id))
     );
+    const selected = new Set(source.dataAnnotationIds || []);
+    for (const [rawId, mode] of Object.entries(source.dataBindings || {})) {
+      const id = positiveInteger(rawId);
+      const policy = source.attachmentPolicies?.[id];
+      if (
+        !id || !selected.has(id) || !["local", "remote"].includes(mode) ||
+        (policy && !(policy.allowed_modes || []).includes(mode))
+      ) return "";
+      url.searchParams.append("data_binding", `${id}:${mode}`);
+    }
   }
   if (source.openLibrary || (source.libraryItemIds || []).length) {
     url.searchParams.set("open_library", "1");
@@ -274,6 +298,7 @@ export const sourceFromWorkspaceDataset = (payload) => {
       id,
       selectionIds: [],
       dataAnnotationIds: [],
+      dataBindings: {},
       workspaceAnnotationId,
       libraryItemIds: [],
       openLibrary: false,
