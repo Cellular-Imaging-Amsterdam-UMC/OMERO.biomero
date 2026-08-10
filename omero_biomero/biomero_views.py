@@ -2,7 +2,9 @@ import jwt
 import logging
 import os
 import time
+from importlib.metadata import PackageNotFoundError, version
 
+from django.urls import NoReverseMatch, reverse
 from omeroweb.webclient.decorators import login_required, render_response
 
 from .utils import (
@@ -34,6 +36,38 @@ def check_base_directory():
 check_base_directory()
 
 
+def data_analysis_status(enabled):
+    """Return the same-origin OMERO.Analysis host contract for the frontend."""
+    if not enabled:
+        return {"available": False, "url": "", "error": ""}
+
+    try:
+        version("omero-analysis")
+    except PackageNotFoundError:
+        return {
+            "available": False,
+            "url": "",
+            "error": (
+                "Data Analysis is enabled, but the omero-analysis package is "
+                "not installed in this OMERO.web environment."
+            ),
+        }
+
+    try:
+        analysis_url = reverse("omero_analysis_index")
+    except NoReverseMatch:
+        return {
+            "available": False,
+            "url": "",
+            "error": (
+                "Data Analysis is enabled, but the OMERO.Analysis URL is not "
+                "registered. Verify the OMERO.web app configuration."
+            ),
+        }
+
+    return {"available": True, "url": analysis_url, "error": ""}
+
+
 @login_required()
 @render_response()
 def biomero(request, conn=None, **kwargs):
@@ -52,6 +86,10 @@ def biomero(request, conn=None, **kwargs):
 
     importer_enabled = parse_bool_env(os.environ.get("IMPORTER_ENABLED"), default=True)
     analyzer_enabled = parse_bool_env(os.environ.get("ANALYZER_ENABLED"), default=True)
+    data_analysis_enabled = parse_bool_env(
+        os.environ.get("INTEGRATE_DATA_ANALYSIS"), default=False
+    )
+    analysis_status = data_analysis_status(data_analysis_enabled)
 
     current_user = conn.getUser()
     username = current_user.getName()
@@ -88,6 +126,10 @@ def biomero(request, conn=None, **kwargs):
         "app_name": "biomero",
         "importer_enabled": importer_enabled,
         "analyzer_enabled": analyzer_enabled,
+        "data_analysis_enabled": data_analysis_enabled,
+        "data_analysis_available": analysis_status["available"],
+        "data_analysis_url": analysis_status["url"],
+        "data_analysis_error": analysis_status["error"],
         "uploader_allowed_file_extensions": UPLOADER_ALLOWED_FILE_EXTENSIONS,
     }
     return context
