@@ -33,27 +33,6 @@ def get_roi_script_capability(script_service, scripts=None):
     }
 
 
-def descriptor_all_image_outputs_are_labels(workflow_name):
-    """Return true when every declared image output is a label image."""
-    try:
-        with SlurmClient.from_config(config_only=True) as sc:
-            metadata = sc.generic_descriptor_from_github(workflow_name)
-    except Exception as exc:
-        logger.warning(
-            f"Could not inspect descriptor outputs for {workflow_name}: {exc}")
-        return False
-
-    image_outputs = [
-        output for output in metadata.get("outputs", [])
-        if str(output.get("type", "")).lower() == "image"
-    ]
-    return bool(image_outputs) and all(
-        "label" in [str(value).lower() for value in
-                    (output.get("sub-type") or output.get("subtype") or [])]
-        for output in image_outputs
-    )
-
-
 @login_required()
 @require_http_methods(["POST"])
 def run_workflow_script(request, conn=None, **kwargs):
@@ -228,12 +207,12 @@ def run_workflow_script(request, conn=None, **kwargs):
                     return JsonResponse({
                         "error": "ROI color must be empty or use #RRGGBB format"
                     }, status=400)
-                if not roi_label_pattern:
-                    if descriptor_all_image_outputs_are_labels(workflow_name):
-                        roi_label_pattern = "*"
-                    # Otherwise an empty selector requests conservative,
-                    # best-effort selection after result images are imported
-                    # and matched to their source images.
+                # An empty selector requests conservative, best-effort
+                # selection after imported results are matched to sources.
+                # The frontend already uses its loaded descriptor to send "*"
+                # when every image output is declared as a label. Do not fetch
+                # descriptors again here: that adds an external GitHub request
+                # to workflow submission and can exceed Gunicorn's timeout.
 
         delete_label_images_after_rois = (
             create_rois and delete_label_images_after_rois)

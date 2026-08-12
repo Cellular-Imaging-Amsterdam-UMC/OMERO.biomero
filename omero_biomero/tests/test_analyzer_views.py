@@ -266,9 +266,6 @@ class AnalyzerViewsTests(TestCase):
         with patch(
             "omero_biomero.analyzer_views.prepare_workflow_parameters",
             lambda *a, **k: params,
-        ), patch(
-            "omero_biomero.analyzer_views.descriptor_all_image_outputs_are_labels",
-            return_value=False,
         ):
             resp = _raw("run_workflow_script")(request, conn=conn)
 
@@ -378,27 +375,6 @@ class AnalyzerViewsTests(TestCase):
         data = json.loads(response.content)
         self.assertTrue(data["capabilities"]["roi_postprocessing"]["available"])
         svc.getParams.assert_called_once_with(42)
-
-    def test_roi_descriptor_hint_requires_every_image_output_to_be_label(self):
-        from omero_biomero.analyzer_views import (
-            descriptor_all_image_outputs_are_labels,
-        )
-
-        class LabelsOnly(self._StubSlurmBase):
-            _metadata = {"wfA": {"outputs": [
-                {"type": "image", "sub-type": ["label"]},
-            ]}}
-
-        class Mixed(self._StubSlurmBase):
-            _metadata = {"wfA": {"outputs": [
-                {"type": "image", "subtype": ["label"]},
-                {"type": "image", "subtype": ["grayscale"]},
-            ]}}
-
-        with patch("omero_biomero.analyzer_views.SlurmClient", LabelsOnly):
-            self.assertTrue(descriptor_all_image_outputs_are_labels("wfA"))
-        with patch("omero_biomero.analyzer_views.SlurmClient", Mixed):
-            self.assertFalse(descriptor_all_image_outputs_are_labels("wfA"))
 
     # --- list_workflows ---
     def test_list_workflows_success(self):
