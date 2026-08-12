@@ -252,6 +252,7 @@ class AnalyzerViewsTests(TestCase):
             "clearExistingRois": True,
             "clearRoiFilter": "cellpose",
             "roiLabelPattern": "",
+            "roiColor": "#e15759",
         }
 
         class _Session(dict):
@@ -281,12 +282,51 @@ class AnalyzerViewsTests(TestCase):
             unwrap(sent_inputs[workflow.ROI_CLEAR_EXISTING]))
         self.assertEqual(
             unwrap(sent_inputs[workflow.ROI_CLEAR_FILTER]), "cellpose")
+        self.assertEqual(
+            unwrap(sent_inputs[workflow.ROI_COLOR]), "#E15759")
 
     def test_run_workflow_script_invalid_json(self):
         view = _raw("run_workflow_script")
         request = SimpleNamespace(method="POST", body=b"not-json")
         resp = view(request, conn=MagicMock())
         self.assertEqual(resp.status_code, 400)
+
+    def test_run_workflow_rejects_invalid_roi_color(self):
+        class Script:
+            def __init__(self, script_id, name):
+                self.id = script_id
+                self.name = name
+
+            def getName(self):
+                return self.name
+
+        svc = MagicMock()
+        svc.getScripts.return_value = [
+            Script(42, "SLURM_Run_Workflow.py"),
+            Script(43, "Labels2Rois.py"),
+        ]
+        conn = MagicMock()
+        conn.getScriptService.return_value = svc
+        params = {
+            "IDs": [1],
+            "Data_Type": "Image",
+            "selectedDatasets": ["Results"],
+            "createRois": True,
+            "roiColor": "red",
+        }
+        request = SimpleNamespace(
+            method="POST",
+            body=json.dumps({"workflow_name": "wfA", "params": params}).encode(),
+        )
+        with patch(
+            "omero_biomero.analyzer_views.prepare_workflow_parameters",
+            lambda *a, **k: params,
+        ):
+            resp = _raw("run_workflow_script")(request, conn=conn)
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("#RRGGBB", resp.content.decode())
+        svc.runScript.assert_not_called()
 
     def test_run_workflow_script_run_exception(self):
         class StubSlurm(self._StubSlurmBase):

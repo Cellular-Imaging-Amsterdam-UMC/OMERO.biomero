@@ -31,7 +31,7 @@ const INFRA_PARAMS = new Set([
   'active_group_id', 'receiveEmail', 'importAsZip', 'uploadCsv', 'attachFileOutputs',
   'attachToOriginalImages', 'selectedDatasets', 'selectedDatasetId', 'selectedScreens', 'selectedScreenId', 'renamePattern', 'enableRename',
   'createRois', 'roiLabelPattern', 'roiShape', 'deleteLabelImagesAfterRois',
-  'clearExistingRois', 'clearRoiFilter',
+  'clearExistingRois', 'clearRoiFilter', 'roiColor',
   'batchEnabled', 'batchCount', 'batchSize', 'version',
   'cytomine_host', 'cytomine_public_key', 'cytomine_private_key',
   'cytomine_id_project', 'cytomine_id_software',
@@ -61,7 +61,8 @@ const WorkflowSubmitToast = ({ workflowName, startedAt, params, metadata, warnin
     const clearing = params.clearExistingRois
       ? `; existing ROIs cleared${params.clearRoiFilter ? ` matching "${params.clearRoiFilter}"` : ""}`
       : "";
-    outputLines.push(`ROIs on original images (${params.roiShape || "Polygon"}${cleanup}${clearing})`);
+    const color = params.roiColor ? `; color ${params.roiColor}` : "; automatic run color";
+    outputLines.push(`ROIs on original images (${params.roiShape || "Polygon"}${color}${cleanup}${clearing})`);
   }
   if (params.receiveEmail) outputLines.push("E-mail on completion");
 

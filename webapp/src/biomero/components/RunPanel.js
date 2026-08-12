@@ -190,6 +190,7 @@ const RunPanel = ({ onWorkflowError }) => {
       clearRoiFilter: "",
       roiLabelPattern: allImageOutputsAreLabels ? "*" : "",
       roiShape: "Polygon",
+      roiColor: "",
     };
   };
 

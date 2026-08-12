@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+import re
 from django.core.cache import cache
 
 
@@ -188,6 +189,7 @@ def run_workflow_script(request, conn=None, **kwargs):
         clear_roi_filter = str(params.get("clearRoiFilter", "") or "").strip()
         roi_label_pattern = str(params.get("roiLabelPattern", "") or "").strip()
         roi_shape = str(params.get("roiShape", "Polygon") or "Polygon")
+        roi_color = str(params.get("roiColor", "") or "").strip().upper()
         # EXPERIMENTAL: ZARR format support
         use_zarr = params.get("useZarrFormat", False)
         # Always default to 0.4 so omero-cli-zarr doesn't fall back to 0.5 (Zarr v3)
@@ -221,6 +223,10 @@ def run_workflow_script(request, conn=None, **kwargs):
                 if roi_shape not in ("Polygon", "Mask"):
                     return JsonResponse({
                         "error": "ROI shape must be Polygon or Mask"
+                    }, status=400)
+                if roi_color and not re.fullmatch(r"#[0-9A-F]{6}", roi_color):
+                    return JsonResponse({
+                        "error": "ROI color must be empty or use #RRGGBB format"
                     }, status=400)
                 if not roi_label_pattern:
                     if descriptor_all_image_outputs_are_labels(workflow_name):
@@ -268,6 +274,7 @@ def run_workflow_script(request, conn=None, **kwargs):
             "clearRoiFilter",         # Converted to workflow.ROI_CLEAR_FILTER
             "roiLabelPattern",    # Converted to workflow.ROI_LABEL_PATTERN
             "roiShape",           # Converted to workflow.ROI_SHAPE
+            "roiColor",           # Converted to workflow.ROI_COLOR
         ]
         # File-attachment params arrive as FILE_{param_id}: int annotation ID.
         # Must be rlong — wrap() would give rstring if the value is a string.
@@ -319,6 +326,7 @@ def run_workflow_script(request, conn=None, **kwargs):
                 workflow.OUTPUT_CREATE_ROIS: rbool(create_rois),
                 workflow.ROI_LABEL_PATTERN: wrap(roi_label_pattern),
                 workflow.ROI_SHAPE: wrap(roi_shape),
+                workflow.ROI_COLOR: wrap(roi_color),
             }
         )
         if delete_label_images_after_rois:

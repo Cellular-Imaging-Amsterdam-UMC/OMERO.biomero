@@ -62,6 +62,7 @@ const baseFormData = {
   createRois: false,
   roiLabelPattern: "",
   roiShape: "Polygon",
+  roiColor: "",
   clearExistingRois: false,
   clearRoiFilter: "",
 };
@@ -259,6 +260,65 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
 
     expect(updateState).toHaveBeenCalledWith({
       formData: expect.objectContaining({ deleteLabelImagesAfterRois: true }),
+    });
+  });
+
+  test("defaults ROI color to Auto and offers a custom color picker", () => {
+    const updateState = jest.fn();
+    useAppContext.mockReturnValue({
+      state: {
+        formData: {
+          ...baseFormData,
+          selectedDatasets: ["Results"],
+          createRois: true,
+        },
+        inputDatasets: [],
+        selectedWorkflow: { name: "cellpose", metadata: { outputs: [] } },
+        capabilities: { roi_postprocessing: { available: true } },
+        omeroFileTreeData: {},
+      },
+      updateState,
+    });
+
+    render(<WorkflowOutput onSelectionChange={jest.fn()} />);
+
+    const colorMode = screen.getByLabelText("ROI color");
+    expect(colorMode).toHaveValue("auto");
+    expect(screen.getByText(/stable color from the workflow run UUID/i)).toBeInTheDocument();
+
+    fireEvent.change(colorMode, { target: { value: "custom" } });
+
+    expect(updateState).toHaveBeenCalledWith({
+      formData: expect.objectContaining({ roiColor: "#147EB3" }),
+    });
+  });
+
+  test("updates a custom ROI color", () => {
+    const updateState = jest.fn();
+    useAppContext.mockReturnValue({
+      state: {
+        formData: {
+          ...baseFormData,
+          selectedDatasets: ["Results"],
+          createRois: true,
+          roiColor: "#E15759",
+        },
+        inputDatasets: [],
+        selectedWorkflow: { name: "cellpose", metadata: { outputs: [] } },
+        capabilities: { roi_postprocessing: { available: true } },
+        omeroFileTreeData: {},
+      },
+      updateState,
+    });
+
+    render(<WorkflowOutput onSelectionChange={jest.fn()} />);
+
+    fireEvent.change(screen.getByLabelText("ROI color picker"), {
+      target: { value: "#4e79a7" },
+    });
+
+    expect(updateState).toHaveBeenCalledWith({
+      formData: expect.objectContaining({ roiColor: "#4E79A7" }),
     });
   });
 

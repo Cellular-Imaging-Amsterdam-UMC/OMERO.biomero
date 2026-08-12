@@ -98,6 +98,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         clearRoiFilter: "",
         roiLabelPattern: "",
         roiShape: "Polygon",
+        roiColor: "",
       }
     : {
         receiveEmail: true,
@@ -115,6 +116,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         clearRoiFilter: "",
         roiLabelPattern: "",
         roiShape: "Polygon",
+        roiColor: "",
       };
 
   const hasOutputSelection = useMemo(() => outputOptions.some((opt) =>
@@ -714,6 +716,44 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
             </FormGroup>
 
             <FormGroup
+              label="ROI color"
+              labelFor="roi-color-mode"
+              helperText="Auto derives a stable color from the workflow run UUID, so separate ROI runs are visually distinct. A custom color overrides it."
+              className="mt-2 mb-0"
+            >
+              <div className="flex items-center gap-2">
+                <HTMLSelect
+                  id="roi-color-mode"
+                  value={state.formData.roiColor ? "custom" : "auto"}
+                  onChange={(e) => handleInputChange(
+                    "roiColor",
+                    e.target.value === "custom"
+                      ? (state.formData.roiColor || "#147EB3")
+                      : ""
+                  )}
+                  options={[
+                    { label: "Auto — based on run UUID", value: "auto" },
+                    { label: "Choose a color", value: "custom" },
+                  ]}
+                />
+                {state.formData.roiColor && (
+                  <>
+                    <input
+                      type="color"
+                      aria-label="ROI color picker"
+                      value={state.formData.roiColor}
+                      onChange={(e) => handleInputChange("roiColor", e.target.value.toUpperCase())}
+                      className="h-8 w-12 cursor-pointer rounded border border-gray-300 bg-white p-0.5"
+                    />
+                    <span className="font-mono text-xs text-gray-600">
+                      {state.formData.roiColor}
+                    </span>
+                  </>
+                )}
+              </div>
+            </FormGroup>
+
+            <FormGroup
               label="Imported label images"
               labelFor="roi-label-image-retention"
               helperText="Workflow files in .analyzed are preserved."
@@ -773,6 +813,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
               onChange={(e) => handleFormDataUpdate({
                 createRois: e.target.checked,
                 roiShape: state.formData.roiShape || "Polygon",
+                roiColor: state.formData.roiColor || "",
                 ...(e.target.checked
                   ? { roiLabelPattern: outputHints.allImageOutputsAreLabels ? "*" : "" }
                   : {}),
