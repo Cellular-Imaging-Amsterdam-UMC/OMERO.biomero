@@ -91,7 +91,7 @@ const imageItemPropsAreEqual = (prev, next) =>
   prev.apiLoading === next.apiLoading;
 
 // Memoized list row — only re-renders when this specific image’s selection/thumbnail changes.
-const ImageListRow = React.memo(
+export const ImageListRow = React.memo(
   ({ image, isSelected, isDisabled, thumbnail, apiLoading, datasetInfo, onToggle, onVisible }) => (
     <div
       className={`flex items-center justify-between gap-4 ${
@@ -107,6 +107,9 @@ const ImageListRow = React.memo(
         {image.name}
       </Switch>
       <div className="flex items-center gap-1 shrink-0">
+        <Tag minimal round size="small" icon="id-number">
+          ID: {image.id}
+        </Tag>
         {datasetInfo && (
           <Tag minimal round size="small" icon="id-number">
             {datasetInfo.data} (ID: {datasetInfo.id})
@@ -126,12 +129,15 @@ const ImageListRow = React.memo(
 );
 
 // Memoized grid card — same principle.
-const ImageGridCard = React.memo(
+export const ImageGridCard = React.memo(
   ({ image, isSelected, isDisabled, thumbnail, apiLoading, datasetInfo, onToggle, onVisible }) => (
     <Tooltip
       content={
         <div>
           <div>{image.name}</div>
+          <div className="text-xs opacity-75 mt-0.5">
+            Image ID: {image.id}
+          </div>
           {datasetInfo && (
             <div className="text-xs opacity-75 mt-0.5">
               {datasetInfo.data} (ID: {datasetInfo.id})
