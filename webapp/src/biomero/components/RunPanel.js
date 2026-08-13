@@ -170,12 +170,27 @@ const RunPanel = ({ onWorkflowError }) => {
       }
       return false;
     });
+    const imageOutputs = outputs.filter(
+      (output) => String(output?.type || "").toLowerCase() === "image"
+    );
+    const allImageOutputsAreLabels = imageOutputs.length > 0 && imageOutputs.every((output) => {
+      const subtypes = output?.["sub-type"] || output?.subtype || [];
+      const values = Array.isArray(subtypes) ? subtypes : [subtypes];
+      return values.map((value) => String(value).toLowerCase()).includes("label");
+    });
 
     return {
       attachToOriginalImages: false,
       importAsZip: false,  // Zip is opt-in only; no output type auto-enables it
       uploadCsv: hasCsvTableOutput || useDescriptorFallbackSuggestions,
       attachFileOutputs: hasFileAnnotationOutput || useDescriptorFallbackSuggestions,
+      createRois: false,
+      deleteLabelImagesAfterRois: false,
+      clearExistingRois: false,
+      clearRoiFilter: "",
+      roiLabelPattern: allImageOutputsAreLabels ? "*" : "",
+      roiShape: "Polygon",
+      roiColor: "",
     };
   };
 

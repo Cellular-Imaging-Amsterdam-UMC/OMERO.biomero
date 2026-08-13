@@ -23,13 +23,15 @@ import {
 } from "./apiService";
 import { getDjangoConstants } from "./constants";
 import { transformStructure, extractGroups } from "./utils";
-import { OverlayToaster, Position, Collapse, Divider, Icon } from "@blueprintjs/core";
+import { OverlayToaster, Position, Callout, Collapse, Divider, Icon } from "@blueprintjs/core";
 
 // Fields that are infrastructure/output config, not workflow-specific parameters
 const INFRA_PARAMS = new Set([
   'IDs', 'Data_Type', 'workflowMode', 'plateMode', 'useZarrFormat', 'Format',
   'active_group_id', 'receiveEmail', 'importAsZip', 'uploadCsv', 'attachFileOutputs',
   'attachToOriginalImages', 'selectedDatasets', 'selectedDatasetId', 'selectedScreens', 'selectedScreenId', 'renamePattern', 'enableRename',
+  'createRois', 'roiLabelPattern', 'roiShape', 'deleteLabelImagesAfterRois',
+  'clearExistingRois', 'clearRoiFilter', 'roiColor',
   'batchEnabled', 'batchCount', 'batchSize', 'version',
   'cytomine_host', 'cytomine_public_key', 'cytomine_private_key',
   'cytomine_id_project', 'cytomine_id_software',
@@ -38,7 +40,7 @@ const INFRA_PARAMS = new Set([
 const MAX_INPUT_IDS_SHOWN = 20;
 
 
-const WorkflowSubmitToast = ({ workflowName, startedAt, params, metadata }) => {
+const WorkflowSubmitToast = ({ workflowName, startedAt, params, metadata, warnings = [] }) => {
   const [openSection, setOpenSection] = React.useState(null);
   const toggle = (key) => setOpenSection((prev) => (prev === key ? null : key));
 
@@ -54,6 +56,14 @@ const WorkflowSubmitToast = ({ workflowName, startedAt, params, metadata }) => {
   if (params.uploadCsv) outputLines.push("OMERO tables (CSV)");
   if (params.attachFileOutputs) outputLines.push("File annotations");
   if (params.attachToOriginalImages) outputLines.push("Attached to input images");
+  if (params.createRois) {
+    const cleanup = params.deleteLabelImagesAfterRois ? "; imported labels removed from OMERO" : "";
+    const clearing = params.clearExistingRois
+      ? `; existing ROIs cleared${params.clearRoiFilter ? ` matching "${params.clearRoiFilter}"` : ""}`
+      : "";
+    const color = params.roiColor ? `; color ${params.roiColor}` : "; automatic run color";
+    outputLines.push(`ROIs on original images (${params.roiShape || "Polygon"}${color}${cleanup}${clearing})`);
+  }
   if (params.receiveEmail) outputLines.push("E-mail on completion");
 
   // Build lookup from descriptor so we can classify each param
@@ -108,6 +118,11 @@ const WorkflowSubmitToast = ({ workflowName, startedAt, params, metadata }) => {
     <div className="min-w-64">
       <div><strong>{workflowName}</strong> submitted successfully</div>
       {startedAt && <div className="bp5-text-small mt-0.5 opacity-80">Started at {startedAt}</div>}
+      {warnings.map((warning, index) => (
+        <Callout key={`${warning.code || "warning"}-${index}`} intent="warning" compact className="mt-1">
+          {warning.message || String(warning)}
+        </Callout>
+      ))}
 
       {outputLines.length > 0 && (
         <SectionRow label={`Output (${outputLines.length})`} sectionKey="output">
@@ -157,6 +172,7 @@ export const AppProvider = ({ children }) => {
     scripts: [],
     workflows: null,
     workflowMetadata: null,
+    capabilities: {},
     workflowStatusTooltipShown: false,
     inputDatasets: [],
     omeroFileTreeData: null,
@@ -397,10 +413,12 @@ export const AppProvider = ({ children }) => {
       // Use local browser time with timezone label (server time is UTC, browser clock may differ)
       const startedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
 
+      const warnings = response?.warnings || [];
+      const effectiveParams = { ...params, ...(response?.effectiveOptions || {}) };
       toaster.show({
-        intent: "success",
-        icon: "tick-circle",
-        message: <WorkflowSubmitToast workflowName={workflowName} startedAt={startedAt} params={params} metadata={state.selectedWorkflow?.metadata} />,
+        intent: warnings.length ? "warning" : "success",
+        icon: warnings.length ? "warning-sign" : "tick-circle",
+        message: <WorkflowSubmitToast workflowName={workflowName} startedAt={startedAt} params={effectiveParams} metadata={state.selectedWorkflow?.metadata} warnings={warnings} />,
         timeout: 0,
       });
     } catch (err) {

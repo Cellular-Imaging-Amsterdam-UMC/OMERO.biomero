@@ -124,11 +124,206 @@ class AnalyzerViewsTests(TestCase):
         )
         svc.runScript.assert_called()  # ensure script executed
 
+    def test_run_workflow_missing_roi_script_downgrades_to_warning(self):
+        from biomero.constants import workflow
+        from omero.rtypes import unwrap
+
+        class Script:
+            id = 42
+
+            def getName(self):
+                return "SLURM_Run_Workflow.py"
+
+        class Proc:
+            class Job:
+                _id = 99
+
+            def getJob(self):
+                return self.Job()
+
+        svc = MagicMock()
+        svc.getScripts.return_value = [Script()]
+        svc.runScript.return_value = Proc()
+        conn = MagicMock()
+        conn.getScriptService.return_value = svc
+        params = {
+            "IDs": [1],
+            "Data_Type": "Image",
+            "selectedDatasets": ["Results"],
+            "createRois": True,
+            "roiLabelPattern": "*_cp_masks.tif",
+        }
+
+        class _Session(dict):
+            modified = False
+
+        request = SimpleNamespace(
+            method="POST",
+            body=json.dumps({"workflow_name": "wfA", "params": params}).encode(),
+            session=_Session(),
+        )
+        with patch(
+            "omero_biomero.analyzer_views.prepare_workflow_parameters",
+            lambda *a, **k: params,
+        ):
+            resp = _raw("run_workflow_script")(request, conn=conn)
+
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data["warnings"][0]["code"], "roi_script_unavailable")
+        self.assertFalse(data["effectiveOptions"]["createRois"])
+        sent_inputs = svc.runScript.call_args.args[1]
+        self.assertFalse(unwrap(sent_inputs[workflow.OUTPUT_CREATE_ROIS]))
+        self.assertNotIn(
+            workflow.ROI_DELETE_LABEL_IMAGES, sent_inputs)
+
+    def test_run_workflow_roi_requires_import_destination(self):
+        class Script:
+            def __init__(self, script_id, name):
+                self.id = script_id
+                self.name = name
+
+            def getName(self):
+                return self.name
+
+            def getVersion(self):
+                return "0.6"
+
+        svc = MagicMock()
+        svc.getScripts.return_value = [
+            Script(42, "SLURM_Run_Workflow.py"),
+            Script(43, "Labels2Rois.py"),
+        ]
+        conn = MagicMock()
+        conn.getScriptService.return_value = svc
+        params = {
+            "IDs": [1],
+            "Data_Type": "Image",
+            "createRois": True,
+            "roiLabelPattern": "*_cp_masks.tif",
+        }
+        request = SimpleNamespace(
+            method="POST",
+            body=json.dumps({"workflow_name": "wfA", "params": params}).encode(),
+        )
+        with patch(
+            "omero_biomero.analyzer_views.prepare_workflow_parameters",
+            lambda *a, **k: params,
+        ):
+            resp = _raw("run_workflow_script")(request, conn=conn)
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("Dataset or Screen", resp.content.decode())
+        svc.getParams.assert_not_called()
+
+    def test_run_workflow_roi_accepts_automatic_selector(self):
+        from biomero.constants import workflow
+        from omero.rtypes import unwrap
+
+        class Script:
+            def __init__(self, script_id, name):
+                self.id = script_id
+                self.name = name
+
+            def getName(self):
+                return self.name
+
+        class Proc:
+            class Job:
+                _id = 99
+
+            def getJob(self):
+                return self.Job()
+
+        svc = MagicMock()
+        svc.getScripts.return_value = [
+            Script(42, "SLURM_Run_Workflow.py"),
+            Script(43, "Labels2Rois.py"),
+        ]
+        svc.runScript.return_value = Proc()
+        conn = MagicMock()
+        conn.getScriptService.return_value = svc
+        params = {
+            "IDs": [1],
+            "Data_Type": "Image",
+            "selectedDatasets": ["Results"],
+            "createRois": True,
+            "deleteLabelImagesAfterRois": True,
+            "clearExistingRois": True,
+            "clearRoiFilter": "cellpose",
+            "roiLabelPattern": "",
+            "roiColor": "#e15759",
+        }
+
+        class _Session(dict):
+            modified = False
+
+        request = SimpleNamespace(
+            method="POST",
+            body=json.dumps({"workflow_name": "wfA", "params": params}).encode(),
+            session=_Session(),
+        )
+        with patch(
+            "omero_biomero.analyzer_views.prepare_workflow_parameters",
+            lambda *a, **k: params,
+        ):
+            resp = _raw("run_workflow_script")(request, conn=conn)
+
+        self.assertEqual(resp.status_code, 200)
+        sent_inputs = svc.runScript.call_args.args[1]
+        self.assertEqual(
+            unwrap(sent_inputs[workflow.ROI_LABEL_PATTERN]), "")
+        self.assertTrue(
+            unwrap(sent_inputs[workflow.ROI_DELETE_LABEL_IMAGES]))
+        self.assertTrue(
+            unwrap(sent_inputs[workflow.ROI_CLEAR_EXISTING]))
+        self.assertEqual(
+            unwrap(sent_inputs[workflow.ROI_CLEAR_FILTER]), "cellpose")
+        self.assertEqual(
+            unwrap(sent_inputs[workflow.ROI_COLOR]), "#E15759")
+
     def test_run_workflow_script_invalid_json(self):
         view = _raw("run_workflow_script")
         request = SimpleNamespace(method="POST", body=b"not-json")
         resp = view(request, conn=MagicMock())
         self.assertEqual(resp.status_code, 400)
+
+    def test_run_workflow_rejects_invalid_roi_color(self):
+        class Script:
+            def __init__(self, script_id, name):
+                self.id = script_id
+                self.name = name
+
+            def getName(self):
+                return self.name
+
+        svc = MagicMock()
+        svc.getScripts.return_value = [
+            Script(42, "SLURM_Run_Workflow.py"),
+            Script(43, "Labels2Rois.py"),
+        ]
+        conn = MagicMock()
+        conn.getScriptService.return_value = svc
+        params = {
+            "IDs": [1],
+            "Data_Type": "Image",
+            "selectedDatasets": ["Results"],
+            "createRois": True,
+            "roiColor": "red",
+        }
+        request = SimpleNamespace(
+            method="POST",
+            body=json.dumps({"workflow_name": "wfA", "params": params}).encode(),
+        )
+        with patch(
+            "omero_biomero.analyzer_views.prepare_workflow_parameters",
+            lambda *a, **k: params,
+        ):
+            resp = _raw("run_workflow_script")(request, conn=conn)
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("#RRGGBB", resp.content.decode())
+        svc.runScript.assert_not_called()
 
     def test_run_workflow_script_run_exception(self):
         class StubSlurm(self._StubSlurmBase):
@@ -154,6 +349,32 @@ class AnalyzerViewsTests(TestCase):
             request = SimpleNamespace(method="POST", body=json.dumps(payload).encode())
             resp = view(request, conn=conn)
         self.assertEqual(resp.status_code, 500)
+
+    def test_slurm_status_reports_roi_script_capability(self):
+        class Script:
+            def __init__(self, script_id, name):
+                self.id = script_id
+                self.name = name
+
+            def getName(self):
+                return self.name
+
+        svc = MagicMock()
+        svc.getScripts.return_value = [
+            Script(42, "SLURM_Run_Workflow.py"),
+            Script(43, "Labels2Rois.py"),
+        ]
+        svc.getParams.return_value = SimpleNamespace(inputs={})
+        conn = MagicMock()
+        conn.getScriptService.return_value = svc
+
+        response = _raw("get_slurm_status")(
+            SimpleNamespace(method="GET"), conn=conn)
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertTrue(data["capabilities"]["roi_postprocessing"]["available"])
+        svc.getParams.assert_called_once_with(42)
 
     # --- list_workflows ---
     def test_list_workflows_success(self):

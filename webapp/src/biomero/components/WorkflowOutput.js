@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Alignment, Card, FormGroup, InputGroup, Switch, SwitchCard, Callout, Tooltip, Icon, Divider, Tag } from "@blueprintjs/core";
+import { Alignment, Card, FormGroup, HTMLSelect, InputGroup, Switch, SwitchCard, Callout, Tooltip, Icon, Divider, Tag } from "@blueprintjs/core";
 import { useAppContext } from "../../AppContext";
 import DatasetSelectWithPopover from "./DatasetSelectWithPopover.js";
 
@@ -92,6 +92,13 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         attachFileOutputs: false,
         selectedScreens: [],
         selectedScreenId: null,
+        createRois: false,
+        deleteLabelImagesAfterRois: false,
+        clearExistingRois: false,
+        clearRoiFilter: "",
+        roiLabelPattern: "",
+        roiShape: "Polygon",
+        roiColor: "",
       }
     : {
         receiveEmail: true,
@@ -103,6 +110,13 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         selectedDatasetId: null,
         renamePattern: "{original_file}_result.{ext}",
         enableRename: false,
+        createRois: false,
+        deleteLabelImagesAfterRois: false,
+        clearExistingRois: false,
+        clearRoiFilter: "",
+        roiLabelPattern: "",
+        roiShape: "Polygon",
+        roiColor: "",
       };
 
   const hasOutputSelection = useMemo(() => outputOptions.some((opt) =>
@@ -164,6 +178,11 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
       return formats.map((fmt) => String(fmt).toLowerCase()).includes("csv");
     };
     const imageOutputs = outputs.filter((output) => isType(output, "image"));
+    const labelImageOutputs = imageOutputs.filter((output) => {
+      const subtypes = output?.["sub-type"] || output?.subtype || [];
+      const values = Array.isArray(subtypes) ? subtypes : [subtypes];
+      return values.map((value) => String(value).toLowerCase()).includes("label");
+    });
     const measurementOutputs = outputs.filter((output) => isCsvTableOutput(output));
     // Zip is purely opt-in (bulk backup). No output type auto-enables it.
     const zipOutputs = [];
@@ -212,8 +231,21 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
       uploadCsv: measurementSuggested,
       attachFileOutputs: fileAnnotationSuggested,
       hasImageOutput: imageOutputs.length > 0,
+      hasLabelImageOutput: labelImageOutputs.length > 0,
+      allImageOutputsAreLabels: imageOutputs.length > 0 && labelImageOutputs.length === imageOutputs.length,
+      labelImageLabel: summarize(labelImageOutputs),
+      labelImageLabelFull: summarizeFull(labelImageOutputs),
     };
   }, [state.selectedWorkflow?.metadata, useDescriptorFallbackSuggestions]);
+
+  const roiCapability = state.capabilities?.roi_postprocessing;
+  const roiCapabilityAvailable = roiCapability?.available === true;
+  const roiHasDestination = plateMode
+    ? (state.formData.selectedScreens?.length ?? 0) > 0
+    : (state.formData.selectedDatasets?.length ?? 0) > 0;
+  const roiValidationError = !!state.formData.createRois && (
+    !roiCapabilityAvailable || !roiHasDestination
+  );
 
   // suggested: workflow hint recommends this option on
   // label: short badge text (may be truncated with "+N more")
@@ -294,12 +326,12 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   useEffect(() => {
     if (plateMode) {
       // Plate mode: no rename validation — selection state is the only gate
-      onSelectionChange?.(hasOutputSelection);
+      onSelectionChange?.(hasOutputSelection && !roiValidationError);
     } else {
       const hasValidationError = state.formData.enableRename && renameValidation.hasError;
-      onSelectionChange?.(hasOutputSelection && !hasValidationError);
+      onSelectionChange?.(hasOutputSelection && !hasValidationError && !roiValidationError);
     }
-  }, [plateMode, hasOutputSelection, renameValidation, state.formData.enableRename]);
+  }, [plateMode, hasOutputSelection, renameValidation, state.formData.enableRename, roiValidationError]);
 
   const autoFilledDatasets = useRef(false);
 
@@ -555,6 +587,16 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
             <strong>Rename Pattern:</strong> {renameValidation.message}
           </Callout>
         )}
+        {state.formData.createRois && !roiHasDestination && (
+          <Callout intent="danger" compact className="mb-2">
+            <strong>ROI creation:</strong> Select a {containerType} destination so the label images are imported first.
+          </Callout>
+        )}
+        {state.formData.createRois && !roiCapabilityAvailable && (
+          <Callout intent="danger" compact className="mb-2">
+            <strong>ROI creation:</strong> {roiCapability?.reason || "The ROI utility capability has not been confirmed."}
+          </Callout>
+        )}
       </div>
 
       {/* ── Workflow Results ───────────────────────────── */}
@@ -620,6 +662,182 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
           </Card>
         );
       })()}
+
+      {/* Optional label-image ROI postprocessing */}
+      <div className="ml-4 pl-3 border-l border-gray-200">
+        {state.formData.createRois ? (
+          <Card compact={true} selected className="mt-2">
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <div className="min-w-0 flex-1">
+                {renderCardTitle(
+                  "polygon-filter",
+                  "Create ROIs on original images",
+                  "convert imported label images after import",
+                  outputHints.hasLabelImageOutput
+                    ? <Tag minimal round intent="primary">Label output detected</Tag>
+                    : null
+                )}
+              </div>
+              <Switch
+                checked={true}
+                onChange={(e) => handleInputChange("createRois", e.target.checked)}
+                className="shrink-0 mt-0.5 mb-0"
+              />
+            </div>
+
+            <Callout
+              intent={outputHints.allImageOutputsAreLabels ? "success" : "primary"}
+              compact
+              minimal
+              className="mt-2 text-sm"
+            >
+              <div>
+                {outputHints.allImageOutputsAreLabels
+                  ? "All declared image outputs are labels. BIOMERO will use them automatically."
+                  : "BIOMERO will match imported results to each original image and select label-like outputs automatically. Ambiguous results are skipped without failing the workflow."}
+              </div>
+              <div className="mt-1">
+                Created ROI names include the workflow name and run UUID for provenance and filtering.
+              </div>
+            </Callout>
+
+            <FormGroup
+              label="ROI representation"
+              labelFor="roi-shape"
+              helperText="Polygon creates outlines; Mask preserves the segmented pixel region."
+              className="mt-2 mb-0"
+            >
+              <HTMLSelect
+                id="roi-shape"
+                value={state.formData.roiShape || "Polygon"}
+                onChange={(e) => handleInputChange("roiShape", e.target.value)}
+                options={["Polygon", "Mask"]}
+              />
+            </FormGroup>
+
+            <FormGroup
+              label="ROI color"
+              labelFor="roi-color-mode"
+              helperText="Auto derives a stable color from the workflow run UUID, so separate ROI runs are visually distinct. A custom color overrides it."
+              className="mt-2 mb-0"
+            >
+              <div className="flex items-center gap-2">
+                <HTMLSelect
+                  id="roi-color-mode"
+                  value={state.formData.roiColor ? "custom" : "auto"}
+                  onChange={(e) => handleInputChange(
+                    "roiColor",
+                    e.target.value === "custom"
+                      ? (state.formData.roiColor || "#147EB3")
+                      : ""
+                  )}
+                  options={[
+                    { label: "Auto — based on run UUID", value: "auto" },
+                    { label: "Choose a color", value: "custom" },
+                  ]}
+                />
+                {state.formData.roiColor && (
+                  <>
+                    <input
+                      type="color"
+                      aria-label="ROI color picker"
+                      value={state.formData.roiColor}
+                      onChange={(e) => handleInputChange("roiColor", e.target.value.toUpperCase())}
+                      className="h-8 w-12 cursor-pointer rounded border border-gray-300 bg-white p-0.5"
+                    />
+                    <span className="font-mono text-xs text-gray-600">
+                      {state.formData.roiColor}
+                    </span>
+                  </>
+                )}
+              </div>
+            </FormGroup>
+
+            <FormGroup
+              label="Imported label images"
+              labelFor="roi-label-image-retention"
+              helperText="Workflow files in .analyzed are preserved."
+              className="mt-2 mb-0"
+            >
+              <HTMLSelect
+                id="roi-label-image-retention"
+                value={state.formData.deleteLabelImagesAfterRois ? "delete" : "keep"}
+                onChange={(e) => handleInputChange(
+                  "deleteLabelImagesAfterRois",
+                  e.target.value === "delete"
+                )}
+                options={[
+                  { label: "Keep in OMERO", value: "keep" },
+                  {
+                    label: "Delete from OMERO after ROI creation",
+                    value: "delete",
+                  },
+                ]}
+              />
+            </FormGroup>
+
+            <FormGroup
+              helperText="New ROIs are always added to the original images. Enable this only when older ROIs on those originals should be removed first."
+              className="mt-2 mb-0"
+            >
+              <Switch
+                label="Clear existing ROIs on original images"
+                checked={!!state.formData.clearExistingRois}
+                onChange={(e) => handleInputChange("clearExistingRois", e.target.checked)}
+                className="mb-0"
+              />
+            </FormGroup>
+
+            {state.formData.clearExistingRois && (
+              <FormGroup
+                label="Only clear ROI names containing (optional)"
+                labelFor="roi-clear-filter"
+                helperText="Case-sensitive. Leaving the filter empty removes every existing ROI from each original image before this run's ROIs are added."
+                className="mt-2 mb-0"
+              >
+                <InputGroup
+                  id="roi-clear-filter"
+                  value={state.formData.clearRoiFilter || ""}
+                  onChange={(e) => handleInputChange("clearRoiFilter", e.target.value)}
+                  placeholder="e.g. cellpose or a workflow UUID"
+                />
+              </FormGroup>
+            )}
+          </Card>
+        ) : (
+          <>
+            <SwitchCard
+              alignIndicator={Alignment.END}
+              checked={false}
+              disabled={!roiCapabilityAvailable}
+              onChange={(e) => handleFormDataUpdate({
+                createRois: e.target.checked,
+                roiShape: state.formData.roiShape || "Polygon",
+                roiColor: state.formData.roiColor || "",
+                ...(e.target.checked
+                  ? { roiLabelPattern: outputHints.allImageOutputsAreLabels ? "*" : "" }
+                  : {}),
+              })}
+              className="mt-2"
+              compact={true}
+            >
+              {renderCardTitle(
+                "polygon-filter",
+                "Create ROIs on original images",
+                "optional postprocessing after label image import",
+                outputHints.hasLabelImageOutput
+                  ? <Tag minimal round intent="primary">Label output detected</Tag>
+                  : null
+              )}
+            </SwitchCard>
+            {!roiCapabilityAvailable && (
+              <Callout intent="warning" compact minimal className="mt-1 text-sm">
+                {roiCapability?.reason || "Checking whether the Labels2Rois utility is installed."}
+              </Callout>
+            )}
+          </>
+        )}
+      </div>
 
       {/* 1b. Rename result images (dataset mode only) */}
       {!plateMode && (
