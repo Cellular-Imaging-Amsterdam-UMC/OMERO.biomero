@@ -92,6 +92,8 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         attachFileOutputs: false,
         selectedScreens: [],
         selectedScreenId: null,
+        importPlateLabelPreview: false,
+        plateLabelPreviewName: "",
         createRois: false,
         deleteLabelImagesAfterRois: false,
         clearExistingRois: false,
@@ -658,6 +660,44 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
             {renderDefaultHelperCallout(
               _suggested,
               _currentValue
+            )}
+            {plateMode && hasDestination && isImporterEnabled && (
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <Switch
+                  label="Import Plate label preview"
+                  checked={!!state.formData.importPlateLabelPreview}
+                  onChange={(e) => handleFormDataUpdate(
+                    e.target.checked
+                      ? { importPlateLabelPreview: true }
+                      : {
+                          importPlateLabelPreview: false,
+                          plateLabelPreviewName: "",
+                        }
+                  )}
+                  className="mb-1"
+                />
+                <p className="text-xs text-gray-500 mb-2">
+                  Also register a Plate view whose well images display one segmentation label.
+                  The authoritative shallow Plate remains available for reconstruction and analysis.
+                </p>
+                {state.formData.importPlateLabelPreview && (
+                  <FormGroup
+                    label="Exact label name (optional)"
+                    labelFor="plate-label-preview-name"
+                    helperText="Leave empty when exactly one label is common to every image in the Plate. Ambiguous results skip only this optional preview."
+                  >
+                    <InputGroup
+                      id="plate-label-preview-name"
+                      value={state.formData.plateLabelPreviewName || ""}
+                      onChange={(e) => handleInputChange(
+                        "plateLabelPreviewName",
+                        e.target.value
+                      )}
+                      placeholder="e.g. nuclei"
+                    />
+                  </FormGroup>
+                )}
+              </div>
             )}
           </Card>
         );

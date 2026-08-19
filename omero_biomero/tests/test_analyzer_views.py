@@ -92,7 +92,14 @@ class AnalyzerViewsTests(TestCase):
         conn = MagicMock()
         conn.getScriptService.return_value = svc
 
-        params_in = {"IDs": [1, 2], "Data_Type": "Image", "receiveEmail": True}
+        params_in = {
+            "IDs": [1, 2],
+            "Data_Type": "Plate",
+            "receiveEmail": True,
+            "selectedScreens": ["Segmentation results"],
+            "importPlateLabelPreview": True,
+            "plateLabelPreviewName": "nuclei",
+        }
         with patch("omero_biomero.analyzer_views.SlurmClient", StubSlurm), patch(
             "omero_biomero.analyzer_views.prepare_workflow_parameters",
             lambda *a, **k: params_in,
@@ -123,6 +130,15 @@ class AnalyzerViewsTests(TestCase):
             )
         )
         svc.runScript.assert_called()  # ensure script executed
+        import biomero.constants as constants
+        sent_inputs = svc.runScript.call_args.args[1]
+        from omero.rtypes import unwrap
+        self.assertTrue(unwrap(
+            sent_inputs[constants.results.IMPORT_PLATE_LABEL_PREVIEW]))
+        self.assertEqual(
+            unwrap(sent_inputs[constants.results.PLATE_LABEL_PREVIEW_NAME]),
+            "nuclei",
+        )
 
     def test_run_workflow_missing_roi_script_downgrades_to_warning(self):
         from biomero.constants import workflow

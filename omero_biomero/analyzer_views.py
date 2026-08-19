@@ -157,6 +157,10 @@ def run_workflow_script(request, conn=None, **kwargs):
         output_sc = params.get("selectedScreens", [])
         output_ds_id = params.get("selectedDatasetId")  # OMERO ID (int or None)
         output_sc_id = params.get("selectedScreenId")   # OMERO ID (int or None)
+        import_plate_label_preview = bool(
+            params.get("importPlateLabelPreview", False))
+        plate_label_preview_name = str(
+            params.get("plateLabelPreviewName", "") or "").strip()
         rename_enabled = params.get("enableRename", False)
         rename_pt = params.get("renamePattern", "")
         version = params.get("version")
@@ -177,6 +181,17 @@ def run_workflow_script(request, conn=None, **kwargs):
         batch_enabled = params.get("batchEnabled", False)
         batch_count = params.get("batchCount", 1)
         batch_size = params.get("batchSize", len(input_ids) if input_ids else 1)
+
+        # This optional view is meaningful only for a Plate result imported to
+        # a Screen. SLURM_Run_Workflow applies the importer/shallow feature
+        # gates as the final authority; normalize the UI contract here too.
+        import_plate_label_preview = bool(
+            import_plate_label_preview
+            and data_type == transfer.DATA_TYPE_PLATE
+            and (output_sc or output_sc_id)
+        )
+        if not import_plate_label_preview:
+            plate_label_preview_name = ""
 
         if create_rois:
             roi_capability = get_roi_script_capability(svc, scripts)
@@ -232,6 +247,8 @@ def run_workflow_script(request, conn=None, **kwargs):
             "selectedScreens",
             "selectedDatasetId",
             "selectedScreenId",
+            "importPlateLabelPreview",
+            "plateLabelPreviewName",
             "renamePattern",
             "enableRename",
             "workflow_name",
@@ -296,6 +313,10 @@ def run_workflow_script(request, conn=None, **kwargs):
                 constants.results.OUTPUT_ATTACH_NEW_SCREEN_ID: (
                     rlong(int(output_sc_id)) if output_sc_id else None
                 ),
+                constants.results.IMPORT_PLATE_LABEL_PREVIEW: rbool(
+                    import_plate_label_preview),
+                constants.results.PLATE_LABEL_PREVIEW_NAME: wrap(
+                    plate_label_preview_name),
                 workflow.OUTPUT_DUPLICATES: rbool(False),
                 workflow.OUTPUT_RENAME: (
                     wrap(rename_pt) if (rename_enabled and rename_pt) else wrap(workflow.NO)
@@ -353,6 +374,9 @@ def run_workflow_script(request, conn=None, **kwargs):
                             delete_label_images_after_rois,
                         "clearExistingRois": clear_existing_rois,
                         "clearRoiFilter": clear_roi_filter,
+                        "importPlateLabelPreview":
+                            import_plate_label_preview,
+                        "plateLabelPreviewName": plate_label_preview_name,
                     },
                 }
             )

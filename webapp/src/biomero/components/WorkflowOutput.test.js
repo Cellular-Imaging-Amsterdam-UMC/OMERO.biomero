@@ -385,4 +385,51 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
 
     await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(false));
   });
+
+  test("offers a label-backed Plate preview only with a Plate Screen destination", () => {
+    const updateState = jest.fn();
+    const originalWebclient = window.WEBCLIENT;
+    window.WEBCLIENT = { UI: { IMPORTER_ENABLED: true } };
+    const context = {
+      state: {
+        formData: {
+          ...baseFormData,
+          plateMode: true,
+          selectedScreens: ["Results"],
+          selectedScreenId: 12,
+          importPlateLabelPreview: false,
+          plateLabelPreviewName: "",
+        },
+        selectedWorkflow: {
+          name: "plate-labels",
+          metadata: { outputs: [{ type: "image", subtype: ["label"] }] },
+        },
+        capabilities: {},
+        omeroFileTreeData: {},
+      },
+      updateState,
+    };
+    useAppContext.mockReturnValue(context);
+
+    const { rerender } = render(
+      <WorkflowOutput plateMode onSelectionChange={jest.fn()} />
+    );
+
+    fireEvent.click(screen.getByLabelText("Import Plate label preview"));
+    expect(updateState).toHaveBeenCalledWith({
+      formData: expect.objectContaining({ importPlateLabelPreview: true }),
+    });
+
+    context.state.formData.importPlateLabelPreview = true;
+    useAppContext.mockReturnValue(context);
+    rerender(<WorkflowOutput plateMode onSelectionChange={jest.fn()} />);
+    fireEvent.change(screen.getByLabelText("Exact label name (optional)"), {
+      target: { value: "nuclei" },
+    });
+    expect(updateState).toHaveBeenCalledWith({
+      formData: expect.objectContaining({ plateLabelPreviewName: "nuclei" }),
+    });
+
+    window.WEBCLIENT = originalWebclient;
+  });
 });
