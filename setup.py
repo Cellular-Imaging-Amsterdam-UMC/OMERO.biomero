@@ -52,7 +52,7 @@ setup(
     install_requires=[
         "omero-web>=5.31.0,<6",
         "pyjwt>=2.12.1,<3",
-        "biomero @ git+https://github.com/NL-BioImaging/biomero.git@main",
+        "biomero>=2.8.2,<3",
         "configupdater>=3.2,<4",
         "biomero-importer>=1.3.1,<2",
         "convertleica-file-browser>=1.7.4,<2",

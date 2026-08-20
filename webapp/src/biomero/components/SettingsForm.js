@@ -1181,7 +1181,8 @@ const SettingsForm = () => {
             <div className="bp5-form-content">
               <div className="bp5-form-helper-text">
                 ZIP command for archiving result files on the cluster. Leave blank to auto-detect
-                (<code>7z</code> or <code>7za</code> in PATH).
+                (<code>7z</code> or <code>7za</code> in PATH). Set <code>zip</code> to use the
+                Info-ZIP <code>zip</code>/<code>unzip</code> pair.
               </div>
             </div>
           </div>
@@ -1191,8 +1192,9 @@ const SettingsForm = () => {
             settingsForm.SLURM?.slurm_zip_cmd,
             "",
             <>
-              Explicit zip command. Leave blank to auto-detect (<code>7z</code> or <code>7za</code> in PATH).
-              <ExampleNote>7za</ExampleNote>
+              Executable name or path. Leave blank to auto-detect (<code>7z</code> or <code>7za</code> in PATH).
+              <code>zip</code> selects Info-ZIP syntax and requires the matching <code>unzip</code> executable.
+              <ExampleNote>zip</ExampleNote>
               <EnvVarNote vars={["BIOMERO_SLURM_ZIP_CMD"]} />
             </>
           )}
