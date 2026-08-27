@@ -437,4 +437,88 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
 
     window.WEBCLIENT = originalWebclient;
   });
+
+  test("offers contextual file annotation destinations for Plate workflows", () => {
+    const updateState = jest.fn();
+    useAppContext.mockReturnValue({
+      state: {
+        formData: {
+          ...baseFormData,
+          plateMode: true,
+          IDs: [301],
+          attachFileOutputs: true,
+          fileOutputTarget: "auto",
+          selectedScreens: ["screen_demo"],
+          selectedScreenId: 51,
+        },
+        selectedWorkflow: {
+          name: "plate-analysis",
+          metadata: { outputs: [{ type: "file", format: "duckdb" }] },
+        },
+        capabilities: {},
+        omeroFileTreeData: {
+          "screen-40": {
+            id: 40,
+            data: "input_screen",
+            category: "screens",
+            children: ["plate-301"],
+          },
+        },
+      },
+      updateState,
+    });
+
+    render(<WorkflowOutput plateMode onSelectionChange={jest.fn()} />);
+
+    const target = screen.getByLabelText("File annotation destination");
+    expect(target).toHaveValue("auto");
+    expect(screen.getByRole("option", { name: /Result destination \(screen_demo\)/i }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Input Plate/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Input Screen \(input_screen\)/i }))
+      .toBeInTheDocument();
+
+    fireEvent.change(target, { target: { value: "input_parent" } });
+    expect(updateState).toHaveBeenCalledWith({
+      formData: expect.objectContaining({ fileOutputTarget: "input_parent" }),
+    });
+  });
+
+  test("offers typed Dataset and Project file annotation destinations", () => {
+    useAppContext.mockReturnValue({
+      state: {
+        formData: {
+          ...baseFormData,
+          IDs: [1],
+          attachFileOutputs: true,
+          fileOutputTarget: "input_parent",
+          selectedDatasets: ["results"],
+          selectedDatasetId: 55,
+        },
+        selectedWorkflow: {
+          name: "image-analysis",
+          metadata: { outputs: [{ type: "file", format: "duckdb" }] },
+        },
+        capabilities: {},
+        omeroFileTreeData: {
+          "project-7": {
+            id: 7,
+            data: "input_project",
+            category: "projects",
+            children: ["dataset-1"],
+          },
+        },
+      },
+      updateState: jest.fn(),
+    });
+
+    render(<WorkflowOutput onSelectionChange={jest.fn()} />);
+
+    expect(screen.getByRole("option", { name: /Result destination \(results\)/i }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /^Input Dataset$/i }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Input Project \(input_project\)/i }))
+      .toBeInTheDocument();
+  });
 });

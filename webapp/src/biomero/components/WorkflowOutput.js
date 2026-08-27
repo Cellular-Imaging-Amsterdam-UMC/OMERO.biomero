@@ -90,6 +90,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         importAsZip: false,
         uploadCsv: false,
         attachFileOutputs: false,
+        fileOutputTarget: "auto",
         selectedScreens: [],
         selectedScreenId: null,
         importPlateLabelPreview: false,
@@ -108,6 +109,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         uploadCsv: false,
         attachToOriginalImages: false,
         attachFileOutputs: false,
+        fileOutputTarget: "auto",
         selectedDatasets: [],
         selectedDatasetId: null,
         renamePattern: "{original_file}_result.{ext}",
@@ -521,6 +523,30 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   const selectedContainerId = plateMode ? state.formData.selectedScreenId : state.formData.selectedDatasetId;
   const containerCategory = plateMode ? "screens" : "datasets";
   const containerType = plateMode ? "screen" : "dataset";
+  const inputParentNode = useMemo(() => {
+    const inputId = state.formData?.IDs?.[0];
+    if (!inputId || !state.omeroFileTreeData) return null;
+    const childKey = `${plateMode ? "plate" : "dataset"}-${inputId}`;
+    const parentCategory = plateMode ? "screens" : "projects";
+    return Object.values(state.omeroFileTreeData).find((node) =>
+      node.category === parentCategory && node.children?.includes(childKey)
+    ) || null;
+  }, [plateMode, state.formData?.IDs, state.omeroFileTreeData]);
+  const fileOutputTargetOptions = [
+    { value: "auto", label: "Auto — result destination, otherwise input container" },
+    {
+      value: "result_destination",
+      label: selectedContainers?.[0]
+        ? `Result destination (${selectedContainers[0]})`
+        : `Result ${plateMode ? "Screen" : "Dataset"} (not selected)`,
+      disabled: !(selectedContainers?.length > 0),
+    },
+    { value: "input_container", label: `Input ${plateMode ? "Plate" : "Dataset"}` },
+    {
+      value: "input_parent",
+      label: `Input ${plateMode ? "Screen" : "Project"}${inputParentNode?.data ? ` (${inputParentNode.data})` : ""}`,
+    },
+  ];
 
   const handleContainerChange = (values, type) => {
     if (type === "manual") {
@@ -1026,6 +1052,22 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
               renderDefaultCue(outputHints.attachFileOutputs, outputHints.fileAnnotationLabel, state.formData.attachFileOutputs, outputHints.fileAnnotationLabelFull)
             )}
             {renderDefaultHelperCallout(outputHints.attachFileOutputs, state.formData.attachFileOutputs)}
+            {_checked && (
+              <FormGroup
+                label="File annotation destination"
+                labelFor="file-output-target"
+                className="mt-2 mb-0"
+              >
+                <HTMLSelect
+                  id="file-output-target"
+                  aria-label="File annotation destination"
+                  fill
+                  options={fileOutputTargetOptions}
+                  value={state.formData.fileOutputTarget ?? defaultValues.fileOutputTarget}
+                  onChange={(e) => handleInputChange("fileOutputTarget", e.target.value)}
+                />
+              </FormGroup>
+            )}
           </SwitchCard>
         );
       })()}

@@ -165,6 +165,15 @@ def run_workflow_script(request, conn=None, **kwargs):
         rename_pt = params.get("renamePattern", "")
         version = params.get("version")
         attach_file_outputs = params.get("attachFileOutputs", False)
+        file_output_target = params.get("fileOutputTarget")
+        if file_output_target is None:
+            # Cached/older clients did not send a target mode. Preserve the
+            # historic input Dataset/Plate behavior for those submissions.
+            file_output_target = constants.file_output_targets.INPUT_CONTAINER
+        if file_output_target not in constants.file_output_targets.USER_VALUES:
+            return JsonResponse({
+                "error": "Invalid file annotation destination"
+            }, status=400)
         create_rois = bool(params.get("createRois", False))
         delete_label_images_after_rois = bool(
             params.get("deleteLabelImagesAfterRois", False))
@@ -274,6 +283,7 @@ def run_workflow_script(request, conn=None, **kwargs):
             "batchCount",     # Frontend calculated (not sent to script)
             "batchSize",      # Converted to Batch_Size for script
             "attachFileOutputs",  # Converted to workflow.OUTPUT_ATTACH_FILE_OUTPUTS
+            "fileOutputTarget",   # Converted to workflow target policy
             "createRois",         # Converted to workflow.OUTPUT_CREATE_ROIS
             "deleteLabelImagesAfterRois",  # Converted to workflow.ROI_DELETE_LABEL_IMAGES
             "clearExistingRois",      # Converted to workflow.ROI_CLEAR_EXISTING
@@ -333,6 +343,8 @@ def run_workflow_script(request, conn=None, **kwargs):
                 ),
                 workflow.OUTPUT_CSV_TABLE: rbool(uploadcsv),
                 workflow.OUTPUT_ATTACH_FILE_OUTPUTS: rbool(attach_file_outputs),
+                workflow.OUTPUT_ATTACH_FILE_OUTPUTS_TARGET: wrap(
+                    file_output_target),
                 workflow.OUTPUT_CREATE_ROIS: rbool(create_rois),
                 workflow.ROI_LABEL_PATTERN: wrap(roi_label_pattern),
                 workflow.ROI_SHAPE: wrap(roi_shape),
