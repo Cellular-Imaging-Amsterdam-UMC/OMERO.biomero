@@ -245,7 +245,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   const roiHasDestination = plateMode
     ? (state.formData.selectedScreens?.length ?? 0) > 0
     : (state.formData.selectedDatasets?.length ?? 0) > 0;
-  const roiValidationError = !!state.formData.createRois && (
+  const roiValidationError = !plateMode && !!state.formData.createRois && (
     !roiCapabilityAvailable || !roiHasDestination
   );
 
@@ -705,7 +705,21 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
 
       {/* Optional label-image ROI postprocessing */}
       <div className="ml-4 pl-3 border-l border-gray-200">
-        {state.formData.createRois ? (
+        {plateMode ? (
+          <Card compact={true} className="mt-2">
+            <Switch
+              label="Create ROIs on original images"
+              checked={false}
+              disabled
+              onChange={() => {}}
+              className="mb-1"
+            />
+            <Callout intent="warning" compact minimal className="mt-1 text-sm">
+              ROI conversion for Plate workflows is not yet supported. The Plate
+              result and optional label-backed Plate preview can still be imported.
+            </Callout>
+          </Card>
+        ) : state.formData.createRois ? (
           <Card compact={true} selected className="mt-2">
             <div className="flex items-center justify-between gap-3 mb-1">
               <div className="min-w-0 flex-1">

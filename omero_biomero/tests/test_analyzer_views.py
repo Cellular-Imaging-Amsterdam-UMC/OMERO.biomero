@@ -193,6 +193,59 @@ class AnalyzerViewsTests(TestCase):
         self.assertNotIn(
             workflow.ROI_DELETE_LABEL_IMAGES, sent_inputs)
 
+    def test_run_workflow_plate_roi_request_is_disabled(self):
+        from biomero.constants import workflow
+        from omero.rtypes import unwrap
+
+        class Script:
+            id = 42
+
+            def getName(self):
+                return "SLURM_Run_Workflow.py"
+
+        class Proc:
+            class Job:
+                _id = 99
+
+            def getJob(self):
+                return self.Job()
+
+        svc = MagicMock()
+        svc.getScripts.return_value = [Script()]
+        svc.runScript.return_value = Proc()
+        conn = MagicMock()
+        conn.getScriptService.return_value = svc
+        params = {
+            "IDs": [301],
+            "Data_Type": "Plate",
+            "selectedScreens": ["screen_demo"],
+            "selectedScreenId": 51,
+            "createRois": True,
+            "deleteLabelImagesAfterRois": True,
+        }
+
+        class _Session(dict):
+            modified = False
+
+        request = SimpleNamespace(
+            method="POST",
+            body=json.dumps({"workflow_name": "wfA", "params": params}).encode(),
+            session=_Session(),
+        )
+        with patch(
+            "omero_biomero.analyzer_views.prepare_workflow_parameters",
+            lambda *a, **k: params,
+        ):
+            resp = _raw("run_workflow_script")(request, conn=conn)
+
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data["warnings"][0]["code"], "roi_plate_unsupported")
+        self.assertFalse(data["effectiveOptions"]["createRois"])
+        sent_inputs = svc.runScript.call_args.args[1]
+        self.assertFalse(unwrap(sent_inputs[workflow.OUTPUT_CREATE_ROIS]))
+        self.assertNotIn(workflow.ROI_DELETE_LABEL_IMAGES, sent_inputs)
+
     def test_run_workflow_roi_requires_import_destination(self):
         class Script:
             def __init__(self, script_id, name):

@@ -361,13 +361,13 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
     });
   });
 
-  test("requires imported screen images for plate ROI postprocessing", async () => {
+  test("disables ROI postprocessing for Plate workflows", async () => {
     const onSelectionChange = jest.fn();
     useAppContext.mockReturnValue({
       state: {
         formData: {
-          selectedScreens: [],
-          selectedScreenId: null,
+          selectedScreens: ["screen_demo"],
+          selectedScreenId: 51,
           createRois: true,
           roiLabelPattern: "*",
         },
@@ -383,7 +383,12 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
 
     render(<WorkflowOutput plateMode onSelectionChange={onSelectionChange} />);
 
-    await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(false));
+    const roiSwitch = screen.getByLabelText("Create ROIs on original images");
+    expect(roiSwitch).toBeDisabled();
+    expect(roiSwitch).not.toBeChecked();
+    expect(screen.getByText(/ROI conversion for Plate workflows is not yet supported/i))
+      .toBeInTheDocument();
+    await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(true));
   });
 
   test("offers a label-backed Plate preview only with a Plate Screen destination", () => {

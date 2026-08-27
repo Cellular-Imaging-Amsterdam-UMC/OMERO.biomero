@@ -193,6 +193,16 @@ def run_workflow_script(request, conn=None, **kwargs):
         if not import_plate_label_preview:
             plate_label_preview_name = ""
 
+        if create_rois and data_type == transfer.DATA_TYPE_PLATE:
+            create_rois = False
+            launch_warnings.append({
+                "code": "roi_plate_unsupported",
+                "message": (
+                    "ROI postprocessing for Plate workflows is not yet "
+                    "supported; the Plate result will still be imported."
+                ),
+            })
+
         if create_rois:
             roi_capability = get_roi_script_capability(svc, scripts)
             if not roi_capability["available"]:
