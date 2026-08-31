@@ -36,6 +36,13 @@ committed and published together.
    the final commit and push, verify the generated manifest and assets, and
    include them in the published commit. Do not publish frontend source with a
    stale bundle. Inspect the complete diff and run `git diff --check`.
+7. During merges, treat conflicts under the generated frontend asset directory
+   as disposable output, not source to reconcile manually. Resolve the actual
+   frontend source first and choose either side's generated files only as needed
+   to clear Git's conflicts. From the resulting merged source, run
+   `corepack yarn build` in `webapp` and replace the chosen artifacts with that
+   fresh output. Commit the regenerated assets in the merge commit or an
+   immediate follow-up, and push the merge and asset update together.
 
 ## Reference Routing
 

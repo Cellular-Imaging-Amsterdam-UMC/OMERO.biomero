@@ -80,3 +80,15 @@ The build performs its own asset cleanup and production compilation. Verify the
 updated manifest and files under `omero_biomero/static/omero_biomero/assets`,
 then commit those generated artifacts with the frontend source. Do not publish
 frontend source while its packaged bundle is stale.
+
+## Merging Generated Assets
+
+Generated bundle names and manifests commonly conflict across branches. Do not
+hand-merge their contents. Resolve the React and other frontend source first;
+choose either side of generated-asset conflicts only to let Git establish the
+merged tree. Then run `corepack yarn build` from `webapp/` and use its output as
+the authoritative assets for the merged source.
+
+The regenerated assets may be included in the merge commit or in an immediate
+follow-up commit. Push the merge and regenerated-assets commit together; do not
+publish a merge that leaves the arbitrary conflict-resolution bundle in place.
