@@ -66,10 +66,11 @@ corepack yarn test --watchAll=false --runInBand
 .\node_modules\.bin\eslint.cmd src
 ```
 
-During iterative work, do not start a competing watcher or invoke
-`clear-assets` directly. Preserve generated output from an existing watcher.
-Before committing or pushing frontend changes, run this from `webapp/` on the
-host platform:
+During local-only work, including local commits, do not start a competing
+watcher, invoke `clear-assets` directly, or produce a release build. Preserve
+generated output from the developer's existing watcher. When the task includes
+pushing frontend changes, run this from `webapp/` on the host platform
+immediately before the final commit and push:
 
 ```text
 corepack yarn build

@@ -29,10 +29,12 @@ committed and published together.
 5. Run Python installation and tests through the repository-local `venv`.
    Install the editable package and test requirements into that environment
    when imports are missing; never fall back to bare `python` or `pip`.
-6. During iterative work, do not start a competing frontend watcher or invoke
-   `clear-assets` directly. Before committing or pushing frontend changes, run
-   `corepack yarn build` from `webapp`, verify the generated manifest and assets,
-   and include them in the same commit. Do not publish frontend source with a
+6. During local-only work, including local commits, do not start a competing
+   frontend watcher, invoke `clear-assets` directly, or produce a release build;
+   preserve the developer's watch/dev output. When the task includes pushing
+   frontend changes, run `corepack yarn build` from `webapp` immediately before
+   the final commit and push, verify the generated manifest and assets, and
+   include them in the published commit. Do not publish frontend source with a
    stale bundle. Inspect the complete diff and run `git diff --check`.
 
 ## Reference Routing
