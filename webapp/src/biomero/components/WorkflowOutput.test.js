@@ -361,7 +361,7 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
     });
   });
 
-  test("disables ROI postprocessing for Plate workflows", async () => {
+  test("hides ROI postprocessing for Plate workflows", async () => {
     const onSelectionChange = jest.fn();
     useAppContext.mockReturnValue({
       state: {
@@ -383,11 +383,10 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
 
     render(<WorkflowOutput plateMode onSelectionChange={onSelectionChange} />);
 
-    const roiSwitch = screen.getByLabelText("Create ROIs on original images");
-    expect(roiSwitch).toBeDisabled();
-    expect(roiSwitch).not.toBeChecked();
-    expect(screen.getByText(/ROI conversion for Plate workflows is not yet supported/i))
-      .toBeInTheDocument();
+    expect(screen.queryByLabelText("Create ROIs on original images"))
+      .not.toBeInTheDocument();
+    expect(screen.queryByText(/ROI conversion for Plate workflows is not yet supported/i))
+      .not.toBeInTheDocument();
     await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(true));
   });
 
@@ -420,7 +419,13 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
       <WorkflowOutput plateMode onSelectionChange={jest.fn()} />
     );
 
-    fireEvent.click(screen.getByLabelText("Import Plate label preview"));
+    expect(screen.getByText("Create a Plate mask preview")).toBeInTheDocument();
+    expect(screen.getByText(/adds a second Plate to the selected Screen/i))
+      .toBeInTheDocument();
+    expect(screen.queryByText(/authoritative shallow Plate/i))
+      .not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Create a Plate mask preview"));
     expect(updateState).toHaveBeenCalledWith({
       formData: expect.objectContaining({ importPlateLabelPreview: true }),
     });
@@ -428,7 +433,7 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
     context.state.formData.importPlateLabelPreview = true;
     useAppContext.mockReturnValue(context);
     rerender(<WorkflowOutput plateMode onSelectionChange={jest.fn()} />);
-    fireEvent.change(screen.getByLabelText("Exact label name (optional)"), {
+    fireEvent.change(screen.getByLabelText("Segmentation label name (optional)"), {
       target: { value: "nuclei" },
     });
     expect(updateState).toHaveBeenCalledWith({

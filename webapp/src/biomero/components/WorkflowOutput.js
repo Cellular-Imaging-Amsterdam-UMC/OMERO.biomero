@@ -687,10 +687,32 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
               _suggested,
               _currentValue
             )}
-            {plateMode && hasDestination && isImporterEnabled && (
-              <div className="mt-3 pt-3 border-t border-gray-200">
+          </Card>
+        );
+      })()}
+
+      {/* Optional mask-result presentation */}
+      <div className="ml-4 pl-3 border-l border-gray-200">
+        {plateMode ? (
+          (selectedContainers?.length ?? 0) > 0 && isImporterEnabled ? (
+            <Card
+              compact={true}
+              selected={!!state.formData.importPlateLabelPreview}
+              className="mt-2"
+            >
+              <div className="flex items-center justify-between gap-3 mb-1">
+                <div className="min-w-0 flex-1">
+                  {renderCardTitle(
+                    "grid-view",
+                    "Create a Plate mask preview",
+                    "show one segmentation layer across the Plate",
+                    outputHints.hasLabelImageOutput
+                      ? <Tag minimal round intent="primary">Label output detected</Tag>
+                      : null
+                  )}
+                </div>
                 <Switch
-                  label="Import Plate label preview"
+                  aria-label="Create a Plate mask preview"
                   checked={!!state.formData.importPlateLabelPreview}
                   onChange={(e) => handleFormDataUpdate(
                     e.target.checked
@@ -700,51 +722,36 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
                           plateLabelPreviewName: "",
                         }
                   )}
-                  className="mb-1"
+                  className="shrink-0 mt-0.5 mb-0"
                 />
-                <p className="text-xs text-gray-500 mb-2">
-                  Also register a Plate view whose well images display one segmentation label.
-                  The authoritative shallow Plate remains available for reconstruction and analysis.
-                </p>
-                {state.formData.importPlateLabelPreview && (
-                  <FormGroup
-                    label="Exact label name (optional)"
-                    labelFor="plate-label-preview-name"
-                    helperText="Leave empty when exactly one label is common to every image in the Plate. Ambiguous results skip only this optional preview."
-                  >
-                    <InputGroup
-                      id="plate-label-preview-name"
-                      value={state.formData.plateLabelPreviewName || ""}
-                      onChange={(e) => handleInputChange(
-                        "plateLabelPreviewName",
-                        e.target.value
-                      )}
-                      placeholder="e.g. nuclei"
-                    />
-                  </FormGroup>
-                )}
               </div>
-            )}
-          </Card>
-        );
-      })()}
 
-      {/* Optional label-image ROI postprocessing */}
-      <div className="ml-4 pl-3 border-l border-gray-200">
-        {plateMode ? (
-          <Card compact={true} className="mt-2">
-            <Switch
-              label="Create ROIs on original images"
-              checked={false}
-              disabled
-              onChange={() => {}}
-              className="mb-1"
-            />
-            <Callout intent="warning" compact minimal className="mt-1 text-sm">
-              ROI conversion for Plate workflows is not yet supported. The Plate
-              result and optional label-backed Plate preview can still be imported.
-            </Callout>
-          </Card>
+              <Callout intent="primary" compact minimal className="mt-2 text-sm">
+                Adds a second Plate to the selected Screen, with each field displaying
+                one segmentation mask. The regular workflow result is still imported
+                separately.
+              </Callout>
+
+              {state.formData.importPlateLabelPreview && (
+                <FormGroup
+                  label="Segmentation label name (optional)"
+                  labelFor="plate-label-preview-name"
+                  helperText="Leave empty when one label is common to every image. If several labels are present, enter the label name to choose which mask Plate to create. If no single label can be selected, only this preview is skipped."
+                  className="mt-2 mb-0"
+                >
+                  <InputGroup
+                    id="plate-label-preview-name"
+                    value={state.formData.plateLabelPreviewName || ""}
+                    onChange={(e) => handleInputChange(
+                      "plateLabelPreviewName",
+                      e.target.value
+                    )}
+                    placeholder="e.g. nuclei"
+                  />
+                </FormGroup>
+              )}
+            </Card>
+          ) : null
         ) : state.formData.createRois ? (
           <Card compact={true} selected className="mt-2">
             <div className="flex items-center justify-between gap-3 mb-1">
