@@ -66,8 +66,16 @@ corepack yarn test --watchAll=false --runInBand
 .\node_modules\.bin\eslint.cmd src
 ```
 
-Do not run `build`, `clear-assets`, or `watch`. The developer keeps
-`corepack yarn watch` running and owns generated updates under
-`omero_biomero/static/omero_biomero/assets`. Do not start a competing watcher or
-rewrite those assets after source changes. Preserve and report any watcher
-output visible in the worktree.
+During iterative work, do not start a competing watcher or invoke
+`clear-assets` directly. Preserve generated output from an existing watcher.
+Before committing or pushing frontend changes, run this from `webapp/` on the
+host platform:
+
+```text
+corepack yarn build
+```
+
+The build performs its own asset cleanup and production compilation. Verify the
+updated manifest and files under `omero_biomero/static/omero_biomero/assets`,
+then commit those generated artifacts with the frontend source. Do not publish
+frontend source while its packaged bundle is stale.

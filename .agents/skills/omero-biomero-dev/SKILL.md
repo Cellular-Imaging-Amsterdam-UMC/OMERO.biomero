@@ -12,7 +12,8 @@ do not reformat or rewrite unrelated code.
 
 Preserve released behavior and deployment compatibility unless the user
 explicitly authorizes a breaking change. Treat generated frontend bundles as
-watcher-owned output. Change and verify source, but do not build or clear assets.
+tracked deployment artifacts: frontend source and its production bundle must be
+committed and published together.
 
 ## Workflow
 
@@ -28,9 +29,11 @@ watcher-owned output. Change and verify source, but do not build or clear assets
 5. Run Python installation and tests through the repository-local `venv`.
    Install the editable package and test requirements into that environment
    when imports are missing; never fall back to bare `python` or `pip`.
-6. Never run `build`, `clear-assets`, or start another frontend watcher. Assume
-   the developer-owned `corepack yarn watch` process updates assets. Inspect the
-   source diff, preserve watcher output, and run `git diff --check`.
+6. During iterative work, do not start a competing frontend watcher or invoke
+   `clear-assets` directly. Before committing or pushing frontend changes, run
+   `corepack yarn build` from `webapp`, verify the generated manifest and assets,
+   and include them in the same commit. Do not publish frontend source with a
+   stale bundle. Inspect the complete diff and run `git diff --check`.
 
 ## Reference Routing
 
