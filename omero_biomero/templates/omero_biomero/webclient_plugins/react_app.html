@@ -82,6 +82,7 @@
     WEBCLIENT.UI.TREE.type_order = "{{ui.tree.type_order}}".toLowerCase().split(",").filter(function(e){return e});
     WEBCLIENT.UI.IMPORTER_ENABLED = {{ importer_enabled|yesno:"true,false" }};
     WEBCLIENT.UI.ANALYZER_ENABLED = {{ analyzer_enabled|yesno:"true,false" }};
+    WEBCLIENT.UI.BIOMERO_SHALLOW_ZARR_ENABLED = {{ shallow_zarr_enabled|yesno:"true,false" }};
     WEBCLIENT.UI.UPLOADER_ALLOWED_FILE_EXTENSIONS = {{ uploader_allowed_file_extensions|json_dumps|safe }};
 
 

@@ -18,6 +18,15 @@ Additionally, the plugin provides a user-friendly interface to execute OMERO scr
 - **Workflow Execution**: Execute BIOMERO workflows on SLURM cluster and monitor their execution.
 - **Optional ROI Output**: Import label-image results and convert them into Polygon or Mask ROIs on the original images. BIOMERO automatically matches results to source images and selects label-like outputs on a best-effort basis.
 
+### File annotation destination behavior
+
+Workflow dialogs now let users choose where non-image result files are
+attached. The new UI defaults to **Auto**, which attaches to the selected
+result destination when one exists and otherwise to the input container. This
+is an intentional behavior change from older dialogs, which attached files to
+the input Dataset or Plate. Cached and older clients that do not send the new
+destination field retain that historical input-container behavior.
+
 ## Technologies Used
 
 - **Frontend**: React
@@ -47,6 +56,22 @@ Reads remain backward compatible with deployments that only have
 
 The following instructions assume Ubuntu OS.
 For development, we use [NL-BIOMERO](https://github.com/NL-BioImaging/NL-BIOMERO) - dockerized OMERO setup.
+
+### Plate ROI postprocessing TODO
+
+ROI creation from workflow label Images is currently exposed only for Image
+and Dataset workflows. The Plate workflow UI deliberately hides this option,
+while the backend continues to normalize requests from older clients to
+`createRois=false` for compatibility.
+
+The existing result code can enumerate the original Images in a Plate, but its
+general result-to-source matcher still relies on names, similarity, and stable
+ordering. Plate ROI support must instead pair only label-backed result Images
+to their original Images by exact Plate/well/field membership (for example,
+`A/1/1` to `A/1/1`). It must also exclude the normal source-backed result Plate
+from label conversion and validate matching dimensions and coordinates before
+calling `Labels2Rois`. Keep the UI gate until those rules have unit coverage and
+a live multi-well Plate test.
 
 ### Setup and development of plugin core/Django files
 

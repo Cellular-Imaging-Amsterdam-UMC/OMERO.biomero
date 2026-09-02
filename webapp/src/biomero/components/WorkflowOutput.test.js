@@ -361,13 +361,13 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
     });
   });
 
-  test("requires imported screen images for plate ROI postprocessing", async () => {
+  test("hides ROI postprocessing for Plate workflows", async () => {
     const onSelectionChange = jest.fn();
     useAppContext.mockReturnValue({
       state: {
         formData: {
-          selectedScreens: [],
-          selectedScreenId: null,
+          selectedScreens: ["screen_demo"],
+          selectedScreenId: 51,
           createRois: true,
           roiLabelPattern: "*",
         },
@@ -383,6 +383,185 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
 
     render(<WorkflowOutput plateMode onSelectionChange={onSelectionChange} />);
 
-    await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(false));
+    expect(screen.queryByLabelText("Create ROIs on original images"))
+      .not.toBeInTheDocument();
+    expect(screen.queryByText(/ROI conversion for Plate workflows is not yet supported/i))
+      .not.toBeInTheDocument();
+    await waitFor(() => expect(onSelectionChange).toHaveBeenLastCalledWith(true));
+  });
+
+  test("offers a label-backed Plate preview only with a Plate Screen destination", () => {
+    const updateState = jest.fn();
+    const originalWebclient = window.WEBCLIENT;
+    window.WEBCLIENT = {
+      UI: {
+        IMPORTER_ENABLED: true,
+        BIOMERO_SHALLOW_ZARR_ENABLED: true,
+      },
+    };
+    const context = {
+      state: {
+        formData: {
+          ...baseFormData,
+          plateMode: true,
+          selectedScreens: ["Results"],
+          selectedScreenId: 12,
+          importPlateLabelPreview: false,
+          plateLabelPreviewName: "",
+        },
+        selectedWorkflow: {
+          name: "plate-labels",
+          metadata: { outputs: [{ type: "image", subtype: ["label"] }] },
+        },
+        capabilities: {},
+        omeroFileTreeData: {},
+      },
+      updateState,
+    };
+    useAppContext.mockReturnValue(context);
+
+    const { rerender } = render(
+      <WorkflowOutput plateMode onSelectionChange={jest.fn()} />
+    );
+
+    expect(screen.getByText("Create a Plate mask preview")).toBeInTheDocument();
+    expect(screen.getByText(/adds a second Plate to the selected Screen/i))
+      .toBeInTheDocument();
+    expect(screen.queryByText(/authoritative shallow Plate/i))
+      .not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Create a Plate mask preview"));
+    expect(updateState).toHaveBeenCalledWith({
+      formData: expect.objectContaining({ importPlateLabelPreview: true }),
+    });
+
+    context.state.formData.importPlateLabelPreview = true;
+    useAppContext.mockReturnValue(context);
+    rerender(<WorkflowOutput plateMode onSelectionChange={jest.fn()} />);
+    fireEvent.change(screen.getByLabelText("Segmentation label name (optional)"), {
+      target: { value: "nuclei" },
+    });
+    expect(updateState).toHaveBeenCalledWith({
+      formData: expect.objectContaining({ plateLabelPreviewName: "nuclei" }),
+    });
+
+    window.WEBCLIENT = originalWebclient;
+  });
+
+  test("hides the Plate mask preview when shallow Zarr is disabled", () => {
+    const originalWebclient = window.WEBCLIENT;
+    window.WEBCLIENT = {
+      UI: {
+        IMPORTER_ENABLED: true,
+        BIOMERO_SHALLOW_ZARR_ENABLED: false,
+      },
+    };
+    useAppContext.mockReturnValue({
+      state: {
+        formData: {
+          ...baseFormData,
+          plateMode: true,
+          selectedScreens: ["Results"],
+          selectedScreenId: 12,
+        },
+        selectedWorkflow: {
+          name: "plate-labels",
+          metadata: { outputs: [{ type: "image", subtype: ["label"] }] },
+        },
+        capabilities: {},
+        omeroFileTreeData: {},
+      },
+      updateState: jest.fn(),
+    });
+
+    render(<WorkflowOutput plateMode onSelectionChange={jest.fn()} />);
+
+    expect(screen.queryByText("Create a Plate mask preview"))
+      .not.toBeInTheDocument();
+    window.WEBCLIENT = originalWebclient;
+  });
+
+  test("offers contextual file annotation destinations for Plate workflows", () => {
+    const updateState = jest.fn();
+    useAppContext.mockReturnValue({
+      state: {
+        formData: {
+          ...baseFormData,
+          plateMode: true,
+          IDs: [301],
+          attachFileOutputs: true,
+          fileOutputTarget: "auto",
+          selectedScreens: ["screen_demo"],
+          selectedScreenId: 51,
+        },
+        selectedWorkflow: {
+          name: "plate-analysis",
+          metadata: { outputs: [{ type: "file", format: "duckdb" }] },
+        },
+        capabilities: {},
+        omeroFileTreeData: {
+          "screen-40": {
+            id: 40,
+            data: "input_screen",
+            category: "screens",
+            children: ["plate-301"],
+          },
+        },
+      },
+      updateState,
+    });
+
+    render(<WorkflowOutput plateMode onSelectionChange={jest.fn()} />);
+
+    const target = screen.getByLabelText("File annotation destination");
+    expect(target).toHaveValue("auto");
+    expect(screen.getByRole("option", { name: /Result destination \(screen_demo\)/i }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Input Plate/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Input Screen \(input_screen\)/i }))
+      .toBeInTheDocument();
+
+    fireEvent.change(target, { target: { value: "input_parent" } });
+    expect(updateState).toHaveBeenCalledWith({
+      formData: expect.objectContaining({ fileOutputTarget: "input_parent" }),
+    });
+  });
+
+  test("offers typed Dataset and Project file annotation destinations", () => {
+    useAppContext.mockReturnValue({
+      state: {
+        formData: {
+          ...baseFormData,
+          IDs: [1],
+          attachFileOutputs: true,
+          fileOutputTarget: "input_parent",
+          selectedDatasets: ["results"],
+          selectedDatasetId: 55,
+        },
+        selectedWorkflow: {
+          name: "image-analysis",
+          metadata: { outputs: [{ type: "file", format: "duckdb" }] },
+        },
+        capabilities: {},
+        omeroFileTreeData: {
+          "project-7": {
+            id: 7,
+            data: "input_project",
+            category: "projects",
+            children: ["dataset-1"],
+          },
+        },
+      },
+      updateState: jest.fn(),
+    });
+
+    render(<WorkflowOutput onSelectionChange={jest.fn()} />);
+
+    expect(screen.getByRole("option", { name: /Result destination \(results\)/i }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /^Input Dataset$/i }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Input Project \(input_project\)/i }))
+      .toBeInTheDocument();
   });
 });
