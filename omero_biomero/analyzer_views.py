@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+import os
 import re
 from django.core.cache import cache
 
@@ -13,6 +14,8 @@ from django.views.decorators.http import require_http_methods
 from omeroweb.webclient.decorators import login_required
 from omero.rtypes import unwrap, rbool, wrap, rlong, rlist
 import omero.model
+
+from .utils import parse_bool_env
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +51,17 @@ def run_workflow_script(request, conn=None, **kwargs):
             return JsonResponse({"error": "workflow_name is required"}, status=400)
         params = data.get("params", {})
         launch_warnings = []
+        if (
+            params.get("importPlateLabelPreview", False)
+            and not parse_bool_env(
+                os.environ.get("BIOMERO_SHALLOW_ZARR"), default=False
+            )
+        ):
+            return JsonResponse({
+                "error": (
+                    "Plate mask preview requires BIOMERO_SHALLOW_ZARR=true"
+                )
+            }, status=400)
         
         # Determine which script to use based on batch processing settings
         batch_enabled = params.get("batchEnabled", False)

@@ -100,7 +100,11 @@ class AnalyzerViewsTests(TestCase):
             "importPlateLabelPreview": True,
             "plateLabelPreviewName": "nuclei",
         }
-        with patch("omero_biomero.analyzer_views.SlurmClient", StubSlurm), patch(
+        with patch.dict(
+            "os.environ", {"BIOMERO_SHALLOW_ZARR": "true"}
+        ), patch(
+            "omero_biomero.analyzer_views.SlurmClient", StubSlurm
+        ), patch(
             "omero_biomero.analyzer_views.prepare_workflow_parameters",
             lambda *a, **k: params_in,
         ):
@@ -138,6 +142,26 @@ class AnalyzerViewsTests(TestCase):
         self.assertEqual(
             unwrap(sent_inputs[constants.results.PLATE_LABEL_PREVIEW_NAME]),
             "nuclei",
+        )
+
+    def test_run_workflow_rejects_plate_preview_when_shallow_disabled(self):
+        view = _raw("run_workflow_script")
+        payload = {
+            "workflow_name": "wfA",
+            "params": {"importPlateLabelPreview": True},
+        }
+        request = SimpleNamespace(
+            method="POST", body=json.dumps(payload).encode()
+        )
+        with patch.dict(
+            "os.environ", {"BIOMERO_SHALLOW_ZARR": "false"}
+        ):
+            response = view(request, conn=MagicMock())
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(
+            "requires BIOMERO_SHALLOW_ZARR=true",
+            response.content.decode(),
         )
 
     def test_run_workflow_missing_roi_script_downgrades_to_warning(self):

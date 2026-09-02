@@ -52,6 +52,9 @@ def biomero(request, conn=None, **kwargs):
 
     importer_enabled = parse_bool_env(os.environ.get("IMPORTER_ENABLED"), default=True)
     analyzer_enabled = parse_bool_env(os.environ.get("ANALYZER_ENABLED"), default=True)
+    shallow_zarr_enabled = parse_bool_env(
+        os.environ.get("BIOMERO_SHALLOW_ZARR"), default=False
+    )
 
     current_user = conn.getUser()
     username = current_user.getName()
@@ -88,6 +91,7 @@ def biomero(request, conn=None, **kwargs):
         "app_name": "biomero",
         "importer_enabled": importer_enabled,
         "analyzer_enabled": analyzer_enabled,
+        "shallow_zarr_enabled": shallow_zarr_enabled,
         "uploader_allowed_file_extensions": UPLOADER_ALLOWED_FILE_EXTENSIONS,
     }
     return context

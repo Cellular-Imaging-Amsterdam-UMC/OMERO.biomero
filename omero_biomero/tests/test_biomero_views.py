@@ -67,6 +67,7 @@ class BiomeroViewTests(TestCase):
             "METABASE_IMPORTS_DB_PAGE_DASHBOARD_ID": "22",
             "IMPORTER_ENABLED": "true",
             "ANALYZER_ENABLED": "false",
+            "BIOMERO_SHALLOW_ZARR": "true",
         }
         with patch.dict(os.environ, env, clear=False), patch(
             "omero_biomero.biomero_views.get_react_build_file",
@@ -77,6 +78,7 @@ class BiomeroViewTests(TestCase):
         self.assertEqual(ctx["metabase_site_url"], env["METABASE_SITE_URL"])
         self.assertTrue(ctx["importer_enabled"])  # true parsed
         self.assertFalse(ctx["analyzer_enabled"])  # false parsed
+        self.assertTrue(ctx["shallow_zarr_enabled"])
         self.assertEqual(ctx["main_js"], "hashed-main.js")
         self.assertEqual(ctx["main_css"], "hashed-main.css")
         self.assertIn(".lif", ctx["uploader_allowed_file_extensions"])
@@ -109,6 +111,7 @@ class BiomeroViewTests(TestCase):
         self.assertEqual(ctx["main_js"], "fallback.js")
         self.assertTrue(ctx["importer_enabled"])  # default True
         self.assertTrue(ctx["analyzer_enabled"])  # default True
+        self.assertFalse(ctx["shallow_zarr_enabled"])  # opt-in default
 
     def test_biomero_build_file_fallback(self):
         with patch.dict(

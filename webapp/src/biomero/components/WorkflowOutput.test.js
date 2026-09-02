@@ -393,7 +393,12 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
   test("offers a label-backed Plate preview only with a Plate Screen destination", () => {
     const updateState = jest.fn();
     const originalWebclient = window.WEBCLIENT;
-    window.WEBCLIENT = { UI: { IMPORTER_ENABLED: true } };
+    window.WEBCLIENT = {
+      UI: {
+        IMPORTER_ENABLED: true,
+        BIOMERO_SHALLOW_ZARR_ENABLED: true,
+      },
+    };
     const context = {
       state: {
         formData: {
@@ -440,6 +445,39 @@ describe("WorkflowOutput image-pathway destination suggestions", () => {
       formData: expect.objectContaining({ plateLabelPreviewName: "nuclei" }),
     });
 
+    window.WEBCLIENT = originalWebclient;
+  });
+
+  test("hides the Plate mask preview when shallow Zarr is disabled", () => {
+    const originalWebclient = window.WEBCLIENT;
+    window.WEBCLIENT = {
+      UI: {
+        IMPORTER_ENABLED: true,
+        BIOMERO_SHALLOW_ZARR_ENABLED: false,
+      },
+    };
+    useAppContext.mockReturnValue({
+      state: {
+        formData: {
+          ...baseFormData,
+          plateMode: true,
+          selectedScreens: ["Results"],
+          selectedScreenId: 12,
+        },
+        selectedWorkflow: {
+          name: "plate-labels",
+          metadata: { outputs: [{ type: "image", subtype: ["label"] }] },
+        },
+        capabilities: {},
+        omeroFileTreeData: {},
+      },
+      updateState: jest.fn(),
+    });
+
+    render(<WorkflowOutput plateMode onSelectionChange={jest.fn()} />);
+
+    expect(screen.queryByText("Create a Plate mask preview"))
+      .not.toBeInTheDocument();
     window.WEBCLIENT = originalWebclient;
   });
 

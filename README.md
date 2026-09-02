@@ -18,6 +18,15 @@ Additionally, the plugin provides a user-friendly interface to execute OMERO scr
 - **Workflow Execution**: Execute BIOMERO workflows on SLURM cluster and monitor their execution.
 - **Optional ROI Output**: Import label-image results and convert them into Polygon or Mask ROIs on the original images. BIOMERO automatically matches results to source images and selects label-like outputs on a best-effort basis.
 
+### File annotation destination behavior
+
+Workflow dialogs now let users choose where non-image result files are
+attached. The new UI defaults to **Auto**, which attaches to the selected
+result destination when one exists and otherwise to the input container. This
+is an intentional behavior change from older dialogs, which attached files to
+the input Dataset or Plate. Cached and older clients that do not send the new
+destination field retain that historical input-container behavior.
+
 ## Technologies Used
 
 - **Frontend**: React

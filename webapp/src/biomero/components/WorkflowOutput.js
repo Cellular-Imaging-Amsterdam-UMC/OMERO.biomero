@@ -71,6 +71,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   // Plate-mode helpers: auto-fill screen tracking, importer check, parent-screen finder
   const autoFilledForPlateId = useRef(null);
   const isImporterEnabled = !plateMode || (window.WEBCLIENT?.UI?.IMPORTER_ENABLED || false);
+  const isShallowZarrEnabled = window.WEBCLIENT?.UI?.BIOMERO_SHALLOW_ZARR_ENABLED || false;
   const findParentScreen = (plateId, treeData) => {
     if (!plateId || !treeData) return null;
     const plateKey = `plate-${plateId}`;
@@ -694,7 +695,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
       {/* Optional mask-result presentation */}
       <div className="ml-4 pl-3 border-l border-gray-200">
         {plateMode ? (
-          (selectedContainers?.length ?? 0) > 0 && isImporterEnabled ? (
+          (selectedContainers?.length ?? 0) > 0 && isImporterEnabled && isShallowZarrEnabled ? (
             <Card
               compact={true}
               selected={!!state.formData.importPlateLabelPreview}
