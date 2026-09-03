@@ -1205,7 +1205,6 @@ const SettingsForm = () => {
             "",
             <>
               Dedicated partition for image initialization. Leave blank to inherit <code>sbatch_partition</code>. This value overrides the global flag when set.
-              <ExampleNote>defq</ExampleNote>
               <EnvVarNote vars={["BIOMERO_PULL_PARTITION"]} />
             </>
           )}
