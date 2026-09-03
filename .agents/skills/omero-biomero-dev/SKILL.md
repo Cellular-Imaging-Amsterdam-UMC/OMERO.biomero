@@ -12,7 +12,8 @@ do not reformat or rewrite unrelated code.
 
 Preserve released behavior and deployment compatibility unless the user
 explicitly authorizes a breaking change. Treat generated frontend bundles as
-watcher-owned output. Change and verify source, but do not build or clear assets.
+tracked deployment artifacts: frontend source and its production bundle must be
+committed and published together.
 
 ## Workflow
 
@@ -32,9 +33,20 @@ watcher-owned output. Change and verify source, but do not build or clear assets
 5. Run Python installation and tests through the repository-local `venv`.
    Install the editable package and test requirements into that environment
    when imports are missing; never fall back to bare `python` or `pip`.
-6. Never run `build`, `clear-assets`, or start another frontend watcher. Assume
-   the developer-owned `corepack yarn watch` process updates assets. Inspect the
-   source diff, preserve watcher output, and run `git diff --check`.
+6. During local-only work, including local commits, do not start a competing
+   frontend watcher, invoke `clear-assets` directly, or produce a release build;
+   preserve the developer's watch/dev output. When the task includes pushing
+   frontend changes, run `corepack yarn build` from `webapp` immediately before
+   the final commit and push, verify the generated manifest and assets, and
+   include them in the published commit. Do not publish frontend source with a
+   stale bundle. Inspect the complete diff and run `git diff --check`.
+7. During merges, treat conflicts under the generated frontend asset directory
+   as disposable output, not source to reconcile manually. Resolve the actual
+   frontend source first and choose either side's generated files only as needed
+   to clear Git's conflicts. From the resulting merged source, run
+   `corepack yarn build` in `webapp` and replace the chosen artifacts with that
+   fresh output. Commit the regenerated assets in the merge commit or an
+   immediate follow-up, and push the merge and asset update together.
 
 ## Reference Routing
 

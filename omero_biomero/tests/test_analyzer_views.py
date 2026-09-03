@@ -92,8 +92,19 @@ class AnalyzerViewsTests(TestCase):
         conn = MagicMock()
         conn.getScriptService.return_value = svc
 
-        params_in = {"IDs": [1, 2], "Data_Type": "Image", "receiveEmail": True}
-        with patch("omero_biomero.analyzer_views.SlurmClient", StubSlurm), patch(
+        params_in = {
+            "IDs": [1, 2],
+            "Data_Type": "Plate",
+            "receiveEmail": True,
+            "selectedScreens": ["Segmentation results"],
+            "importPlateLabelPreview": True,
+            "plateLabelPreviewName": "nuclei",
+        }
+        with patch.dict(
+            "os.environ", {"BIOMERO_SHALLOW_ZARR": "true"}
+        ), patch(
+            "omero_biomero.analyzer_views.SlurmClient", StubSlurm
+        ), patch(
             "omero_biomero.analyzer_views.prepare_workflow_parameters",
             lambda *a, **k: params_in,
         ):
@@ -123,6 +134,35 @@ class AnalyzerViewsTests(TestCase):
             )
         )
         svc.runScript.assert_called()  # ensure script executed
+        import biomero.constants as constants
+        sent_inputs = svc.runScript.call_args.args[1]
+        from omero.rtypes import unwrap
+        self.assertTrue(unwrap(
+            sent_inputs[constants.results.IMPORT_PLATE_LABEL_PREVIEW]))
+        self.assertEqual(
+            unwrap(sent_inputs[constants.results.PLATE_LABEL_PREVIEW_NAME]),
+            "nuclei",
+        )
+
+    def test_run_workflow_rejects_plate_preview_when_shallow_disabled(self):
+        view = _raw("run_workflow_script")
+        payload = {
+            "workflow_name": "wfA",
+            "params": {"importPlateLabelPreview": True},
+        }
+        request = SimpleNamespace(
+            method="POST", body=json.dumps(payload).encode()
+        )
+        with patch.dict(
+            "os.environ", {"BIOMERO_SHALLOW_ZARR": "false"}
+        ):
+            response = view(request, conn=MagicMock())
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(
+            "requires BIOMERO_SHALLOW_ZARR=true",
+            response.content.decode(),
+        )
 
     def test_run_workflow_missing_roi_script_downgrades_to_warning(self):
         from biomero.constants import workflow
@@ -176,6 +216,145 @@ class AnalyzerViewsTests(TestCase):
         self.assertFalse(unwrap(sent_inputs[workflow.OUTPUT_CREATE_ROIS]))
         self.assertNotIn(
             workflow.ROI_DELETE_LABEL_IMAGES, sent_inputs)
+
+    def test_run_workflow_plate_roi_request_is_disabled(self):
+        from biomero.constants import workflow
+        from omero.rtypes import unwrap
+
+        class Script:
+            id = 42
+
+            def getName(self):
+                return "SLURM_Run_Workflow.py"
+
+        class Proc:
+            class Job:
+                _id = 99
+
+            def getJob(self):
+                return self.Job()
+
+        svc = MagicMock()
+        svc.getScripts.return_value = [Script()]
+        svc.runScript.return_value = Proc()
+        conn = MagicMock()
+        conn.getScriptService.return_value = svc
+        params = {
+            "IDs": [301],
+            "Data_Type": "Plate",
+            "selectedScreens": ["screen_demo"],
+            "selectedScreenId": 51,
+            "createRois": True,
+            "deleteLabelImagesAfterRois": True,
+        }
+
+        class _Session(dict):
+            modified = False
+
+        request = SimpleNamespace(
+            method="POST",
+            body=json.dumps({"workflow_name": "wfA", "params": params}).encode(),
+            session=_Session(),
+        )
+        with patch(
+            "omero_biomero.analyzer_views.prepare_workflow_parameters",
+            lambda *a, **k: params,
+        ):
+            resp = _raw("run_workflow_script")(request, conn=conn)
+
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data["warnings"][0]["code"], "roi_plate_unsupported")
+        self.assertFalse(data["effectiveOptions"]["createRois"])
+        sent_inputs = svc.runScript.call_args.args[1]
+        self.assertFalse(unwrap(sent_inputs[workflow.OUTPUT_CREATE_ROIS]))
+        self.assertNotIn(workflow.ROI_DELETE_LABEL_IMAGES, sent_inputs)
+
+    def test_file_output_destination_mode_is_forwarded_to_run_workflow(self):
+        from biomero.constants import file_output_targets, workflow
+        from omero.rtypes import unwrap
+
+        class Script:
+            id = 42
+
+            def getName(self):
+                return "SLURM_Run_Workflow.py"
+
+        class Proc:
+            class Job:
+                _id = 99
+
+            def getJob(self):
+                return self.Job()
+
+        svc = MagicMock()
+        svc.getScripts.return_value = [Script()]
+        svc.runScript.return_value = Proc()
+        conn = MagicMock()
+        conn.getScriptService.return_value = svc
+        params = {
+            "IDs": [301],
+            "Data_Type": "Plate",
+            "selectedScreens": ["screen_demo"],
+            "selectedScreenId": 51,
+            "attachFileOutputs": True,
+            "fileOutputTarget": file_output_targets.INPUT_PARENT,
+        }
+
+        class _Session(dict):
+            modified = False
+
+        request = SimpleNamespace(
+            method="POST",
+            body=json.dumps({"workflow_name": "wfA", "params": params}).encode(),
+            session=_Session(),
+        )
+        with patch(
+            "omero_biomero.analyzer_views.prepare_workflow_parameters",
+            lambda *a, **k: params,
+        ):
+            resp = _raw("run_workflow_script")(request, conn=conn)
+
+        self.assertEqual(resp.status_code, 200)
+        sent_inputs = svc.runScript.call_args.args[1]
+        self.assertEqual(
+            unwrap(sent_inputs[workflow.OUTPUT_ATTACH_FILE_OUTPUTS_TARGET]),
+            file_output_targets.INPUT_PARENT,
+        )
+
+    def test_invalid_file_output_destination_is_rejected(self):
+        class Script:
+            id = 42
+
+            def getName(self):
+                return "SLURM_Run_Workflow.py"
+
+        svc = MagicMock()
+        svc.getScripts.return_value = [Script()]
+        conn = MagicMock()
+        conn.getScriptService.return_value = svc
+        params = {
+            "IDs": [301],
+            "Data_Type": "Plate",
+            "attachFileOutputs": True,
+            "fileOutputTarget": "Screen:51",
+        }
+
+        class _Session(dict):
+            modified = False
+
+        request = SimpleNamespace(
+            method="POST",
+            body=json.dumps({"workflow_name": "wfA", "params": params}).encode(),
+            session=_Session(),
+        )
+        with patch(
+            "omero_biomero.analyzer_views.prepare_workflow_parameters",
+            lambda *a, **k: params,
+        ):
+            resp = _raw("run_workflow_script")(request, conn=conn)
+
+        self.assertEqual(resp.status_code, 400)
 
     def test_run_workflow_roi_requires_import_destination(self):
         class Script:

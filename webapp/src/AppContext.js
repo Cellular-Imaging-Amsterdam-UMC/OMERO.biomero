@@ -30,6 +30,7 @@ const INFRA_PARAMS = new Set([
   'IDs', 'Data_Type', 'workflowMode', 'plateMode', 'useZarrFormat', 'Format',
   'active_group_id', 'receiveEmail', 'importAsZip', 'uploadCsv', 'attachFileOutputs',
   'attachToOriginalImages', 'selectedDatasets', 'selectedDatasetId', 'selectedScreens', 'selectedScreenId', 'renamePattern', 'enableRename',
+  'importPlateLabelPreview', 'plateLabelPreviewName',
   'createRois', 'roiLabelPattern', 'roiShape', 'deleteLabelImagesAfterRois',
   'clearExistingRois', 'clearRoiFilter', 'roiColor',
   'batchEnabled', 'batchCount', 'batchSize', 'version',
@@ -51,6 +52,12 @@ const WorkflowSubmitToast = ({ workflowName, startedAt, params, metadata, warnin
   }
   if (params.selectedScreens?.length) {
     outputLines.push(`Screen: ${params.selectedScreens.join(", ")}`);
+  }
+  if (params.importPlateLabelPreview) {
+    const label = params.plateLabelPreviewName
+      ? ` (${params.plateLabelPreviewName})`
+      : " (automatic label selection)";
+    outputLines.push(`Plate label preview${label}`);
   }
   if (params.importAsZip) outputLines.push("Zip archive");
   if (params.uploadCsv) outputLines.push("OMERO tables (CSV)");

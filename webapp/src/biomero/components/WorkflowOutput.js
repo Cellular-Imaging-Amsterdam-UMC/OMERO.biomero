@@ -71,6 +71,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   // Plate-mode helpers: auto-fill screen tracking, importer check, parent-screen finder
   const autoFilledForPlateId = useRef(null);
   const isImporterEnabled = !plateMode || (window.WEBCLIENT?.UI?.IMPORTER_ENABLED || false);
+  const isShallowZarrEnabled = window.WEBCLIENT?.UI?.BIOMERO_SHALLOW_ZARR_ENABLED || false;
   const findParentScreen = (plateId, treeData) => {
     if (!plateId || !treeData) return null;
     const plateKey = `plate-${plateId}`;
@@ -90,8 +91,11 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         importAsZip: false,
         uploadCsv: false,
         attachFileOutputs: false,
+        fileOutputTarget: "auto",
         selectedScreens: [],
         selectedScreenId: null,
+        importPlateLabelPreview: false,
+        plateLabelPreviewName: "",
         createRois: false,
         deleteLabelImagesAfterRois: false,
         clearExistingRois: false,
@@ -106,6 +110,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         uploadCsv: false,
         attachToOriginalImages: false,
         attachFileOutputs: false,
+        fileOutputTarget: "auto",
         selectedDatasets: [],
         selectedDatasetId: null,
         renamePattern: "{original_file}_result.{ext}",
@@ -243,7 +248,7 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   const roiHasDestination = plateMode
     ? (state.formData.selectedScreens?.length ?? 0) > 0
     : (state.formData.selectedDatasets?.length ?? 0) > 0;
-  const roiValidationError = !!state.formData.createRois && (
+  const roiValidationError = !plateMode && !!state.formData.createRois && (
     !roiCapabilityAvailable || !roiHasDestination
   );
 
@@ -519,6 +524,30 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
   const selectedContainerId = plateMode ? state.formData.selectedScreenId : state.formData.selectedDatasetId;
   const containerCategory = plateMode ? "screens" : "datasets";
   const containerType = plateMode ? "screen" : "dataset";
+  const inputParentNode = useMemo(() => {
+    const inputId = state.formData?.IDs?.[0];
+    if (!inputId || !state.omeroFileTreeData) return null;
+    const childKey = `${plateMode ? "plate" : "dataset"}-${inputId}`;
+    const parentCategory = plateMode ? "screens" : "projects";
+    return Object.values(state.omeroFileTreeData).find((node) =>
+      node.category === parentCategory && node.children?.includes(childKey)
+    ) || null;
+  }, [plateMode, state.formData?.IDs, state.omeroFileTreeData]);
+  const fileOutputTargetOptions = [
+    { value: "auto", label: "Auto — result destination, otherwise input container" },
+    {
+      value: "result_destination",
+      label: selectedContainers?.[0]
+        ? `Result destination (${selectedContainers[0]})`
+        : `Result ${plateMode ? "Screen" : "Dataset"} (not selected)`,
+      disabled: !(selectedContainers?.length > 0),
+    },
+    { value: "input_container", label: `Input ${plateMode ? "Plate" : "Dataset"}` },
+    {
+      value: "input_parent",
+      label: `Input ${plateMode ? "Screen" : "Project"}${inputParentNode?.data ? ` (${inputParentNode.data})` : ""}`,
+    },
+  ];
 
   const handleContainerChange = (values, type) => {
     if (type === "manual") {
@@ -663,9 +692,68 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
         );
       })()}
 
-      {/* Optional label-image ROI postprocessing */}
+      {/* Optional mask-result presentation */}
       <div className="ml-4 pl-3 border-l border-gray-200">
-        {state.formData.createRois ? (
+        {plateMode ? (
+          (selectedContainers?.length ?? 0) > 0 && isImporterEnabled && isShallowZarrEnabled ? (
+            <Card
+              compact={true}
+              selected={!!state.formData.importPlateLabelPreview}
+              className="mt-2"
+            >
+              <div className="flex items-center justify-between gap-3 mb-1">
+                <div className="min-w-0 flex-1">
+                  {renderCardTitle(
+                    "grid-view",
+                    "Create a Plate mask preview",
+                    "show one segmentation layer across the Plate",
+                    outputHints.hasLabelImageOutput
+                      ? <Tag minimal round intent="primary">Label output detected</Tag>
+                      : null
+                  )}
+                </div>
+                <Switch
+                  aria-label="Create a Plate mask preview"
+                  checked={!!state.formData.importPlateLabelPreview}
+                  onChange={(e) => handleFormDataUpdate(
+                    e.target.checked
+                      ? { importPlateLabelPreview: true }
+                      : {
+                          importPlateLabelPreview: false,
+                          plateLabelPreviewName: "",
+                        }
+                  )}
+                  className="shrink-0 mt-0.5 mb-0"
+                />
+              </div>
+
+              <Callout intent="primary" compact minimal className="mt-2 text-sm">
+                Adds a second Plate to the selected Screen, with each field displaying
+                one segmentation mask. The regular workflow result is still imported
+                separately.
+              </Callout>
+
+              {state.formData.importPlateLabelPreview && (
+                <FormGroup
+                  label="Segmentation label name (optional)"
+                  labelFor="plate-label-preview-name"
+                  helperText="Leave empty when one label is common to every image. If several labels are present, enter the label name to choose which mask Plate to create. If no single label can be selected, only this preview is skipped."
+                  className="mt-2 mb-0"
+                >
+                  <InputGroup
+                    id="plate-label-preview-name"
+                    value={state.formData.plateLabelPreviewName || ""}
+                    onChange={(e) => handleInputChange(
+                      "plateLabelPreviewName",
+                      e.target.value
+                    )}
+                    placeholder="e.g. nuclei"
+                  />
+                </FormGroup>
+              )}
+            </Card>
+          ) : null
+        ) : state.formData.createRois ? (
           <Card compact={true} selected className="mt-2">
             <div className="flex items-center justify-between gap-3 mb-1">
               <div className="min-w-0 flex-1">
@@ -972,6 +1060,22 @@ const WorkflowOutput = ({ onSelectionChange, plateMode = false }) => {
               renderDefaultCue(outputHints.attachFileOutputs, outputHints.fileAnnotationLabel, state.formData.attachFileOutputs, outputHints.fileAnnotationLabelFull)
             )}
             {renderDefaultHelperCallout(outputHints.attachFileOutputs, state.formData.attachFileOutputs)}
+            {_checked && (
+              <FormGroup
+                label="File annotation destination"
+                labelFor="file-output-target"
+                className="mt-2 mb-0"
+              >
+                <HTMLSelect
+                  id="file-output-target"
+                  aria-label="File annotation destination"
+                  fill
+                  options={fileOutputTargetOptions}
+                  value={state.formData.fileOutputTarget ?? defaultValues.fileOutputTarget}
+                  onChange={(e) => handleInputChange("fileOutputTarget", e.target.value)}
+                />
+              </FormGroup>
+            )}
           </SwitchCard>
         );
       })()}

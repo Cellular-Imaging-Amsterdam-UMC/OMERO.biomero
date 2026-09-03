@@ -184,6 +184,7 @@ const RunPanel = ({ onWorkflowError }) => {
       importAsZip: false,  // Zip is opt-in only; no output type auto-enables it
       uploadCsv: hasCsvTableOutput || useDescriptorFallbackSuggestions,
       attachFileOutputs: hasFileAnnotationOutput || useDescriptorFallbackSuggestions,
+      fileOutputTarget: "auto",
       createRois: false,
       deleteLabelImagesAfterRois: false,
       clearExistingRois: false,
