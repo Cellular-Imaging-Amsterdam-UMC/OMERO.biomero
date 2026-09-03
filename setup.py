@@ -52,7 +52,9 @@ setup(
     install_requires=[
         "omero-web>=5.31.0,<6",
         "pyjwt>=2.12.1,<3",
-        "biomero>=2.9.0b1,<3",
+        # Development-only cross-repository proof of concept. Restore the
+        # released version range before publishing OMERO.biomero.
+        "biomero @ git+https://github.com/NL-BioImaging/biomero.git@feature/slurm-image-pull-array",
         "configupdater>=3.2,<4",
         "biomero-importer>=1.5.0b2,<2",
         "convertleica-file-browser>=1.7.4,<2",
